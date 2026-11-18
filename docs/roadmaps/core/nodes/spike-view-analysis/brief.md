@@ -1,0 +1,58 @@
+---
+id: spike-view-analysis
+title: Spike: model path analysis of view JSX with oxc
+status: todo
+priority: must
+type: spike
+story:
+early: false
+outline: false
+milestone: todo-resumes
+target:
+ship: auto
+land: auto
+from:
+size: M
+spike: true
+hypothesis:
+verify: 
+exclusive: []
+fulfilled_by:
+gate: false
+added:
+spent:
+owns:
+  - docs/roadmaps/core/nodes/spike-view-analysis/**
+shared: []
+reserves: []
+provides:
+  - view-ir
+depends_on: []
+---
+
+# Spike: model path analysis of view JSX with oxc
+
+## Goal
+
+Answer: can an oxc pass compute, for every hole in a view, the set of model paths it reads, including `<For>` item paths, `<Show>` conditions and helper calls? Freeze the view IR the analysis produces.
+
+## Context
+
+- Source: `docs/proposals/0001-dsl.md`, View rules table.
+- Use `oxc-parser` (the same parser brumate uses, see `../brumate/packages/brumate/package.json`).
+- Contract to freeze: `contracts/view-ir.md`.
+
+## Acceptance
+
+- [ ] A prototype under this node folder analyzes the todo view from the proposal and prints the path set per hole.
+- [ ] `outcome.md` answers: which constructs resolve to exact paths, which fall back to "depends on all of `m`", and which must be compile errors.
+- [ ] `contracts/view-ir.md` describes the IR (template tree, holes, path sets, events, list and condition blocks) and is frozen.
+
+## Sizing
+
+M with high uncertainty, time-boxed. The code is a prototype, not shipped.
+
+## Notes for the worker
+
+- Path sets use `*` for a list item: `todos.*.done`.
+- Destructuring (`const { todos } = m`) and aliases must either resolve or be rejected. Record which.

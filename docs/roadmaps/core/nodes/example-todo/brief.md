@@ -1,0 +1,78 @@
+---
+id: example-todo
+title: Todo example written in the DSL, passing the e2e tests
+status: todo
+priority: must
+type: feature
+story:
+early: false
+outline: false
+milestone: todo-resumes
+target:
+ship: auto
+land: auto
+from:
+size: M
+spike: false
+hypothesis:
+verify: pnpm --filter e2e test
+exclusive: []
+fulfilled_by:
+gate: true
+added:
+spent:
+owns:
+  - examples/todo/**
+shared:
+  - e2e/playwright.config.ts
+  - pnpm-lock.yaml
+reserves: []
+provides: []
+depends_on:
+  - on: vite-plugin
+    kind: hard
+    why: the example builds through the plugin
+  - on: e2e-harness
+    kind: hard
+    why: switches the e2e tests from the fixture to this app
+  - on: compile-view-analyze
+    kind: hard
+    why: the real compiler must analyze the example view
+  - on: compile-update
+    kind: hard
+    why: the real compiler must split the example update
+  - on: ssr-render
+    kind: hard
+    why: the example must render with the real server renderer
+  - on: resume-loader
+    kind: hard
+    why: the example must resume with the real loader
+  - on: patch-bindings
+    kind: hard
+    why: the example must patch with the real binding patcher
+  - on: patch-lists
+    kind: hard
+    why: the todo list needs keyed list patching
+  - on: compile-integration
+    kind: hard
+    why: the example compiles through the real compile()
+  - on: jsx-types
+    kind: hard
+    why: the example view must typecheck with the real JSX types
+---
+
+# Todo example written in the DSL, passing the e2e tests
+
+## Goal
+
+`examples/todo`: the todo app from `docs/proposals/0001-dsl.md`, written in the DSL and built with `idlip/vite`. The e2e tests run against it instead of the fixture. This node closes the first milestone.
+
+## Acceptance
+
+- [ ] `pnpm --filter todo build` and `pnpm --filter todo dev` work.
+- [ ] The e2e tests pass against the example.
+- [ ] `outcome.md` lists the bytes loaded before and after the first click.
+
+## Notes for the worker
+
+- If the compiled output differs from the fixture, fix the compiler, not the fixture, unless the fixture is wrong. Report which.
