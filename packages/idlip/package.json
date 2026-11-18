@@ -1,0 +1,41 @@
+{
+  "name": "idlip",
+  "version": "0.0.0-stage",
+  "description": "A resumable UI framework built on Model-View-Update",
+  "homepage": "https://github.com/lxsmnsyc/idlip",
+  "bugs": "https://github.com/lxsmnsyc/idlip/issues",
+  "license": "MIT",
+  "author": "Alexis Munsayac",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lxsmnsyc/idlip.git",
+    "directory": "packages/idlip"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "tsdown": "^0.23.7",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
