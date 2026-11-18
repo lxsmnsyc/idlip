@@ -3,7 +3,7 @@ milestones: [todo-resumes, apps, '0.1']
 run: parallel
 review: auto
 merge:
-  mode: maintainer
+  mode: auto
 land:
   mode: batch
 branches:
