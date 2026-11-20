@@ -1,6 +1,6 @@
 ---
 name: core-api
-version: 3
+version: 4
 status: draft
 defined_by: core-api
 ---
@@ -31,6 +31,9 @@ interface ModuleSpec<Model, Handlers, Props = undefined> {
   readonly update: Handlers;
   readonly view: (model: Model, msg: MessageConstructors<Handlers>, props: Props) => JSX.Element;
   readonly subscriptions?: (model: Model, msg: MessageConstructors<Handlers>, props: Props) => ReadonlyArray<Sub | false | null | undefined>;
+  // Reserved: error boundary fallback, and document head for the root module only.
+  readonly catch?: (error: unknown) => JSX.Element;
+  readonly head?: (model: Model) => { title?: string; meta?: ReadonlyArray<Record<string, string>> };
 }
 interface Module<Model, Handlers, Props = undefined> extends ModuleSpec<Model, Handlers, Props> {
   // The component that renders this module inside a parent view: <Counter.View model={m.left} />.
@@ -46,6 +49,16 @@ type MsgOf<M> = /* MessageOf of a Module's Handlers */;
 interface Cmd { readonly kind: string; readonly args: Serializable; readonly to?: string }
 const cmd: { readonly none: Cmd; batch(cmds: readonly Cmd[]): Cmd; send(message: Message): Cmd };
 interface Sub { readonly kind: string; readonly args: Serializable; readonly message: Message }
+
+// Reserved, implemented by later nodes (`docs/proposals/0004-effects-refs-errors.md`).
+interface Task<Input, Output> { readonly id: string; run(input: Input, to: string, err?: string): Cmd }
+function task<Input, Output>(fn: (input: Input, signal: AbortSignal) => Promise<Output>, options?: { mode?: 'all' | 'latest' | 'queue' }): Task<Input, Output>;
+function defineSub<Args, State, Value>(spec: { start(args: Args, send: (value: Value) => void): State; update?(state: State, args: Args): void; stop(state: State): void }): { readonly id: string; listen(args: Args, to: MessageConstructor<string, Value>): Sub };
+type RefName = string | readonly [string, string | number];
+interface Ref { readonly ref: RefName }
+function ref(name: RefName): Ref;
+type TrustedHtml = string & { readonly __trusted: unique symbol };
+function trusted(html: string): TrustedHtml;
 
 // Placeholder read from the DOM event when the message is dispatched.
 const event: { readonly value: string; readonly checked: boolean; readonly key: string };
@@ -66,6 +79,8 @@ Subpaths: `idlip`, `idlip/server`, `idlip/client`, `idlip/compiler`, `idlip/vite
 - `Sub.message` is the message dispatched on each event. It is built with the `msg` parameter, so its payload is type-checked.
 - `Serializable` rejects functions at type level. Class instances other than Date, Map and Set cannot be told apart by a structural type, so `ssr-render` rejects them at render time through seroval and reports the model path.
 - Falsy entries returned by `subscriptions` are ignored.
+- `task()` and `defineSub()` must be called at module level. The compiler rejects a call inside a function. Their ids come from the compiler.
+- A `Ref` in command, task or subscription args is resolved to its `Element` by the runtime before the effect runs.
 
 ## Stub
 
@@ -88,6 +103,7 @@ From `docs/proposals/0003-update-analysis.md`. Not exported until their nodes la
 
 ## Changes
 
+- v4: reserves `task`, `defineSub`, `ref`, `trusted`, and the `catch` and `head` module properties. Source: `docs/proposals/0004-effects-refs-errors.md`.
 - v3: reserves `event.form` and the `Dom` commands. Source: `docs/proposals/0003-update-analysis.md`.
 - v2: `defineModule` with one default export replaces `defineMessages` and `defineUpdate`. Message types come from the handlers. Constructors carry `tag`. `Sub` carries a message instead of a tag. Adds `cmd.send`, `event`, `ModelOf` and `MsgOf`. Source: `docs/proposals/0002-modules.md`.
 - v1: initial draft.

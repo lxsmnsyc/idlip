@@ -40,4 +40,4 @@ Implement the Form fields section of `docs/proposals/0003-update-analysis.md`. I
 - the `["$form", name]` placeholder, read from `FormData` at dispatch
 - the `event.form` types
 - default `preventDefault()` on `on:submit`
-- the `Dom.reset` and `Dom.focus` commands
+- the `Dom.reset` and `Dom.focus` commands (`Dom.focus` switches from a selector to a ref when `dom-refs` lands, see `docs/proposals/0004-effects-refs-errors.md`)

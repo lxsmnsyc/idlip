@@ -64,6 +64,7 @@ A todo app written in the idlip DSL renders on the server and resumes in the bro
 - `docs/proposals/0001-dsl.md`
 - `docs/proposals/0002-modules.md` (replaces the Messages, Update and Nesting sections of 0001)
 - `docs/proposals/0003-update-analysis.md` (write sets, update ops, form fields, keyed paths; draft)
+- `docs/proposals/0004-effects-refs-errors.md` (custom effects, refs, error boundaries, global events, head, SVG, raw HTML; draft)
 
 ## Open questions
 

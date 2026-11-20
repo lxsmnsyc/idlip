@@ -44,7 +44,7 @@ depends_on:
 
 ## Goal
 
-`Http.get`, `Storage.set`, `Focus.el` and `Time.every` as data, with their client executors loaded only when used. Active subscriptions start on resume from the list in the state script.
+`Http.get`, `Storage.set`, `Focus.el`, `Time.every` and `Browser.on` as data, with their client executors loaded only when used. Active subscriptions start on resume from the list in the state script.
 
 ## Context
 
@@ -56,3 +56,4 @@ depends_on:
 - [ ] A subscription listed in the state script starts on resume without loading any update chunk.
 - [ ] After a message, subscriptions start and stop to match the new model. The `subscriptions` function runs again only when a model path it reads changed, so most messages load no subscriptions chunk.
 - [ ] `Http.get` takes an error tag. A failed request dispatches a message to it.
+- [ ] `Browser.on(name, constructor, options)` subscribes to `window` and `document` events, with `event` placeholders and key filters (`docs/proposals/0004-effects-refs-errors.md`, Global events).

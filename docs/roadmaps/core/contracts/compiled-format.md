@@ -1,6 +1,6 @@
 ---
 name: compiled-format
-version: 4
+version: 5
 status: draft
 defined_by: compiled-format
 ---
@@ -41,6 +41,11 @@ To be decided by the `compiled-format` node. It must define:
 - Path sets use `*` for list items, for example `todos.*.done`.
 - Reserved path syntax for keyed segments: `name[key=source]`, where `source` is `$p`, `$p.<field>` or a model path, for example `todos[id=$p].done`. The parser must reject it until `keyed-paths` lands, so no fixture uses it by accident.
 - Reserved placeholder `["$form", name]`, read from the `FormData` of the event target's form. Implemented by `form-fields`.
+- Templates inside `<svg>` and `<math>` keep their namespace, including item templates and condition block templates created on the client. The encoding records the namespace of each template.
+- Reserved: a ref marker attribute on elements with `ref`, scoped by module path. Implemented by `dom-refs`.
+- Reserved: a raw HTML binding that sets `innerHTML` from a `TrustedHtml` value. Implemented by `svg-and-html`.
+- Reserved manifest fields: `tasks` and `subs` (effect id to chunk), and `fallback` per module (chunk of its `catch` view). The effects seam loads a task or subscription chunk by id. Implemented by `custom-effects` and `errors`.
+- Reserved: boundary markers around a module's region, so the client can swap in its fallback. Implemented by `errors`.
 
 ## Stub
 
@@ -52,6 +57,7 @@ The golden fixtures are the stub for both sides.
 
 ## Changes
 
+- v5: SVG and MathML namespaces, and reserved ref markers, raw HTML bindings, effect and fallback manifest fields and boundary markers. Source: `docs/proposals/0004-effects-refs-errors.md`.
 - v4: adds the state encoding budget, early events, event modifiers, HTML parser rules, placeholder timing and CSP nonces. Source: runtime gap review against brumate, 2026-11-20.
 - v3: reserves the manifest fields `writes`, `bindings` and `ops`, keyed path segments and the `$form` placeholder. Source: `docs/proposals/0003-update-analysis.md`.
 - v2: message path instead of leading tags, `*.idlip.tsx` default export modules, room for `dynamic` path sets in the state script. Source: `docs/proposals/0002-modules.md`.

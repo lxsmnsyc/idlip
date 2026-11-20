@@ -1,6 +1,6 @@
 ---
 name: view-ir
-version: 4
+version: 5
 status: draft
 defined_by: spike-view-analysis
 ---
@@ -24,6 +24,11 @@ Fixed now:
 - A helper is an import or a module-level function, and every argument is in the closed grammar. A hole's paths are the union of its argument paths. A closure argument or a whole-model argument is an error. A helper whose body is one return expression in the closed grammar is inlined. Each helper call records `helper: 'args' | 'inlined'`.
 - A ternary or `&&` whose branches are JSX is a condition block. Its condition is a hole with its own path set. `<Show>`, `<Switch>` and `<Match>` do not exist.
 - Each diagnostic carries a rule id.
+- Imported values and module-level `const` bindings are allowed in holes. Their path set is empty, so the hole is static.
+- `ref` takes a string literal, or a tuple of a literal and a loop variable path inside `<For>`. The IR records it on the element.
+- `html={trusted(...)}` is a raw HTML hole. The element must have no children.
+- Elements record their namespace (HTML, SVG or MathML).
+- The module's `catch` view, when present, is a second template tree with no holes that read the model.
 - `<Counter.View model={m.left} />` is a child block that records the child module and its model path.
 
 The IR does not fix how messages or markers are written into the DOM. `contracts/compiled-format.md` owns that encoding, and `compile-view-codegen` applies it.
@@ -44,6 +49,7 @@ Hand-written IR for the counter and todo views, in this file, once the spike fre
 
 ## Changes
 
+- v5: constants in holes, refs, raw HTML holes, namespaces, `catch` view. Source: `docs/proposals/0004-effects-refs-errors.md`.
 - v4: closed hole grammar, helper rule, JSX branches as condition blocks instead of `<Show>`, rule ids on diagnostics. Source: `debate/debate.md`, 2026-11-20.
 - v3: path type reserves keyed segments. Source: `docs/proposals/0003-update-analysis.md`.
 - v2: reads the `view(m, msg)` property of `defineModule`. Adds `dynamic` holes, inlined partials and child blocks. Source: `docs/proposals/0002-modules.md`.

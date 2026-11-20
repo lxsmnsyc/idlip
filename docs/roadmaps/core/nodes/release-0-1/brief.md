@@ -26,6 +26,18 @@ shared: []
 reserves: []
 provides: []
 depends_on:
+  - on: custom-effects
+    kind: hard
+    why: ships in 0.1.0
+  - on: dom-refs
+    kind: hard
+    why: ships in 0.1.0
+  - on: document-head
+    kind: hard
+    why: ships in 0.1.0
+  - on: svg-and-html
+    kind: hard
+    why: ships in 0.1.0
   - on: markup-frontend
     kind: hard
     why: 0.1.0 ships the final view syntax, so users do not migrate from TSX
