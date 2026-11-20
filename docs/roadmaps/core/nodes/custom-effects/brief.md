@@ -38,4 +38,4 @@ depends_on:
 
 ## Goal
 
-`task()` and `defineSub()` from `docs/proposals/0004-effects-refs-errors.md`, Custom effects. A task wraps a module-level async function, runs from `task.run(input, to, err)`, and supports the `all`, `latest` and `queue` modes and `Task.cancel`. A custom subscription has `start`, optional `update` and `stop`, and the runtime diffs active subscriptions by id and args. `Time.after` and the built-in `Http` and `Storage` commands run as tasks. Tasks never run on the server.
+`task()` and `defineSub()` from `docs/proposals/0004-effects-refs-errors.md`, Custom effects. A task wraps a module-level async function. Calling it, `loadUser(id, msg.gotUser)`, returns a command whose result reaches the constructor as `Result<T>`. It supports the `all`, `latest` and `queue` modes and `Task.cancel`. A custom subscription has `start`, optional `update` and `stop`, and the runtime diffs active subscriptions by id and args. `Time.after` and the built-in `Http` and `Storage` commands run as tasks. Tasks never run on the server.

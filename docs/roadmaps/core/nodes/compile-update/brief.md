@@ -51,6 +51,4 @@ An oxc pass that finds the `update` property of the `defineModule` default expor
 
 - [ ] For both fixtures, the emitted handler modules match the expected chunks.
 - [ ] A handler that calls a module-level helper gets the helper in its chunk; an unused helper is left out.
-- [ ] A `Cmd.to` tag that is not an `update` key is an error diagnostic.
-- [ ] `update` placed after `view` or `subscriptions` is an error diagnostic.
 - [ ] Fast check passes: `pnpm --filter idlip test`

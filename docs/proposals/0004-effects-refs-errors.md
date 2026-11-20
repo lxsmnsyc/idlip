@@ -6,7 +6,7 @@ This proposal fills gaps found by a feature review of the core roadmap on 2026-1
 
 ## Decisions
 
-- **Custom effects.** `task()` and `defineSub()` wrap module-level functions. A command or subscription refers to them by id, so it stays plain data. One mechanism covers promises, server calls, sockets, timers and third-party libraries.
+- **Custom effects.** `task()` and `defineSub()` wrap module-level functions. A command or subscription refers to them by id and to its result by message constructor, so it stays plain data and type-checked. One mechanism covers promises, server calls, sockets, timers and third-party libraries.
 - **Refs.** A `ref` attribute names an element. Commands, tasks and subscriptions take the ref, and the runtime resolves it to the element when they run.
 - **Error boundaries per module.** A module can declare `catch`, a fallback view. Each module is a boundary. There is no boundary component.
 - **Global events** are subscriptions: `Browser.on('keydown', msg.key)`.
@@ -31,28 +31,37 @@ export const loadUser = task(async (id: string, signal: AbortSignal) => {
 });
 ```
 
-A handler returns the command that runs it. The command is data: `{ kind: 'task', args: { id, input }, to, err }`.
+Calling a task returns a command. It takes the input and the constructor that receives the result, as in Elm's `Http.get { expect = Http.expectJson GotUser decoder }`. The loading state is an explicit union in the model that the handlers set.
 
 ```ts
-update: {
-  open(m, id: string) {
-    return [{ ...m, loading: true }, loadUser.run(id, 'gotUser', 'loadFailed')];
+type UserState =
+  | { state: 'notAsked' }
+  | { state: 'loading'; id: string }
+  | { state: 'failure'; error: string }
+  | { state: 'success'; user: User };
+
+interface Model { user: UserState }
+interface Msg { open: string; gotUser: Result<User> }
+
+export default defineModule<Model, Msg>()({
+  init: () => ({ user: { state: 'notAsked' } }),
+  update: {
+    open: (m, id, msg) => [{ ...m, user: { state: 'loading', id } }, loadUser(id, msg.gotUser)],
+    gotUser: (m, r) => ({ ...m, user: r.ok ? { state: 'success', user: r.value } : { state: 'failure', error: r.error } }),
   },
-  gotUser(m, user: User) {
-    return { ...m, loading: false, user };
-  },
-  loadFailed(m, error: string) {
-    return { ...m, loading: false, error };
-  },
-}
+  view: (m, msg) => ...,
+});
 ```
 
+- The command runs right after the handler returns. Its result is dispatched to the constructor's tag as `Result<T>`.
+- `loadUser(id, msg.open)` is a type error, because `open` takes `string`, not `Result<User>`. Checked with `tsc` 7.0.2.
 - `task()` must be called at module level. The compiler rejects a call inside a function.
-- The result goes to the `to` tag and a rejection to the `err` tag. A rejection with no `err` tag fires `idlip:error`.
-- Concurrency: `task(fn, { mode })` with `mode` one of `'all'` (default), `'latest'` (aborts the previous run of the same task) or `'queue'`. `Task.cancel(loadUser)` aborts running instances through the `AbortSignal`.
-- `Time.after(ms, tag)` is a built-in task. A debounce is a `'latest'` task that waits first.
+- Concurrency is set on the task: `task(fn, { mode })` with `mode` one of `'all'` (default), `'latest'` (a new run aborts the previous run of the same task) or `'queue'`. `Task.cancel(loadUser)` is a command that aborts running instances through the `AbortSignal`. An aborted run dispatches nothing.
+- `Time.after(ms, msg.done)` is a built-in task. A debounce is a `'latest'` task that waits first.
 - The built-in `Http` and `Storage` commands are tasks inside the runtime, so there is one executor path.
 - Tasks run only on the client. `init` returns a model and no command, so the server never runs a task. Data loading on the server stays a non-goal.
+
+Prior art: Elm's `Cmd` with `Http.expectJson GotUser`, Lustre's `lustre_http.expect_json`, Iced's `Task::perform(future, Message::Loaded)`. redux-loop's `Cmd.run(fn, { successActionCreator })` is the negative case: result handlers named in an options object read like Node callbacks.
 
 ### Subscriptions
 
@@ -130,6 +139,7 @@ A hole may read imported values and module-level `const` bindings, such as `clas
 
 ## Open questions
 
+- **Explicit subscriptions.** `subscriptions(m, msg)` is diffed by the runtime, as in Elm, which hides start and stop. An explicit alternative is a start and a stop command per subscription. Not decided.
 - **Purity of update handlers.** The examples call `createId()` inside a handler. Either allow impure handlers, or make randomness and time commands (`Random.id('added')`, `Time.now('gotTime')`). This affects devtools replay and deterministic tests. Not decided.
 - **File payloads.** `File` objects do not serialize, so they cannot enter the model. One option is that an `event.files` placeholder may only be passed to a task, not stored. Not decided.
 - **Transitions.** Enter and exit animations for condition blocks and list items. Later.

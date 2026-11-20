@@ -1,14 +1,15 @@
 # 0002: Modules and function components
 
-Status: accepted
+Status: accepted. Revised 2026-11-20: messages are declared first, as in Elm, and commands take message constructors by value.
 
 This proposal changes how an idlip module is written. It replaces the Messages, Update and Nesting sections of [0001](0001-dsl.md) and adds function components as a later layer. The rest of 0001 still holds.
 
 ## Decisions
 
 - **One default export per module.** `defineModule` holds `init`, `update`, `view` and `subscriptions` in one object.
-- **Handlers are the message spec.** Each tag and payload type is written once, as an `update` key and its payload parameter. `defineMessages` is removed.
-- **The view receives `msg` as a parameter.** There is no `msg` export.
+- **Messages are declared first.** A module declares one interface, `Msg`, that maps each tag to its payload type. `update` has exactly one handler per tag, and each handler takes its payload type from `Msg`, so every type is written once. This is how Elm, Lustre and Iced avoid circular types. (Revised 2026-11-20. Before, handlers were the message spec, so handlers could not receive a typed `msg` and commands named their result tag as a string.)
+- **Commands take constructors by value.** A handler gets `msg` as its third parameter. A command that returns a result takes a constructor, as in `loadUser(id, msg.gotUser)`.
+- **The view and the handlers receive `msg` as a parameter.** There is no `msg` export.
 - **Stateless components are partials.** A partial is a plain function that returns JSX, and the compiler inlines it.
 - **Nesting routes by model path.** A child's slice of the model is also its message prefix.
 - **Messages pass down as props.** A child sends a message to its parent by dispatching a message the parent passed in as a prop.
@@ -32,8 +33,14 @@ interface Model {
   todos: Todo[];
   timerOn: boolean;
 }
+interface Msg {
+  add: undefined;
+  setDraft: string;
+  toggle: string;
+  tick: undefined;
+}
 
-export default defineModule<Model>()({
+export default defineModule<Model, Msg>()({
   init: () => ({ draft: '', todos: [], timerOn: false }),
 
   update: {
@@ -41,10 +48,10 @@ export default defineModule<Model>()({
       const todo = { id: createId(), text: m.draft, done: false };
       return { ...m, draft: '', todos: [...m.todos, todo] };
     },
-    setDraft(m, text: string) {
+    setDraft(m, text) {
       return { ...m, draft: text };
     },
-    toggle(m, id: string) {
+    toggle(m, id) {
       return { ...m, todos: m.todos.map((t) => (t.id === id ? { ...t, done: !t.done } : t)) };
     },
     tick(m) {
@@ -79,21 +86,23 @@ export default defineModule<Model>()({
 
 Rules:
 
-- `update` must come before `view` and `subscriptions`. TypeScript infers object properties in order, so a `view` placed first gets an untyped `msg`. The compiler reports the wrong order as an error.
+- `update` has exactly the tags of `Msg`. A missing handler, an extra handler or a payload type that differs from `Msg` is a type error. Handlers need no payload annotations.
+- Handlers are `(model, payload, msg)`. Property order in the spec does not matter.
 - Each `update` key is a split point. The compiler emits one chunk per handler.
-- The compiler finds message constructors as calls on the second parameter of `view` and `subscriptions`. It rewrites `msg.toggle(t.id)` in an event prop into DOM data.
+- The compiler finds message constructors as calls on the `msg` parameter of `view`, `subscriptions` and the handlers. It rewrites `msg.toggle(t.id)` in an event prop into DOM data.
 - Other code gets the types with `ModelOf<typeof Todo>` and `MsgOf<typeof Todo>`. Tests call handlers as `Todo.update.add(model)`.
 
-Checked with `tsc` 7 in strict mode. `msg` in `view` is inferred from the handlers. A wrong payload type and an unknown tag are both errors.
+Checked with `tsc` 7.0.2 in strict mode on 2026-11-20: handlers take their payload types from `Msg`; a missing handler, an extra handler, a wrong payload annotation, a wrong constructor payload in `view`, and a constructor whose payload type does not match a command's result are all type errors.
 
 ## Messages
 
-A constructor is a function with a `tag` property. `msg.toggle('a1')` returns `{ t: 'toggle', p: 'a1' }`, and `msg.toggle.tag` is `'toggle'`. A handler with no payload parameter makes a constructor with no argument.
+A constructor is a function with a `tag` property. `msg.toggle('a1')` returns `{ t: 'toggle', p: 'a1' }`, and `msg.toggle.tag` is `'toggle'`. A tag whose payload type is `undefined` makes a constructor with no argument.
 
 ## Commands and subscriptions
 
 - `subscriptions(m, msg)` passes messages built with `msg`, so their payloads are type-checked.
-- A command inside a handler names the tag that receives its result as a string: `Http.get('/todos', 'gotTodos')`. Handlers cannot receive a typed `msg`, because the type of `msg` depends on the handlers themselves. A `tsc` test of that design failed with `Property 'gotTodos' does not exist on type 'Msgs<unknown>'`. The compiler reports a tag that is not an `update` key. Whether the payload type can also be checked is an open question for `core-api`.
+- A command that returns a result takes the constructor that receives it: `Http.get('/todos', msg.gotTodos)`, where `gotTodos` has payload type `Result<Todo[]>`. A constructor with another payload type is a type error. The command stores the constructor's tag, so it stays plain data.
+- `Result<T>` is `{ ok: true, value: T } | { ok: false, error: string }`. Loading and error states live in the model as explicit unions that the handlers set.
 
 ## Event placeholder
 
@@ -115,16 +124,16 @@ export function TodoItem(props: { todo: Todo; onToggle: Message }) {
 
 ## Nesting
 
-A parent lists which model fields hold child modules. Routing comes from that table.
+A parent lists which model fields hold child modules in its `children` table. Routing comes from that table, so child messages need no entry in the parent's `Msg`.
 
 ```tsx
 import Counter from './counter.idlip';
 
-export default defineModule<Model>()({
+export default defineModule<Model, Msg>()({
   init: () => ({ left: Counter.init(), right: Counter.init(), counters: [] }),
+  children: { left: Counter, right: Counter, counters: list(Counter, 'id') },
   update: {
-    ...children({ left: Counter, right: Counter, counters: list(Counter, 'id') }),
-    removeCounter(m, id: string) {
+    removeCounter(m, id) {
       return { ...m, counters: m.counters.filter((c) => c.id !== id) };
     },
   },

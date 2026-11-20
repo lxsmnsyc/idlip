@@ -48,7 +48,7 @@ depends_on:
 
 ## Context
 
-- Source: `docs/proposals/0002-modules.md`, Commands and subscriptions. A command names its result tag as a string. A subscription carries the message it dispatches.
+- Source: `docs/proposals/0002-modules.md`, Commands and subscriptions. A command that returns a result takes the receiving constructor by value (`Http.get(url, msg.gotTodos)`), with payload type `Result<T>`. A subscription carries the message it dispatches.
 
 ## Acceptance
 
