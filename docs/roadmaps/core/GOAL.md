@@ -36,6 +36,7 @@ A todo app written in the idlip DSL renders on the server and resumes in the bro
 ## Constraints
 
 - MVU concept, not Elm's API. Names follow TypeScript conventions.
+- Views are TSX for the proof of concept, with a closed hole grammar and `<For>` as the only control-flow component. A markup DSL with blocks follows as `markup-frontend`. See `debate/debate.md`.
 - Nothing the client resumes is a closure. Models, messages, commands and subscriptions are plain data.
 - Serialization uses seroval.
 - Build integration is a Vite plugin (`idlip/vite`). The compiler uses `oxc-parser`.

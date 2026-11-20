@@ -26,6 +26,9 @@ shared: []
 reserves: []
 provides: []
 depends_on:
+  - on: markup-frontend
+    kind: hard
+    why: 0.1.0 ships the final view syntax, so users do not migrate from TSX
   - on: website
     kind: hard
     why: 0.1.0 ships with docs

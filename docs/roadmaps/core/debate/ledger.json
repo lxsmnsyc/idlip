@@ -1,0 +1,590 @@
+{
+  "goal": "Pick idlip's surface language (TS subset, own Elm-like language, hybrid .idlip syntax compiled to typed TS, or brumate-style markup without script/style blocks) so the todo app resumes with one handler chunk plus changed binding chunks, at the lowest total cost",
+  "research": false,
+  "max_rounds": 3,
+  "roadmap": "docs/roadmaps/core",
+  "supersedes": null,
+  "extra_axes": [],
+  "claims": [
+    {
+      "id": "J1",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "device",
+      "text": "8 GB RAM, 8 cores, 15 GiB free disk (93% used). Any option fits; a second toolchain (LSP, extension builds) adds little.",
+      "evidence": {
+        "type": "measured",
+        "source": "sysctl hw.memsize hw.ncpu; df -h",
+        "detail": ""
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "J2",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "time",
+      "text": "idlip has no compiler code yet: 64 tracked files, docs plus packages/idlip/src/index.ts (message types) and one test. Switching language now costs a rewrite of 41 KB of proposals and contracts, not code.",
+      "evidence": {
+        "type": "measured",
+        "source": "git ls-files; wc -c docs/proposals/*.md docs/roadmaps/core/contracts/*.md",
+        "detail": ""
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "J3",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "time",
+      "text": "Nodes that recover static facts JS hides: jsx-types, spike-view-analysis, compile-view-analyze (must, M each), write-sets, keyed-paths, dynamic-paths, update-ops (should, outline, M each). compile-update also analyzes handler bodies. 8 M nodes of 36.",
+      "evidence": {
+        "type": "measured",
+        "source": "grep size/priority/outline docs/roadmaps/core/nodes/*/brief.md",
+        "detail": ""
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "J4",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "time",
+      "text": "brumate (author's own resumable language): custom .brm syntax, built 2026-10-20 to 2026-11-20, 2969 commits, ~64k lines in packages/brumate/src. Type checking and editor support use Volar virtual code over a toTypeScript() emitter (src/check.ts, 1295 lines) plus ~440 lines across language-core, language-server, tsc, typescript-plugin, vscode; 65 commits, mostly 2026-10-21 to 11-02.",
+      "evidence": {
+        "type": "calibration",
+        "source": "../brumate git log; wc -l packages/*/src",
+        "detail": "the hybrid route (custom syntax, TS checks through a generated .ts) cost the author about 2 weeks of a 1-month build"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "J5",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "time",
+      "text": "brumate markup holds TS<Expression> in holes, attribute values and event handlers (grammar.md). Closures and arbitrary JS stay legal there, so a brumate-style shell by itself does not remove expression analysis; only a restricted expression grammar does.",
+      "evidence": {
+        "type": "source",
+        "source": "../brumate/docs/grammar.md",
+        "detail": ""
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "J6",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "time",
+      "text": "Current constraints lean TS: 'MVU concept, not Elm's API. Names follow TypeScript conventions', 'The compiler uses oxc-parser', file convention *.idlip.tsx with one default export.",
+      "evidence": {
+        "type": "inferred",
+        "source": "docs/roadmaps/core/GOAL.md Constraints; docs/proposals/0002-modules.md",
+        "detail": "the user reopened this choice, so these are inputs, not settled"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "J7",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "time",
+      "text": "External prior art: Elm (own language and checker; HM inference, error messages and editor tooling took years, ecosystem small); ReScript and Gleam/Lustre (own language, JS interop through FFI bindings); Svelte, Vue and Marko (custom template syntax, TS checks via svelte2tsx or Volar virtual code, widely adopted).",
+      "evidence": {
+        "type": "prior-art",
+        "source": "elm-lang.org, rescript-lang.org, gleam.run, github.com/volarjs/volar.js, github.com/sveltejs/language-tools",
+        "detail": "custom template plus generated TS is the proven adoption path; own type checkers are proven costly"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "J8",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "time",
+      "text": "User asks to also weigh brumate's markup DSL (blocks such as #if/#for/#switch, attribute value forms, on* events) without its <script> and <style> blocks, which they think could be done better.",
+      "evidence": {
+        "type": "user",
+        "source": "conversation 2026-11-20",
+        "detail": "option D",
+        "question": "Q1"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "P1",
+      "round": 1,
+      "by": "proponent",
+      "kind": "proposal",
+      "axis": "time",
+      "text": "Fix the hole grammar before the surface syntax. Holes, attribute values and event payloads accept only: model/loop-variable paths, literals, comparison and boolean operators, ternary, template strings, and calls to imported helpers marked pure. No closures, no assignment, no statements. Every frontend (JSX or markup) parses into the same view-ir, so the choice of shell no longer sits on the must path.",
+      "estimate": {
+        "value": 0,
+        "unit": "must nodes added; spike-view-analysis and compile-view-analyze shrink from arbitrary-JS walks to a closed grammar"
+      },
+      "evidence": {
+        "type": "source",
+        "source": "docs/proposals/0001-dsl.md View table; docs/roadmaps/core/nodes/spike-view-analysis/brief.md",
+        "detail": "0001 already states hole = 'pure expression over the model'; J5 says only a restricted grammar removes expression analysis, whichever shell is used"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "P2",
+      "round": 1,
+      "by": "proponent",
+      "kind": "proposal",
+      "axis": "time",
+      "text": "Ship option A for the todo-resumes milestone: *.idlip.tsx with JSX, oxc enforcing P1's grammar, plain TS model/messages/update. jsx-types stays as typing for the shell; the todo app reaches 'one handler chunk plus changed binding chunks' with no new parser, Volar plugin or editor extension. Zero new tooling nodes before the contract gate.",
+      "estimate": {
+        "value": 8,
+        "unit": "must nodes touched (jsx-types, spike-view-analysis, compile-view-analyze, compile-update, plus the existing 4), no additions"
+      },
+      "evidence": {
+        "type": "source",
+        "source": "docs/roadmaps/core/GOAL.md Constraints and Acceptance; J2, J3",
+        "detail": "the acceptance test counts requests on examples/todo; it does not depend on syntax. TS gives checking, formatting and editor support for free"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "P3",
+      "round": 1,
+      "by": "proponent",
+      "kind": "proposal",
+      "axis": "time",
+      "text": "After 0.1, add a brumate-style markup shell (option D) as a second frontend: .idlip files with only markup (#if/#for/#switch blocks, attribute value forms, on* events), compiled to typed .ts by a toTypeScript() emitter so tsc checks it. Reuse brumate's grammar.md and Volar wiring instead of designing again. Reason to do it: #for/#if blocks make the key and the branch structure syntactic, which removes keyed-paths and dynamic-paths guesswork from JSX <For>/<Show> call analysis.",
+      "estimate": {
+        "value": 2,
+        "unit": "weeks (author's own cost for the same route in brumate)"
+      },
+      "evidence": {
+        "type": "calibration",
+        "source": "J4: brumate hybrid route about 2 weeks of a 1-month build; language-core/src/index.ts 210 lines, check.ts 1295 lines, grammar.md 163 lines with 54 productions",
+        "detail": "idlip's markup is a strict subset (no script, style, await, context), so expect well under check.ts size"
+      },
+      "ruling": "rejected",
+      "ruling_why": "O1 measured brumate's parser and analyzer at 4348 lines beyond the 2-week tooling route, and O2 shows the shell cuts no node; O7's park with a trigger replaces it",
+      "user_ruling": "upheld",
+      "user_why": "The user wants a markup DSL with real control-flow blocks; JSX needs fake control-flow components. It comes after the TSX proof of concept."
+    },
+    {
+      "id": "P4",
+      "round": 1,
+      "by": "proponent",
+      "kind": "proposal",
+      "axis": "tokens",
+      "text": "Replace brumate's <script> with nothing: a markup file holds only an import header and one 'view(m: Model)' signature line, because model, messages, update and helpers live in plain .ts (option C split). That keeps handlers, which need write-set analysis, in files oxc and tsc already own. Replace <style> with an imported sidecar stylesheet (import './todo.css') that the compiler scopes, so CSS tooling and chunking apply unchanged.",
+      "estimate": {
+        "value": 0,
+        "unit": "script/style parser productions (brumate has ModuleScript, InstanceScript, BlockScript, Style, BlockStyle: 5 of 54)"
+      },
+      "evidence": {
+        "type": "source",
+        "source": "../brumate/docs/grammar.md lines 18-20, 113-114; docs/decisions.md 'Signals never leave the file'",
+        "detail": "script blocks exist in brumate because signals and instance state live in the component; idlip has no instance state (MVU), so nothing is lost"
+      },
+      "ruling": "rejected",
+      "ruling_why": "conceded in P7 on O3"
+    },
+    {
+      "id": "P5",
+      "round": 1,
+      "by": "proponent",
+      "kind": "proposal",
+      "axis": "time",
+      "text": "Keep update handlers as TS in every option and make write-sets and update-ops the single analysis for them. A handler body restricted to the same pure core (spread, property write via spread, array methods push/filter/map with literal-path predicates) lets the compiler derive the write set; the outline nodes write-sets, update-ops and keyed-paths stay in the roadmap, none grows. Do not move handlers into a new syntax, since only that part of option B would help.",
+      "estimate": {
+        "value": 3,
+        "unit": "outline nodes unchanged (write-sets, update-ops, keyed-paths)"
+      },
+      "evidence": {
+        "type": "source",
+        "source": "docs/proposals/0003-update-analysis.md Write sets, Update ops; docs/roadmaps/core/nodes/compile-update/brief.md",
+        "detail": "compile-update already uses an oxc pass on the defineModule export; a handler language is the only thing B adds, and 0003 already gives that restricted form inside TS"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "A1",
+      "round": 1,
+      "by": "proponent",
+      "kind": "alternative",
+      "axis": "time",
+      "text": "Cheapest path: A only, forever. Add one editor aid, a tsc language-service plugin that reports P1 violations as diagnostics (no new file type, no emitter). Total new code about one oxc visitor plus a ~100-line plugin; the brumate-style shell is never built unless the todo's keyed lists show JSX <For> analysis failing.",
+      "estimate": {
+        "value": 3,
+        "unit": "days for the diagnostics plugin (estimate)"
+      },
+      "evidence": {
+        "type": "prior-art",
+        "source": "Solid and Qwik: JSX compiled with custom rules and lint plus TS plugin, large adoption without a new file type",
+        "detail": "github.com/solidjs/solid (babel-preset-solid), github.com/QwikDev/qwik (optimizer uses oxc/swc over TSX); both enforce rules by compiler over TSX"
+      },
+      "ruling": "rejected",
+      "ruling_why": "O6: diagnostics already come from the compiler through the Vite plugin and a check pass; a language-service plugin duplicates them"
+    },
+    {
+      "id": "A2",
+      "round": 1,
+      "by": "proponent",
+      "kind": "alternative",
+      "axis": "time",
+      "text": "Reject B (own Elm-like language and checker). The only gain is a handler language that makes write sets trivial, but 0003 gets that inside TS. Cost: HM inference, errors and editor work took Elm years, and idlip would lose npm types, model/helper reuse and oxc.",
+      "estimate": {
+        "value": 3,
+        "unit": "months minimum (estimate; brumate needed a month for a TS-hosted language with 64k lines)"
+      },
+      "evidence": {
+        "type": "prior-art",
+        "source": "J7; J4",
+        "detail": "Elm, ReScript and Gleam each own a checker and an FFI layer; brumate chose Volar over TS for the same reason"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "O1",
+      "round": 1,
+      "by": "opponent",
+      "kind": "cost",
+      "axis": "time",
+      "severity": "high",
+      "answers": [
+        "P3"
+      ],
+      "text": "P3's 2 weeks counts only the Volar and toTypeScript() route (J4). brumate also needed its own parser (parser.ts 1140 lines) and analyzer (analyze.ts 3208 lines), and the check route kept changing after 2026-11-02 (17 more commits to check.ts and language-core). A markup frontend for idlip also needs its own view-ir producer beside the oxc JSX one, so two frontends must stay in step.",
+      "estimate": {
+        "value": 4348,
+        "unit": "lines of parser plus analyzer in brumate, beyond the 2-week check route"
+      },
+      "evidence": {
+        "type": "measured",
+        "source": "wc -l ../brumate/packages/brumate/src/parser.ts analyze.ts; git log --since=2026-11-02 -- packages/brumate/src/check.ts packages/language-core",
+        "detail": "parser 1140, analyze 3208, 17 commits after the first fortnight"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "O2",
+      "round": 1,
+      "by": "opponent",
+      "kind": "rebuttal",
+      "axis": "time",
+      "severity": "high",
+      "answers": [
+        "P3"
+      ],
+      "text": "P3's reason is wrong. keyed-paths and dynamic-paths are about paths in update handlers and model lookups (todos[id=$p].done, find-by-key writes), not about how the view marks keys or branches. A #for/#if shell changes neither node, and the restricted <For key> and <Show when> props already carry the same facts in JSX. So D buys no node cut.",
+      "evidence": {
+        "type": "source",
+        "source": "docs/roadmaps/core/nodes/keyed-paths/brief.md Goal; nodes/dynamic-paths/brief.md Goal",
+        "detail": "both implement 0003 sections on write sets and lookups; neither reads view syntax"
+      },
+      "ruling": "upheld",
+      "ruling_why": "dynamic-paths is about view holes, but what makes a hole dynamic is the expression grammar (P1), not the block syntax, so the conclusion stands"
+    },
+    {
+      "id": "O3",
+      "round": 1,
+      "by": "opponent",
+      "kind": "cost",
+      "axis": "time",
+      "severity": "high",
+      "answers": [
+        "P4",
+        "P3"
+      ],
+      "text": "Splitting the view out into a markup file breaks the module contract. 0002 has one default export from defineModule holding init, update, view and subscriptions; msg is the view's second parameter, and update must precede view so TS infers msg. P4's 'view(m: Model)' header drops msg typing and the compiler's way of finding message constructors, and compile-update's oxc pass on the defineModule export, core-api, view-ir and 0002 all need rewriting. The same split in option C moves the same cost.",
+      "evidence": {
+        "type": "source",
+        "source": "docs/proposals/0002-modules.md lines 9, 82, 84; docs/roadmaps/core/nodes/spike-view-analysis/brief.md Context",
+        "detail": "'The view is the view(m, msg) property of the defineModule default export'"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "O4",
+      "round": 1,
+      "by": "opponent",
+      "kind": "cost",
+      "axis": "tokens",
+      "severity": "medium",
+      "answers": [
+        "P3",
+        "P4"
+      ],
+      "text": "Every agent that writes or reviews markup must be given the grammar, since models know TSX but not brumate's #for/#if/$bind forms. grammar.md is 8.5 KB, about 2k tokens per worker prompt, on 36 nodes plus examples and docs. Models also write worse code in a language absent from their training data, which raises review loops. A JSX shell costs zero such tokens.",
+      "estimate": {
+        "value": 2100,
+        "unit": "tokens per agent prompt, estimate"
+      },
+      "evidence": {
+        "type": "estimate",
+        "source": "ls docs/grammar.md in brumate (8.5K); 8.5 KB / ~4 bytes per token",
+        "detail": "per-prompt overhead only; review-loop cost not measured"
+      },
+      "ruling": "upheld",
+      "ruling_why": "estimate only, weighed low: it matters for agent prompts, not for the structure"
+    },
+    {
+      "id": "O5",
+      "round": 1,
+      "by": "opponent",
+      "kind": "risk",
+      "axis": "time",
+      "severity": "medium",
+      "answers": [
+        "P1"
+      ],
+      "text": "'Calls to imported helpers marked pure' has no mechanism. oxc cannot verify purity, and path analysis through helper(m.todos, m.filter) needs the helper's body or an annotation, across files. The marker form, who checks it and what a wrong mark does are not defined, so the 'closed grammar' keeps an open hole. This lands on spike-view-analysis (must) and may need its own contract line.",
+      "evidence": {
+        "type": "source",
+        "source": "docs/proposals/0002-modules.md line 152 (helper calls take model paths as arguments); nodes/spike-view-analysis/brief.md Goal ('helper calls')",
+        "detail": "proposal does not say how helpers are marked or checked"
+      },
+      "ruling": "upheld",
+      "ruling_why": "0001 already says a helper call depends on its argument paths; what is missing is a rule for helper purity, which P1 must state"
+    },
+    {
+      "id": "O6",
+      "round": 1,
+      "by": "opponent",
+      "kind": "rebuttal",
+      "axis": "time",
+      "severity": "low",
+      "answers": [
+        "A1"
+      ],
+      "text": "A1's 3-day tsc plugin is optional and duplicates what the compiler already reports. A TS language-service plugin does not run under the tsc CLI, and both repos use TypeScript 7 (native). brumate needed a separate brumate-tsc package besides its typescript-plugin for exactly this. Drop the plugin from the plan and let the Vite plugin and one 'idlip check' pass over oxc report P1 violations.",
+      "evidence": {
+        "type": "measured",
+        "source": "grep typescript package.json in both repos; ls ../brumate/packages (tsc, typescript-plugin, language-server)",
+        "detail": "typescript ^7.0.2 in both; brumate ships tsc and typescript-plugin as separate packages"
+      },
+      "ruling": "upheld",
+      "ruling_why": "weighed low; the TS 7 plugin claim is unsourced and does not decide anything, since A1 falls on duplication alone"
+    },
+    {
+      "id": "O7",
+      "round": 1,
+      "by": "opponent",
+      "kind": "alternative",
+      "axis": "time",
+      "severity": "high",
+      "answers": [
+        "P2",
+        "P3"
+      ],
+      "text": "Cheapest structure: A with P1's closed grammar for todo-resumes and 0.1, and make the view-ir contract the only seam. Park D as one outline node with a measured trigger: build it only if P1 violations or JSX noise show up in examples/todo and one more app. No new must node, no file-type tooling, no spec rewrite. B is dropped, as A2 says.",
+      "evidence": {
+        "type": "inferred",
+        "source": "docs/roadmaps/core/GOAL.md Constraints ('Names follow TypeScript conventions', oxc-parser) and J2, J3, O2",
+        "detail": "acceptance counts requests on examples/todo and does not depend on syntax; D has no gain on any must node"
+      },
+      "ruling": "upheld",
+      "ruling_why": "needs a measurable trigger for D, still to be defined"
+    },
+    {
+      "id": "P6",
+      "round": 2,
+      "by": "proponent",
+      "kind": "proposal",
+      "axis": "time",
+      "answers": [
+        "P1",
+        "O5"
+      ],
+      "text": "Amend P1 with a helper rule, no marker and no purity proof. A helper call is legal when the callee is an import or module-level function whose arguments are all in the closed grammar (a closure argument is a compile error). Its hole paths are the union of the argument paths, as 0001 already says. A whole-model argument is a warning. If the helper body is one return expression in the closed grammar, the analysis inlines it for exact paths, the same as partials. A hidden dependency in a helper (module state, Date.now) can only cause a stale binding, so dev mode re-evaluates each patched hole from the new model and reports a mismatch as an error naming the hole. The view-ir contract gets one line, helper: 'args' | 'inlined'.",
+      "estimate": {
+        "value": 1,
+        "unit": "contract line in view-ir.md; one dev-only check in the errors node"
+      },
+      "evidence": {
+        "type": "source",
+        "source": "docs/proposals/0001-dsl.md View table ('Helper call: depends on the paths of its arguments'); docs/proposals/0002-modules.md partials are inlined",
+        "detail": "oxc cannot prove purity, so the rule relies on the argument-path contract plus a runtime dev check, the same trade Svelte and Solid make for derived values"
+      },
+      "ruling": "upheld",
+      "ruling_why": "the helper legality, inlining and union-of-argument-paths rules stand; its dev re-evaluation check falls to O8 and is replaced by O9"
+    },
+    {
+      "id": "P7",
+      "round": 2,
+      "by": "proponent",
+      "kind": "concession",
+      "answers": [
+        "P4"
+      ],
+      "why": "O3: a separate markup file drops msg typing and the single defineModule export, and a markup-in-TS shell needs a whole-file TS parser that oxc cannot give, so no script replacement beats having none",
+      "text": "Withdraw the 'view(m: Model) header plus plain .ts' replacement of brumate's <script>. Keep two parts: styles stay an imported sidecar (import './todo.css') inside the *.idlip.tsx module, which option A already allows and needs no syntax change; if D is ever built, it replaces only the JSX expression inside view(m, msg) of the same defineModule file (block syntax for #if/#for, same view-ir), never the module.",
+      "ruling": "upheld",
+      "ruling_why": "names O3 as its reason"
+    },
+    {
+      "id": "P8",
+      "round": 2,
+      "by": "proponent",
+      "kind": "proposal",
+      "axis": "time",
+      "text": "Park D as one outline node, markup-frontend (priority could, milestone later, provides view-ir). Build trigger, measured with a script over examples/todo plus one more app (a form-heavy one, written after 0.1): D is worth building only if both hold. (1) Token count of the view bodies (oxc tokens) is at least 25% lower when rewritten in brumate block syntax, since D must save more than its upkeep. (2) The compiler's closed-grammar diagnostics log at least 3 distinct JSX-shape errors per 100 view lines that block syntax makes unwritable. If either fails, D stays parked. Cost cap to compare against: brumate's parser 1140 lines plus analyzer 3208 lines (O1), so D must pay back about 4.3k lines of upkeep.",
+      "estimate": {
+        "value": 25,
+        "unit": "percent view-token saving threshold (estimate)"
+      },
+      "evidence": {
+        "type": "estimate",
+        "source": "O1 measured 4348 lines of parser and analyzer in brumate; O7",
+        "detail": "thresholds are a judgment, not measured; the measurement scripts need only oxc and ../brumate/examples/todos as the reference rewrite"
+      },
+      "ruling": "rejected",
+      "ruling_why": "O10: the token and per-100-line test is not measurable as stated; O11 replaces the trigger, keeping the parked markup-frontend node"
+    },
+    {
+      "id": "P9",
+      "round": 2,
+      "by": "proponent",
+      "kind": "proposal",
+      "axis": "time",
+      "text": "Roadmap and contract changes under the settled structure (A, closed grammar, D parked). Contracts: view-ir.md gains helper: 'args'|'inlined' and the closed-grammar list; core-api.md and 0002 stay unchanged (defineModule, update before view, view(m, msg)). Nodes: jsx-types, compile-update, write-sets, update-ops, keyed-paths, dynamic-paths unchanged; spike-view-analysis and compile-view-analyze take the closed grammar and helper rule as scope and report violations as errors; errors node gets the dev hole re-evaluation check; one new outline node markup-frontend (could, parked). Net: 0 new must nodes, 1 outline node.",
+      "estimate": {
+        "value": 0,
+        "unit": "must nodes added"
+      },
+      "evidence": {
+        "type": "source",
+        "source": "docs/roadmaps/core/nodes/*/brief.md; docs/roadmaps/core/contracts/view-ir.md, core-api.md",
+        "detail": "P1, P2, P5, P6 and P8 together touch only the scopes listed"
+      },
+      "ruling": "upheld",
+      "ruling_why": "amended by O12"
+    },
+    {
+      "id": "O8",
+      "round": 2,
+      "by": "opponent",
+      "kind": "rebuttal",
+      "axis": "time",
+      "severity": "high",
+      "answers": [
+        "P6"
+      ],
+      "text": "P6's dev re-evaluation cannot catch the failure it targets. A hidden dependency in a helper makes a hole stale because its binding is not patched, and unpatched binding chunks are not loaded, so 'each patched hole' only re-evaluates holes that were already recomputed, and the check is circular. Catching a stale hole means evaluating every hole after each update, which loads every binding chunk in dev and changes the request pattern the acceptance test counts. It also flags Date.now holes on every update as mismatches.",
+      "evidence": {
+        "type": "source",
+        "source": "docs/roadmaps/core/contracts/compiled-format.md lines 24-29 (manifest maps binding group to chunk and path set; patch loads chunks for changed paths via diffPaths)",
+        "detail": "stale = path set missed a read; the patcher never evaluates it, so a check limited to patched holes sees nothing"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "O9",
+      "round": 2,
+      "by": "opponent",
+      "kind": "alternative",
+      "axis": "time",
+      "severity": "medium",
+      "answers": [
+        "P6"
+      ],
+      "text": "Cheaper and sound check for P6: run it in the must node testing-mount, in Node tests, not in the browser. After each message in a test, re-render the whole view on the server from the new model and compare it with the DOM the patcher produced. This catches stale holes from any cause, needs no dev chunk loading, and uses code that already exists (ssr-render plus patch-bindings). Also make a whole-model argument to a helper a compile error, not a warning: its path set is the root, so the hole rebinds on every patch and defeats the goal.",
+      "evidence": {
+        "type": "inferred",
+        "source": "docs/roadmaps/core/nodes/testing-mount/brief.md (priority must, size S); P6 text 'A whole-model argument is a warning'",
+        "detail": "server render equals patched DOM is the resume invariant; a root path set is by definition over-approximate"
+      },
+      "ruling": "upheld",
+      "ruling_why": "a whole-model helper argument becomes a compile error, changing 0001's warning"
+    },
+    {
+      "id": "O10",
+      "round": 2,
+      "by": "opponent",
+      "kind": "rebuttal",
+      "axis": "time",
+      "severity": "medium",
+      "answers": [
+        "P8"
+      ],
+      "text": "P8's trigger is not measurable as stated. (1) Counting 'oxc tokens' of JSX against brumate block syntax compares two lexers, and the rewrite has to be done by hand or agent first, so it is a cost, not a script. (2) Compiler diagnostics do not record whether block syntax would make a shape unwritable, and J5 says D's holes are TS expressions, so closures and other hole errors would persist under D. With a todo view of tens of lines, '3 per 100 lines' is one error, which is noise. Thresholds of 25% and 3/100 have no basis, and 4.3k lines of upkeep and a token percentage are not on one scale.",
+      "evidence": {
+        "type": "source",
+        "source": "ledger P8 evidence ('thresholds are a judgment'); J5; ../brumate/docs/grammar.md (holes hold TS expressions)",
+        "detail": "no baseline for either number exists in the repo or in brumate's history"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "O11",
+      "round": 2,
+      "by": "opponent",
+      "kind": "alternative",
+      "axis": "time",
+      "severity": "medium",
+      "answers": [
+        "P8",
+        "O7"
+      ],
+      "text": "Amend my O7 trigger to something a script can read: the compiler tags each closed-grammar diagnostic with a rule id, and the trigger counts only the ids that block syntax removes by construction (list rendered by .map instead of <For>, && or ternary instead of <Show>/<Switch>, missing or non-path key). D is built only if those ids total at least 10 across the todo app, one form-heavy app and agent-written drafts of both, and agents fail to fix them in one retry. Needs only an id field on diagnostics in the errors node. Drop the token-percentage test.",
+      "evidence": {
+        "type": "inferred",
+        "source": "docs/roadmaps/core/nodes/errors/brief.md; docs/proposals/0001-dsl.md View table (<For>, <Show>, <Switch>)",
+        "detail": "threshold 10 is still a judgment; it is stated so the judge can set it. Only these ids are cured by #for/#if/#switch"
+      },
+      "ruling": "upheld",
+      "ruling_why": "judge sets the threshold at 10 tagged block-removable diagnostics across the three corpora, as proposed; it is judgment, revisited when the count is first taken",
+      "user_ruling": "rejected",
+      "user_why": "No trigger: the DSL is planned after the proof of concept, because the debate weighed syntax only by node count, not authoring value."
+    },
+    {
+      "id": "O12",
+      "round": 2,
+      "by": "opponent",
+      "kind": "risk",
+      "axis": "time",
+      "severity": "medium",
+      "answers": [
+        "P9"
+      ],
+      "text": "P9 omits three changes. (1) Inlining helper bodies in P6 is beyond the spike's scope, which covers partials only; it must be in spike-view-analysis acceptance before view-ir freezes at the contract gate, or the freeze has to be reopened. (2) P9 lists an 'errors node dev check' that O8 shows unsound, so it should become a testing-mount test (O9). (3) size-budgets and benchmarks must include a model-wide helper argument case, since it bloats binding path sets. Net still 0 new must nodes, but spike-view-analysis grows within its M size.",
+      "evidence": {
+        "type": "source",
+        "source": "docs/roadmaps/core/GOAL.md Gates (frozen contracts after spike-view-analysis); nodes/spike-view-analysis/brief.md Acceptance; docs/proposals/0002-modules.md line 104 (partials only are inlined)",
+        "detail": "view-ir frozen after the contract wave"
+      },
+      "ruling": "upheld"
+    }
+  ],
+  "questions": [
+    {
+      "id": "Q1",
+      "by": "judge",
+      "ask": "Should the brumate markup design be considered?",
+      "blocks": [],
+      "answer": "Yes, minus the <script> and <style> blocks"
+    }
+  ],
+  "proofs": [],
+  "hypothesis": null,
+  "spend": [
+    {
+      "round": 1,
+      "tokens": 118543
+    },
+    {
+      "round": 2,
+      "tokens": 60000
+    },
+    {
+      "round": 3,
+      "tokens": 5000
+    }
+  ]
+}

@@ -38,7 +38,7 @@ depends_on:
 
 ## Goal
 
-`idlip/jsx-runtime` types: intrinsic elements whose `on:*` props accept only a `Message`, the `event` placeholder from `idlip`, and the `For`, `Show`, `Switch` and `Match` components.
+`idlip/jsx-runtime` types: intrinsic elements whose `on:*` props accept only a `Message`, the `event` placeholder from `idlip`, and the `For` component. Conditions are plain JSX ternaries and `&&`, so there is no `Show`, `Switch` or `Match`.
 
 ## Context
 

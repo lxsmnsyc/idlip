@@ -46,5 +46,5 @@ Turn the prototype from `spike-view-analysis` into the shipped analysis: view JS
 ## Acceptance
 
 - [ ] The todo and counter views produce the IR recorded in the contract examples.
-- [ ] Each rule in the proposal's View rules table has a diagnostic test.
+- [ ] Each rule in the proposal's View rules table has a diagnostic test with a stable rule id.
 - [ ] Fast check passes: `pnpm --filter idlip test`

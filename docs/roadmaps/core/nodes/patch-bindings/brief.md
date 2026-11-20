@@ -37,7 +37,7 @@ depends_on:
 
 ## Goal
 
-Given the old model, the new model and the manifest, find the binding groups whose model paths changed (reference comparison along each path), load their chunks, and patch text, attributes, classes and `<Show>` blocks.
+Given the old model, the new model and the manifest, find the binding groups whose model paths changed (reference comparison along each path), load their chunks, and patch text, attributes, classes and condition blocks (JSX ternaries and `&&`).
 
 ## Context
 

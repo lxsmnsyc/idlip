@@ -39,3 +39,5 @@ depends_on:
 ## Goal
 
 A `mount(module, model)` helper for tests: render on the server, resume in happy-dom, dispatch DOM events, and wait until chunks and patches settle. The loader's `start()` returns a `stop()` so tests can tear a page down. Brumate's version is `../brumate/packages/brumate/src/runtime/testing.ts`.
+
+After each message, `mount` can re-render the view on the server from the new model and compare it with the patched DOM. A mismatch is a stale binding, for example from a helper with a hidden dependency. Source: `debate/debate.md`.
