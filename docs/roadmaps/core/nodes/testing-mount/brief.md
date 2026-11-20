@@ -2,12 +2,12 @@
 id: testing-mount
 title: `idlip/testing`: render on the server and resume in happy-dom
 status: todo
-priority: should
+priority: must
 type: feature
 story:
 early: false
 outline: true
-milestone: apps
+milestone: todo-resumes
 target:
 ship: auto
 land: auto

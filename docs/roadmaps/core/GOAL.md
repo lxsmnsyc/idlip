@@ -1,5 +1,5 @@
 ---
-milestones: [todo-resumes, apps, '0.1', components]
+milestones: [todo-resumes, apps, '0.1', components, '0.2']
 run: parallel
 review: auto
 merge:

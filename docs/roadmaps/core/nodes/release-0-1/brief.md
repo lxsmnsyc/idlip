@@ -47,9 +47,6 @@ depends_on:
   - on: dynamic-paths
     kind: hard
     why: 0.1.0 accepts views whose paths the analysis cannot resolve
-  - on: update-ops
-    kind: hard
-    why: 0.1.0 includes update ops, off by default if the size is not settled
   - on: form-fields
     kind: hard
     why: 0.1.0 includes form field placeholders and Dom commands

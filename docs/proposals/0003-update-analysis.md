@@ -121,7 +121,7 @@ All three contracts are still `draft`. The encodings below should be reserved no
 
 ## Roadmap changes
 
-These go in the `apps` milestone, after `example-todo`, except the contract reservations.
+These go in the `apps` milestone, after `example-todo`. The exceptions are the contract reservations, which land now, and `update-ops`, which moves to the `0.2` milestone.
 
 | Change                                              | Node                                                                |
 | --------------------------------------------------- | ------------------------------------------------------------------- |

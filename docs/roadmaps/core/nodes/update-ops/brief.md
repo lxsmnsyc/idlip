@@ -7,7 +7,7 @@ type: feature
 story:
 early: false
 outline: true
-milestone: apps
+milestone: '0.2'
 target:
 ship: auto
 land: auto
