@@ -38,6 +38,7 @@ Answer: how does a Vite plugin turn one source module into many lazily loaded ch
 ## Context
 
 - Source: `docs/proposals/0001-dsl.md`, Compiler output.
+- Modules are `*.idlip.tsx` files with one default export (`docs/proposals/0002-modules.md`). Use that suffix for the plugin filter.
 - brumate solved a similar problem. Read `../brumate/packages/brumate/src/vite.ts` and its bundle manifest code first.
 
 ## Acceptance

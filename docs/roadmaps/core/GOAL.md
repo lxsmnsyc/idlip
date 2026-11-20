@@ -1,5 +1,5 @@
 ---
-milestones: [todo-resumes, apps, '0.1']
+milestones: [todo-resumes, apps, '0.1', components]
 run: parallel
 review: auto
 merge:
@@ -29,7 +29,7 @@ A todo app written in the idlip DSL renders on the server and resumes in the bro
 ## Priorities
 
 - must: needed for the `todo-resumes` milestone, the todo app resuming end to end.
-- should: needed before the `0.1` release (nesting, effects, docs, benchmarks).
+- should: needed before the `0.1` release (nesting, effects, docs, benchmarks), or in the `components` milestone after it (function components).
 - could: worth doing when agents are free (devtools).
 - later: parked.
 
@@ -61,10 +61,11 @@ A todo app written in the idlip DSL renders on the server and resumes in the bro
 ## Sources
 
 - `docs/proposals/0001-dsl.md`
+- `docs/proposals/0002-modules.md` (replaces the Messages, Update and Nesting sections of 0001)
 
 ## Open questions
 
-- File convention for idlip modules (`.tsx` with detection, or a suffix such as `.idlip.tsx`). Decided by `spike-chunk-split`.
+- None open. The file convention is `*.idlip.tsx` with one default export (`docs/proposals/0002-modules.md`).
 
 ## Gates
 

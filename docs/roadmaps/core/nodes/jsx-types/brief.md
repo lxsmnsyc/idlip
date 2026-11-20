@@ -38,16 +38,16 @@ depends_on:
 
 ## Goal
 
-`idlip/jsx-runtime` types: intrinsic elements whose `on:*` props accept only a `Message`, the typed `$event` placeholder, and the `For`, `Show`, `Switch` and `Match` components.
+`idlip/jsx-runtime` types: intrinsic elements whose `on:*` props accept only a `Message`, the `event` placeholder from `idlip`, and the `For`, `Show`, `Switch` and `Match` components.
 
 ## Context
 
-- Source: `docs/proposals/0001-dsl.md`, View rules table.
+- Source: `docs/proposals/0001-dsl.md`, View rules table, and `docs/proposals/0002-modules.md`, Event placeholder.
 - Core types: `contracts/core-api.md`.
 
 ## Acceptance
 
-- [ ] Type tests: `on:click={msg.add()}` compiles, `on:click={() => 1}` fails, `msg.setDraft($event.value)` compiles.
+- [ ] Type tests: `on:click={msg.add()}` compiles, `on:click={() => 1}` fails, `msg.setDraft(event.value)` compiles.
 - [ ] Fast check passes: `pnpm --filter idlip test`
 
 ## Sizing

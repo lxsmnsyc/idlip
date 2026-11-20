@@ -1,6 +1,6 @@
 ---
 name: compiled-format
-version: 1
+version: 2
 status: draft
 defined_by: compiled-format
 ---
@@ -16,7 +16,7 @@ The seam between the compiler (`compile-update`, `compile-view-codegen`, `vite-p
 To be decided by the `compiled-format` node. It must define:
 
 - DOM encoding: event attributes, `$event` placeholders, binding markers, list keys.
-- State script: element, seroval payload, subscription list.
+- State script: element, seroval payload, subscription list, recorded path sets of `dynamic` holes (used once `dynamic-paths` lands).
 - Manifest: message tag to chunk, binding group to chunk and path set, list block to item template chunk.
 - Module shapes: server render function, update handler chunk, binding chunk, item template chunk.
 - Compiler API: `compile(source, id)` returning server module, client modules, manifest and diagnostics.
@@ -28,7 +28,8 @@ To be decided by the `compiled-format` node. It must define:
 ## Behavior
 
 - A message in the DOM is the tuple `[tag, payload]`, which `JSON.parse` reads, apart from `$event` placeholders. The loader turns it into `Message` (`{ t, p }`) after resolving the placeholders.
-- A nested module's message carries its prefixes as leading tags, for example `["left","increment"]`. The `nesting` node defines routing. Until then a tag has no prefix.
+- A nested module's message carries the model path of the module that handles it, for example `left`, or `counters` and `c7` for a list item with key `c7`. The encoding must keep the path apart from the tag, because a payload can be a string. The `nesting` node defines routing. Until then a message has no path.
+- Module source files are `*.idlip.tsx` with one default export, the `defineModule` result (`contracts/core-api.md`). Update handler chunks come from the keys of its `update` property.
 - Path sets use `*` for list items, for example `todos.*.done`.
 
 ## Stub
@@ -41,4 +42,5 @@ The golden fixtures are the stub for both sides.
 
 ## Changes
 
+- v2: message path instead of leading tags, `*.idlip.tsx` default export modules, room for `dynamic` path sets in the state script. Source: `docs/proposals/0002-modules.md`.
 - v1: initial draft.

@@ -48,7 +48,7 @@ Define exactly what the compiler emits and what the server renderer and the clie
 
 ## Context
 
-- Source: `docs/proposals/0001-dsl.md`, sections View, Patching after resume, Compiler output.
+- Source: `docs/proposals/0001-dsl.md`, sections View, Patching after resume, Compiler output, and `docs/proposals/0002-modules.md`, sections Module and Nesting.
 - Contract to freeze: `contracts/compiled-format.md`. Its draft lists the parts to decide.
 - Read `nodes/spike-chunk-split/outcome.md` and `contracts/view-ir.md` first. The manifest follows the spike's chunk scheme, and binding groups follow the path sets the analysis computes.
 - Types go in `packages/idlip/src/core/format.ts` so both sides import them.
@@ -60,7 +60,7 @@ Define exactly what the compiler emits and what the server renderer and the clie
 - [ ] Decide the manifest: message tag to chunk URL, binding group to chunk URL, binding group to model path set (with `*` for list items).
 - [ ] Decide the module shapes: server render function, update handler chunk export, binding chunk export, list item template chunk export.
 - [ ] Decide the compiler API: `compile(source, id) => { server, client: Module[], manifest, diagnostics }`.
-- [ ] Hand-write `test/fixtures/counter/` and `test/fixtures/todo/`: source `.tsx`, expected server module, expected client chunks, expected manifest, expected HTML for a given model.
+- [ ] Hand-write `test/fixtures/counter/` and `test/fixtures/todo/`: source `.idlip.tsx` with a `defineModule` default export, expected server module, expected client chunks, expected manifest, expected HTML for a given model.
 - [ ] Add a fixture test that loads each fixture and checks the files parse and the manifest points at existing exports.
 
 ## Acceptance

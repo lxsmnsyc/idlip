@@ -38,14 +38,15 @@ Answer: can an oxc pass compute, for every hole in a view, the set of model path
 
 ## Context
 
-- Source: `docs/proposals/0001-dsl.md`, View rules table.
+- Source: `docs/proposals/0001-dsl.md`, View rules table, and `docs/proposals/0002-modules.md`, sections Module, Partials and Path tracking.
+- The view is the `view(m, msg)` property of the `defineModule` default export. Message constructors are calls on its second parameter.
 - Use `oxc-parser` (the same parser brumate uses, see `../brumate/packages/brumate/package.json`).
 - Contract to freeze: `contracts/view-ir.md`.
 
 ## Acceptance
 
 - [ ] A prototype under this node folder analyzes the todo view from the proposal and prints the path set per hole.
-- [ ] `outcome.md` answers: which constructs resolve to exact paths, which fall back to "depends on all of `m`", and which must be compile errors.
+- [ ] `outcome.md` answers: which constructs resolve to exact paths, which are `dynamic` holes, and which must be compile errors. Partials must resolve by inlining.
 - [ ] `contracts/view-ir.md` describes the IR (template tree, holes, path sets, events, list and condition blocks) and is frozen.
 
 ## Sizing

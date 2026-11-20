@@ -46,6 +46,10 @@ depends_on:
 
 `Http.get`, `Storage.set`, `Focus.el` and `Time.every` as data, with their client executors loaded only when used. Active subscriptions start on resume from the list in the state script.
 
+## Context
+
+- Source: `docs/proposals/0002-modules.md`, Commands and subscriptions. A command names its result tag as a string. A subscription carries the message it dispatches.
+
 ## Acceptance
 
 - [ ] Each effect has a unit test in happy-dom.

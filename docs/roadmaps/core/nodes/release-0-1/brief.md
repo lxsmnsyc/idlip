@@ -44,6 +44,9 @@ depends_on:
   - on: nesting
     kind: hard
     why: 0.1.0 includes nesting
+  - on: dynamic-paths
+    kind: hard
+    why: 0.1.0 accepts views whose paths the analysis cannot resolve
 ---
 
 # Release 0.1.0

@@ -1,6 +1,6 @@
 ---
 id: nesting
-title: Nested modules with message prefixes
+title: Nested modules routed by model path
 status: todo
 priority: should
 type: feature
@@ -31,8 +31,8 @@ depends_on:
     why: builds on the finished compiler and runtime
 ---
 
-# Nested modules with message prefixes
+# Nested modules routed by model path
 
 ## Goal
 
-Child modules with `as` prefixes and `nest()` routing, as in the proposal section Nesting. No mapping closures.
+Child modules routed by model path, as in `docs/proposals/0002-modules.md`, section Nesting: `children()` and `list()` in `update`, `<Child.View model={...} />` in the view, and message props with `cmd.send`. No mapping closures.
