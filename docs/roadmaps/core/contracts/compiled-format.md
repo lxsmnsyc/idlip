@@ -1,6 +1,6 @@
 ---
 name: compiled-format
-version: 2
+version: 3
 status: draft
 defined_by: compiled-format
 ---
@@ -18,6 +18,7 @@ To be decided by the `compiled-format` node. It must define:
 - DOM encoding: event attributes, `$event` placeholders, binding markers, list keys.
 - State script: element, seroval payload, subscription list, recorded path sets of `dynamic` holes (used once `dynamic-paths` lands).
 - Manifest: message tag to chunk, binding group to chunk and path set, list block to item template chunk.
+- Reserved manifest fields for a message tag, from `docs/proposals/0003-update-analysis.md`: `writes` (the write set) and `bindings` (binding groups whose read sets intersect it). An entry holds either `chunk` or `ops`. Nodes before `write-sets` may leave `writes` and `bindings` out.
 - Module shapes: server render function, update handler chunk, binding chunk, item template chunk.
 - Compiler API: `compile(source, id)` returning server module, client modules, manifest and diagnostics.
 - Patcher interface called by the loader: `patch(root, oldModel, newModel, manifest): Promise<void>`. It loads chunks, so it is async. The loader awaits it before the next queued message.
@@ -31,6 +32,8 @@ To be decided by the `compiled-format` node. It must define:
 - A nested module's message carries the model path of the module that handles it, for example `left`, or `counters` and `c7` for a list item with key `c7`. The encoding must keep the path apart from the tag, because a payload can be a string. The `nesting` node defines routing. Until then a message has no path.
 - Module source files are `*.idlip.tsx` with one default export, the `defineModule` result (`contracts/core-api.md`). Update handler chunks come from the keys of its `update` property.
 - Path sets use `*` for list items, for example `todos.*.done`.
+- Reserved path syntax for keyed segments: `name[key=source]`, where `source` is `$p`, `$p.<field>` or a model path, for example `todos[id=$p].done`. The parser must reject it until `keyed-paths` lands, so no fixture uses it by accident.
+- Reserved placeholder `["$form", name]`, read from the `FormData` of the event target's form. Implemented by `form-fields`.
 
 ## Stub
 
@@ -42,5 +45,6 @@ The golden fixtures are the stub for both sides.
 
 ## Changes
 
+- v3: reserves the manifest fields `writes`, `bindings` and `ops`, keyed path segments and the `$form` placeholder. Source: `docs/proposals/0003-update-analysis.md`.
 - v2: message path instead of leading tags, `*.idlip.tsx` default export modules, room for `dynamic` path sets in the state script. Source: `docs/proposals/0002-modules.md`.
 - v1: initial draft.

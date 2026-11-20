@@ -1,6 +1,6 @@
 ---
 name: view-ir
-version: 2
+version: 3
 status: draft
 defined_by: spike-view-analysis
 ---
@@ -27,6 +27,7 @@ The IR does not fix how messages or markers are written into the DOM. `contracts
 ## Behavior
 
 - Path sets use `*` for list items.
+- The path type must leave room for keyed segments (`todos[id=selected].text`), from `docs/proposals/0003-update-analysis.md`. The analysis emits them only once `keyed-paths` lands.
 - Until `dynamic-paths` lands, the analysis reports a `dynamic` hole as an error diagnostic and emits no code for it.
 
 ## Stub
@@ -39,5 +40,6 @@ Hand-written IR for the counter and todo views, in this file, once the spike fre
 
 ## Changes
 
+- v3: path type reserves keyed segments. Source: `docs/proposals/0003-update-analysis.md`.
 - v2: reads the `view(m, msg)` property of `defineModule`. Adds `dynamic` holes, inlined partials and child blocks. Source: `docs/proposals/0002-modules.md`.
 - v1: initial draft.

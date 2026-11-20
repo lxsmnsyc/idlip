@@ -29,6 +29,9 @@ depends_on:
   - on: example-todo
     kind: hard
     why: needs the real chunk graph to measure against
+  - on: write-sets
+    kind: behavior
+    via: compiled-format
 ---
 
 # Prefetch chunks for messages present in the page

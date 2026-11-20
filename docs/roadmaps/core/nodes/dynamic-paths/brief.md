@@ -29,6 +29,9 @@ depends_on:
   - on: example-todo
     kind: hard
     why: builds on the shipped analysis, server renderer and binding patcher
+  - on: keyed-paths
+    kind: hard
+    why: keyed paths turn lookups by key into static holes, which shrinks this node
 ---
 
 # Runtime path tracking for dynamic holes

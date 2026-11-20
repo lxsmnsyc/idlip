@@ -1,6 +1,6 @@
 ---
 name: core-api
-version: 2
+version: 3
 status: draft
 defined_by: core-api
 ---
@@ -75,11 +75,19 @@ Subpaths: `idlip`, `idlip/server`, `idlip/client`, `idlip/compiler`, `idlip/vite
 
 `packages/idlip/test/core/`.
 
+## Reserved
+
+From `docs/proposals/0003-update-analysis.md`. Not exported until their nodes land, but the names are taken:
+
+- `event.form.<name>: string` and `event.form.all.<name>: string[]`, implemented by `form-fields`.
+- `Dom.reset(target)` and `Dom.focus(target)` commands, implemented by `form-fields`. The target type is an open question in 0003.
+
 ## Open questions
 
 - Whether `Cmd.to` can be checked against the payload type at type level. A `msg` parameter on handlers fails, because its type depends on the handlers.
 
 ## Changes
 
+- v3: reserves `event.form` and the `Dom` commands. Source: `docs/proposals/0003-update-analysis.md`.
 - v2: `defineModule` with one default export replaces `defineMessages` and `defineUpdate`. Message types come from the handlers. Constructors carry `tag`. `Sub` carries a message instead of a tag. Adds `cmd.send`, `event`, `ModelOf` and `MsgOf`. Source: `docs/proposals/0002-modules.md`.
 - v1: initial draft.
