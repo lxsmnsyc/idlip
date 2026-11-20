@@ -56,4 +56,5 @@ M with high uncertainty, time-boxed. The code is a prototype, not shipped.
 ## Notes for the worker
 
 - Path sets use `*` for a list item: `todos.*.done`.
+- Record which element nestings the HTML parser rewrites (`<div>` inside `<p>`, `<li>` outside a list, table rows outside table sections). The analysis should report them as diagnostics. Brumate's list is in `../brumate/website/docs/page-format.md`, section Elements.
 - Destructuring (`const { todos } = m`) and aliases must either resolve or be rejected. Record which.

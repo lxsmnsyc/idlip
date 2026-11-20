@@ -59,6 +59,10 @@ Define exactly what the compiler emits and what the server renderer and the clie
 - [ ] Decide the state script: element, seroval output, where the subscription list goes.
 - [ ] Decide the manifest: message tag to chunk URL, binding group to chunk URL, binding group to model path set (with `*` for list items).
 - [ ] Decide the module shapes: server render function, update handler chunk export, binding chunk export, list item template chunk export.
+- [ ] Decide the state encoding and the loader gzip budget. Read `../brumate/docs/compiler.md` (seroval code records) first.
+- [ ] Decide how events before the loader runs are kept.
+- [ ] Decide the event modifier encoding (`prevent`, `stop`, `once`, `capture`, `passive`, key filters), with `jsx-types` for the authoring syntax.
+- [ ] List the element nestings the HTML parser rewrites and whether each is rejected or survives with its markers.
 - [ ] Decide the compiler API: `compile(source, id) => { server, client: Module[], manifest, diagnostics }`.
 - [ ] Hand-write `test/fixtures/counter/` and `test/fixtures/todo/`: source `.idlip.tsx` with a `defineModule` default export, expected server module, expected client chunks, expected manifest, expected HTML for a given model.
 - [ ] Add a fixture test that loads each fixture and checks the files parse and the manifest points at existing exports.
@@ -66,6 +70,7 @@ Define exactly what the compiler emits and what the server renderer and the clie
 ## Acceptance
 
 - [ ] Both fixtures exist and the fixture test passes.
+- [ ] The todo fixture has a form submit with `prevent` and an input with a key filter.
 - [ ] The contract has no "TBD" left. Set `status: frozen`.
 - [ ] Fast check passes: `pnpm --filter idlip test`
 

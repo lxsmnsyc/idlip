@@ -53,6 +53,11 @@ The resume entry of `idlip/client`: one delegated listener per event type, decod
 - [ ] In happy-dom, a click on the counter fixture loads only the `increment` chunk and calls the patcher with the old and new model.
 - [ ] Two clicks before the chunk resolves apply in order.
 - [ ] `$event.value` decodes from an `input` event.
+- [ ] Three `input` events before the chunk resolves dispatch three messages with the three values typed, because placeholders resolve when the event fires.
+- [ ] `prevent` and `stop` modifiers apply before the chunk loads. A form submit with `prevent` does not navigate.
+- [ ] `focus` and `blur` messages fire through delegation.
+- [ ] A chunk that fails to load keeps the queued events, reports the error, and loads again on the next event for that tag.
+- [ ] Several messages queued while a chunk loads run through `update` in order, then patch once.
 - [ ] Fast check passes: `pnpm --filter idlip test`
 
 ## Sizing
@@ -61,4 +66,5 @@ M: known pattern from Qwik and brumate, new to this repo.
 
 ## Notes for the worker
 
+- Brumate's loader handles the same problems. Read `../brumate/packages/brumate/src/runtime/boot.ts` (delegation, modifiers, retry) before starting.
 - The loader must stay small. Report its minified and gzipped size in `outcome.md`.

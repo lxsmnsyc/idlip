@@ -53,6 +53,18 @@ depends_on:
   - on: form-fields
     kind: hard
     why: 0.1.0 includes form field placeholders and Dom commands
+  - on: deploy-skew
+    kind: hard
+    why: 0.1.0 pages must survive a deploy while cached
+  - on: testing-mount
+    kind: hard
+    why: 0.1.0 ships a test helper for users
+  - on: hmr
+    kind: hard
+    why: 0.1.0 dev server keeps the model on edits
+  - on: errors
+    kind: hard
+    why: 0.1.0 reports handler and command errors
 ---
 
 # Release 0.1.0

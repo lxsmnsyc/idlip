@@ -54,3 +54,5 @@ depends_on:
 
 - [ ] Each effect has a unit test in happy-dom.
 - [ ] A subscription listed in the state script starts on resume without loading any update chunk.
+- [ ] After a message, subscriptions start and stop to match the new model. The `subscriptions` function runs again only when a model path it reads changed, so most messages load no subscriptions chunk.
+- [ ] `Http.get` takes an error tag. A failed request dispatches a message to it.

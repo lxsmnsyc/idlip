@@ -36,3 +36,6 @@ depends_on:
 ## Goal
 
 Measure bytes loaded and time to first interaction for the todo app against Qwik, Marko and brumate, like brumate/benchmarks.
+
+- Measure the first click at 150 ms RTT. With one chunk per handler and per binding group, round trips can cost more than bytes.
+- Compare the current split with a merge threshold, like brumate's 4096 B `merge` option, and report which gives the faster first click.

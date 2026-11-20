@@ -50,7 +50,8 @@ depends_on:
 ## Acceptance
 
 - [ ] For both fixtures, rendering the fixture model gives the fixture HTML.
-- [ ] Text and attribute values are escaped. A test covers a model string with `</script>` and `"`.
+- [ ] Text and attribute values are escaped. A test covers a model string with `</script>`, `<!--`, `"` and U+2028.
+- [ ] A `nonce` render option is written on the state script and any inline script.
 - [ ] Fast check passes: `pnpm --filter idlip test`
 
 ## Sizing

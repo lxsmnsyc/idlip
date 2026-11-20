@@ -50,6 +50,10 @@ Given the old model, the new model and the manifest, find the binding groups who
 - [ ] A property test (fast-check) shows the changed-path set is exactly the set of paths whose values differ, for random model pairs.
 - [ ] Fast check passes: `pnpm --filter idlip test`
 
+## Notes for the worker
+
+- Find marker nodes lazily on the first patch, not at resume, so resume does no work. Report the lookup time for the todo fixture in `outcome.md`. Brumate builds a full index at boot (`../brumate/packages/brumate/src/runtime/client/blocks.ts`), which idlip avoids.
+
 ## Sizing
 
 M: path diff logic needs a property test. `fast-check` is installed by `core-api`.

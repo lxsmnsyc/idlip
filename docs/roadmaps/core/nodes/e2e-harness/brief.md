@@ -59,6 +59,10 @@ An `e2e/` workspace package with Playwright tests for the todo app: the page wor
 - [ ] The test target comes from the `E2E_TARGET` variable (`fixture` or `example`), so `example-todo` switches it in one line of `e2e/playwright.config.ts`.
 - [ ] A test clicks before page scripts finish loading, and the click still applies.
 - [ ] Chunk counting reads network requests, not runtime internals.
+- [ ] The todo page runs under a strict CSP with a nonce, `strict-dynamic` and Trusted Types, as brumate's e2e does.
+- [ ] Any console error or failed request fails the test.
+- [ ] Before the first event, no update or binding chunk loads and the state script is not decoded.
+- [ ] The loader's gzip size stays within the budget set in `contracts/compiled-format.md`.
 - [ ] `check.yml` runs the e2e tests with Chromium.
 
 ## Notes for the worker

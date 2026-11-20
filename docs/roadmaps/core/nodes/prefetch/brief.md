@@ -39,3 +39,5 @@ depends_on:
 ## Goal
 
 Preload update and binding chunks likely needed by messages in the DOM, so the first click does not wait on the network.
+
+Brumate removed idle prefetch on 2026-10-25 and kept `modulepreload` links and 103 Early Hints. Read `../brumate/docs/performance.md`, section Client loading, before choosing a strategy.
