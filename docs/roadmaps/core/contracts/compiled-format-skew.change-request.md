@@ -1,7 +1,7 @@
 # Change request: compiled-format v10, build id
 
 - From node: deploy-skew
-- Status: open
+- Status: applied on 2026-11-21 by the curator, from the code on `batch/core`
 
 ## Problem
 
@@ -26,4 +26,4 @@ Implemented in `src/client/skew.ts`, `src/vite/skew.ts`, `src/vite/plugin.ts` (`
 
 ## Decision
 
-Filled in by the orchestrator.
+Applied in v11 from the landed code.

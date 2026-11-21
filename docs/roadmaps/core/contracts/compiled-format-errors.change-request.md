@@ -1,7 +1,7 @@
 # Change request: compiled-format v10, `<Try>` regions
 
 - From node: errors
-- Status: open
+- Status: applied on 2026-11-21 by the curator, from the code on `batch/core`
 
 ## Problem
 
@@ -29,4 +29,4 @@ Implemented in `src/compiler/view/codegen/` (`html.ts` `addTry`, `chunks.ts` `em
 
 ## Decision
 
-Filled in by the orchestrator.
+Applied in v11 from the landed code.

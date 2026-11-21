@@ -120,3 +120,10 @@ depends_on:
 ## Goal
 
 Set `idlip` to `0.1.0`, set up npm trusted publishing (`npm trust github idlip --file release.yml --repo lxsmnsyc/idlip --allow-publish`), and let changesets publish from CI with provenance.
+
+## Updates after wave 9
+
+- The batch cut into `main` (PR #1) comes first: nothing here starts before it merges.
+- Defaults the changeset and the README must state: `skew` is on (serve `build.js` with `no-store`, keep `outDir` between deploys), prefetch is opt-in (`renderPreload`), `render()` drops head output (use `renderPage`), URL attributes drop `javascript:` URLs, form submits are prevented, `idlip/testing` rethrows an error a `<Try>` caught unless `expectCaught`.
+- Contracts are at `compiled-format` 11, `core-api` 11 and `view-ir` 11 and match the code. The loader with no optional features is 3881 B gzip against the 4096 B contract.
+- Not built, so not in 0.1 unless a node is added: `Step.send`, `let-reserved`, tracked dynamic holes in rows, branches and children.

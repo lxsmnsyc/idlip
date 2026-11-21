@@ -78,3 +78,8 @@ M: about eight pages with an export-coverage check. Verifiability is a script.
 
 - Follow the plain-writing skill.
 - The extension is private and not on the marketplace; say how to install the `.vsix` (see the `markup-vscode` outcome).
+
+## Updates after wave 9
+
+- New exports to cover: `idlip`: `trusted`, `TrustedHtml`, `Dom`, `Rect`, `RefName`, `timer`, `socket`, `eventSource`, `media`; `idlip/server`: `renderPage`, `renderPreload`, `PreloadOptions`, `safeUrl`, `slot`, `track`; `idlip/client`: `addChild`, `setProp`, `restartSub`; `idlip/testing`: `expectCaught`. Contracts `core-api` and `compiled-format` are at v11.
+- Diagnostics to list in the syntax page: see the Diagnostics table of `contracts/view-ir.md` v11.

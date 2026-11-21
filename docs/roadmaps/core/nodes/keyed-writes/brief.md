@@ -62,3 +62,11 @@ S: one pattern, two runtime lines.
 
 - `keyed-paths` landed. A keyed path prints `todos[id=selected].text`, the manifest keeps it, `getChunkFile` maps `[`, `]` and `=` to `(`, `)` and `~`, and `diffPaths` in `src/client/patch/diff.ts` reads the source as a model path from each model root, with `HAS_KEYED` gating the code. This node adds `$p.<n>` and `$p.<n>.<field>` sources: the loader replaces them with the payload value before it diffs. Read `test/client/patch/keyed.test.ts` first, and reuse its cases.
 - `HAS_KEYED` already covers the keyed segment, so the new loader code goes behind it. Its detector looks for `[` in a group path, which also matches a write set path. Check that the `writes` of a handler are counted by the detector, or add them.
+
+## Updates after wave 9
+
+- `write-sets` is in `compiled-format` v11 (Write sets): `meetsPath` in `compiler/update/writes.ts` treats `name[field=source]` as `name.*`. Reuse it.
+- The `HAS_KEYED` detector (`src/vite/features.ts`) reads only group paths. A `$p.<n>` source appears in handler `writes`, so extend the detector to read `manifest.handlers[*].writes` too, or the replacement code is dropped from a build whose groups have no `[`.
+- A handler of a child component runs against the slot's model. The `$p` index counts the payload of that handler, and the payload's owner is not part of it.
+- Every handler entry with `bindings` also lists `$dynamic` when the module has the group (`dynamic-paths`). Keep it when you change `bindings`.
+- Loader budget: the todo loader with no flags is 3881 B gzip against 3900 B in the e2e test (`loader-trim`), so the flag-on code must sit behind `HAS_KEYED` and cost nothing when off.

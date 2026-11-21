@@ -1,7 +1,7 @@
 # Change request: compiled-format dynamic holes
 
 - From node: dynamic-paths
-- Status: proposed
+- Status: applied on 2026-11-21 by the curator, from the code on `batch/core`
 
 ## Problem
 
@@ -26,3 +26,5 @@ compiled-format reserves a `dynamic` field in `PageState` and gives dynamic hole
 As described. `core/helpers.ts` lists `track$` as a copied helper.
 
 ## Decision
+
+Applied in v11 from the landed code.

@@ -1,7 +1,7 @@
 # Change request: compiled-format v9 to v10
 
 - From node: nesting-format
-- Status: open
+- Status: applied on 2026-11-21 by the curator, from the code on `batch/core`
 
 ## Problem
 
@@ -207,4 +207,4 @@ The fixtures `packages/idlip/test/fixtures/nested/` carry the proposed format. `
 
 ## Decision
 
-<Filled in by the orchestrator.>
+Applied in v11 from the landed code. Where the code differs, the code wins (see the contract Changes entry).

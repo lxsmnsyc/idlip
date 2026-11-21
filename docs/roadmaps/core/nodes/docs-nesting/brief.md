@@ -66,3 +66,8 @@ S: one page, one sample, small context.
 ## Notes for the worker
 
 - Follow the plain-writing skill.
+
+## Updates after wave 9
+
+- The limits to state: `Step.send` (a child handler that calls a message prop) is not built, a dynamic hole inside a child binds with its static paths, a child's model is not kept after its block is removed, and on a hot remount only a child's model is kept (its props come from the fresh render).
+- Nesting costs about +650 B of loader when on (`HAS_CHILDREN`). A child with no `key` outside a loop is slotted by position.

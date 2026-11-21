@@ -1,7 +1,7 @@
 # Change request: view-ir dynamic holes
 
 - From node: dynamic-paths
-- Status: proposed
+- Status: applied on 2026-11-21 by the curator, from the code on `batch/core`
 
 ## Problem
 
@@ -26,3 +26,5 @@ view-ir says the analysis never produces `dynamic` and that a `dynamic` hole is 
 `isTracked` and `scanTracked` in `analyze.ts`, `bindDynamic` in `plan.ts`. The analyzer test lists `dynamic.idlip.tsx.txt` as the only fixture with a dynamic hole.
 
 ## Decision
+
+Applied in v11 from the landed code.

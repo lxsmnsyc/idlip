@@ -82,3 +82,7 @@ S: one config file. The deployment is a human step.
 
 - Do not run `vercel`, push, or trigger any workflow. Check `gh repo view --json visibility` before suggesting anything that runs CI; run checks locally.
 - Write no tokens or project ids into the repo.
+
+## Updates after wave 9
+
+- `build.js` of the client build must be served with `Cache-Control: no-store` or a short max age (`deploy-skew`). The `immutable` header for `/assets/` in `vercel.json` must not match it: check where the build writes `build.js` (next to the loader entry) and give it its own header rule.

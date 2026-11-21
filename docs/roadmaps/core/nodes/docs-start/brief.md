@@ -71,3 +71,10 @@ M: four pages, about 800 lines of prose and samples. Verifiability is a check sc
 - Follow the plain-writing skill. Short sentences, no metaphors, no em-dashes.
 - Do not describe features that have no merged node yet. Effects, subscriptions, refs and nesting have their own nodes.
 - Do not edit the sidebar; front matter drives it.
+
+## Updates after wave 9
+
+- Form fields are plain event paths (`e.currentTarget.elements.draft.value`) and a `submit` is always prevented: use `form-fields` for the page, not the 0003 text. `$form` is gone.
+- Name these analyzer ids in the common-errors list: `event-computed-key`, `event-placeholder`, `html-trusted`, `attr-event`, `srcdoc-trusted`, `hole-dynamic` (only where a dynamic path set cannot be bound).
+- Views with a helper that takes the whole model or `props` are now accepted (`dynamic-paths`), so do not list them as errors.
+- The `resuming` page may show the optional preload (`renderPreload`) as the way to make the first click request nothing. It is off by default: the page and the e2e count stay at the loader only.

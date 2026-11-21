@@ -79,3 +79,9 @@ M: four pages, mostly reading the outcomes. Coupling is high in dependency count
 
 - Document only what the code does at the time you write. If a dependency's outcome lists a stub, say so on the page or leave it out.
 - Follow the plain-writing skill.
+
+## Updates after wave 9
+
+- `Dom.focus`, `Dom.scrollIntoView` and `Dom.reset` must be statements of their own in a handler (`dom-call-position`) and run once after the batch's patch. `Dom.measure` is awaited and returns a plain `{ x, y, width, height }` or `null`. A tuple ref in a row must use the row's key (`ref-key`).
+- A subscription whose `key` reads state restarts on a change. `QueuedEvent.done` makes one value in flight.
+- Cost for the reader: refs about +550 B and subscriptions +937 B of loader when on.

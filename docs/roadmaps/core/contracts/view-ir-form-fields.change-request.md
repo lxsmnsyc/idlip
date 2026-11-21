@@ -2,7 +2,7 @@
 
 From: `form-fields`. Target: the `Root` type and the diagnostics table of `contracts/view-ir.md`.
 
-Status: open.
+Status: applied on 2026-11-21 by the curator, from the code on `batch/core`
 
 ## Change
 

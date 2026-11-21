@@ -63,3 +63,7 @@ S: one page. The only cost is a benchmark run.
 
 - Do not hide the rows where idlip loses.
 - Follow the plain-writing skill.
+
+## Updates after wave 9
+
+- `prefetch` measured the cold first click with the links on: 60 ms against 221 ms off, at 150 ms RTT (`nodes/prefetch/outcome.md`, `benchmarks/prefetch/run.mjs`). Add it as a labelled row or note only if the page says prefetch is opt-in and loads two chunks before any click. The main table stays the default build.

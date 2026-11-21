@@ -1,7 +1,7 @@
 # Change request: compiled-format, `<Head>` markers
 
 - From node: document-head
-- Status: proposed, implemented as written in `packages/idlip`
+- Status: applied on 2026-11-21 by the curator, from the code on `batch/core`
 
 ## Problem
 
@@ -29,4 +29,4 @@ Implemented in `src/client/head.ts`, `src/compiler/view/codegen/head.ts`, `src/s
 
 ## Decision
 
-Filled in by the orchestrator.
+Applied in v11 from the landed code.

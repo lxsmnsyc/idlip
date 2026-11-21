@@ -1,7 +1,7 @@
 # Change request: compiled-format, write sets
 
 - From node: write-sets
-- Status: open
+- Status: applied on 2026-11-21 by the curator, from the code on `batch/core`
 
 ## Problem
 
@@ -25,4 +25,4 @@ Implemented in `packages/idlip/src/compiler/update/writes.ts`, `src/compiler/vie
 
 ## Decision
 
-Pending.
+Applied in v11 from the landed code.

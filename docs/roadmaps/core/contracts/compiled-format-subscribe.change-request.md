@@ -1,7 +1,7 @@
 # Change request: compiled-format, `<Subscribe>` markers
 
 - From node: commands-subs
-- Status: proposed, implemented as written in `packages/idlip`
+- Status: applied on 2026-11-21 by the curator, from the code on `batch/core`
 
 ## Problem
 
@@ -30,4 +30,4 @@ Implemented in `src/client/subs/`, `src/compiler/view/codegen/subscribe.ts`, `sr
 
 ## Decision
 
-Filled in by the orchestrator.
+Applied in v11 from the landed code.

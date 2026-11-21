@@ -1,6 +1,10 @@
 # Change request: compiled-format, raw HTML binding
 
-From node `svg-and-html`. The contract's Reserved section says a raw HTML binding is the export `h<id>`. The built binding is an element binding, `a<id>`.
+From node `svg-and-html`.
+
+Status: applied on 2026-11-21 by the curator, from the code on `batch/core`.
+
+The contract's Reserved section said a raw HTML binding is the export `h<id>`. The built binding is an element binding, `a<id>`.
 
 ## Change
 

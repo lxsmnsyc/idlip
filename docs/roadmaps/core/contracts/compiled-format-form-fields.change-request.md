@@ -2,7 +2,7 @@
 
 From: `form-fields`. Target: Placeholders, Modifiers and the reserved list of `contracts/compiled-format.md`.
 
-Status: open.
+Status: applied on 2026-11-21 by the curator, from the code on `batch/core`
 
 ## Change
 
