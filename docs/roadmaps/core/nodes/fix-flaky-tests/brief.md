@@ -1,7 +1,7 @@
 ---
 id: fix-flaky-tests
 title: Find and fix the flaky unit tests
-status: active
+status: done
 priority: should
 type: fix
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 73720
 owns:
   - packages/idlip/test/client/tasks/tasks.test.ts
   - packages/idlip/test/client/list/list.test.ts
@@ -39,9 +39,11 @@ Workers saw single failures that passed on rerun: `test/client/tasks/tasks.test.
 
 ## Acceptance
 
-- [ ] Each failure is reproduced, with the command and seed in `log.md`, or recorded as not reproduced after 50 runs under load.
-- [ ] The verify loop passes 10 times in a row.
+- [x] Each failure is reproduced, with the command and seed in `log.md`, or recorded as not reproduced after 50 runs under load.
+- [x] The verify loop passes 10 times in a row.
 
 ## Sizing
 
 S: three tests.
+
+Landed as 890467e on `batch/core` after self-review. `settled.test.ts` (11/75) and `list.test.ts` (2/75, a test bug with a todo titled `/t`) reproduced and fixed; `tasks.test.ts` not reproduced in 105 runs, fixed waits anyway. All in tests, no code bug. Flakes later reported in `nest` and `loader` tests (after this branch was cut) are not covered.
