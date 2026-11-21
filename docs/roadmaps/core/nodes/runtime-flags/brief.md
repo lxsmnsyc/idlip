@@ -1,7 +1,7 @@
 ---
 id: runtime-flags
 title: Runtime feature flags that drop unused loader code
-status: active
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 175734
 owns:
   - packages/idlip/src/client/features.ts
   - packages/idlip/src/vite/features.ts
@@ -58,12 +58,14 @@ The loader has a 4096 B gzip budget and was at 4061 B after `keyed-paths`. Sever
 
 ## Acceptance
 
-- [ ] `HAS_TASKS` and `HAS_KEYED` exist. The task runner from `run-tasks` and the keyed diff from `keyed-paths` sit behind them.
-- [ ] A build of `examples/todo` (no tasks, no keyed paths) has a loader without that code. The e2e budget test reports the size, and it is below the size on `batch/core` before this node.
-- [ ] A build of an app that uses a feature keeps its code (a test builds a fixture with an `await` handler and checks the task runner is in the loader).
-- [ ] Unbundled tests still run every feature.
-- [ ] `pnpm build && pnpm --filter e2e test` pass.
+- [x] `HAS_TASKS` and `HAS_KEYED` exist. The task runner from `run-tasks` and the keyed diff from `keyed-paths` sit behind them.
+- [x] A build of `examples/todo` (no tasks, no keyed paths) has a loader without that code. The e2e budget test reports the size, and it is below the size on `batch/core` before this node.
+- [x] A build of an app that uses a feature keeps its code (a test builds a fixture with an `await` handler and checks the task runner is in the loader).
+- [x] Unbundled tests still run every feature.
+- [x] `pnpm build && pnpm --filter e2e test` pass.
 
 ## Sizing
 
 M: plugin plus loader, known pattern from brumate.
+
+Landed as 41cd230 on `batch/core` after one fresh review round (hook filters, uncounted modules fail the build). Budget decision: 4096 B gzip is the loader with no optional features; each feature reports its cost (tasks +274 B, keyed paths +124 B).

@@ -1,7 +1,7 @@
 ---
 id: run-tasks
 title: Run tasks and dispatch continuations in the loader
-status: active
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 206720
 owns:
   - packages/idlip/src/client/tasks/**
   - packages/idlip/test/client/tasks/**
@@ -53,11 +53,13 @@ depends_on:
 
 ## Acceptance
 
-- [ ] A task resolves and the continuation runs with `{ ok: true, value }`. A rejection gives `{ ok: false, error }`. A failed task chunk is reported and keeps the model.
-- [ ] `Random.id` in a step patches once, after the continuation.
-- [ ] Two clicks give two independent continuations.
-- [ ] Loader size is at most 4096 B gzip.
+- [x] A task resolves and the continuation runs with `{ ok: true, value }`. A rejection gives `{ ok: false, error }`. A failed task chunk is reported and keeps the model.
+- [x] `Random.id` in a step patches once, after the continuation.
+- [x] Two clicks give two independent continuations.
+- [x] Loader size is at most 4096 B gzip.
 
 ## Sizing
 
 M: loader queue changes in a tight budget.
+
+Landed as 2b8ad15 on `batch/core` after two fresh review rounds (built-in detection, missing task export). Lands together with runtime-flags, which brings the loader back under budget.
