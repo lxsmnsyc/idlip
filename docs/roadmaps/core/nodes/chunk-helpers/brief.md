@@ -1,7 +1,7 @@
 ---
 id: chunk-helpers
 title: Copy DOM and render helpers into chunks
-status: active
+status: done
 priority: must
 type: perf
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 282253
 owns:
   - packages/idlip/src/compiler/view/codegen/**
   - packages/idlip/test/compiler/view/codegen/**
@@ -63,3 +63,5 @@ The `resume-loader` review measured the loader with the real patcher and list pa
 - [ ] The loader is at most 4096 B gzip -9, measured the same way, and the e2e budget test passes.
 - [ ] The first todo click still loads exactly `handler=toggle` and `binding=todos.*.done`; report the binding chunk's size before and after.
 - [ ] Golden fixtures updated where chunk text changes, with the reason in the outcome.
+
+Landed on `batch/core` as ef63cb1. Loader 3844 B gzip -9 minified. Edits outside paths: patch.test.ts, test/vite client stub and test, e2e/tests/support.ts.

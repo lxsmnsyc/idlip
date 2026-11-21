@@ -1,7 +1,7 @@
 ---
 id: testing-mount
 title: `idlip/testing`: render on the server and resume in happy-dom
-status: todo
+status: active
 priority: must
 type: feature
 story:
