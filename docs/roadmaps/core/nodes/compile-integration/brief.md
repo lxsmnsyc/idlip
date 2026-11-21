@@ -34,6 +34,9 @@ depends_on:
   - on: compile-view-analyze
     kind: hard
     why: calls the real view analysis
+  - on: props-method-path
+    kind: hard
+    why: the payload order must match between update chunks and events
   - on: analyze-v9
     kind: hard
     why: the todo source uses event modifiers, which the analysis accepts only after view-ir v9

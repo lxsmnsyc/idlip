@@ -1,7 +1,7 @@
 ---
 id: compile-update
 title: Compiler: compile handler functions into update chunks
-status: active
+status: done
 priority: must
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added:
-spent:
+spent: 264692
 owns:
   - packages/idlip/src/compiler/update/**
   - packages/idlip/test/compiler/update/**
@@ -53,3 +53,5 @@ An oxc pass that compiles each handler, a function declaration in a component bo
 - [ ] A handler that calls a module-level helper gets the helper in its chunk; an unused helper is left out.
 - [ ] A handler that reads a prop gets it as a payload field, and a handler that calls another handler runs both in one message.
 - [ ] Fast check passes: `pnpm --filter idlip test`
+
+Landed on `batch/core` as 73fb529. Follow-up `props-method-path` fixes the IR path of a method call on a props path.
