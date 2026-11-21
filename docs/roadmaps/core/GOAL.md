@@ -54,7 +54,7 @@ A todo app written in the idlip DSL renders on the server and resumes in the bro
 ## Verification
 
 - Fast check (safe to run in parallel worktrees): `pnpm --filter idlip test`
-- Full check (at checkpoints): `pnpm build && pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm --filter e2e test` (under 2 minutes, no shared resources)
+- Full check (at checkpoints): `pnpm build && pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm --filter e2e test` (under 2 minutes). The e2e servers use fixed ports; in parallel worktrees set `E2E_PORT`, `E2E_COUNTERS_PORT` and `E2E_SUBS_PORT` to free ports.
 
 ## Numbered resources
 

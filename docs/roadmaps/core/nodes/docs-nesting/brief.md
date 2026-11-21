@@ -1,7 +1,7 @@
 ---
 id: docs-nesting
 title: Guide: nesting components
-status: active
+status: done
 priority: should
 type: docs
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 120000
 owns:
   - website/docs/nesting.md
 shared: []
