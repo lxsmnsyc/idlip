@@ -1,7 +1,7 @@
 ---
 id: run-tasks
 title: Run tasks and dispatch continuations in the loader
-status: todo
+status: active
 priority: should
 type: feature
 story:
