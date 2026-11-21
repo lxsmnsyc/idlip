@@ -1,7 +1,7 @@
 ---
 id: docs-start
 title: Guide: getting started, components and state, views
-status: active
+status: done
 priority: should
 type: docs
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 152000
 owns:
   - website/docs/getting-started.md
   - website/docs/components.md
