@@ -1,7 +1,7 @@
 ---
 id: fix-global-late-listener
 title: Listen for window and document events added by a patch
-status: todo
+status: active
 priority: should
 type: fix
 story:
