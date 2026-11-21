@@ -1,9 +1,11 @@
 // oxlint-disable import/prefer-default-export
 import { DEV, warnDeepQueue } from '../../core/dev.ts';
 import { getChunkId } from '../../core/format.ts';
-import { HAS_TASKS } from '../features.ts';
+import { runAfter } from '../dom/run.ts';
+import { HAS_REFS, HAS_TASKS } from '../features.ts';
 import { runTask } from '../tasks/run.ts';
 import type {
+  After,
   Boot,
   HandlerChunk,
   Model,
@@ -23,6 +25,8 @@ interface Root {
   model: Model;
   /** The model the DOM shows. It changes only after a patch succeeds. */
   rendered: Model;
+  /** Dom calls to run after the patch of the batch. */
+  after?: After[];
 }
 
 interface Pending {
@@ -49,7 +53,7 @@ function importChunk(url: string): Promise<unknown> {
 }
 
 function isStep(result: Model | Step): result is Step {
-  return 'task' in result && 'model' in result;
+  return '$step' in result;
 }
 
 export interface Resumed {
@@ -262,12 +266,18 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
   // other task runs on its own, and its continuation joins the queue when it settles.
   async function apply(root: Root, update: Update, message: QueuedEvent['message']): Promise<void> {
     const result = update(root.model, message.p);
-    if (!HAS_TASKS || !isStep(result)) {
+    if (!((HAS_TASKS || HAS_REFS) && isStep(result))) {
       // oxlint-disable-next-line typescript/no-unsafe-type-assertion
       root.model = result as Model;
       return;
     }
     root.model = result.model;
+    if (HAS_REFS && result.after !== undefined) {
+      (root.after ??= []).push(...result.after);
+    }
+    if (!HAS_TASKS || result.task === undefined) {
+      return;
+    }
     await runTask(
       {
         page: root.page,
@@ -296,12 +306,20 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
       if (stopped) {
         return;
       }
+      let patched = true;
       if (root.model !== root.rendered) {
         try {
           await patch(root.page, root.rendered, root.model);
           root.rendered = root.model;
         } catch (error) {
+          patched = false;
           report(error);
+        }
+      }
+      if (HAS_REFS) {
+        const calls = root.after?.splice(0);
+        if (patched && calls !== undefined) {
+          runAfter(root.page, calls);
         }
       }
     }

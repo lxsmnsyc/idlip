@@ -35,7 +35,7 @@ export async function runTask(host: TaskHost, { site, args, then, carried }: Tas
     let outcome: Outcome;
     try {
       // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-      outcome = { ok: true, value: await (run as Run)(...args) };
+      outcome = { ok: true, value: await Reflect.apply(run as Run, host.page.root, args) };
     } catch (error) {
       outcome = { ok: false, error };
     }

@@ -10,9 +10,13 @@
 
 declare const __IDLIP_HAS_TASKS__: boolean | undefined;
 declare const __IDLIP_HAS_KEYED__: boolean | undefined;
+declare const __IDLIP_HAS_REFS__: boolean | undefined;
 
 /** Handlers that `await`, which the task runner serves. */
 export const HAS_TASKS: boolean = typeof __IDLIP_HAS_TASKS__ === 'undefined' || __IDLIP_HAS_TASKS__;
 
 /** Paths with a keyed segment such as `todos[id=selected]`, which the diff resolves by key. */
 export const HAS_KEYED: boolean = typeof __IDLIP_HAS_KEYED__ === 'undefined' || __IDLIP_HAS_KEYED__;
+
+/** Handlers that call `Dom.focus`, `Dom.scrollIntoView` or `Dom.reset`, which run after the patch. */
+export const HAS_REFS: boolean = typeof __IDLIP_HAS_REFS__ === 'undefined' || __IDLIP_HAS_REFS__;

@@ -150,6 +150,10 @@ export interface SplitInput {
   options: EmitOptions;
   /** The expression the model becomes, such as `{ ...model, save }`. */
   nextModel: string;
+  /** What a handler returns when it ends, when it also collects `$after`: a step. */
+  result?: string;
+  /** The steps that start a task carry `$after` too. */
+  hasAfter?: boolean;
   /** The props paths in payload order, which order the props a continuation carries. */
   propsOrder: readonly string[];
   /** Props paths that every continuation takes, such as those read by called handlers. */
@@ -232,7 +236,9 @@ function writeSegments(
           used[current].add(path);
           options.onProps?.(path);
         },
-        ...(replacements === undefined ? {} : { replacements }),
+        ...(replacements === undefined
+          ? {}
+          : { replacements: new Map([...(options.replacements ?? []), ...replacements]) }),
       },
       indent,
     );
@@ -256,11 +262,14 @@ function writeSegments(
     }
     const tag = input.tags[index];
     const carried = listCarried(index).join(', ');
+    const task = `${indent}  task: { site: '${tag}', args: [${args.join(', ')}], then: '${tag}', carried: [${carried}] },`;
+    const after = input.hasAfter === true ? [`${indent}  after: $after,`] : [];
     return [
       `${indent}return {`,
       `${indent}  $step: true,`,
       `${indent}  model: ${nextModel},`,
-      `${indent}  task: { site: '${tag}', args: [${args.join(', ')}], then: '${tag}', carried: [${carried}] },`,
+      task,
+      ...after,
       `${indent}};`,
     ];
   }
@@ -319,7 +328,7 @@ function writeSegments(
     }
     if (index === -1) {
       if (body.at(-1)?.type !== 'ReturnStatement') {
-        lines.push(`  return ${nextModel};`);
+        lines.push(`  return ${input.result ?? nextModel};`);
       }
     } else if (body[stop].type === 'TryStatement') {
       lines.push(...writeRegion(stop, 0, undefined));

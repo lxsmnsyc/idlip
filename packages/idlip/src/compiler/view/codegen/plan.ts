@@ -300,9 +300,6 @@ class Planner {
             }
           }
           ids.push(...this.bindEvents(node.events, context));
-          if (node.ref !== undefined) {
-            this.report('codegen-unsupported', 'ref is not generated yet', node.span);
-          }
           if (node.html !== undefined) {
             this.report('codegen-unsupported', 'html is not generated yet', node.span);
           }

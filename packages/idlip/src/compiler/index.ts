@@ -53,7 +53,7 @@ export function compile(source: string, id: string): CompileResult {
   return {
     server: view.server,
     client: [...handlers.client, ...view.client],
-    manifest: view.manifest,
+    manifest: handlers.after === true ? { ...view.manifest, after: true } : view.manifest,
     diagnostics,
   };
 }

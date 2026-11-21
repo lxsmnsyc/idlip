@@ -20,6 +20,7 @@ function hasKeyedPath({ manifest }: CompileResult): boolean {
 const DETECTORS: Readonly<Record<string, Detector>> = {
   TASKS: ({ manifest }) => manifest.tasks !== undefined,
   KEYED: hasKeyedPath,
+  REFS: ({ manifest }) => manifest.after === true,
 };
 
 /** Returns the flags that the compiled modules turn on. */

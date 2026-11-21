@@ -11,15 +11,23 @@ import {
   listReferences,
   scanReferences,
 } from './emit.ts';
-import type { PropsRoots } from './emit.ts';
+import type { EmitOptions, PropsRoots } from './emit.ts';
 import { findAwaitSites, splitSegments } from './segments.ts';
 import type { AwaitSite } from './segments.ts';
-import { emitBuiltinTask, emitTaskRun, getTaskChunk, isBuiltinTask } from './tasks.ts';
+import {
+  emitBuiltinTask,
+  emitTaskRun,
+  findDomCalls,
+  getTaskChunk,
+  isBuiltinTask,
+} from './tasks.ts';
 
 export interface CompileHandlersResult {
   /** One module per handler, `handler=<tag>`. Empty when a diagnostic is an error. */
   client: Module[];
   diagnostics: CompileDiagnostic[];
+  /** True when a handler calls `Dom` after the patch, so the manifest says `after`. */
+  after?: true;
 }
 
 /** Where a module-level name is declared, and the statement to copy. */
@@ -355,6 +363,23 @@ function collectHelpers(
   return { statements, queue };
 }
 
+/** The local name of `Dom` imported from `idlip`, if any. */
+function findDomLocal(scope: Scope): string | undefined {
+  for (const [name, binding] of scope.imports) {
+    const { statement, specifier } = binding;
+    if (
+      statement.type === 'ImportDeclaration' &&
+      statement.source.value === 'idlip' &&
+      specifier.type === 'ImportSpecifier' &&
+      specifier.imported.type === 'Identifier' &&
+      specifier.imported.name === 'Dom'
+    ) {
+      return name;
+    }
+  }
+  return undefined;
+}
+
 /** An awaited call of a handler, ready for its task. */
 interface AwaitedCall {
   site: AwaitSite;
@@ -471,7 +496,7 @@ function compileHandler(
   scope: Scope,
   handler: Handler,
   diagnostics: CompileDiagnostic[],
-): { code: string; tasks: Module[] } | undefined {
+): { code: string; tasks: Module[]; after: boolean } | undefined {
   const { component, source } = scope;
   const byName = new Map<string, Handler>();
   for (const candidate of component.handlers) {
@@ -562,6 +587,11 @@ function compileHandler(
       }
     }
   }
+  // `Dom` calls become entries of `$after`, so the chunk does not import `Dom`.
+  const domLocal = findDomLocal(scope);
+  if (domLocal !== undefined) {
+    references.delete(domLocal);
+  }
   // A derived value reads state, other derived values, helpers and imports.
   const derivedDeps = new Map<string, Set<string>>();
   for (let index = 0; index < derivedNames.length; index++) {
@@ -627,6 +657,9 @@ function compileHandler(
     if (fn !== undefined) {
       listReferencesOutside(fn, awaited.callees, used);
     }
+  }
+  if (domLocal !== undefined) {
+    used.delete(domLocal);
   }
 
   // The payload: the props values of the closure, then the handler's arguments.
@@ -717,7 +750,7 @@ function compileHandler(
   }
   // The props that called handlers read ride in every continuation, as they are in every function.
   const nestedProps: string[] = [];
-  const options = {
+  const options: EmitOptions = {
     props: scope.roots,
     onProps(path: string): void {
       onProps(path);
@@ -726,6 +759,42 @@ function compileHandler(
       }
     },
   };
+  // Plain `Dom` calls of the closure run after the patch: each pushes to `$after`.
+  let hasAfter = false;
+  if (domLocal !== undefined) {
+    const functions: AstNode[] = [];
+    for (const item of closure) {
+      const fn = scope.handlers.get(item.name);
+      if (fn !== undefined) {
+        functions.push(fn);
+      }
+    }
+    const calls = findDomCalls(functions, domLocal, (argument) =>
+      emitRange(
+        source,
+        [argument],
+        argument.start,
+        argument.end,
+        { ...options, locals: entryParams },
+        '',
+      ),
+    );
+    if (calls.error !== undefined) {
+      diagnostics.push({
+        rule: 'dom-call-position',
+        severity: 'error',
+        message: 'Call Dom.focus, Dom.scrollIntoView and Dom.reset as a statement of their own',
+        span: { start: calls.error.start, end: calls.error.end },
+      });
+      return undefined;
+    }
+    hasAfter = calls.replacements.size > 0;
+    options.replacements = calls.replacements;
+  }
+  const result = hasAfter ? `{ $step: true, model: ${nextModel}, after: $after }` : nextModel;
+  if (hasAfter) {
+    out.push('  const $after = [];');
+  }
   for (const item of recursive ? closure : closure.slice(1)) {
     const fn = scope.handlers.get(item.name);
     if (fn !== undefined) {
@@ -753,12 +822,14 @@ function compileHandler(
       options: {
         ...options,
         locals: entryParams,
-        returns: `return ${nextModel};`,
+        returns: `return ${result};`,
         onFinallyReturn: (start: number): void => {
           finallyReturns.push(start);
         },
       },
       nextModel,
+      result,
+      hasAfter,
       propsOrder: propsPaths,
       fixedProps: nestedProps,
     });
@@ -777,13 +848,13 @@ function compileHandler(
     continuations.push(...parts.rest);
   } else if (recursive) {
     out.push(`  ${handler.name}(...$args);`);
-    out.push(`  return ${nextModel};`);
+    out.push(`  return ${result};`);
   } else {
     const finallyReturns: number[] = [];
     const inline = {
       ...options,
       locals: entryParams,
-      returns: `return ${nextModel};`,
+      returns: `return ${result};`,
       onFinallyReturn: (start: number): void => {
         finallyReturns.push(start);
       },
@@ -805,7 +876,7 @@ function compileHandler(
       return undefined;
     }
     if (statements.at(-1)?.type !== 'ReturnStatement') {
-      out.push(`  return ${nextModel};`);
+      out.push(`  return ${result};`);
     }
   }
 
@@ -854,7 +925,7 @@ function compileHandler(
     }
     tasks.push(task);
   }
-  return { code: `${lines.join('\n')}\n`, tasks };
+  return { code: `${lines.join('\n')}\n`, tasks, after: hasAfter };
 }
 
 /** Writes the `import` lines for the names the chunk uses. */
@@ -939,9 +1010,11 @@ export function compileHandlers(
     return { client: [], diagnostics };
   }
   const client: Module[] = [];
+  let after = false;
   for (const handler of component.handlers) {
     const compiled = compileHandler(scope, handler, diagnostics);
     if (compiled !== undefined) {
+      after ||= compiled.after;
       client.push({ chunk: `handler=${handler.name}`, code: compiled.code }, ...compiled.tasks);
     }
   }
@@ -950,5 +1023,5 @@ export function compileHandlers(
       return { client: [], diagnostics };
     }
   }
-  return { client, diagnostics };
+  return after ? { client, diagnostics, after } : { client, diagnostics };
 }

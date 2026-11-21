@@ -1799,7 +1799,23 @@ class Analyzer {
       ) {
         const key = this.lower(second, scope);
         if (key.kind === 'path' && key.root.kind === 'loop') {
-          return { kind: 'tuple', name: first.value, key };
+          const row = context.rowKey;
+          if (
+            row !== undefined &&
+            !key.root.index &&
+            key.root.name === row.item &&
+            key.segments.length === 1 &&
+            key.segments[0] === row.key
+          ) {
+            return { kind: 'tuple', name: first.value, key };
+          }
+          this.report(
+            'ref-key',
+            'error',
+            `The key of a ref must be the key of the enclosing <For>, the field ${row?.key ?? ''} of its item`,
+            attribute,
+          );
+          return undefined;
         }
       }
     }
@@ -2095,6 +2111,10 @@ class Analyzer {
     const body = this.lowerBranch(render.body, inner, {
       ...context,
       loopDepth: context.loopDepth + 1,
+      rowKey: {
+        item: itemName,
+        key: keyNode?.type === 'Literal' && typeof keyNode.value === 'string' ? keyNode.value : '',
+      },
     });
     return [
       {
@@ -3096,6 +3116,8 @@ interface ViewContext {
   namespace: Namespace;
   inHead: boolean;
   loopDepth: number;
+  /** The innermost `<For>`: its item name and `key` field. */
+  rowKey?: { item: string; key: string };
 }
 
 // ---------------------------------------------------------------------------------------------

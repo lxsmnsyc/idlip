@@ -168,6 +168,21 @@ export class HtmlBuilder {
     }
   }
 
+  /** Writes `i-ref="name"`, or `i-ref="name key"` for a row. The key never patches. */
+  addRef(node: Extract<Node, { kind: 'element' }>, built: Built): void {
+    const { ref } = node;
+    if (ref === undefined) {
+      return;
+    }
+    if (ref.kind === 'name') {
+      addText(built, ` i-ref="${escapeAttribute(ref.name)}"`);
+      return;
+    }
+    this.emitter.at = node.span;
+    this.emitter.usage.helpers.add('attr');
+    addCode(built, `attr$('i-ref', ${quote(`${ref.name} `)} + ${this.emitter.expr(ref.key, 14)})`);
+  }
+
   addAnchor(node: Node, built: Built): void {
     const ids = this.plan.anchors.get(node);
     if (ids !== undefined) {
@@ -194,6 +209,7 @@ export class HtmlBuilder {
       }
     }
     this.addEvents(node.events, built);
+    this.addRef(node, built);
     this.addAnchor(node, built);
     addText(built, '>');
     if (VOID_TAGS.has(node.tag)) {

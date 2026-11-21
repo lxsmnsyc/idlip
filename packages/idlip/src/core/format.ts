@@ -50,6 +50,8 @@ export interface Manifest {
    * handler awaits.
    */
   readonly tasks?: Readonly<Record<string, string>>;
+  /** True when a handler returns `after` Dom calls, which the loader runs after the patch. */
+  readonly after?: true;
   /** Binding groups by key, ordered so a group comes before the groups it covers. */
   readonly groups: Readonly<Record<string, BindingGroup>>;
   /** `<For>` blocks by binding id, written as a string. */
@@ -160,8 +162,19 @@ export type Binding = NodeBinding | ListBinding;
 export type Update = (model: Model, payload: readonly unknown[]) => Model | Step;
 
 export interface Step {
+  /** Marks a step, since a model may have a field named `model` or `task`. */
+  readonly $step?: true;
   readonly model: Model;
-  readonly task: Task;
+  readonly task?: Task;
+  /** Dom calls that run once after the batch's patch. */
+  readonly after?: readonly After[];
+}
+
+/** A `Dom.focus`, `Dom.scrollIntoView` or `Dom.reset` call of a handler, run after the patch. */
+export interface After {
+  readonly call: 'focus' | 'scrollIntoView' | 'reset';
+  /** The ref name: a string, or `[name, key]` for a row. */
+  readonly args: readonly [string | readonly [string, string | number]];
 }
 
 /** An awaited call, run by `runTask`. */

@@ -23,7 +23,7 @@ const scope = globalThis as unknown as Globals;
 const SOURCES: Record<string, string> = {
   'handler=go': `
 export function go(model) {
-  return { model: { ...model, busy: true }, task: { site: 'go$1', args: [], then: 'go$1', carried: [] } };
+  return { $step: true, model: { ...model, busy: true }, task: { site: 'go$1', args: [], then: 'go$1', carried: [] } };
 }
 export function go$1(model, [outcome]) {
   return { ...model, id: outcome.ok ? outcome.value : 'failed' };
@@ -31,7 +31,7 @@ export function go$1(model, [outcome]) {
 function rid() { return 'id-1'; }
 export { rid as 'task$go$1' };
 export function slow(model, [n]) {
-  return { model: { ...model, wait: true }, task: { site: 'slow$1', args: [n], then: 'slow$1', carried: ['tag'] } };
+  return { $step: true, model: { ...model, wait: true }, task: { site: 'slow$1', args: [n], then: 'slow$1', carried: ['tag'] } };
 }
 export function slow$1(model, [outcome, tag]) {
   return { ...model, last: [outcome.ok, outcome.ok ? outcome.value : String(outcome.error), tag] };
