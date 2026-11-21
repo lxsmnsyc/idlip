@@ -1,7 +1,7 @@
 ---
 id: errors
 title: Errors: the Try block in the compiler and on the server
-status: active
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-20
-spent:
+spent: 241160
 owns:
   - packages/idlip/src/compiler/view/codegen/try.ts
   - packages/idlip/src/server/try.ts
@@ -60,11 +60,11 @@ Generate code for the `try` node that the analyzer already lowers (`analyze.ts`,
 
 ## Acceptance
 
-- [ ] A fixture with a `<Try>` around a hole that throws renders the catch view on the server. Golden files in `test/fixtures/try/`.
-- [ ] A `<Try>` inside a condition and inside a `<For>` row renders and compiles.
-- [ ] The manifest has `fallback` for each region; a module with no `<Try>` has none and its output is byte-identical to before (todo goldens unchanged).
-- [ ] Fast check passes: `pnpm --filter idlip test`
-- [ ] Change request: `contracts/compiled-format-errors.change-request.md` (region marker, `fallback`, `reset` message, what the catch view reads).
+- [x] A fixture with a `<Try>` around a hole that throws renders the catch view on the server. Golden files in `test/fixtures/try/`.
+- [x] A `<Try>` inside a condition and inside a `<For>` row renders and compiles.
+- [x] The manifest has `fallback` for each region; a module with no `<Try>` has none and its output is byte-identical to before (todo goldens unchanged).
+- [x] Fast check passes: `pnpm --filter idlip test`
+- [x] Change request: `contracts/compiled-format-errors.change-request.md` (region marker, `fallback`, `reset` message, what the catch view reads).
 
 ## Sizing
 
@@ -74,3 +74,5 @@ Compiler plus server only, one new block kind. The runtime half is `errors-clien
 
 - Components are plain functions; the catch arrow is the only closure in the source and is compiled away. Do not serialize it.
 - Brumate's `#try ... #catch` is in `../brumate/packages/brumate/src/runtime/boot.ts` and `html.ts`; read it first for how the server marks a failed region.
+
+Landed as 0b1558c on `batch/core` after one fresh review round (own region counter, fixture coverage, `name: message` error text). The runtime is `errors-client`.
