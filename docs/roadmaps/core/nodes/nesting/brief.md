@@ -1,7 +1,7 @@
 ---
 id: nesting
 title: Nested components, end to end
-status: todo
+status: active
 priority: should
 type: feature
 story:
