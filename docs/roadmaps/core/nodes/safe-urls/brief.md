@@ -1,7 +1,7 @@
 ---
 id: safe-urls
 title: Block javascript URLs in URL attributes
-status: active
+status: done
 priority: should
 type: fix
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 93333
 owns:
   - packages/idlip/test/security/**
   - packages/idlip/src/core/url.ts
@@ -43,10 +43,12 @@ The `svg-and-html` security review found that `href`, `src`, `action`, `formacti
 
 ## Acceptance
 
-- [ ] A test binds `javascript:alert(1)` from the model into `href` on `<a>` and on SVG `<a>`, on the server render and after a client patch; it fails on the base and passes on the branch (the value is replaced or the attribute dropped, with a dev warning).
-- [ ] A static `href="javascript:void(0)"` written in source keeps working, or is a compile error; pick one and document it.
-- [ ] Todo loader stays under 4096 B gzip.
+- [x] A test binds `javascript:alert(1)` from the model into `href` on `<a>` and on SVG `<a>`, on the server render and after a client patch; it fails on the base and passes on the branch (the value is replaced or the attribute dropped, with a dev warning).
+- [x] A static `href="javascript:void(0)"` written in source keeps working, or is a compile error; pick one and document it.
+- [x] Todo loader stays under 4096 B gzip.
 
 ## Sizing
 
 S: one URL check shared by server and client.
+
+Landed as 7ab212d on `batch/core`. Proof: `javascript:alert(1)` from the model stayed in `href` on the server and after a patch on the base; dropped with a dev warning on the branch. Static literals in source are not checked. Loader unchanged (the check lives in chunks). Follow-up: `safe-urls-2`.

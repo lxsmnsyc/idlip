@@ -26,6 +26,9 @@ shared: []
 reserves: []
 provides: []
 depends_on:
+  - on: safe-urls-2
+    kind: hard
+    why: ships in 0.1.0
   - on: fix-flaky-tests-2
     kind: hard
     why: ships in 0.1.0
