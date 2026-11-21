@@ -81,3 +81,7 @@ Options weighed: (A) TS subset with restricted JSX in `*.idlip.tsx`, (B) an own 
 ## Cost of this debate
 
 - 3 of 3 rounds, about 184k tokens
+
+## Follow-up, 2026-11-21
+
+The user: "we can't have two compilers in the same framework". The markup DSL replaces TSX as the only source syntax; `.idlip.tsx` input is removed by story children `markup-port` and `markup-only`.

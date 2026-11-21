@@ -36,6 +36,9 @@ shared:
 reserves: []
 provides: []
 depends_on:
+  - on: markup-only
+    kind: hard
+    why: the DSL is the only source syntax
   - on: markup-frontend
     kind: hard
     why: the sample checker compiles every idlip block with toTypeScript from idlip/compiler

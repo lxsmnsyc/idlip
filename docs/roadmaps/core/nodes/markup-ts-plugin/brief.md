@@ -31,6 +31,9 @@ shared:
 reserves: []
 provides: []
 depends_on:
+  - on: markup-only
+    kind: hard
+    why: the DSL is the only source syntax
   - on: markup-frontend
     kind: hard
     why: needs @idlip/language-core and the VS Code extension on the main branch
