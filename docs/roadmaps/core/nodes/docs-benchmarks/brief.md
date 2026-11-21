@@ -36,6 +36,12 @@ depends_on:
   - on: spike-chunk-merge
     kind: hard
     why: the first-click numbers change if chunk merging lands, so the page waits for the final ones
+  - on: bench-rows
+    kind: hard
+    why: the page shows the rows and dashboard tables
+  - on: perf-from-bench
+    kind: hard
+    why: the page shows the numbers after the performance work
 ---
 
 # Benchmarks page
@@ -67,3 +73,8 @@ S: one page. The only cost is a benchmark run.
 ## Updates after wave 9
 
 - `prefetch` measured the cold first click with the links on: 60 ms against 221 ms off, at 150 ms RTT (`nodes/prefetch/outcome.md`, `benchmarks/prefetch/run.mjs`). Add it as a labelled row or note only if the page says prefetch is opt-in and loads two chunks before any click. The main table stays the default build.
+
+## Updates after the bench nodes (2026-11-21)
+
+- Columns: idlip, brumate latest (`benchmarks/brumate`), brumate 0.3.0, Marko 6, Qwik 1, Qwik 2 for todos; idlip, brumate, Marko for rows and dashboard (`bench-rows`).
+- Use the run recorded after `perf-from-bench`, and copy its "Where idlip loses" list.

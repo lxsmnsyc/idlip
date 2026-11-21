@@ -107,6 +107,9 @@ depends_on:
   - on: spike-chunk-merge
     kind: hard
     why: ships in 0.1.0
+  - on: perf-from-bench
+    kind: hard
+    why: 0.1.0 ships the fixes for the benchmark gaps
 ---
 
 # Release 0.1.0
