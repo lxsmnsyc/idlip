@@ -1,7 +1,7 @@
 ---
 id: patch-lists
 title: Keyed list patching for <For>
-status: todo
+status: active
 priority: must
 type: feature
 story:

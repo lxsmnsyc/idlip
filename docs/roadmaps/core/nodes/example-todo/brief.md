@@ -72,6 +72,7 @@ depends_on:
 - [ ] `pnpm --filter todo build` and `pnpm --filter todo dev` work.
 - [ ] The e2e tests pass against the example.
 - [ ] `outcome.md` lists the bytes loaded before and after the first click.
+- [ ] The e2e harness runs it with `E2E_TARGET=example`: the package is `todo`, `pnpm --filter todo preview --port 4173 --strictPort` serves it, and `GET /?props=<json>` renders the page for `{ initial: [...] }`. Adapt `getChunkName` in `e2e/tests/support.ts` to the built file names if needed (from `e2e-harness`).
 
 ## Notes for the worker
 
