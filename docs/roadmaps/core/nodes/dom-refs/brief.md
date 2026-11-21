@@ -1,7 +1,7 @@
 ---
 id: dom-refs
 title: Refs and Dom functions
-status: active
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-20
-spent:
+spent: 246972
 owns:
   - packages/idlip/src/client/dom/**
   - packages/idlip/src/core/dom.ts
@@ -68,10 +68,10 @@ depends_on:
 
 ## Acceptance
 
-- [ ] Server and item-template output carry `i-ref`. The fixtures cover a row ref.
-- [ ] Focus on an element the same message renders works. A missing ref warns and does nothing.
-- [ ] `await Dom.measure` gives the rect to the continuation.
-- [ ] Loader size is at most 4096 B gzip.
+- [x] Server and item-template output carry `i-ref`. The fixtures cover a row ref.
+- [x] Focus on an element the same message renders works. A missing ref warns and does nothing.
+- [x] `await Dom.measure` gives the rect to the continuation.
+- [x] Loader size is at most 4096 B gzip.
 
 ## Sizing
 
@@ -82,3 +82,5 @@ M: codegen, handler rewrite and runtime, each small; context load is medium.
 - `Dom.measure` is a built-in site. `compiled-format` v10 lists a built-in in `manifest.tasks` with the value `handler=<name>`, and the handler chunk exports `task$<site>(...args)`. The loader runs it in the current batch through `runTask(host, task)` (`src/client/tasks/run.ts`), so one patch covers the step and its continuation. Add the site to `emitBuiltinTask` in `src/compiler/update/tasks.ts`. `Step.after` is a new field: read how `apply` in `resume.ts` runs a step first.
 - Loader size: the budget is the loader with no optional features. Put the loader code behind a `HAS_<NAME>` flag (`HAS_REFS`), following the recipe in `nodes/runtime-flags/outcome.md`: a `declare const` and export in `src/client/features.ts`, one line in `DETECTORS` of `src/vite/features.ts`, and `if (HAS_REFS)` around the code. The 4096 B gzip budget is the loader with no optional features, so the flag removes your cost from apps that do not use it. Report the feature's cost; it is not capped. The detector is on when a handler has an after-patch `Dom` call or a view has `i-ref`.
 - The `mount` test with `await Random.id()` can reuse `test/client/tasks/tasks.test.ts` and `test/compiler/update/effects.test.ts` as models. `Random` and `Time` are exported from `idlip` now.
+
+Landed as 79e6554 on `batch/core` after one fresh review round. Todo loader 3950 B (+24 B with refs off); refs add about 550 B. A missing ref warns; `measure` resolves to `null`. Accepted changes outside paths: `handlers.ts`, `tasks.ts`, `tasks/run.ts`, `compiler/index.ts`.
