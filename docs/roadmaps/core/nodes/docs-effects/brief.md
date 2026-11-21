@@ -1,7 +1,7 @@
 ---
 id: docs-effects
 title: Guide: effects, subscriptions, refs, global events
-status: active
+status: done
 priority: should
 type: docs
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 200000
 owns:
   - website/docs/effects.md
   - website/docs/subscriptions.md

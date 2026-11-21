@@ -1,7 +1,7 @@
 ---
 id: docs-nesting
 title: Guide: nesting components
-status: todo
+status: active
 priority: should
 type: docs
 story:
