@@ -1,7 +1,7 @@
 ---
 id: compiled-format
 title: Freeze the compiled module format with golden fixtures
-status: active
+status: done
 priority: must
 type: contract
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: true
 added:
-spent:
+spent: 579003
 owns:
   - packages/idlip/test/fixtures/**
   - packages/idlip/src/core/format.ts
@@ -82,3 +82,5 @@ L: uncertainty high (novel format), blast radius high (every runtime and compile
 
 - The fixtures are the acceptance target for `ssr-render`, `resume-loader`, `patch-bindings`, `patch-lists`, `compile-update`, `compile-view-codegen` and `compile-integration`. Keep them small and readable.
 - Design for the e2e assertion in `e2e-harness`: a click loads one update chunk and only the binding chunks whose paths changed.
+
+Landed on `batch/core` as fb0c506. Contracts applied: compiled-format v8 (frozen), view-ir v9, core-api v9. Follow-up node `analyze-v9` brings the analysis to view-ir v9.

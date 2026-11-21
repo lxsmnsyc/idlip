@@ -1,6 +1,6 @@
 ---
 name: core-api
-version: 8
+version: 9
 status: frozen
 defined_by: core-api
 ---
@@ -44,16 +44,21 @@ const Dom: {
 
 // idlip/jsx-runtime
 // on:* props take a function of the element's event. The compiler restricts it to a handler,
-// or an arrow whose body is one handler call (rule ids in contracts/view-ir.md).
+// an arrow whose body is one handler call, or an arrow whose block body is leading
+// `e.preventDefault()` and `e.stopPropagation()` statements and one handler call, optionally
+// inside a key test `if (e.key === '<key>')` (rule ids and forms in contracts/view-ir.md).
 type EventFor<El extends Element, E extends Event> = E & { readonly currentTarget: El };
 type EventProp<El extends Element, E extends Event> = (event: EventFor<El, E>) => unknown;
-// Exports the types `JSX`, `EventFor` and `EventProp`. `IntrinsicElements` is empty until `jsx-types` fills it.
+// Exports the types `JSX`, `EventFor` and `EventProp`, and `IntrinsicElements` filled by `jsx-types`.
 // Intrinsic elements: attributes, `class` as a string or a record of booleans, `ref`, `html`, `key`, on:* props.
 // Also `<window>` and `<document>`, which take only on:* and latest:* props.
 // latest:* props take the same functions as on:* and opt into latest-wins delivery.
 
 // idlip/server, owned by `ssr-render`.
 function render<Props>(component: (props: Props) => JSX.Element, props: Props, options?: { nonce?: string }): Promise<string>;
+// idlip/server, implemented by `resume-loader`.
+// Returns the listener `<script>` tag for the page's `<head>`. It keeps events that fire before the loader runs.
+function renderListener(options?: { nonce?: string }): string;
 ```
 
 Internal types shared by the compiler and the runtime (`Message` as `{ t, p }`, manifest, chunk shapes) live in `packages/idlip/src/core/format.ts` and belong to `contracts/compiled-format.md`. They are not exported from `idlip`.
@@ -67,6 +72,7 @@ Subpaths: `idlip`, `idlip/server`, `idlip/client`, `idlip/compiler`, `idlip/vite
 - `tsc` checks components as ordinary TypeScript: handler calls in event props, props of child components, the element type of `e.currentTarget`, and `For`'s `key`.
 - State types follow the `let` rule of 0002: `let x = v satisfies T as T` for a wider type. The compiler reports `let x: T = v` and a bare `as T`. The type tests show why, with TS2367 on a narrowed `let`.
 - A model value that does not serialize is reported at compile time when it is a function, and at server render through seroval otherwise, with the model path. `File` and `Blob` are client-only (`docs/proposals/0004-effects-refs-errors.md`, Files).
+- A page puts `renderListener()` in `<head>`, before any markup from `render()`.
 - A ref name in a `Dom` call is resolved to the element in the current DOM when the call runs.
 
 ## Stub
@@ -87,6 +93,7 @@ Done by `core-api`: the old exports and `test/messages.test.ts` are deleted, and
 
 ## Changes
 
+- v9 (2026-11-21, `contracts/core-api.change-request.md`, from `compiled-format`): `renderListener` in `idlip/server`; event props may be block-bodied arrows for modifiers.
 - v8 (2026-11-21, found in the `jsx-types` review): `Try` and `Head` take one child or several. A head with a title and a meta tag, or a boundary around siblings, failed with TS2746.
 - v7 (frozen 2026-11-21 by `core-api` and `spike-view-analysis`): `For` children take `(item, index)`. `Try`, `Head` and `Subscribe` are exported as throwing stubs. `Random`, `Time`, `until` and `Dom` are not exported until their nodes. `jsx-runtime` exports `JSX`, `EventFor` and `EventProp`. The stub is removed.
 - v6 (amended 2026-11-21 by the subscriptions debate): `until`, `Time.sleep` with a signal, `latest:` props.

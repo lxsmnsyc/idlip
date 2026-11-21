@@ -1,7 +1,7 @@
 # Change request: compiled-format v7 to v8
 
 - From node: compiled-format
-- Status: open
+- Status: accepted and applied by the orchestrator on 2026-11-21, after two fresh review rounds.
 
 ## Problem
 
