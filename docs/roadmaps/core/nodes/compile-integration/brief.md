@@ -1,7 +1,7 @@
 ---
 id: compile-integration
 title: 'Compiler: wire compile() end to end'
-status: todo
+status: active
 priority: must
 type: feature
 story:
@@ -53,6 +53,8 @@ depends_on:
 
 ## Acceptance
 
+- [ ] `idlip/compiler` exports `compile()` plus the analysis, `compileHandlers` and `generate`. One component picker (first exported stateful component) is exported from `compiler/update` and used by codegen too.
+- [ ] `compile()` output for both fixtures equals the golden fixtures, and `vite-plugin`'s default `compile` resolves to it.
 - [ ] For both fixtures in `packages/idlip/test/fixtures/`, `compile()` on the source gives the expected output.
 - [ ] Diagnostics from the analysis reach the caller with file positions.
 - [ ] Fast check passes: `pnpm --filter idlip test`
