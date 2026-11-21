@@ -28,7 +28,6 @@ export type DomMessage =
  */
 export type Placeholder =
   | readonly ['$event', ...segments: string[]]
-  | readonly ['$form', name: string]
   | readonly ['$', ...items: unknown[]];
 
 /** The state fields of a component, by name. */

@@ -67,7 +67,10 @@ function toItem(expr: Expr, emitter: Emitter): Item {
       const segments: string[] = [];
       for (const segment of expr.segments) {
         if (typeof segment !== 'string') {
-          emitter.fail('event-placeholder', 'An event argument reads fields by name only');
+          emitter.fail(
+            'event-computed-key',
+            'An event argument reads fields by a fixed name, such as elements.draft.value',
+          );
           break;
         }
         segments.push(segment);

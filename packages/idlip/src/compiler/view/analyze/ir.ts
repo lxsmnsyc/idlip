@@ -23,8 +23,7 @@ export type Segment =
 /**
  * Where a path starts. `state` and `props` are model paths: they are what bindings subscribe
  * to. `loop`, `event` and `local` paths are resolved against a loop row, a DOM event or a
- * `<Try>` catch parameter and never appear in a path set. `form` is reserved for the
- * `["$form", name]` placeholder of `form-fields` and never emitted yet. `global` is a pure
+ * `<Try>` catch parameter and never appear in a path set. `global` is a pure
  * global from the allow-list (`String`, `Math.max`).
  */
 export type Root =
@@ -32,7 +31,6 @@ export type Root =
   | { kind: 'props' }
   | { kind: 'loop'; name: string; index: boolean }
   | { kind: 'event' }
-  | { kind: 'form'; name: string }
   | { kind: 'local'; name: string }
   | { kind: 'global'; name: string }
   | { kind: 'import'; name: string; source: string }

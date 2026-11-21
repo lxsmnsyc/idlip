@@ -166,9 +166,33 @@ export interface SpecificAttributes {
   link: LinkAttributes;
 }
 
+/** What an event arrow reads from a named field of a form, such as `e.currentTarget.elements.draft.value`. */
+export interface FormField {
+  readonly value: string;
+  readonly checked: boolean;
+  readonly valueAsNumber: number;
+}
+
+/** A form whose `elements` has a named field for each name an arrow reads. */
+export type FormElement = EventTarget &
+  Pick<
+    HTMLFormElement,
+    'action' | 'checkValidity' | 'id' | 'method' | 'name' | 'reportValidity' | 'reset'
+  > & {
+    readonly elements: Readonly<Record<string, FormField>>;
+  };
+
+interface TargetOverrides {
+  form: FormElement;
+}
+
+type TargetOf<Tag extends keyof HTMLElementTagNameMap> = Tag extends keyof TargetOverrides
+  ? TargetOverrides[Tag]
+  : HTMLElementTagNameMap[Tag];
+
 type ElementProps<Tag extends keyof HTMLElementTagNameMap> = CommonAttributes &
   (Tag extends keyof SpecificAttributes ? SpecificAttributes[Tag] : unknown) &
-  EventProps<HTMLElementTagNameMap[Tag], HTMLElementEventMap>;
+  (TargetOf<Tag> extends infer T extends EventTarget ? EventProps<T, HTMLElementEventMap> : never);
 
 /**
  * Every HTML element. Its `on:*` and `latest:*` props take a function of an event whose

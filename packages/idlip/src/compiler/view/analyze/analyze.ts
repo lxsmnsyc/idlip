@@ -1685,6 +1685,10 @@ class Analyzer {
             );
           }
         }
+        // A submit never navigates: the arrow's handler gets the fields at dispatch instead.
+        if (event.name === 'submit') {
+          addPrevent(event);
+        }
         events.push(event);
         continue;
       }
@@ -3255,6 +3259,16 @@ function readEventMember(node: AstNode, param: string): string | undefined {
     return node.property.name;
   }
   return undefined;
+}
+
+/** Adds `prevent` to an event that does not have it. */
+function addPrevent(event: Event): void {
+  for (const modifier of event.modifiers) {
+    if (modifier.kind === 'prevent') {
+      return;
+    }
+  }
+  event.modifiers = [...event.modifiers, { kind: 'prevent' }];
 }
 
 /** True when the argument reads the event other than as a whole member path. */

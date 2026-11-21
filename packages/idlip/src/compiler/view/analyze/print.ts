@@ -37,8 +37,6 @@ function printRoot(root: Root): string {
       return root.name;
     case 'event':
       return '$event';
-    case 'form':
-      return `$form.${root.name}`;
     case 'local':
       return root.name;
     case 'global':
