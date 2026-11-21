@@ -1,7 +1,7 @@
 ---
 id: chunk-helpers
 title: Copy DOM and render helpers into chunks
-status: todo
+status: active
 priority: must
 type: perf
 story:

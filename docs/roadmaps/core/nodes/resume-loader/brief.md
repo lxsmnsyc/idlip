@@ -1,7 +1,7 @@
 ---
 id: resume-loader
 title: Client event delegation, message decode and update dispatch
-status: active
+status: done
 priority: must
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added:
-spent:
+spent: 344397
 owns:
   - packages/idlip/src/client/index.ts
   - packages/idlip/src/client/loader/**
@@ -70,3 +70,5 @@ M: known pattern from Qwik and brumate, new to this repo.
 
 - Brumate's loader handles the same problems. Read `../brumate/packages/brumate/src/runtime/boot.ts` (delegation, modifiers, retry) before starting.
 - The loader must stay small. Report its minified and gzipped size in `outcome.md`.
+
+Landed on `batch/core` as 62572f4. Loader 3811 B gzip -9 minified, listener 974 B. Also adds the `renderListener` re-export to `src/server/index.ts`. Not tested: other roots continuing while one root waits on a failed chunk (needs `multi-root`).
