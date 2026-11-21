@@ -232,13 +232,13 @@ export default function TodoApp(props, context) {
 }
 ```
 
-- The default export is a `ServerRender`: it computes the initial state from props, calls `context.state({ manifest, chunks, model, props })` once, and returns the markup. `render()` from `idlip/server` calls it, then writes the state script. Derived values are inlined, and module-level helpers are copied as they are.
+- The default export is a `ServerRender`, `Component(props, context, model?)`: it computes the initial state from props, or takes `model` when given (`idlip/testing` re-renders from a model after each message), calls `context.state({ manifest, chunks, model, props })` once, and returns the markup. `render()` from `idlip/server` calls it, then writes the state script. Derived values are inlined, and module-level helpers are copied as they are.
 - Static markup is string literals. Constant event attributes are literals. A render-time payload uses `on(event, message)`.
 - The `manifest` export equals the `manifest` of `compile()`.
 
 ### Render helpers
 
-`idlip/server` and `idlip/client` both export these, with the same output. The client uses them in templates.
+`idlip/server` exports these. Client chunks carry their own copies from the same source (see Budgets).
 
 | Helper               | Returns                                                          |
 | -------------------- | ---------------------------------------------------------------- |
@@ -370,6 +370,7 @@ The golden fixtures are the stub for both sides. Each of `test/fixtures/counter/
 
 ## Changes
 
+- v9 (2026-11-21, from `testing-mount`): the server render takes an optional model.
 - v9 (2026-11-21, from the `resume-loader` review): DOM and render helpers are copied into chunks instead of living in the loader; `stop` uses `stopImmediatePropagation`; more non-bubbling events.
 - v9 (2026-11-21, from the `compile-view-codegen` review): groups are ordered topologically by covers; a chosen row binding runs on every kept row.
 - v9 (2026-11-21, from the `compile-update` review): the payload puts props values before the arguments, so a rest parameter stays last, and includes the props paths of called handlers.
