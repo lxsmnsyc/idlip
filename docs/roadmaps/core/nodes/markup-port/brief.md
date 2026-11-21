@@ -1,7 +1,7 @@
 ---
 id: markup-port
 title: Port every view module to the markup DSL
-status: active
+status: todo
 priority: should
 type: refactor
 story: markup-frontend
@@ -31,9 +31,9 @@ shared:
 reserves: []
 provides: []
 depends_on:
-  - on: markup-example
+  - on: markup-v2
     kind: hard
-    why: builds on the DSL compiler and tooling on the story branch
+    why: ports to the v2 grammar
 ---
 
 # Port every view module to the markup DSL
