@@ -1,4 +1,5 @@
 // Turns view nodes into JS that builds their markup: the server render and client templates.
+import { isUrlAttr } from '../../../core/url.ts';
 import type { Component, Node } from '../analyze/index.ts';
 import { addChildNode } from './child.ts';
 import { getMessage, printModifiers } from './events.ts';
@@ -344,7 +345,12 @@ export class HtmlBuilder {
       } else {
         emitter.at = attr.value.hole.span;
         emitter.usage.helpers.add('attr');
-        addCode(built, `attr$(${quote(attr.name)}, ${emitter.expr(attr.value.hole.expr, 1)})`);
+        let value = emitter.expr(attr.value.hole.expr, 1);
+        if (isUrlAttr(attr.name)) {
+          emitter.usage.helpers.add('safeUrl');
+          value = `safeUrl$(${value}, ${quote(attr.name)})`;
+        }
+        addCode(built, `attr$(${quote(attr.name)}, ${value})`);
       }
     }
     this.addEvents(node.events, built);

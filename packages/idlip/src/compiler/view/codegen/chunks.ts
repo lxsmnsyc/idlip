@@ -2,6 +2,7 @@
 import type { Component, Expr } from '../analyze/index.ts';
 import type { Module } from '../../../core/format.ts';
 import { printHelpers } from '../../../core/helpers.ts';
+import { isUrlAttr } from '../../../core/url.ts';
 import { printSlot } from './child.ts';
 import { emitHeadBody } from './head.ts';
 import { printHtmlBody } from './raw.ts';
@@ -73,7 +74,11 @@ function emitBinding(binding: Binding, context: ChunkContext): Emitted {
     case 'attr': {
       emitter.at = source.hole.span;
       usage.helpers.add('setAttr');
-      const value = emitter.expr(source.hole.expr, 1);
+      let value = emitter.expr(source.hole.expr, 1);
+      if (isUrlAttr(source.name)) {
+        usage.helpers.add('safeUrl');
+        value = `safeUrl$(${value}, ${quote(source.name)})`;
+      }
       const body = `setAttr$(el, ${quote(source.name)}, ${value});`;
       return {
         code: `export function ${binding.name}(${printParams('el', usage)}) {\n${body}\n}`,

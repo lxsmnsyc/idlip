@@ -9,7 +9,7 @@
 // - A loader export is called as `name$`, through the forwarding function below. In a chunk the
 //   name is the import alias, `parseHtml as parseHtml$`. A bundler or a test runner renames
 //   imported bindings in the text of a function, but not a function declared in the module.
-// oxlint-disable typescript/no-base-to-string
+// oxlint-disable typescript/no-base-to-string, no-control-regex
 import { addBlock, findInnerBlocks, removeBlock } from '../client/patch/blocks.ts';
 import { parseHtml } from '../client/patch/dom.ts';
 import type { Namespace } from '../client/patch/dom.ts';
@@ -96,6 +96,30 @@ export function slot$(path: string, site: number, ...keys: unknown[]): string {
  */
 export function text$(value: unknown): string {
   return escapeText$(getText$(value));
+}
+
+/**
+ * Returns a URL attribute's value, or `undefined` for a `javascript:` or `vbscript:` URL, so the
+ * attribute is left out. An object or function is dropped too, since `attr$` would join its keys. A browser ignores control characters and spaces in a scheme, so they
+ * are removed before the test. Wraps every bound value of a URL attribute, on the server and in
+ * a chunk.
+ */
+export function safeUrl$(value: unknown, name: string): unknown {
+  if (value === null || value === undefined || typeof value === 'boolean') {
+    return value;
+  }
+  if (
+    typeof value === 'object' ||
+    typeof value === 'function' ||
+    /^(?:javascript|vbscript):/i.test(String(value).replace(/[\u0000- ]/g, ''))
+  ) {
+    if (process.env.NODE_ENV !== 'production') {
+      // oxlint-disable-next-line no-console
+      console.warn(`idlip: dropped an unsafe URL from ${name}.`);
+    }
+    return undefined;
+  }
+  return value;
 }
 
 /**
@@ -228,6 +252,7 @@ const HELPERS: Record<string, Helper | undefined> = {
   encode$: { source: encode$, uses: [], client: [] },
   findEnd$: { source: findEnd$, uses: [], client: [] },
   text$: { source: text$, uses: ['getText$', 'escapeText$'], client: [] },
+  safeUrl$: { source: safeUrl$, uses: [], client: [] },
   attr$: { source: attr$, uses: ['getText$', 'escapeAttr$', 'joinClass$'], client: [] },
   on$: { source: on$, uses: [], client: [] },
   slot$: { source: slot$, uses: ['encode$'], client: [] },
