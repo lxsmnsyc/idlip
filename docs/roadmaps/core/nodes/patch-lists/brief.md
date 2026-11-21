@@ -52,6 +52,7 @@ Patch a `<For each key>` block when its list changes: insert items (render from 
 
 - [ ] Add, remove, toggle and reorder in the todo fixture produce the DOM the server would render for the new model.
 - [ ] A model test (fast-check commands: add, remove, move, toggle) compares the patched DOM with a fresh server render after every step.
+- [ ] A row binding that also reads state outside the list (`class={selected === t.id}`) re-runs in every kept row when that state changes. Found by `compile-view-codegen`: `patch()` alone would not re-run it.
 - [ ] Fast check passes: `pnpm --filter idlip test`
 
 ## Sizing

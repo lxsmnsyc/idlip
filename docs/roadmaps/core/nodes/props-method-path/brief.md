@@ -1,7 +1,7 @@
 ---
 id: props-method-path
 title: Compiler: stop props paths before a called method
-status: todo
+status: active
 priority: must
 type: fix
 story:
@@ -53,3 +53,4 @@ The second `compile-update` review (2026-11-21) reproduced it with a probe; see 
 - [ ] A test that fails on the current batch: a handler reading `props.list.indexOf(by)` gets payload `[props$list, by]` and computes the right value.
 - [ ] The analysis stops a props path (and a state path) before a called member: `props.list.map(f)` reads `list`.
 - [ ] `compileHandlers` reports an error when a chunk needs a props path that `listHandlerProps` does not list, instead of appending it.
+- [ ] JSX text entities are decoded in the analysis (`&lt;`, `&amp;`, `&nbsp;`, numeric forms), so codegen does not escape them twice. Found by `compile-view-codegen`.
