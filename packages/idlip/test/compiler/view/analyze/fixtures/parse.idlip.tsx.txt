@@ -1,0 +1,4 @@
+// parse: the closing tag is missing. Stored as .txt so the repo formatter skips it.
+export default function Unclosed() {
+  return <div>;
+}

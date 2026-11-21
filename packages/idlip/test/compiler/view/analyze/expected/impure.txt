@@ -1,0 +1,56 @@
+file impure.idlip.tsx
+
+component Impure (stateful, exported)
+  props: props
+  state:
+    count = 0
+  handlers:
+    bump()
+      free: count:state
+      writes: count
+  view:
+    <main>
+      <p>
+        {#0}
+      <p>
+        {#1}
+      <p>
+        {#2}
+      <p id={#3}>
+        {#4}
+      <p>
+        {#5}
+      <button [on:click -> bump()]>
+        {#6}
+      <p>
+        {#7}
+  holes:
+    #0 Math.random()
+        expr  Math.random()
+        paths (static)
+    #1 Date.now()
+        expr  Date.now()
+        paths (static)
+    #2 performance.now()
+        expr  performance.now()
+        paths (static)
+    #3 crypto.randomUUID()
+        expr  crypto.randomUUID()
+        paths (static)
+    #4 roll()
+        expr  roll() => (Math.floor((Math.random() * 6)) + 1)
+        paths (static)
+    #5 props.seed + Math.random()
+        expr  (props.seed + Math.random())
+        paths props.seed
+    #6 `${count} at ${Date.now()}`
+        expr  `${count} at ${Date.now()}`
+        paths count
+    #7 crypto.getRandomValues(count)
+        expr  undefined
+        paths (static)
+
+diagnostics: 3
+  21:11 warning hole-impure: This hole calls an impure global, so its value changes only when props.seed changes
+  23:32 warning hole-impure: This hole calls an impure global, so its value changes only when count changes
+  25:11 error hole-global: crypto.getRandomValues is not in the closed grammar; wrap it in a helper

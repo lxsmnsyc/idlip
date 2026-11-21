@@ -1,0 +1,4 @@
+file parse.idlip.tsx
+
+diagnostics: 1
+  4:1 error parse: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?

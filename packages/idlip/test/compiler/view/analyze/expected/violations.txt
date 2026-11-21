@@ -1,0 +1,386 @@
+file violations.idlip.tsx
+
+component Stateful (stateful)
+  state:
+    n = 0
+  handlers:
+    bump()
+      free: n:state
+      writes: n
+  view:
+    <b [on:click -> bump()]>
+      {#0}
+  holes:
+    #0 n
+        expr  n
+        paths n
+
+component NoView (stateful)
+  state:
+    n = 0
+  handlers:
+    bump()
+      free: n:state
+      writes: n
+  view:
+  holes:
+
+component Two (stateless)
+  props: a
+  view:
+    <i>
+      {#0}
+  holes:
+    #0 a.x
+        expr  props.x
+        paths props.x
+
+component Loop (stateless)
+  view:
+    <div>
+      <div>
+  holes:
+
+component Forward (stateless)
+  props: { onPick, children }
+  view:
+    <b [on:click -> props.onPick()]>
+      {#0}
+      " "
+      {#1}
+  holes:
+    #0 format(onPick)
+        expr  format(undefined)
+        paths (static)
+    #1 format(children)
+        expr  format(undefined)
+        paths (static)
+
+component Pick (stateless)
+  props: { onPick }
+  view:
+    <b [on:click -> props.onPick()]>
+      "pick"
+  holes:
+
+component Whole (stateless)
+  props: props
+  view:
+    <i>
+      {#0}
+  holes:
+    #0 format(props)
+        expr  format(props)
+        paths props
+
+component Broken (stateful, exported)
+  props: {  }
+  state:
+    draft = ""
+    items = []
+    mode = "a"
+    rolled = undefined
+    copy = undefined
+    never = 0
+  derived:
+    markup = undefined
+    loopA = undefined
+    loopB = undefined
+  handlers:
+    steps()
+      free: -
+      writes: -
+    setDraft(text)
+      free: -
+      writes: draft
+    add()
+      free: items:state draft:state mode:state String:global Math:global Date:global
+      writes: draft
+    async save()
+      free: draft:state load:import
+      writes: items mode
+      segment save$1 after await load, carries: -
+      segment save$2 after await ?, carries: -
+  view:
+    <main>
+      <p>
+        {#0}
+      <p>
+        {#1}
+      <p>
+        {#2}
+      <p>
+        {#3}
+      <p>
+        {#4}
+      <p>
+        {#5}
+      <p>
+        {#6}
+      <p>
+        {#7}
+      <p>
+        {#8}
+      <p>
+        {#9}
+      <p>
+        {#10}
+      <p>
+        {#11}
+      <p>
+        {#12}
+      <p>
+      for #13 key=id item=$item
+        <li>
+          {#14}
+      window 
+      subscribe load 
+      child Widget slot=position 0 
+      <i>
+        {#15}
+      <div>
+      <p>
+        {#16}
+      <p>
+        {#17}
+      <p>
+        {#18}
+      <p>
+        {#19}
+      <p>
+        {#20}
+      <p>
+        {#21}
+      <ul>
+      <button>
+        "x"
+      <button>
+        "x"
+      <button>
+        "x"
+      <button [on:click -> save()] [latest:click -> save()]>
+        "x"
+      for #22 key= item=item
+        <li>
+          {#23}
+      <input>
+      <div>
+      <div html={#25}>
+        "child"
+      <p>
+        <div>
+          "block in paragraph"
+      <table>
+        <tr>
+          <td>
+            "row"
+      <table>
+        "text"
+      <a href="/">
+        <a href="/x">
+          "nested link"
+      <title>
+        "Outside head"
+      subscribe load input=#26 [on:value -> setDraft($event)]
+      <div>
+      window 
+      "body"
+      child Stateful slot=position 1 
+      head
+        <title>
+          {#27}
+      <button [on:click -> setDraft(undefined)]>
+        "roll"
+      <b [on:click -> setDraft(undefined)]>
+        "pick"
+      "body"
+      for #29 key=id item=item
+        <li>
+          {#30}
+      {#31}
+  holes:
+    #0 () => draft
+        expr  undefined
+        paths (static)
+    #1 draft.split(',')
+        expr  undefined
+        paths (static)
+    #2 JSON.stringify(draft)
+        expr  undefined
+        paths (static)
+    #3 draft + Math.random()
+        expr  (draft + Math.random())
+        paths draft
+    #4 format([1, ...items])
+        expr  format([1])
+        paths (static)
+    #5 draft()
+        expr  undefined
+        paths (static)
+    #6 new Date()
+        expr  undefined
+        paths (static)
+    #7 this
+        expr  undefined
+        paths (static)
+    #8 format(<i />)
+        expr  format(undefined)
+        paths (static)
+    #9 format(/x/)
+        expr  format(undefined)
+        paths (static)
+    #10 format(draft).name
+        expr  undefined
+        paths (static)
+    #11 format({ ...items })
+        expr  format({  })
+        paths (static)
+    #12 format(...items)
+        expr  format()
+        paths (static)
+    #13 items
+        expr  items
+        paths items
+    #14 first
+        expr  undefined
+        paths (static)
+    #15 format(props)
+        expr  format(undefined)
+        paths (static)
+    #16 setDraft
+        expr  undefined
+        paths (static)
+    #17 draft = 'x'
+        expr  undefined
+        paths (static)
+    #18 nowhere
+        expr  undefined
+        paths (static)
+    #19 format(draft, (x: string) => x)
+        expr  format(draft)
+        paths draft
+    #20 'a' in items
+        expr  undefined
+        paths (static)
+    #21 helper
+        expr  undefined
+        paths (static)
+    #22 items
+        expr  items
+        paths items
+    #23 item
+        expr  item
+        paths items.*
+    #24 items
+        expr  items
+        paths items
+    #25 draft
+        expr  draft
+        paths draft
+    #26 draft
+        expr  draft
+        paths draft
+    #27 draft
+        expr  draft
+        paths draft
+    #28 items
+        expr  items
+        paths items
+    #29 items
+        expr  items
+        paths items
+    #30 item
+        expr  item
+        paths items.*
+    #31 size
+        expr  undefined
+        paths (static)
+
+diagnostics: 87
+  20:1 error body-return: The component NoView must end with return <jsx>
+  28:32 error props-count: A component takes one parameter, props
+  36:7 error component-recursive: <Loop> renders itself
+  46:24 error event-message-args: A forwarded message prop already carries its arguments
+  47:15 error hole-message: onPick is allowed only in an event prop
+  47:32 error hole-children: children is allowed only as a view child
+  63:34 error props-pattern: A props pattern takes plain fields only, without defaults or rest
+  71:3 error body-var: Use let for state and const for derived values, not var
+  76:3 error body-statement: A component body holds declarations and one return, not IfStatement
+  65:7 error let-annotation: Write let items = value satisfies T as T, not let items: T
+  66:14 error let-bare-as: Write value satisfies T as T: a bare as T hides a wrong initial value
+  67:7 error let-init: The state field unset needs an initial value
+  72:9 error body-destructure: Derived values are declared one name at a time; destructuring is not allowed
+  68:16 error let-init: Math.random() in an initial value differs between server and client; set the field in a handler
+  69:14 error init-scope: An initial value reads props, imports and module constants only
+  73:18 error derived-jsx: The derived value markup holds JSX; write a stateless component instead
+  74:17 error derived-cycle: The derived value loopA reads itself
+  77:3 error handler-generator: The handler steps cannot be a generator
+  83:5 error handler-mutate: add calls push() on items; assign a new value instead
+  84:5 error handler-mutate: add changes mode in place; assign a new value instead
+  85:5 error handler-assign: add assigns loopA, which is not a state field or a local
+  86:20 error handler-impure: Math.random() makes add replay differently; use await Random or await Time
+  87:18 error handler-impure: new Date() makes add replay differently; use await Time.now()
+  89:10 error handler-free: missing in add is not state, a derived value, a prop, a handler, an import or a module-level binding
+  93:7 error await-placement: An await inside IfStatement is not allowed in the first version; await at the top level of save or in a try block
+  96:11 error await-callee: The awaited callee must be an import or a module-level function
+  68:7 warning let-unassigned: The state field rolled is never assigned; make it a const
+  69:7 warning let-unassigned: The state field copy is never assigned; make it a const
+  70:7 warning let-unassigned: The state field never is never assigned; make it a const
+  104:11 error hole-closure: A closure is not allowed in a hole
+  106:11 error hole-method: The method call draft.split() is not in the closed grammar; use a helper or <For>
+  108:11 error hole-global: JSON.stringify is not in the closed grammar; wrap it in a helper
+  110:11 warning hole-impure: This hole calls an impure global, so its value changes only when draft changes
+  112:22 error hole-array: Array literals in holes take no holes or spread
+  114:11 error hole-call: draft is not a helper: a helper is an import or a module-level function
+  116:11 error hole-effect: NewExpression is not in the closed grammar
+  118:11 error hole-grammar: ThisExpression is not in the closed grammar
+  120:18 error hole-jsx: JSX is allowed only as a view child or a condition branch
+  122:18 error hole-literal: Regular expression and bigint literals are not in the closed grammar
+  124:11 error hole-member: Property access is allowed only on a path, not on a computed value
+  126:20 error hole-object: Object literals in holes take plain keys and values: no spread, methods or computed keys
+  128:18 error hole-spread: Spread arguments are not in the closed grammar
+  130:16 error attr-jsx: An attribute value cannot be JSX
+  132:8 error jsx-namespace-tag: Namespaced tags are not supported
+  134:7 error for-each: <For> needs each
+  137:11 error for-param: The <For> item is a name or an object pattern
+  137:28 error hole-unknown: first is not a state field, derived value, prop, loop variable, import or module-level binding
+  140:7 error global-children: <window> takes no children
+  142:7 error subscribe-children: <Subscribe> takes no children
+  144:8 error component-import: Widget comes from ./widget, which is not an .idlip.tsx component
+  59:21 error props-whole: A stateless component must read props by name, not pass the props object along
+  36:7 error component-recursive: <Loop> renders itself
+  150:11 error hole-handler: The handler setDraft is allowed only in an event prop
+  152:12 error hole-statement: Assignments are not allowed in a hole
+  154:11 error hole-unknown: nowhere is not a state field, derived value, prop, loop variable, import or module-level binding
+  156:25 error helper-closure: A closure argument to a helper is not allowed
+  158:11 error hole-operator: The operator in is not in the closed grammar
+  160:11 error hole-function-value: The function helper is used as a value; call it or move it to a handler
+  162:12 error view-map: Lists are written with <For each key>, not .map()
+  164:8 error condition-operator: A JSX branch after || is not a condition block; write a ternary
+  166:31 error event-closure: The body of an event arrow must be one handler call
+  168:31 error event-target: console.log is not a handler, a message prop or reset
+  170:25 error event-param: An event arrow takes at most one parameter, the event, as a plain name
+  172:31 error event-mode-twice: click has both on: and latest:, or appears twice
+  176:7 error for-key: <For> needs key="field", a string literal naming a field of the item
+  178:7 error for-render: <For> takes one child: (item, index?) => <jsx>
+  182:14 error ref-form: ref takes a string literal, or [literal, loop variable path] inside <For>
+  184:12 error html-trusted: html takes trusted(value) from idlip
+  186:7 error html-children: An element with html={trusted(...)} must have no children
+  189:9 error html-nesting: <div> cannot be inside <p>: the HTML parser closes or moves it before the page runs
+  193:9 error html-implied: <tr> directly inside <table> makes the HTML parser insert <tbody>; write it out
+  198:14 error html-nesting: Text cannot be inside <table>: the HTML parser moves it before the table
+  201:9 error html-nesting: <a> cannot be inside <a>: the HTML parser closes or moves it before the page runs
+  204:7 error title-outside-head: <title> belongs in <Head>
+  206:35 error subscribe-input-key: <Subscribe input> reads draft, so key must read it too
+  208:22 error subscribe-source: <Subscribe to> takes an imported or module-level async generator
+  210:12 error jsx-spread: Spread attributes are not allowed
+  212:8 error component-unknown: <Missing> is not an imported or module-level component
+  214:15 error global-attr: <window> takes event props only
+  216:7 error try-catch: <Try> takes catch={(error, reset) => <jsx>}
+  218:7 error child-children: Children of a stateful component are not supported yet
+  224:40 error hole-global: Math.random() in an event argument is fixed at render; call it in the handler through await Random or await Time
+  226:36 error hole-global: Date.now() in an event argument is fixed at render; call it in the handler through await Random or await Time
+  228:7 error try-catch: <Try> takes catch={(error, reset) => <jsx>}
+  236:7 error for-render: <For> takes one child: (item, index?) => <jsx>
+  243:17 error for-param: The <For> index is a plain name
+  246:8 error hole-unknown: size is not a state field, derived value, prop, loop variable, import or module-level binding

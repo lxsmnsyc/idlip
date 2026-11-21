@@ -1,0 +1,66 @@
+file todo.idlip.tsx
+
+component TodoApp (stateful, exported)
+  props: props
+  state:
+    draft = ""
+    todos = props.initial
+    save = { state: "idle" }
+  derived:
+    left = countLeft(todos)
+  handlers:
+    setDraft(text)
+      free: -
+      writes: draft
+    toggle(id)
+      free: todos:state
+      writes: todos
+    async add()
+      free: draft:state Random:import todos:state
+      writes: todos draft
+      segment add$1 after await Random.id, carries: -
+    async persist()
+      free: saveTodos:import todos:state String:global
+      writes: save
+      segment persist$1 after await saveTodos, carries: -
+  view:
+    <main>
+      <input value={#0} [on:input -> setDraft($event.currentTarget.value)]>
+      <button disabled={#1} [on:click -> add()]>
+        "Add"
+      <button disabled={#2} [on:click -> persist()]>
+        "Save"
+      <p>
+        {#3}
+        " left"
+      for #4 key=id item=t
+        <li class={#5}>
+          <input type="checkbox" checked={#6} [on:click -> toggle(t.id)  render reads todos.*.id]>
+          {#7}
+  holes:
+    #0 draft
+        expr  draft
+        paths draft
+    #1 draft === ''
+        expr  (draft === "")
+        paths draft
+    #2 save.state === 'saving'
+        expr  (save.state === "saving")
+        paths save.state
+    #3 left
+        expr  countLeft(todos)
+        paths todos
+    #4 todos
+        expr  todos
+        paths todos
+    #5 { done: t.done }
+        expr  { done: t.done }
+        paths todos.*.done
+    #6 t.done
+        expr  t.done
+        paths todos.*.done
+    #7 t.text
+        expr  t.text
+        paths todos.*.text
+
+diagnostics: 0

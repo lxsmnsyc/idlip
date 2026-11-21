@@ -1,0 +1,515 @@
+{
+  "file": "counter.idlip.tsx",
+  "components": [
+    {
+      "name": "Counter",
+      "exported": true,
+      "mode": "stateful",
+      "props": {
+        "kind": "param",
+        "name": "props"
+      },
+      "state": [
+        {
+          "name": "count",
+          "init": {
+            "kind": "path",
+            "root": {
+              "kind": "props"
+            },
+            "segments": ["start"],
+            "optional": false
+          },
+          "assigned": true
+        }
+      ],
+      "derived": [
+        {
+          "name": "even",
+          "expr": {
+            "kind": "binary",
+            "op": "===",
+            "left": {
+              "kind": "binary",
+              "op": "%",
+              "left": {
+                "kind": "path",
+                "root": {
+                  "kind": "state",
+                  "name": "count"
+                },
+                "segments": [],
+                "optional": false
+              },
+              "right": {
+                "kind": "literal",
+                "value": 2
+              }
+            },
+            "right": {
+              "kind": "literal",
+              "value": 0
+            }
+          }
+        }
+      ],
+      "handlers": [
+        {
+          "name": "increment",
+          "params": [],
+          "async": false,
+          "free": [
+            {
+              "name": "count",
+              "kind": "state",
+              "paths": []
+            }
+          ],
+          "writes": ["count"],
+          "segments": [
+            {
+              "tag": "increment",
+              "carried": []
+            }
+          ],
+          "span": {
+            "start": 144,
+            "end": 193
+          }
+        },
+        {
+          "name": "add",
+          "params": ["step"],
+          "async": false,
+          "free": [
+            {
+              "name": "count",
+              "kind": "state",
+              "paths": []
+            }
+          ],
+          "writes": ["count"],
+          "segments": [
+            {
+              "tag": "add",
+              "carried": []
+            }
+          ],
+          "span": {
+            "start": 196,
+            "end": 254
+          }
+        },
+        {
+          "name": "reset",
+          "params": [],
+          "async": false,
+          "free": [
+            {
+              "name": "props",
+              "kind": "props",
+              "paths": [
+                {
+                  "root": "props",
+                  "segments": ["start"]
+                }
+              ]
+            }
+          ],
+          "writes": ["count"],
+          "segments": [
+            {
+              "tag": "reset",
+              "carried": []
+            }
+          ],
+          "span": {
+            "start": 257,
+            "end": 304
+          }
+        }
+      ],
+      "view": [
+        {
+          "kind": "element",
+          "tag": "div",
+          "namespace": "html",
+          "attrs": [],
+          "events": [],
+          "children": [
+            {
+              "kind": "element",
+              "tag": "button",
+              "namespace": "html",
+              "attrs": [],
+              "events": [
+                {
+                  "name": "click",
+                  "mode": "on",
+                  "target": {
+                    "kind": "handler",
+                    "name": "increment"
+                  },
+                  "args": [],
+                  "paths": [],
+                  "modifiers": [],
+                  "span": {
+                    "start": 350,
+                    "end": 361
+                  }
+                }
+              ],
+              "children": [
+                {
+                  "kind": "text",
+                  "value": "+1"
+                }
+              ],
+              "span": {
+                "start": 333,
+                "end": 373
+              }
+            },
+            {
+              "kind": "element",
+              "tag": "button",
+              "namespace": "html",
+              "attrs": [],
+              "events": [
+                {
+                  "name": "click",
+                  "mode": "on",
+                  "target": {
+                    "kind": "handler",
+                    "name": "add"
+                  },
+                  "args": [
+                    {
+                      "kind": "literal",
+                      "value": 10
+                    }
+                  ],
+                  "paths": [],
+                  "modifiers": [],
+                  "span": {
+                    "start": 397,
+                    "end": 412
+                  }
+                }
+              ],
+              "children": [
+                {
+                  "kind": "text",
+                  "value": "+10"
+                }
+              ],
+              "span": {
+                "start": 380,
+                "end": 425
+              }
+            },
+            {
+              "kind": "element",
+              "tag": "button",
+              "namespace": "html",
+              "attrs": [],
+              "events": [
+                {
+                  "name": "click",
+                  "mode": "on",
+                  "target": {
+                    "kind": "handler",
+                    "name": "reset"
+                  },
+                  "args": [],
+                  "paths": [],
+                  "modifiers": [],
+                  "span": {
+                    "start": 449,
+                    "end": 456
+                  }
+                }
+              ],
+              "children": [
+                {
+                  "kind": "text",
+                  "value": "Reset"
+                }
+              ],
+              "span": {
+                "start": 432,
+                "end": 471
+              }
+            },
+            {
+              "kind": "element",
+              "tag": "output",
+              "namespace": "html",
+              "attrs": [
+                {
+                  "name": "class",
+                  "value": {
+                    "kind": "hole",
+                    "hole": {
+                      "id": 0,
+                      "expr": {
+                        "kind": "object",
+                        "entries": [
+                          {
+                            "key": "even",
+                            "value": {
+                              "kind": "binary",
+                              "op": "===",
+                              "left": {
+                                "kind": "binary",
+                                "op": "%",
+                                "left": {
+                                  "kind": "path",
+                                  "root": {
+                                    "kind": "state",
+                                    "name": "count"
+                                  },
+                                  "segments": [],
+                                  "optional": false
+                                },
+                                "right": {
+                                  "kind": "literal",
+                                  "value": 2
+                                }
+                              },
+                              "right": {
+                                "kind": "literal",
+                                "value": 0
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "paths": [
+                        {
+                          "root": "state",
+                          "segments": ["count"]
+                        }
+                      ],
+                      "span": {
+                        "start": 493,
+                        "end": 501
+                      }
+                    }
+                  }
+                }
+              ],
+              "events": [],
+              "children": [
+                {
+                  "kind": "text-hole",
+                  "hole": {
+                    "id": 1,
+                    "expr": {
+                      "kind": "path",
+                      "root": {
+                        "kind": "state",
+                        "name": "count"
+                      },
+                      "segments": [],
+                      "optional": false
+                    },
+                    "paths": [
+                      {
+                        "root": "state",
+                        "segments": ["count"]
+                      }
+                    ],
+                    "span": {
+                      "start": 504,
+                      "end": 509
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "start": 478,
+                "end": 519
+              }
+            },
+            {
+              "kind": "condition",
+              "test": {
+                "id": 2,
+                "expr": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "binary",
+                    "op": "%",
+                    "left": {
+                      "kind": "path",
+                      "root": {
+                        "kind": "state",
+                        "name": "count"
+                      },
+                      "segments": [],
+                      "optional": false
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 2
+                    }
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                },
+                "paths": [
+                  {
+                    "root": "state",
+                    "segments": ["count"]
+                  }
+                ],
+                "span": {
+                  "start": 527,
+                  "end": 531
+                }
+              },
+              "then": [
+                {
+                  "kind": "element",
+                  "tag": "span",
+                  "namespace": "html",
+                  "attrs": [],
+                  "events": [],
+                  "children": [
+                    {
+                      "kind": "text",
+                      "value": "even"
+                    }
+                  ],
+                  "span": {
+                    "start": 535,
+                    "end": 552
+                  }
+                }
+              ],
+              "else": [],
+              "namespace": "html"
+            }
+          ],
+          "span": {
+            "start": 321,
+            "end": 564
+          }
+        }
+      ],
+      "holes": [
+        {
+          "id": 0,
+          "expr": {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "even",
+                "value": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "binary",
+                    "op": "%",
+                    "left": {
+                      "kind": "path",
+                      "root": {
+                        "kind": "state",
+                        "name": "count"
+                      },
+                      "segments": [],
+                      "optional": false
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 2
+                    }
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              }
+            ]
+          },
+          "paths": [
+            {
+              "root": "state",
+              "segments": ["count"]
+            }
+          ],
+          "span": {
+            "start": 493,
+            "end": 501
+          }
+        },
+        {
+          "id": 1,
+          "expr": {
+            "kind": "path",
+            "root": {
+              "kind": "state",
+              "name": "count"
+            },
+            "segments": [],
+            "optional": false
+          },
+          "paths": [
+            {
+              "root": "state",
+              "segments": ["count"]
+            }
+          ],
+          "span": {
+            "start": 504,
+            "end": 509
+          }
+        },
+        {
+          "id": 2,
+          "expr": {
+            "kind": "binary",
+            "op": "===",
+            "left": {
+              "kind": "binary",
+              "op": "%",
+              "left": {
+                "kind": "path",
+                "root": {
+                  "kind": "state",
+                  "name": "count"
+                },
+                "segments": [],
+                "optional": false
+              },
+              "right": {
+                "kind": "literal",
+                "value": 2
+              }
+            },
+            "right": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          "paths": [
+            {
+              "root": "state",
+              "segments": ["count"]
+            }
+          ],
+          "span": {
+            "start": 527,
+            "end": 531
+          }
+        }
+      ]
+    }
+  ],
+  "diagnostics": []
+}

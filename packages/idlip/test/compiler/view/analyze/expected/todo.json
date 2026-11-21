@@ -1,0 +1,921 @@
+{
+  "file": "todo.idlip.tsx",
+  "components": [
+    {
+      "name": "TodoApp",
+      "exported": true,
+      "mode": "stateful",
+      "props": {
+        "kind": "param",
+        "name": "props"
+      },
+      "state": [
+        {
+          "name": "draft",
+          "init": {
+            "kind": "literal",
+            "value": ""
+          },
+          "assigned": true
+        },
+        {
+          "name": "todos",
+          "init": {
+            "kind": "path",
+            "root": {
+              "kind": "props"
+            },
+            "segments": ["initial"],
+            "optional": false
+          },
+          "assigned": true
+        },
+        {
+          "name": "save",
+          "init": {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "state",
+                "value": {
+                  "kind": "literal",
+                  "value": "idle"
+                }
+              }
+            ]
+          },
+          "assigned": true
+        }
+      ],
+      "derived": [
+        {
+          "name": "left",
+          "expr": {
+            "kind": "call",
+            "callee": {
+              "kind": "module",
+              "name": "countLeft"
+            },
+            "args": [
+              {
+                "kind": "path",
+                "root": {
+                  "kind": "state",
+                  "name": "todos"
+                },
+                "segments": [],
+                "optional": false
+              }
+            ],
+            "helper": "args"
+          }
+        }
+      ],
+      "handlers": [
+        {
+          "name": "setDraft",
+          "params": ["text"],
+          "async": false,
+          "free": [],
+          "writes": ["draft"],
+          "segments": [
+            {
+              "tag": "setDraft",
+              "carried": []
+            }
+          ],
+          "span": {
+            "start": 598,
+            "end": 653
+          }
+        },
+        {
+          "name": "toggle",
+          "params": ["id"],
+          "async": false,
+          "free": [
+            {
+              "name": "todos",
+              "kind": "state",
+              "paths": []
+            }
+          ],
+          "writes": ["todos"],
+          "segments": [
+            {
+              "tag": "toggle",
+              "carried": []
+            }
+          ],
+          "span": {
+            "start": 656,
+            "end": 764
+          }
+        },
+        {
+          "name": "add",
+          "params": [],
+          "async": true,
+          "free": [
+            {
+              "name": "draft",
+              "kind": "state",
+              "paths": []
+            },
+            {
+              "name": "Random",
+              "kind": "import",
+              "paths": []
+            },
+            {
+              "name": "todos",
+              "kind": "state",
+              "paths": []
+            }
+          ],
+          "writes": ["todos", "draft"],
+          "segments": [
+            {
+              "tag": "add",
+              "carried": []
+            },
+            {
+              "tag": "add$1",
+              "carried": [],
+              "awaits": {
+                "kind": "import",
+                "name": "Random.id",
+                "source": "idlip"
+              }
+            }
+          ],
+          "span": {
+            "start": 767,
+            "end": 931
+          }
+        },
+        {
+          "name": "persist",
+          "params": [],
+          "async": true,
+          "free": [
+            {
+              "name": "saveTodos",
+              "kind": "import",
+              "paths": []
+            },
+            {
+              "name": "todos",
+              "kind": "state",
+              "paths": []
+            },
+            {
+              "name": "String",
+              "kind": "global",
+              "paths": []
+            }
+          ],
+          "writes": ["save"],
+          "segments": [
+            {
+              "tag": "persist",
+              "carried": []
+            },
+            {
+              "tag": "persist$1",
+              "carried": [],
+              "awaits": {
+                "kind": "import",
+                "name": "saveTodos",
+                "source": "./api"
+              }
+            }
+          ],
+          "span": {
+            "start": 934,
+            "end": 1152
+          }
+        }
+      ],
+      "view": [
+        {
+          "kind": "element",
+          "tag": "main",
+          "namespace": "html",
+          "attrs": [],
+          "events": [],
+          "children": [
+            {
+              "kind": "element",
+              "tag": "input",
+              "namespace": "html",
+              "attrs": [
+                {
+                  "name": "value",
+                  "value": {
+                    "kind": "hole",
+                    "hole": {
+                      "id": 0,
+                      "expr": {
+                        "kind": "path",
+                        "root": {
+                          "kind": "state",
+                          "name": "draft"
+                        },
+                        "segments": [],
+                        "optional": false
+                      },
+                      "paths": [
+                        {
+                          "root": "state",
+                          "segments": ["draft"]
+                        }
+                      ],
+                      "span": {
+                        "start": 1196,
+                        "end": 1201
+                      }
+                    }
+                  }
+                }
+              ],
+              "events": [
+                {
+                  "name": "input",
+                  "mode": "on",
+                  "target": {
+                    "kind": "handler",
+                    "name": "setDraft"
+                  },
+                  "args": [
+                    {
+                      "kind": "path",
+                      "root": {
+                        "kind": "event"
+                      },
+                      "segments": ["currentTarget", "value"],
+                      "optional": false
+                    }
+                  ],
+                  "paths": [],
+                  "modifiers": [],
+                  "span": {
+                    "start": 1212,
+                    "end": 1252
+                  }
+                }
+              ],
+              "children": [],
+              "span": {
+                "start": 1182,
+                "end": 1255
+              }
+            },
+            {
+              "kind": "element",
+              "tag": "button",
+              "namespace": "html",
+              "attrs": [
+                {
+                  "name": "disabled",
+                  "value": {
+                    "kind": "hole",
+                    "hole": {
+                      "id": 1,
+                      "expr": {
+                        "kind": "binary",
+                        "op": "===",
+                        "left": {
+                          "kind": "path",
+                          "root": {
+                            "kind": "state",
+                            "name": "draft"
+                          },
+                          "segments": [],
+                          "optional": false
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": ""
+                        }
+                      },
+                      "paths": [
+                        {
+                          "root": "state",
+                          "segments": ["draft"]
+                        }
+                      ],
+                      "span": {
+                        "start": 1295,
+                        "end": 1307
+                      }
+                    }
+                  }
+                }
+              ],
+              "events": [
+                {
+                  "name": "click",
+                  "mode": "on",
+                  "target": {
+                    "kind": "handler",
+                    "name": "add"
+                  },
+                  "args": [],
+                  "paths": [],
+                  "modifiers": [],
+                  "span": {
+                    "start": 1279,
+                    "end": 1284
+                  }
+                }
+              ],
+              "children": [
+                {
+                  "kind": "text",
+                  "value": "Add"
+                }
+              ],
+              "span": {
+                "start": 1262,
+                "end": 1337
+              }
+            },
+            {
+              "kind": "element",
+              "tag": "button",
+              "namespace": "html",
+              "attrs": [
+                {
+                  "name": "disabled",
+                  "value": {
+                    "kind": "hole",
+                    "hole": {
+                      "id": 2,
+                      "expr": {
+                        "kind": "binary",
+                        "op": "===",
+                        "left": {
+                          "kind": "path",
+                          "root": {
+                            "kind": "state",
+                            "name": "save"
+                          },
+                          "segments": ["state"],
+                          "optional": false
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "saving"
+                        }
+                      },
+                      "paths": [
+                        {
+                          "root": "state",
+                          "segments": ["save", "state"]
+                        }
+                      ],
+                      "span": {
+                        "start": 1381,
+                        "end": 1404
+                      }
+                    }
+                  }
+                }
+              ],
+              "events": [
+                {
+                  "name": "click",
+                  "mode": "on",
+                  "target": {
+                    "kind": "handler",
+                    "name": "persist"
+                  },
+                  "args": [],
+                  "paths": [],
+                  "modifiers": [],
+                  "span": {
+                    "start": 1361,
+                    "end": 1370
+                  }
+                }
+              ],
+              "children": [
+                {
+                  "kind": "text",
+                  "value": "Save"
+                }
+              ],
+              "span": {
+                "start": 1344,
+                "end": 1435
+              }
+            },
+            {
+              "kind": "element",
+              "tag": "p",
+              "namespace": "html",
+              "attrs": [],
+              "events": [],
+              "children": [
+                {
+                  "kind": "text-hole",
+                  "hole": {
+                    "id": 3,
+                    "expr": {
+                      "kind": "call",
+                      "callee": {
+                        "kind": "module",
+                        "name": "countLeft"
+                      },
+                      "args": [
+                        {
+                          "kind": "path",
+                          "root": {
+                            "kind": "state",
+                            "name": "todos"
+                          },
+                          "segments": [],
+                          "optional": false
+                        }
+                      ],
+                      "helper": "args"
+                    },
+                    "paths": [
+                      {
+                        "root": "state",
+                        "segments": ["todos"]
+                      }
+                    ],
+                    "span": {
+                      "start": 1446,
+                      "end": 1450
+                    }
+                  }
+                },
+                {
+                  "kind": "text",
+                  "value": " left"
+                }
+              ],
+              "span": {
+                "start": 1442,
+                "end": 1460
+              }
+            },
+            {
+              "kind": "for",
+              "each": {
+                "id": 4,
+                "expr": {
+                  "kind": "path",
+                  "root": {
+                    "kind": "state",
+                    "name": "todos"
+                  },
+                  "segments": [],
+                  "optional": false
+                },
+                "paths": [
+                  {
+                    "root": "state",
+                    "segments": ["todos"]
+                  }
+                ],
+                "span": {
+                  "start": 1478,
+                  "end": 1483
+                }
+              },
+              "key": "id",
+              "item": "t",
+              "namespace": "html",
+              "body": [
+                {
+                  "kind": "element",
+                  "tag": "li",
+                  "namespace": "html",
+                  "attrs": [
+                    {
+                      "name": "class",
+                      "value": {
+                        "kind": "hole",
+                        "hole": {
+                          "id": 5,
+                          "expr": {
+                            "kind": "object",
+                            "entries": [
+                              {
+                                "key": "done",
+                                "value": {
+                                  "kind": "path",
+                                  "root": {
+                                    "kind": "loop",
+                                    "name": "t",
+                                    "index": false
+                                  },
+                                  "segments": ["done"],
+                                  "optional": false
+                                }
+                              }
+                            ]
+                          },
+                          "paths": [
+                            {
+                              "root": "state",
+                              "segments": [
+                                "todos",
+                                {
+                                  "kind": "item"
+                                },
+                                "done"
+                              ]
+                            }
+                          ],
+                          "span": {
+                            "start": 1534,
+                            "end": 1550
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "events": [],
+                  "children": [
+                    {
+                      "kind": "element",
+                      "tag": "input",
+                      "namespace": "html",
+                      "attrs": [
+                        {
+                          "name": "type",
+                          "value": {
+                            "kind": "static",
+                            "value": "checkbox"
+                          }
+                        },
+                        {
+                          "name": "checked",
+                          "value": {
+                            "kind": "hole",
+                            "hole": {
+                              "id": 6,
+                              "expr": {
+                                "kind": "path",
+                                "root": {
+                                  "kind": "loop",
+                                  "name": "t",
+                                  "index": false
+                                },
+                                "segments": ["done"],
+                                "optional": false
+                              },
+                              "paths": [
+                                {
+                                  "root": "state",
+                                  "segments": [
+                                    "todos",
+                                    {
+                                      "kind": "item"
+                                    },
+                                    "done"
+                                  ]
+                                }
+                              ],
+                              "span": {
+                                "start": 1597,
+                                "end": 1603
+                              }
+                            }
+                          }
+                        }
+                      ],
+                      "events": [
+                        {
+                          "name": "click",
+                          "mode": "on",
+                          "target": {
+                            "kind": "handler",
+                            "name": "toggle"
+                          },
+                          "args": [
+                            {
+                              "kind": "path",
+                              "root": {
+                                "kind": "loop",
+                                "name": "t",
+                                "index": false
+                              },
+                              "segments": ["id"],
+                              "optional": false
+                            }
+                          ],
+                          "paths": [
+                            {
+                              "root": "state",
+                              "segments": [
+                                "todos",
+                                {
+                                  "kind": "item"
+                                },
+                                "id"
+                              ]
+                            }
+                          ],
+                          "modifiers": [],
+                          "span": {
+                            "start": 1614,
+                            "end": 1634
+                          }
+                        }
+                      ],
+                      "children": [],
+                      "span": {
+                        "start": 1565,
+                        "end": 1637
+                      }
+                    },
+                    {
+                      "kind": "text-hole",
+                      "hole": {
+                        "id": 7,
+                        "expr": {
+                          "kind": "path",
+                          "root": {
+                            "kind": "loop",
+                            "name": "t",
+                            "index": false
+                          },
+                          "segments": ["text"],
+                          "optional": false
+                        },
+                        "paths": [
+                          {
+                            "root": "state",
+                            "segments": [
+                              "todos",
+                              {
+                                "kind": "item"
+                              },
+                              "text"
+                            ]
+                          }
+                        ],
+                        "span": {
+                          "start": 1651,
+                          "end": 1657
+                        }
+                      }
+                    }
+                  ],
+                  "span": {
+                    "start": 1523,
+                    "end": 1674
+                  }
+                }
+              ]
+            }
+          ],
+          "span": {
+            "start": 1169,
+            "end": 1710
+          }
+        }
+      ],
+      "holes": [
+        {
+          "id": 0,
+          "expr": {
+            "kind": "path",
+            "root": {
+              "kind": "state",
+              "name": "draft"
+            },
+            "segments": [],
+            "optional": false
+          },
+          "paths": [
+            {
+              "root": "state",
+              "segments": ["draft"]
+            }
+          ],
+          "span": {
+            "start": 1196,
+            "end": 1201
+          }
+        },
+        {
+          "id": 1,
+          "expr": {
+            "kind": "binary",
+            "op": "===",
+            "left": {
+              "kind": "path",
+              "root": {
+                "kind": "state",
+                "name": "draft"
+              },
+              "segments": [],
+              "optional": false
+            },
+            "right": {
+              "kind": "literal",
+              "value": ""
+            }
+          },
+          "paths": [
+            {
+              "root": "state",
+              "segments": ["draft"]
+            }
+          ],
+          "span": {
+            "start": 1295,
+            "end": 1307
+          }
+        },
+        {
+          "id": 2,
+          "expr": {
+            "kind": "binary",
+            "op": "===",
+            "left": {
+              "kind": "path",
+              "root": {
+                "kind": "state",
+                "name": "save"
+              },
+              "segments": ["state"],
+              "optional": false
+            },
+            "right": {
+              "kind": "literal",
+              "value": "saving"
+            }
+          },
+          "paths": [
+            {
+              "root": "state",
+              "segments": ["save", "state"]
+            }
+          ],
+          "span": {
+            "start": 1381,
+            "end": 1404
+          }
+        },
+        {
+          "id": 3,
+          "expr": {
+            "kind": "call",
+            "callee": {
+              "kind": "module",
+              "name": "countLeft"
+            },
+            "args": [
+              {
+                "kind": "path",
+                "root": {
+                  "kind": "state",
+                  "name": "todos"
+                },
+                "segments": [],
+                "optional": false
+              }
+            ],
+            "helper": "args"
+          },
+          "paths": [
+            {
+              "root": "state",
+              "segments": ["todos"]
+            }
+          ],
+          "span": {
+            "start": 1446,
+            "end": 1450
+          }
+        },
+        {
+          "id": 4,
+          "expr": {
+            "kind": "path",
+            "root": {
+              "kind": "state",
+              "name": "todos"
+            },
+            "segments": [],
+            "optional": false
+          },
+          "paths": [
+            {
+              "root": "state",
+              "segments": ["todos"]
+            }
+          ],
+          "span": {
+            "start": 1478,
+            "end": 1483
+          }
+        },
+        {
+          "id": 5,
+          "expr": {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "done",
+                "value": {
+                  "kind": "path",
+                  "root": {
+                    "kind": "loop",
+                    "name": "t",
+                    "index": false
+                  },
+                  "segments": ["done"],
+                  "optional": false
+                }
+              }
+            ]
+          },
+          "paths": [
+            {
+              "root": "state",
+              "segments": [
+                "todos",
+                {
+                  "kind": "item"
+                },
+                "done"
+              ]
+            }
+          ],
+          "span": {
+            "start": 1534,
+            "end": 1550
+          }
+        },
+        {
+          "id": 6,
+          "expr": {
+            "kind": "path",
+            "root": {
+              "kind": "loop",
+              "name": "t",
+              "index": false
+            },
+            "segments": ["done"],
+            "optional": false
+          },
+          "paths": [
+            {
+              "root": "state",
+              "segments": [
+                "todos",
+                {
+                  "kind": "item"
+                },
+                "done"
+              ]
+            }
+          ],
+          "span": {
+            "start": 1597,
+            "end": 1603
+          }
+        },
+        {
+          "id": 7,
+          "expr": {
+            "kind": "path",
+            "root": {
+              "kind": "loop",
+              "name": "t",
+              "index": false
+            },
+            "segments": ["text"],
+            "optional": false
+          },
+          "paths": [
+            {
+              "root": "state",
+              "segments": [
+                "todos",
+                {
+                  "kind": "item"
+                },
+                "text"
+              ]
+            }
+          ],
+          "span": {
+            "start": 1651,
+            "end": 1657
+          }
+        }
+      ]
+    }
+  ],
+  "diagnostics": []
+}
