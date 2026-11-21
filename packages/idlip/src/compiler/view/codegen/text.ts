@@ -13,6 +13,7 @@ const INTEGER = /^(?:0|[1-9]\d*)$/;
 const RESERVED = new Set([
   ...HELPER_NAMES,
   'props',
+  'path',
   'context',
   'manifest',
   'chunks',

@@ -1,29 +1,53 @@
 {
   "module": "/src/counter.idlip.tsx",
-  "events": ["click"],
+  "events": [
+    "click"
+  ],
   "handlers": {
-    "increment": { "chunk": "handler=increment" }
+    "increment": {
+      "chunk": "handler=increment",
+      "writes": [
+        "count"
+      ],
+      "bindings": [
+        "count"
+      ]
+    }
   },
   "groups": {
     "props.label": {
-      "paths": ["props.label"],
+      "paths": [
+        "props.label"
+      ],
       "chunk": "binding=props.label",
-      "bindings": ["t0"],
+      "bindings": [
+        "t0"
+      ],
       "covers": []
     },
     "props.onRemove": {
-      "paths": ["props.onRemove"],
+      "paths": [
+        "props.onRemove"
+      ],
       "chunk": "binding=props.onRemove",
-      "bindings": ["a2"],
+      "bindings": [
+        "a2"
+      ],
       "covers": []
     },
     "count": {
-      "paths": ["count"],
+      "paths": [
+        "count"
+      ],
       "chunk": "binding=count",
-      "bindings": ["t1"],
+      "bindings": [
+        "t1"
+      ],
       "covers": []
     }
   },
   "lists": {},
-  "view": { "chunk": "view" }
+  "view": {
+    "chunk": "view"
+  }
 }

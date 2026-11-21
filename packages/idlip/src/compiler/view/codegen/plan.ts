@@ -1,9 +1,14 @@
 // Plans the bindings of a component: which holes and events patch, their ids, groups and lists.
-import type { Component, Event, Expr, Hole, Node, Path, Span } from '../analyze/index.ts';
+import type { Component, Event, Expr, Hole, Node, Path, Root, Span } from '../analyze/index.ts';
 import type { Frame, Report } from './expr.ts';
+
+type ForNode = Extract<Node, { kind: 'for' }>;
+export type ChildNode = Extract<Node, { kind: 'child' }>;
 
 export type Source =
   | { kind: 'attr'; name: string; hole: Hole }
+  | { kind: 'prop'; child: ChildNode; name: string; hole: Hole }
+  | { kind: 'message'; child: ChildNode; event: Event }
   | { kind: 'event'; event: Event }
   | { kind: 'text'; hole: Hole }
   | { kind: 'condition'; node: Extract<Node, { kind: 'condition' }> }
@@ -11,8 +16,8 @@ export type Source =
 
 export interface Binding {
   id: number;
-  /** `a` for an element, `t` for text, `c` for a condition, `l` for a list. */
-  kind: 'a' | 't' | 'c' | 'l';
+  /** `a` for an element, `t` for text, `c` for a condition, `l` for a list, `p` for a prop. */
+  kind: 'a' | 't' | 'c' | 'l' | 'p';
   /** The export name, such as `a4`. */
   name: string;
   /** The state paths the binding reads, sorted. Never empty. */
@@ -31,6 +36,26 @@ export interface ListInfo {
   parent: number | undefined;
   /** The rows around the list block. */
   frames: Frame[];
+}
+
+/** Where a child component sits in its parent. */
+export interface ChildInfo {
+  /** The index of the child among all child nodes of the view, in source order. */
+  site: number;
+  /** The `<For>` blocks around the child, outermost first. */
+  loops: ForNode[];
+}
+
+/** A stateful component that the view renders. */
+export interface Used {
+  /** The local name of the import, such as `Counter`. */
+  name: string;
+  /** The specifier of the import, as the source writes it. */
+  source: string;
+  /** The id of the child's module, which `generate` resolves from the specifier. */
+  module: string;
+  /** The id of the child's `view` chunk. */
+  view: string;
 }
 
 export interface Group {
@@ -53,6 +78,10 @@ export interface Plan {
   lists: ListInfo[];
   /** Event types the view listens to, sorted. */
   events: string[];
+  /** The place of every child node. */
+  children: Map<Node, ChildInfo>;
+  /** The child components the view renders, once each, in source order. */
+  uses: Used[];
 }
 
 /** Prints the source of a keyed segment: the model path of its value. */
@@ -89,15 +118,20 @@ export function printPathKey(path: Path, report: Report, span: Span): string {
 }
 
 /** Returns the sorted state paths of a hole or event, or an empty list when nothing patches. */
-export function getStatePaths(paths: Path[] | 'dynamic', report: Report, span: Span): string[] {
+export function getStatePaths(
+  paths: Path[] | 'dynamic',
+  report: Report,
+  span: Span,
+  child = false,
+): string[] {
   if (paths === 'dynamic') {
     report('hole-dynamic', 'A dynamic path set cannot be generated', span);
     return [];
   }
   const keys = new Set<string>();
   for (const path of paths) {
-    // Root props never change, so only state paths patch.
-    if (path.root === 'state') {
+    // Root props never change, so only state paths patch. A child's props change with the parent.
+    if (path.root === 'state' || child) {
       keys.add(printPathKey(path, report, span));
     }
   }
@@ -107,6 +141,7 @@ export function getStatePaths(paths: Path[] | 'dynamic', report: Report, span: S
 interface WalkContext {
   frames: Frame[];
   list: number | undefined;
+  loops: ForNode[];
 }
 
 class Planner {
@@ -116,11 +151,14 @@ class Planner {
   anchors = new Map<Node, number[]>();
   lists: ListInfo[] = [];
   events = new Set<string>();
+  children = new Map<Node, ChildInfo>();
+  uses: Used[] = [];
   nextEvent: number;
 
   constructor(
     component: Component,
     readonly report: Report,
+    readonly child: boolean,
   ) {
     let max = -1;
     for (const hole of component.holes) {
@@ -154,7 +192,7 @@ class Planner {
     context: WalkContext,
     source: Source,
   ): number | undefined {
-    const paths = getStatePaths(hole.paths, this.report, hole.span);
+    const paths = getStatePaths(hole.paths, this.report, hole.span, this.child);
     if (paths.length === 0) {
       return undefined;
     }
@@ -163,11 +201,22 @@ class Planner {
     return hole.id;
   }
 
+  /** The model paths an event reads at render: its arguments, and the prop it forwards. */
+  getEventPaths(event: Event): string[] {
+    const paths = getStatePaths(event.paths, this.report, event.span, this.child);
+    // A message prop is read from the props. It changes only when the parent passes a new one.
+    if (event.target.kind === 'prop' && this.child) {
+      paths.push(`props.${event.target.name}`);
+      paths.sort();
+    }
+    return paths;
+  }
+
   /** Assigns ids to the events that read state at render. Returns the ids. */
   bindEvents(events: Event[], context: WalkContext): number[] {
     const ids: number[] = [];
     for (const event of events) {
-      if (event.target.kind !== 'handler') {
+      if (event.target.kind !== 'handler' && event.target.kind !== 'prop') {
         this.report(
           'codegen-unsupported',
           `An event that targets a ${event.target.kind} is not generated yet`,
@@ -176,7 +225,7 @@ class Planner {
         continue;
       }
       this.events.add(event.name);
-      const paths = getStatePaths(event.paths, this.report, event.span);
+      const paths = this.getEventPaths(event);
       if (paths.length === 0) {
         continue;
       }
@@ -186,6 +235,46 @@ class Planner {
       ids.push(id);
     }
     return ids;
+  }
+
+  /** Plans a stateful child: its site, the bindings of its props and its message props. */
+  planChild(node: ChildNode, context: WalkContext): void {
+    this.children.set(node, { site: this.children.size, loops: context.loops });
+    const root: Root = node.component;
+    if (root.kind !== 'import' || root.name.includes('.')) {
+      this.report(
+        'codegen-unsupported',
+        'A stateful child must be a component imported by its default name',
+        { start: 0, end: 0 },
+      );
+    } else if (!this.uses.some((used) => used.name === root.name)) {
+      this.uses.push({ name: root.name, source: root.source, module: '', view: '' });
+    }
+    for (const prop of node.props) {
+      this.bindHole(prop.value, 'p', context, {
+        kind: 'prop',
+        child: node,
+        name: prop.name,
+        hole: prop.value,
+      });
+    }
+    for (const event of node.messages) {
+      if (event.target.kind !== 'handler' && event.target.kind !== 'prop') {
+        this.report(
+          'codegen-unsupported',
+          `A message prop that targets a ${event.target.kind} is not generated yet`,
+          event.span,
+        );
+        continue;
+      }
+      const paths = this.getEventPaths(event);
+      if (paths.length === 0) {
+        continue;
+      }
+      const id = this.nextEvent++;
+      this.eventIds.set(event, id);
+      this.addBinding('p', id, paths, context, { kind: 'message', child: node, event });
+    }
   }
 
   walk(nodes: Node[], context: WalkContext): void {
@@ -232,13 +321,20 @@ class Planner {
             row: context.frames.length,
           };
           this.lists.push({ id, node, parent: context.list, frames: context.frames });
-          this.walk(node.body, { frames: [...context.frames, frame], list: id });
+          this.walk(node.body, {
+            frames: [...context.frames, frame],
+            list: id,
+            loops: [...context.loops, node],
+          });
           break;
         }
         case 'condition':
           this.bindHole(node.test, 'c', context, { kind: 'condition', node });
           this.walk(node.then, context);
           this.walk(node.else, context);
+          break;
+        case 'child':
+          this.planChild(node, context);
           break;
         case 'global': {
           const ids = this.bindEvents(node.events, context);
@@ -258,9 +354,9 @@ class Planner {
 }
 
 /** Plans the bindings of a component's view. */
-export function planBindings(component: Component, report: Report): Plan {
-  const planner = new Planner(component, report);
-  planner.walk(component.view, { frames: [], list: undefined });
+export function planBindings(component: Component, report: Report, child = false): Plan {
+  const planner = new Planner(component, report, child);
+  planner.walk(component.view, { frames: [], list: undefined, loops: [] });
   // Order by id: holes in view order, then events.
   const ids = [...planner.bindings.keys()].sort((a, b) => a - b);
   const bindings: Binding[] = [];
@@ -277,6 +373,8 @@ export function planBindings(component: Component, report: Report): Plan {
     anchors: planner.anchors,
     lists: planner.lists,
     events: [...planner.events].sort(),
+    children: planner.children,
+    uses: planner.uses,
   };
 }
 

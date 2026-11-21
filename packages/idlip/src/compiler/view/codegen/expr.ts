@@ -28,6 +28,12 @@ export interface Usage {
   vars: Set<string>;
   /** Runtime helpers: `text`, `attr`, `on`, `setAttr` and so on. */
   helpers: Set<string>;
+  /** Loader exports that a chunk imports as they are: `addChild` and `setProp`. */
+  loader: Set<string>;
+  /** Child view chunks a chunk imports: the local name to the chunk id. */
+  views: Map<string, string>;
+  /** Whether the code reads the model path of the component it renders. */
+  path: boolean;
 }
 
 export function createUsage(): Usage {
@@ -38,6 +44,9 @@ export function createUsage(): Usage {
     props: new Set(),
     vars: new Set(),
     helpers: new Set(),
+    loader: new Set(),
+    views: new Map(),
+    path: false,
   };
 }
 
@@ -60,6 +69,13 @@ export function mergeUsage(into: Usage, from: Usage): void {
   for (const name of from.helpers) {
     into.helpers.add(name);
   }
+  for (const name of from.loader) {
+    into.loader.add(name);
+  }
+  for (const [name, id] of from.views) {
+    into.views.set(name, id);
+  }
+  into.path = into.path || from.path;
 }
 
 export type Report = (rule: string, message: string, span: Span) => void;
@@ -227,9 +243,8 @@ export class Emitter {
         this.usage.scope.add('model');
         return `model${getAccessor(root.name, false)}`;
       case 'props':
-        if (this.mode === 'client') {
-          this.usage.scope.add('props');
-        }
+        // A view chunk prints with the server's names and still reads `props` from its scope.
+        this.usage.scope.add('props');
         return 'props';
       case 'loop':
         return this.printLoop(root.name, root.index);

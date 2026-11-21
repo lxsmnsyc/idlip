@@ -1,5 +1,5 @@
 import { Feature, serialize } from 'seroval';
-import type { PageState, RenderContext } from '../core/format.ts';
+import type { ChunkUrls, Manifest, Model, PageState, Props } from '../core/format.ts';
 import { attr } from './helpers.ts';
 
 export interface RenderOptions {
@@ -28,6 +28,38 @@ function canSerialize(value: unknown): boolean {
   }
 }
 
+/** A rendered child: its module, its model and the props the client reads. */
+interface Slot {
+  readonly module: string;
+  readonly model: Model;
+  readonly props: Props;
+}
+
+/** A compiled server module, as far as the render needs it. */
+interface ModuleInfo {
+  readonly manifest: Manifest;
+  readonly chunks: ChunkUrls;
+  readonly uses?: readonly ModuleInfo[];
+}
+
+/** What a component records: its state, and the server modules of the children it can render. */
+interface ComponentState extends PageState {
+  readonly uses?: readonly ModuleInfo[];
+}
+
+/** `RenderContext` with the nesting additions of compiled-format v10. */
+interface NestedContext {
+  state(state: ComponentState, path?: string): void;
+}
+
+/** What the state script holds: the root's state, the child manifests and the slots. */
+interface RecordedState extends PageState {
+  readonly modules?: Readonly<Record<string, Manifest>>;
+  readonly slots?: Readonly<Record<string, Slot>>;
+  /** The event types of the root and of every module in `modules`. */
+  readonly events: readonly string[];
+}
+
 function joinPath(prefix: string, segment: string): string {
   return prefix === '' ? segment : `${prefix}.${segment}`;
 }
@@ -54,16 +86,30 @@ function findBadPath(value: unknown, path: string, seen: Set<object>): string | 
   return path;
 }
 
-function serializeState(state: PageState): string {
+function serializeState(state: RecordedState): string {
+  const record: Record<string, unknown> = {
+    manifest: state.manifest,
+    chunks: state.chunks,
+    model: state.model,
+    props: state.props,
+  };
+  if (state.modules !== undefined) {
+    record.modules = state.modules;
+  }
+  if (state.slots !== undefined) {
+    record.slots = state.slots;
+  }
   try {
-    return serialize(
-      { manifest: state.manifest, chunks: state.chunks, model: state.model, props: state.props },
-      SEROVAL_OPTIONS,
-    );
+    return serialize(record, SEROVAL_OPTIONS);
   } catch (error) {
     // Walk the values to name the path, which seroval's error does not carry.
     const seen = new Set<object>();
-    const bad = findBadPath(state.model, 'model', seen) ?? findBadPath(state.props, 'props', seen);
+    let bad = findBadPath(state.model, 'model', seen) ?? findBadPath(state.props, 'props', seen);
+    for (const [path, slot] of Object.entries(state.slots ?? {})) {
+      bad ??=
+        findBadPath(slot.model, `slots.${path}.model`, seen) ??
+        findBadPath(slot.props, `slots.${path}.props`, seen);
+    }
     if (bad === undefined) {
       throw error;
     }
@@ -73,8 +119,8 @@ function serializeState(state: PageState): string {
   }
 }
 
-function writeState(state: PageState, nonce: string | undefined): string {
-  const events = escapeScript(JSON.stringify(state.manifest.events.join(' ')));
+function writeState(state: RecordedState, nonce: string | undefined): string {
+  const events = escapeScript(JSON.stringify(state.events.join(' ')));
   // seroval's output is a parenthesized expression, so it serves as the arrow body as it is.
   // It writes `<` as `\x3C` and escapes U+2028 and U+2029, so a value cannot end the script.
   const body = serializeState(state);
@@ -82,14 +128,69 @@ function writeState(state: PageState, nonce: string | undefined): string {
   return `<script i-state${attr('nonce', nonce)}>${script}</script>`;
 }
 
+/** Adds the manifest and chunk URLs of the modules a component can render, and their children. */
+function collectModules(
+  uses: readonly ModuleInfo[],
+  modules: Map<string, Manifest>,
+  chunks: Record<string, string>,
+): void {
+  for (const info of uses) {
+    if (!modules.has(info.manifest.module)) {
+      modules.set(info.manifest.module, info.manifest);
+      Object.assign(chunks, info.chunks);
+      collectModules(info.uses ?? [], modules, chunks);
+    }
+  }
+}
+
+/**
+ * Puts the calls of one render together. The call without a path is the root's. A call with a
+ * path is a child's: it becomes a slot, and its module joins `modules`. The chunk URLs and the
+ * event types of every module on the page join the root's.
+ */
+function mergeState(root: ComponentState, children: Map<string, ComponentState>): RecordedState {
+  const modules = new Map<string, Manifest>();
+  const chunks: Record<string, string> = {};
+  const slots = new Map<string, Slot>();
+  collectModules(root.uses ?? [], modules, chunks);
+  for (const [path, state] of children) {
+    slots.set(path, { module: state.manifest.module, model: state.model, props: state.props });
+    collectModules([state], modules, chunks);
+  }
+  const events = new Set(root.manifest.events);
+  for (const manifest of modules.values()) {
+    for (const event of manifest.events) {
+      events.add(event);
+    }
+  }
+  return {
+    manifest: root.manifest,
+    chunks: { ...root.chunks, ...chunks },
+    model: root.model,
+    props: root.props,
+    ...(modules.size === 0 ? {} : { modules: Object.fromEntries(modules) }),
+    ...(slots.size === 0 ? {} : { slots: Object.fromEntries(slots) }),
+    events: [...events].toSorted(),
+  };
+}
+
 function renderSync(component: (props: never) => unknown, props: unknown, nonce?: string): string {
-  let recorded: PageState | undefined;
-  const context: RenderContext = {
-    state(state) {
-      if (recorded !== undefined) {
-        throw new Error('The component recorded its state twice');
+  let root: ComponentState | undefined;
+  const children = new Map<string, ComponentState>();
+  const context: NestedContext = {
+    state(state, path) {
+      // The root has no path, or the empty one.
+      if (path === undefined || path === '') {
+        if (root !== undefined) {
+          throw new Error('The component recorded its state twice');
+        }
+        root = state;
+      } else {
+        if (children.has(path)) {
+          throw new Error(`The component at \`${path}\` recorded its state twice`);
+        }
+        children.set(path, state);
       }
-      recorded = state;
     },
   };
   // The compiled server module takes the render context as its second argument.
@@ -99,12 +200,12 @@ function renderSync(component: (props: never) => unknown, props: unknown, nonce?
       'The component did not return markup. Pass the default export of a compiled module',
     );
   }
-  if (recorded === undefined) {
+  if (root === undefined) {
     throw new Error(
       'The component recorded no state. Pass the default export of a compiled module',
     );
   }
-  return markup + writeState(recorded, nonce);
+  return markup + writeState(mergeState(root, children), nonce);
 }
 
 /**

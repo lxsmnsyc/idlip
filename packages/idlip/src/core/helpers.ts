@@ -56,6 +56,10 @@ function joinClass$(value: object): string {
   return names.join(' ');
 }
 
+function encode$(part: string): string {
+  return encodeURIComponent(part).replaceAll('-', '%2D');
+}
+
 function findEnd$(start: Comment): Node | null {
   let depth = 0;
   for (let node = start.nextSibling; node !== null; node = node.nextSibling) {
@@ -72,6 +76,19 @@ function findEnd$(start: Comment): Node | null {
     }
   }
   return null;
+}
+
+/**
+ * Returns the model path of a child: the parent's path, then the site of the child and one
+ * escaped key for each enclosing loop and an explicit `key`. A key part never holds `/`, `:`,
+ * `-` or `>`, so a path splits cleanly and cannot end a comment.
+ */
+export function slot$(path: string, site: number, ...keys: unknown[]): string {
+  let id = String(site);
+  for (const key of keys) {
+    id += `:${encode$(String(key))}`;
+  }
+  return path === '' ? id : `${path}/${id}`;
 }
 
 /**
@@ -208,10 +225,12 @@ const HELPERS: Record<string, Helper | undefined> = {
   escapeText$: { source: escapeText$, uses: [], client: [] },
   escapeAttr$: { source: escapeAttr$, uses: [], client: [] },
   joinClass$: { source: joinClass$, uses: [], client: [] },
+  encode$: { source: encode$, uses: [], client: [] },
   findEnd$: { source: findEnd$, uses: [], client: [] },
   text$: { source: text$, uses: ['getText$', 'escapeText$'], client: [] },
   attr$: { source: attr$, uses: ['getText$', 'escapeAttr$', 'joinClass$'], client: [] },
   on$: { source: on$, uses: [], client: [] },
+  slot$: { source: slot$, uses: ['encode$'], client: [] },
   setText$: { source: setText$, uses: ['getText$'], client: [] },
   setAttr$: { source: setAttr$, uses: ['getText$', 'joinClass$'], client: [] },
   setOn$: { source: setOn$, uses: [], client: [] },

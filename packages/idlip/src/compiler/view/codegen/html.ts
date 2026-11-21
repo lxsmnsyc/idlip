@@ -1,5 +1,6 @@
 // Turns view nodes into JS that builds their markup: the server render and client templates.
 import type { Component, Node } from '../analyze/index.ts';
+import { addChildNode } from './child.ts';
 import { getMessage } from './events.ts';
 import type { Emitter } from './expr.ts';
 import type { Plan } from './plan.ts';
@@ -66,11 +67,20 @@ export class HtmlBuilder {
   /** Variable names in use for list rows. */
   accumulators: Set<string> = new Set();
 
+  /**
+   * Where the markup runs. A child is called as a module on the server, and added with
+   * `addChild` in a client template. The view chunk prints with the server's names and
+   * adds children as a template does.
+   */
+  target: 'server' | 'client';
+
   constructor(
     readonly component: Component,
     readonly plan: Plan,
     readonly emitter: Emitter,
-  ) {}
+  ) {
+    this.target = emitter.mode;
+  }
 
   build(nodes: Node[], content: Content = 'html'): Built {
     const built = createBuilt();
@@ -126,6 +136,9 @@ export class HtmlBuilder {
       case 'condition':
         this.addCondition(node, built);
         break;
+      case 'child':
+        addChildNode(this, node, built);
+        break;
       case 'global':
         addText(built, `<template i-global="${node.target}"`);
         this.addEvents(node.events, built);
@@ -141,7 +154,7 @@ export class HtmlBuilder {
   addEvents(events: Extract<Node, { kind: 'element' }>['events'], built: Built): void {
     const { emitter } = this;
     for (const event of events) {
-      if (event.target.kind !== 'handler') {
+      if (event.target.kind !== 'handler' && event.target.kind !== 'prop') {
         continue;
       }
       emitter.at = event.span;

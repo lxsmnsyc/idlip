@@ -1,5 +1,6 @@
 // Emits the server render module, the binding and list chunks and the manifest from the view IR,
 // as `contracts/compiled-format.md` fixes them. Handler chunks come from `compile-update`.
+import { posix } from 'node:path';
 import { getChunkId } from '../../../core/format.ts';
 import type {
   BindingGroup,
@@ -13,7 +14,7 @@ import { HELPER_NAMES } from '../../../core/helpers.ts';
 import { pickComponent } from '../../update/index.ts';
 import { listWrites, meetsPath } from '../../update/writes.ts';
 import type { Component, ModuleIR, Span } from '../analyze/index.ts';
-import { emitBindings, emitGroupChunk, emitListChunk } from './chunks.ts';
+import { emitBindings, emitGroupChunk, emitListChunk, emitViewChunk } from './chunks.ts';
 import type { ChunkContext } from './chunks.ts';
 import { Emitter, createUsage, mergeUsage } from './expr.ts';
 import { HtmlBuilder, toExpression } from './html.ts';
@@ -31,6 +32,23 @@ export interface GenerateResult {
   manifest: Manifest;
   diagnostics: CompileDiagnostic[];
 }
+
+export interface GenerateOptions {
+  /** True when a project module renders this module as a child: it gets a `view` chunk. */
+  child?: boolean;
+  /**
+   * Returns the id of the module that an import specifier names. Vite resolves it. Without it,
+   * a relative specifier is resolved against the id of the importer.
+   */
+  resolve?: (specifier: string, importer: string) => string;
+}
+
+function resolveSpecifier(specifier: string, importer: string): string {
+  return specifier.startsWith('.') ? posix.join(posix.dirname(importer), specifier) : specifier;
+}
+
+/** The manifest of a module that a parent renders: `view` is in compiled-format v10. */
+type ChildManifest = Manifest & { view?: { chunk: string } };
 
 function createEmptyManifest(id: string): Manifest {
   return { module: id, events: [], handlers: {}, groups: {}, lists: {} };
@@ -75,7 +93,8 @@ function buildManifest(
   plan: Plan,
   groups: Group[],
   writes: ReadonlyMap<string, readonly string[] | undefined>,
-): Manifest {
+  child: boolean,
+): ChildManifest {
   const handlers: Record<string, HandlerEntry> = {};
   const tasks: Record<string, string> = {};
   for (const handler of component.handlers) {
@@ -118,7 +137,7 @@ function buildManifest(
     const each = info.node.each;
     let path: string | undefined;
     if (each.expr.kind === 'path' && each.paths !== 'dynamic') {
-      const paths = getStatePaths(each.paths, () => {}, each.span);
+      const paths = getStatePaths(each.paths, () => {}, each.span, child);
       if (paths.length === 1) {
         path = paths[0];
       }
@@ -138,11 +157,19 @@ function buildManifest(
     ...(Object.keys(tasks).length === 0 ? {} : { tasks }),
     groups: groupEntries,
     lists,
+    ...(child ? { view: { chunk: 'view' } } : {}),
   };
 }
 
 /** Generates the server module, the client chunks and the manifest of one `*.idlip.tsx` file. */
-export function generate(ir: ModuleIR, source: string, id: string): GenerateResult {
+export function generate(
+  ir: ModuleIR,
+  source: string,
+  id: string,
+  options: GenerateOptions = {},
+): GenerateResult {
+  const child = options.child === true;
+  const resolve = options.resolve ?? resolveSpecifier;
   const diagnostics: CompileDiagnostic[] = [...ir.diagnostics];
   const report = (rule: string, message: string, span: Span): void => {
     diagnostics.push({ rule, severity: 'error', message, span });
@@ -165,7 +192,11 @@ export function generate(ir: ModuleIR, source: string, id: string): GenerateResu
   }
 
   // Plan which holes and events patch, then group them by path set.
-  const plan = planBindings(component, report);
+  const plan = planBindings(component, report, child);
+  for (const used of plan.uses) {
+    used.module = resolve(used.source, id);
+    used.view = getChunkId(used.module, 'view');
+  }
   const groupList = planGroups(plan.bindings);
   const groups = new Map<string, Group>();
   for (const group of groupList) {
@@ -204,14 +235,30 @@ export function generate(ir: ModuleIR, source: string, id: string): GenerateResu
     mergeUsage(clientUsage, chunk.usage);
   }
 
+  if (child) {
+    const chunk = emitViewChunk(context);
+    client.push(chunk.module);
+    mergeUsage(clientUsage, chunk.usage);
+  }
+
   const manifest = buildManifest(
     id,
     component,
     plan,
     groupList,
     listWrites(ir.file, source, component),
+    child,
   );
-  const server = emitServer(id, component, plan, manifest, clientUsage.props, moduleSource, report);
+  const server = emitServer(
+    id,
+    component,
+    plan,
+    manifest,
+    clientUsage.props,
+    moduleSource,
+    report,
+    child,
+  );
   for (const diagnostic of diagnostics) {
     if (diagnostic.severity === 'error') {
       return { ...empty(), manifest };
@@ -225,10 +272,11 @@ function emitServer(
   id: string,
   component: Component,
   plan: Plan,
-  manifest: Manifest,
+  manifest: ChildManifest,
   clientProps: Set<string>,
   moduleSource: ModuleSource,
   report: ChunkContext['report'],
+  child: boolean,
 ): string {
   const usage = createUsage();
   const emitter = new Emitter('server', usage, report);
@@ -248,9 +296,16 @@ function emitServer(
   for (const field of clientProps) {
     props.push(`${getKey(field)}: props${getAccessor(field, false)}`);
   }
-  lines.push(
-    `context.state({ manifest, chunks, model: { ${model.join(', ')} }, props: ${props.length === 0 ? '{}' : `{ ${props.join(', ')} }`} });`,
-  );
+  // The root's path is `''`. A child gets its path from its parent.
+  const parent = plan.uses.length > 0;
+  const state = [
+    'manifest',
+    'chunks',
+    ...(parent ? ['uses'] : []),
+    `model: { ${model.join(', ')} }`,
+    `props: ${props.length === 0 ? '{}' : `{ ${props.join(', ')} }`}`,
+  ];
+  lines.push(`context.state({ ${state.join(', ')} }${parent || child ? ', path' : ''});`);
 
   // The markup.
   const builder = new HtmlBuilder(component, plan, emitter);
@@ -276,6 +331,9 @@ function emitServer(
   for (const list of Object.values(manifest.lists)) {
     chunkNames.push(list.chunk);
   }
+  if (manifest.view !== undefined) {
+    chunkNames.push(manifest.view.chunk);
+  }
   for (const chunk of chunkNames) {
     const chunkId = quote(getChunkId(id, chunk));
     urls.push(`${chunkId}: ${chunkId},`);
@@ -287,6 +345,10 @@ function emitServer(
   if (usage.helpers.size > 0) {
     imports.push(printHelperImport(usage.helpers, 'idlip/server'));
   }
+  // A child module is imported by the specifier of the source. Vite resolves it.
+  for (const used of plan.uses) {
+    imports.push(`import * as ${used.name} from ${quote(used.source)};`);
+  }
   imports.push(...collected.imports);
   const blocks: string[] = [];
   if (imports.length > 0) {
@@ -296,7 +358,22 @@ function emitServer(
     ...collected.code,
     `export const manifest = ${toLiteral(manifest)};`,
     `// \`vite-plugin\` replaces the URLs in a build.\nexport const chunks = {\n${urls.join('\n')}\n};`,
-    `export default function ${component.name}(props, context, model) {\n${lines.join('\n')}\n}`,
+  );
+  if (parent) {
+    const names = plan.uses.map((used) => used.name).join(', ');
+    blocks.push(
+      `// The server modules of the stateful children, so \`render()\` can write their manifests and\n// chunk URLs, also for children that no row renders yet.\nexport const uses = [${names}];`,
+    );
+  }
+  // `path` is the model path of this component: the empty string for the root.
+  let pathParameter = '';
+  if (parent) {
+    pathParameter = ", path = ''";
+  } else if (child) {
+    pathParameter = ', path';
+  }
+  blocks.push(
+    `export default function ${component.name}(props, context, model${pathParameter}) {\n${lines.join('\n')}\n}`,
   );
   return `${blocks.join('\n\n')}\n`;
 }

@@ -5,6 +5,7 @@ export function add(model) {
   }
   const text = draft;
   return {
+    $step: true,
     model: { ...model, draft, todos },
     task: { site: 'add$1', args: [], then: 'add$1', carried: [text] },
   };

@@ -3,6 +3,7 @@ export function persist(model, [props$step]) {
   save = { state: 'saving' };
   try {
     return {
+      $step: true,
       model: { ...model, save, label, saved },
       task: { site: 'persist$1', args: [todos], then: 'persist$1', carried: [props$step] },
     };

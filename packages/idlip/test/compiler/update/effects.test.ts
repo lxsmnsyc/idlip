@@ -119,6 +119,7 @@ describe('semantics of the effects fixture', () => {
     const chunk = await importChunk('handler=add');
     expect(call(chunk, 'add', model, [])).toEqual({
       model,
+      $step: true,
       task: { site: 'add$1', args: [], then: 'add$1', carried: ['milk'] },
     });
     // The early return of the first part still returns the model.
@@ -150,11 +151,13 @@ describe('semantics of the effects fixture', () => {
     const start = call(chunk, 'rename', model, ['todo']);
     expect(start).toEqual({
       model,
+      $step: true,
       task: { site: 'rename$1', args: ['todo', 1], then: 'rename$1', carried: [1] },
     });
     const middle = call(chunk, 'rename$1', model, [ok('todo-a'), 1]);
     expect(middle).toEqual({
       model,
+      $step: true,
       task: { site: 'rename$2', args: ['todo-a', 1], then: 'rename$2', carried: ['todo-a', 1] },
     });
     expect(call(chunk, 'rename$2', model, [ok('b'), 'todo-a', 1])).toEqual({
@@ -167,6 +170,7 @@ describe('semantics of the effects fixture', () => {
     const chunk = await importChunk('handler=persist');
     expect(call(chunk, 'persist', model, [2])).toEqual({
       model: { ...model, save: { state: 'saving' } },
+      $step: true,
       task: { site: 'persist$1', args: [model.todos], then: 'persist$1', carried: [2] },
     });
   });

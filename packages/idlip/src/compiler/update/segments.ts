@@ -258,6 +258,7 @@ function writeSegments(
     const carried = listCarried(index).join(', ');
     return [
       `${indent}return {`,
+      `${indent}  $step: true,`,
       `${indent}  model: ${nextModel},`,
       `${indent}  task: { site: '${tag}', args: [${args.join(', ')}], then: '${tag}', carried: [${carried}] },`,
       `${indent}};`,

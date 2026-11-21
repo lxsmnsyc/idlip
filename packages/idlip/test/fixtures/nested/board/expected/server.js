@@ -2,38 +2,7 @@ import { slot, text } from 'idlip/server';
 // The compiler keeps the specifier of the source. This one has an extra `../` for the `expected` folder.
 import * as Counter from '../../counter/counter.idlip.tsx';
 
-export const manifest = {
-  module: '/src/board.idlip.tsx',
-  events: [],
-  handlers: {
-    remove: { chunk: 'handler=remove' },
-    clearAll: { chunk: 'handler=clearAll' },
-  },
-  groups: {
-    'items.*.id': {
-      paths: ['items.*.id'],
-      chunk: 'binding=items.*.id',
-      bindings: ['p4'],
-      covers: ['items'],
-    },
-    'items.*.label': {
-      paths: ['items.*.label'],
-      chunk: 'binding=items.*.label',
-      bindings: ['p3'],
-      covers: ['items'],
-    },
-    'items.length': {
-      paths: ['items.length'],
-      chunk: 'binding=items.length',
-      bindings: ['t0'],
-      covers: ['items'],
-    },
-    items: { paths: ['items'], chunk: 'binding=items', bindings: ['l2'], covers: [] },
-  },
-  lists: {
-    2: { key: 'id', path: 'items', chunk: 'list=2', bindings: ['p3', 'p4'] },
-  },
-};
+export const manifest = { module: '/src/board.idlip.tsx', events: [], handlers: { remove: { chunk: 'handler=remove', writes: ['items'], bindings: ['items.*.id', 'items.*.label', 'items.length'] }, clearAll: { chunk: 'handler=clearAll', writes: ['items'], bindings: ['items.*.id', 'items.*.label', 'items.length'] } }, groups: { 'items.*.id': { paths: ['items.*.id'], chunk: 'binding=items.*.id', bindings: ['p4'], covers: ['items'] }, 'items.*.label': { paths: ['items.*.label'], chunk: 'binding=items.*.label', bindings: ['p3'], covers: ['items'] }, 'items.length': { paths: ['items.length'], chunk: 'binding=items.length', bindings: ['t0'], covers: ['items'] }, items: { paths: ['items'], chunk: 'binding=items', bindings: ['l2'], covers: [] } }, lists: { 2: { key: 'id', path: 'items', chunk: 'list=2', bindings: ['p3', 'p4'] } } };
 
 // `vite-plugin` replaces the URLs in a build.
 export const chunks = {
