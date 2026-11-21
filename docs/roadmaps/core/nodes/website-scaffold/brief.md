@@ -1,7 +1,7 @@
 ---
 id: website-scaffold
 title: Website scaffold
-status: active
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 305000
 owns:
   - website/package.json
   - website/tsconfig.json
