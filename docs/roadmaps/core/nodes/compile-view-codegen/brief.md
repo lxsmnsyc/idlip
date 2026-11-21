@@ -1,7 +1,7 @@
 ---
 id: compile-view-codegen
 title: Compiler: emit server template and binding chunks from the view IR
-status: todo
+status: active
 priority: must
 type: feature
 story:

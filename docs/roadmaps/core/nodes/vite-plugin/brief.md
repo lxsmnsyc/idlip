@@ -1,7 +1,7 @@
 ---
 id: vite-plugin
 title: Vite plugin: compile, split chunks, serve SSR in dev
-status: todo
+status: active
 priority: must
 type: feature
 story:

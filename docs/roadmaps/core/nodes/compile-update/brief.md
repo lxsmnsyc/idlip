@@ -1,7 +1,7 @@
 ---
 id: compile-update
 title: Compiler: compile handler functions into update chunks
-status: todo
+status: active
 priority: must
 type: feature
 story:
