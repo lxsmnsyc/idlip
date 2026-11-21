@@ -1,6 +1,7 @@
 // Turns view nodes into JS that builds their markup: the server render and client templates.
 import type { Component, Node } from '../analyze/index.ts';
 import { addChildNode } from './child.ts';
+import { printTracked } from './dynamic.ts';
 import { getMessage, printModifiers } from './events.ts';
 import type { Emitter } from './expr.ts';
 import type { HeadNode, Plan } from './plan.ts';
@@ -116,7 +117,10 @@ export class HtmlBuilder {
       case 'text-hole': {
         emitter.at = node.hole.span;
         emitter.usage.helpers.add('text');
-        const value = `text$(${emitter.expr(node.hole.expr, 1)})`;
+        const inner = this.plan.dynamic.has(node.hole.id)
+          ? printTracked(emitter, this.component, node.hole, `t${node.hole.id}`)
+          : emitter.expr(node.hole.expr, 1);
+        const value = `text$(${inner})`;
         // A raw text element cannot hold the comment markers.
         if (this.plan.bound.has(node.hole.id) && content === 'html') {
           addText(built, `<!--t${node.hole.id}-->`);
@@ -344,7 +348,10 @@ export class HtmlBuilder {
       } else {
         emitter.at = attr.value.hole.span;
         emitter.usage.helpers.add('attr');
-        let value = emitter.expr(attr.value.hole.expr, 1);
+        const { hole } = attr.value;
+        let value = this.plan.dynamic.has(hole.id)
+          ? printTracked(emitter, this.component, hole, `a${hole.id}`)
+          : emitter.expr(hole.expr, 1);
         if (attr.url !== undefined) {
           emitter.usage.helpers.add('safeUrl');
           value = `safeUrl$(${value}, ${quote(attr.name)}${attr.url === 'embed' ? ', true' : ''})`;

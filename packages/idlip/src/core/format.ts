@@ -124,6 +124,12 @@ export interface PageState {
   readonly modules?: Readonly<Record<string, Manifest>>;
   /** Rendered children by model path. */
   readonly slots?: Readonly<Record<string, Slot>>;
+  /**
+   * The model paths each dynamic hole read when it last ran, by binding name. The client keeps
+   * the record and replaces an entry each time the hole runs again. Absent when the module has
+   * no dynamic hole.
+   */
+  readonly dynamic?: Record<string, string[]>;
 }
 
 /** A rendered child: its module, its model and the props the client reads. */
@@ -199,6 +205,8 @@ export interface Scope {
   readonly rows: readonly Row[];
   /** The model path of the component the binding belongs to. Absent means the root. */
   readonly path?: string;
+  /** The paths dynamic holes read, by binding name. Only the root has them. */
+  readonly dynamic?: Record<string, string[]>;
 }
 
 /** An `a<id>`, `t<id>` or `c<id>` export: patches the node it is given. */
@@ -279,6 +287,8 @@ export interface Page {
   readonly path?: string;
   /** The boundary start of a child: its bindings are looked up between it and its end. */
   readonly start?: Comment;
+  /** The state record's `dynamic`. Only the root has it. */
+  readonly dynamic?: Record<string, string[]>;
 }
 
 /** Owned by `patch-bindings`. The loader awaits it before the next queued message. */

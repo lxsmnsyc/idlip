@@ -32,6 +32,7 @@ const DETECTORS: Readonly<Record<string, Detector>> = {
   ERRORS: ({ manifest }) => manifest.fallback !== undefined,
   // `deploy-skew` turns this on for apps without `<Try>` too.
   RETRY: ({ manifest }) => manifest.fallback !== undefined,
+  DYNAMIC: ({ manifest }) => Object.hasOwn(manifest.groups, '$dynamic'),
 };
 
 /** Returns the flags that the compiled modules turn on. */

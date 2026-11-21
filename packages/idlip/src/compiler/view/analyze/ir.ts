@@ -102,6 +102,11 @@ export interface Hole {
   id: number;
   expr: Expr;
   paths: Path[] | 'dynamic';
+  /**
+   * The static paths of a `dynamic` hole, the coarse set the analysis can name. Code generation
+   * binds the hole with them where it cannot track reads: in rows, blocks and children.
+   */
+  fallback?: Path[];
   span: Span;
 }
 

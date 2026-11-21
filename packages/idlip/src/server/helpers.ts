@@ -6,4 +6,5 @@ export {
   safeUrl$ as safeUrl,
   slot$ as slot,
   text$ as text,
+  track$ as track,
 } from '../core/helpers.ts';

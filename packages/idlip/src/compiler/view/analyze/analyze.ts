@@ -565,6 +565,15 @@ class Analyzer {
         );
       case 'props-subst': {
         const [first, ...rest] = segments;
+        if (segments.length === 0) {
+          // The whole props object, as one object of the caller's values. A helper that takes
+          // it reads fields the analysis cannot see, so the hole is dynamic (`createHole`).
+          const entries: { key: string; value: Expr }[] = [];
+          for (const [key, value] of binding.values) {
+            entries.push({ key, value });
+          }
+          return { kind: 'object', entries };
+        }
         if (typeof first !== 'string') {
           return this.reportError(
             'props-whole',
@@ -1090,19 +1099,23 @@ class Analyzer {
     }
   }
 
-  createHole(node: AstNode, scope: Scope): Hole {
+  /**
+   * Creates a hole. A text or attribute hole (`dynamic`) whose path set the analysis cannot
+   * trust gets `paths: 'dynamic'`: the server and the client record what it reads.
+   */
+  createHole(node: AstNode, scope: Scope, dynamic = false): Hole {
     const expr = this.lower(node, scope);
+    const found = this.findPaths(expr);
     const hole: Hole = {
       id: this.holes.length,
       expr,
-      paths: this.findPaths(expr),
+      paths: dynamic && found.length > 0 && isTracked(expr) ? 'dynamic' : found,
       span: this.readSpan(node),
     };
-    // The analysis never produces `dynamic` for the closed grammar. Until `dynamic-paths`
-    // lands, one would be an error.
     if (hole.paths === 'dynamic') {
-      this.report('hole-dynamic', 'error', 'This hole needs runtime path tracking', node);
-    } else if (hole.paths.length > 0 && hasImpureCall(expr)) {
+      hole.fallback = found;
+    }
+    if (hole.paths !== 'dynamic' && hole.paths.length > 0 && hasImpureCall(expr)) {
       // An impure value recomputes only when the hole's paths change.
       const names: string[] = [];
       for (const path of hole.paths) {
@@ -1475,7 +1488,7 @@ class Analyzer {
       return [];
     }
     this.checkTableText(context, node);
-    return [{ kind: 'text-hole', hole: this.createHole(node, scope) }];
+    return [{ kind: 'text-hole', hole: this.createHole(node, scope, true) }];
   }
 
   resolveChildren(node: Expression, scope: Scope): Node[] | undefined {
@@ -1751,7 +1764,7 @@ class Analyzer {
         } else {
           attrs.push({
             name: attrName,
-            value: { kind: 'hole', hole: this.createHole(value.expression, scope) },
+            value: { kind: 'hole', hole: this.createHole(value.expression, scope, true) },
           });
         }
       } else {
@@ -3725,6 +3738,93 @@ function hasImpureCallIn(exprs: Expr[]): boolean {
     }
   }
   return false;
+}
+
+interface TrackScan {
+  /** A helper call takes an object of model fields. */
+  bundle: boolean;
+  /** The expression reads a loop variable, the event or a catch error, or is impure. */
+  blocked: boolean;
+}
+
+function scanTracked(expr: Expr, scan: TrackScan): void {
+  switch (expr.kind) {
+    case 'literal':
+      return;
+    case 'path':
+      if (expr.root.kind === 'loop' || expr.root.kind === 'local' || expr.root.kind === 'event') {
+        scan.blocked = true;
+      }
+      for (const segment of expr.segments) {
+        if (typeof segment === 'object' && segment.kind !== 'item') {
+          scanTracked(segment.value, scan);
+        }
+      }
+      return;
+    case 'unary':
+      scanTracked(expr.arg, scan);
+      return;
+    case 'binary':
+    case 'logical':
+      scanTracked(expr.left, scan);
+      scanTracked(expr.right, scan);
+      return;
+    case 'conditional':
+      scanTracked(expr.test, scan);
+      scanTracked(expr.then, scan);
+      scanTracked(expr.else, scan);
+      return;
+    case 'template':
+      for (const item of expr.exprs) {
+        scanTracked(item, scan);
+      }
+      return;
+    case 'object':
+      for (const entry of expr.entries) {
+        scanTracked(entry.value, scan);
+      }
+      return;
+    case 'array':
+      for (const item of expr.items) {
+        scanTracked(item, scan);
+      }
+      return;
+    case 'property':
+      scanTracked(expr.receiver, scan);
+      return;
+    case 'method':
+      scanTracked(expr.receiver, scan);
+      for (const item of expr.args) {
+        scanTracked(item, scan);
+      }
+      return;
+    default:
+      if (expr.helper === 'inlined') {
+        scanTracked(expr.body, scan);
+        return;
+      }
+      if (expr.impure === true) {
+        scan.blocked = true;
+      }
+      for (const arg of expr.args) {
+        if (arg.kind === 'object' && expr.callee.kind !== 'global') {
+          scan.bundle = true;
+        }
+        scanTracked(arg, scan);
+      }
+  }
+}
+
+/**
+ * Tells whether a hole is dynamic: a helper that is not inlined takes an object of model
+ * fields, such as the whole props of a stateless component or an alias `const view = { todos }`,
+ * so the fields it reads are known only when it runs. A hole that reads a loop variable, the
+ * event or a catch error stays static, since the runtime tracks model reads only.
+ */
+function isTracked(expr: Expr): boolean {
+  const scan: TrackScan = { bundle: false, blocked: false };
+  scanTracked(expr, scan);
+  return scan.bundle && !scan.blocked;
 }
 
 /** Drops paths that have a prefix in the set: a reference check on the prefix covers them. */

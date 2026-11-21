@@ -7,6 +7,7 @@ import { emitHeadBody } from './head.ts';
 import { printHtmlBody } from './raw.ts';
 import { emitSubscribeBinding } from './subscribe.ts';
 import { getMessage } from './events.ts';
+import { printTracked } from './dynamic.ts';
 import { Emitter, createUsage, mergeUsage } from './expr.ts';
 import type { Frame, Report, ScopeName, Usage } from './expr.ts';
 import { HtmlBuilder, toExpression } from './html.ts';
@@ -28,7 +29,7 @@ export interface Emitted {
   usage: Usage;
 }
 
-const SCOPE_ORDER: ScopeName[] = ['model', 'props', 'rows'];
+const SCOPE_ORDER: ScopeName[] = ['model', 'props', 'rows', 'dynamic'];
 
 /**
  * Prints the scope as the destructured parameter, such as `{ model, rows }`, or an empty string.
@@ -73,7 +74,9 @@ function emitBinding(binding: Binding, context: ChunkContext): Emitted {
     case 'attr': {
       emitter.at = source.hole.span;
       usage.helpers.add('setAttr');
-      let value = emitter.expr(source.hole.expr, 1);
+      let value = binding.dynamic
+        ? printTracked(emitter, context.component, source.hole, binding.name)
+        : emitter.expr(source.hole.expr, 1);
       if (source.url !== undefined) {
         usage.helpers.add('safeUrl');
         value = `safeUrl$(${value}, ${quote(source.name)}${source.url === 'embed' ? ', true' : ''})`;
@@ -113,7 +116,10 @@ function emitBinding(binding: Binding, context: ChunkContext): Emitted {
     case 'text': {
       emitter.at = source.hole.span;
       usage.helpers.add('setText');
-      const body = `setText$(start, ${emitter.expr(source.hole.expr, 1)});`;
+      const value = binding.dynamic
+        ? printTracked(emitter, context.component, source.hole, binding.name)
+        : emitter.expr(source.hole.expr, 1);
+      const body = `setText$(start, ${value});`;
       return {
         code: `export function ${binding.name}(${printParams('start', usage)}) {\n${body}\n}`,
         usage,

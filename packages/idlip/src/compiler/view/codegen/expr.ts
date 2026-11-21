@@ -13,7 +13,7 @@ export interface Frame {
   row: number | undefined;
 }
 
-export type ScopeName = 'model' | 'props' | 'rows';
+export type ScopeName = 'model' | 'props' | 'rows' | 'dynamic';
 
 /** What the printed code reads, so a chunk imports and destructures only that. */
 export interface Usage {
@@ -125,6 +125,9 @@ export class Emitter {
   /** The span reported with a diagnostic. Callers set it to the hole or event they print. */
   at: Span = { start: 0, end: 0 };
 
+  /** Prints state as `model.name` on the server too: a dynamic hole reads a proxy of the model. */
+  tracked = false;
+
   constructor(
     readonly mode: 'server' | 'client',
     readonly usage: Usage,
@@ -179,7 +182,12 @@ export class Emitter {
       case 'object': {
         const entries: string[] = [];
         for (const entry of expr.entries) {
-          entries.push(`${getKey(entry.key)}: ${this.expr(entry.value, 1)}`);
+          // A tracked object reads its fields when the helper does, not when it is built.
+          entries.push(
+            this.tracked
+              ? `get ${getKey(entry.key)}() { return ${this.expr(entry.value, 0)}; }`
+              : `${getKey(entry.key)}: ${this.expr(entry.value, 1)}`,
+          );
         }
         return entries.length === 0 ? '{}' : `{ ${entries.join(', ')} }`;
       }
@@ -237,7 +245,7 @@ export class Emitter {
   printRoot(root: Extract<Expr, { kind: 'path' }>['root']): string {
     switch (root.kind) {
       case 'state':
-        if (this.mode === 'server') {
+        if (this.mode === 'server' && !this.tracked) {
           return getLocalName(root.name);
         }
         this.usage.scope.add('model');

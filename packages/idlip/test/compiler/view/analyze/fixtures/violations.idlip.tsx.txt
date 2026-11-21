@@ -54,9 +54,9 @@ function Pick({ onPick }: { onPick: () => void }) {
   return <b on:click={onPick}>pick</b>;
 }
 
-// props-whole: the props object passed along by an inlined component.
+// props-whole: the props object read by a computed key, in an inlined component.
 function Whole(props: { x: number }) {
-  return <i>{format(props)}</i>;
+  return <i>{props[props.x]}</i>;
 }
 
 // props-pattern: a default in the props pattern.

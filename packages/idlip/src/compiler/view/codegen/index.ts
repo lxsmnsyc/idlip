@@ -22,6 +22,7 @@ import {
   emitViewChunk,
 } from './chunks.ts';
 import type { ChunkContext } from './chunks.ts';
+import { DYNAMIC_GROUP, DYNAMIC_STORE } from './dynamic.ts';
 import { Emitter, createUsage, mergeUsage } from './expr.ts';
 import { HtmlBuilder, toExpression } from './html.ts';
 import { ModuleSource } from './module.ts';
@@ -88,6 +89,12 @@ function listBindings(groups: readonly Group[], writes: readonly string[]): stri
   const keys: string[] = [];
   for (const group of met) {
     if (!covered.has(group.key)) {
+      keys.push(group.key);
+    }
+  }
+  // The paths of the dynamic holes are unknown until they run, so any handler may change one.
+  for (const group of groups) {
+    if (group.key === DYNAMIC_GROUP) {
       keys.push(group.key);
     }
   }
@@ -216,7 +223,16 @@ export function generate(
     used.module = resolve(used.source, id);
     used.view = getChunkId(used.module, 'view');
   }
-  const groupList = planGroups(plan.bindings);
+  // The dynamic holes share one group at the end, whose paths the page state records.
+  const staticBindings: Binding[] = [];
+  const dynamicBindings: Binding[] = [];
+  for (const binding of plan.bindings) {
+    (binding.dynamic === true ? dynamicBindings : staticBindings).push(binding);
+  }
+  const groupList = planGroups(staticBindings);
+  if (dynamicBindings.length > 0) {
+    groupList.push({ key: DYNAMIC_GROUP, paths: [], bindings: dynamicBindings, covers: [] });
+  }
   const groups = new Map<string, Group>();
   for (const group of groupList) {
     groups.set(group.key, group);
@@ -340,7 +356,12 @@ function emitServer(
     ...(parent ? ['uses'] : []),
     `model: { ${model.join(', ')} }`,
     `props: ${props.length === 0 ? '{}' : `{ ${props.join(', ')} }`}`,
+    ...(plan.dynamic.size === 0 ? [] : [`dynamic: ${DYNAMIC_STORE}`]),
   ];
+  // Each dynamic hole stores the paths it read as the markup is built.
+  if (plan.dynamic.size > 0) {
+    lines.push(`const ${DYNAMIC_STORE} = {};`);
+  }
   lines.push(`context.state({ ${state.join(', ')} }${parent || child ? ', path' : ''});`);
 
   // The markup.

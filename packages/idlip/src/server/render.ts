@@ -113,6 +113,9 @@ function serializeState(state: RecordedState): string {
   if (state.slots !== undefined) {
     record.slots = state.slots;
   }
+  if (state.dynamic !== undefined) {
+    record.dynamic = state.dynamic;
+  }
   try {
     return serialize(record, SEROVAL_OPTIONS);
   } catch (error) {
@@ -185,6 +188,7 @@ function mergeState(root: ComponentState, children: Map<string, ComponentState>)
     ...(Object.hasOwn(merged, 'build') ? { build } : {}),
     model: root.model,
     props: root.props,
+    ...(root.dynamic === undefined ? {} : { dynamic: root.dynamic }),
     ...(modules.size === 0 ? {} : { modules: Object.fromEntries(modules) }),
     ...(slots.size === 0 ? {} : { slots: Object.fromEntries(slots) }),
     events: [...events].toSorted(),

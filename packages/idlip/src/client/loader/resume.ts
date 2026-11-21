@@ -5,6 +5,7 @@ import { runAfter } from '../dom/run.ts';
 import { RESET, fireError, keepModel, resetRegion } from '../errors.ts';
 import {
   HAS_CHILDREN,
+  HAS_DYNAMIC,
   HAS_ERRORS,
   HAS_HEAD,
   HAS_REFS,
@@ -199,6 +200,7 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
         manifest: state.manifest,
         props: state.props,
         load: async (module, chunk) => load(state.chunks[getChunkId(module, chunk)]),
+        ...(HAS_DYNAMIC && { dynamic: state.dynamic }),
       },
     };
   }

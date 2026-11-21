@@ -36,6 +36,8 @@ export interface Binding {
   /** The id of the list whose rows hold the binding. */
   list: number | undefined;
   source: Source;
+  /** A dynamic hole: its paths are not known at build time, so `paths` is empty. */
+  dynamic?: true;
 }
 
 export interface ListInfo {
@@ -89,6 +91,8 @@ export interface Plan {
   bindings: Binding[];
   /** Hole ids that have a binding. */
   bound: Set<number>;
+  /** Hole ids of the dynamic holes. */
+  dynamic: Set<number>;
   eventIds: Map<Event, number>;
   /** Element and global nodes to the binding ids on them. */
   anchors: Map<Node, number[]>;
@@ -171,11 +175,14 @@ interface WalkContext {
   frames: Frame[];
   list: number | undefined;
   loops: ForNode[];
+  /** The condition and `<Try>` blocks around the node. */
+  blocks: number;
 }
 
 class Planner {
   bindings = new Map<number, Binding>();
   bound = new Set<number>();
+  dynamic = new Set<number>();
   eventIds = new Map<Event, number>();
   anchors = new Map<Node, number[]>();
   lists: ListInfo[] = [];
@@ -227,12 +234,44 @@ class Planner {
     context: WalkContext,
     source: Source,
   ): number | undefined {
-    const paths = getStatePaths(hole.paths, this.report, hole.span, this.child);
+    const tracked =
+      hole.paths === 'dynamic' &&
+      context.frames.length === 0 &&
+      context.blocks === 0 &&
+      !this.child;
+    if (tracked) {
+      return this.bindDynamic(hole, kind, context, source);
+    }
+    // Rows, blocks and children render from templates that record no reads, so a dynamic hole
+    // there keeps the static paths of the analysis.
+    const paths = getStatePaths(
+      hole.paths === 'dynamic' ? (hole.fallback ?? []) : hole.paths,
+      this.report,
+      hole.span,
+      this.child,
+    );
     if (paths.length === 0) {
       return undefined;
     }
     this.bound.add(hole.id);
     this.addBinding(kind, hole.id, paths, context, source);
+    return hole.id;
+  }
+
+  /** Binds a dynamic hole at the top level of a root component, where reads are recorded. */
+  bindDynamic(
+    hole: Hole,
+    kind: Binding['kind'],
+    context: WalkContext,
+    source: Source,
+  ): number | undefined {
+    this.bound.add(hole.id);
+    this.dynamic.add(hole.id);
+    this.addBinding(kind, hole.id, [], context, source);
+    const binding = this.bindings.get(hole.id);
+    if (binding !== undefined) {
+      binding.dynamic = true;
+    }
     return hole.id;
   }
 
@@ -456,13 +495,14 @@ class Planner {
             frames: [...context.frames, frame],
             list: id,
             loops: [...context.loops, node],
+            blocks: context.blocks,
           });
           break;
         }
         case 'condition':
           this.bindHole(node.test, 'c', context, { kind: 'condition', node });
-          this.walk(node.then, context);
-          this.walk(node.else, context);
+          this.walk(node.then, { ...context, blocks: context.blocks + 1 });
+          this.walk(node.else, { ...context, blocks: context.blocks + 1 });
           break;
         case 'child':
           this.planChild(node, context);
@@ -491,7 +531,7 @@ class Planner {
           const id = this.tries.length;
           this.tryIds.set(node, id);
           this.tries.push({ id, node, frames: context.frames });
-          this.walk(node.body, context);
+          this.walk(node.body, { ...context, blocks: context.blocks + 1 });
           this.scanCatch(node.catch);
           break;
         }
@@ -541,7 +581,7 @@ class Planner {
 /** Plans the bindings of a component's view. */
 export function planBindings(component: Component, report: Report, child = false): Plan {
   const planner = new Planner(component, report, child);
-  planner.walk(component.view, { frames: [], list: undefined, loops: [] });
+  planner.walk(component.view, { frames: [], list: undefined, loops: [], blocks: 0 });
   // Order by id: holes in view order, then events.
   const ids = [...planner.bindings.keys()].sort((a, b) => a - b);
   const bindings: Binding[] = [];
@@ -554,6 +594,7 @@ export function planBindings(component: Component, report: Report, child = false
   return {
     bindings,
     bound: planner.bound,
+    dynamic: planner.dynamic,
     eventIds: planner.eventIds,
     anchors: planner.anchors,
     lists: planner.lists,

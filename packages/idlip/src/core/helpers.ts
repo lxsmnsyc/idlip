@@ -12,8 +12,11 @@
 // oxlint-disable typescript/no-base-to-string, no-control-regex
 import { addBlock, findInnerBlocks, removeBlock } from '../client/patch/blocks.ts';
 import { parseHtml } from '../client/patch/dom.ts';
+import { track$ } from './dynamic.ts';
 import type { Namespace } from '../client/patch/dom.ts';
 import type { DomMessage } from './format.ts';
+
+export { track$ };
 
 function addBlock$(start: Comment): void {
   addBlock(start);
@@ -316,6 +319,7 @@ const HELPERS: Record<string, Helper | undefined> = {
   setText$: { source: setText$, uses: ['getText$'], client: [] },
   setAttr$: { source: setAttr$, uses: ['getText$', 'joinClass$'], client: [] },
   setOn$: { source: setOn$, uses: [], client: [] },
+  track$: { source: track$, uses: [], client: [] },
   setBranch$: {
     source: setBranch$,
     uses: ['findEnd$'],

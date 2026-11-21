@@ -12,7 +12,8 @@ import type {
   Scope,
 } from '../../core/format.ts';
 import { failRegion } from '../errors.ts';
-import { HAS_CHILDREN, HAS_ERRORS } from '../features.ts';
+import { DYNAMIC_GROUP, getDynamic, isIdle } from '../dynamic.ts';
+import { HAS_CHILDREN, HAS_DYNAMIC, HAS_ERRORS } from '../features.ts';
 import { diffPaths, getListKeys } from './diff.ts';
 import { isBinding, isComment, isRecord } from './guards.ts';
 import { findNode } from './nodes.ts';
@@ -111,7 +112,13 @@ function compareNames(a: string, b: string): number {
 }
 
 function createScope(page: Page, model: Model): Scope {
-  return { model, props: page.props, rows: [], ...(HAS_CHILDREN && { path: page.path }) };
+  return {
+    model,
+    props: page.props,
+    rows: [],
+    ...(HAS_CHILDREN && { path: page.path }),
+    ...(HAS_DYNAMIC && { dynamic: page.dynamic }),
+  };
 }
 
 function readList(binding: Binding, scope: Scope): readonly unknown[] {
@@ -131,13 +138,17 @@ export function createPatch(patchList: PatchList): Patch {
     const { manifest } = page;
     const plan = getPlan(manifest);
     const selected = selectGroups(manifest, plan, prev, next);
+    const changed = HAS_DYNAMIC ? getDynamic(page, prev, next, plan.keys) : [];
+    if (HAS_DYNAMIC && changed.length > 0) {
+      selected.push(DYNAMIC_GROUP);
+    }
     if (selected.length === 0) {
       return;
     }
     const bindings = await loadBindings(page, selected);
     const names: string[] = [];
     for (const name of bindings.keys()) {
-      if (!plan.rowNames.has(name)) {
+      if (!plan.rowNames.has(name) && !(HAS_DYNAMIC && isIdle(manifest, changed, name))) {
         names.push(name);
       }
     }

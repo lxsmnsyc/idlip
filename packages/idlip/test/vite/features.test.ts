@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createBuilder } from 'vite';
 import { describe, expect, it } from 'vitest';
+import { compile as compileSource } from '../../src/compiler/index.ts';
 import type { CompileResult } from '../../src/core/format.ts';
 import { idlip } from '../../src/vite/index.ts';
 import { getDefines, getFeatures, replaceFeatures } from '../../src/vite/features.ts';
@@ -23,6 +24,8 @@ const LOADER = path.join(PACKAGE, 'src/client/index.ts');
 /** Text that only the task runner and the keyed diff hold. */
 const TASK_CODE = 'idlip: no task for';
 const KEYED_CODE = '\\[(\\w+)=';
+/** Text that only the loader code of dynamic holes holds. */
+const DYNAMIC_CODE = '$dynamic';
 
 type CompileFn = (source: string, id: string) => CompileResult;
 
@@ -47,6 +50,11 @@ function compileInline(source: string, id: string): CompileResult {
 
 /** Builds the fixture module with the real loader, and returns the text of the client files. */
 async function buildClient(name: string, compile?: CompileFn): Promise<string> {
+  return Object.values(await buildFiles(name, compile)).join('');
+}
+
+/** Builds the fixture module with the real loader, and returns the client files by name. */
+async function buildFiles(name: string, compile?: CompileFn): Promise<Record<string, string>> {
   const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'idlip-features-')));
   try {
     mkdirSync(path.join(root, 'src'));
@@ -67,11 +75,11 @@ async function buildClient(name: string, compile?: CompileFn): Promise<string> {
     const builder = await createBuilder(config);
     await builder.buildApp();
     const assets = path.join(root, 'dist/client/assets');
-    let text = '';
+    const files: Record<string, string> = {};
     for (const file of readdirSync(assets)) {
-      text += readFileSync(path.join(assets, file), 'utf8');
+      files[file] = readFileSync(path.join(assets, file), 'utf8');
     }
-    return text;
+    return files;
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -82,6 +90,13 @@ describe('feature detection', () => {
     expect([...getFeatures([compileFixture('', '/src/todo.idlip.tsx')])]).toEqual([]);
     expect([...getFeatures([compileFixture('', '/src/effects.idlip.tsx')])]).toEqual(['TASKS']);
     expect([...getFeatures([compileKeyed('', '/src/todo.idlip.tsx')])]).toEqual(['KEYED']);
+  });
+
+  it('turns DYNAMIC on when a manifest has the dynamic group', () => {
+    const source = readFileSync(path.join(FIXTURES, 'dynamic/dynamic.idlip.tsx'), 'utf8');
+    expect([...getFeatures([compileSource(source, '/src/dynamic.idlip.tsx')])]).toEqual([
+      'DYNAMIC',
+    ]);
   });
 
   it('turns CHILDREN on for a child module and for a module with children', () => {
@@ -172,5 +187,10 @@ describe('feature flags in the client build', () => {
     const text = await buildClient('todo', compileKeyed);
     expect(text).toContain(KEYED_CODE);
     expect(text).not.toContain(TASK_CODE);
+  }, 60_000);
+
+  it('drops the dynamic holes from an app without one and keeps them in an app with one', async () => {
+    expect(await buildClient('todo')).not.toContain(DYNAMIC_CODE);
+    expect(await buildClient('dynamic', compileSource)).toContain(DYNAMIC_CODE);
   }, 60_000);
 });
