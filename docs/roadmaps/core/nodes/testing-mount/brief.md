@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-20
-spent: 245080
+spent: 261031
 owns:
   - packages/idlip/src/testing/**
   - packages/idlip/test/testing/**

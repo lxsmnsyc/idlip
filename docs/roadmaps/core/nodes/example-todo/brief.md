@@ -1,7 +1,7 @@
 ---
 id: example-todo
 title: Todo example written in the DSL, passing the e2e tests
-status: todo
+status: active
 priority: must
 type: feature
 story:
