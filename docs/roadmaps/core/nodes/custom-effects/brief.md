@@ -1,6 +1,6 @@
 ---
 id: custom-effects
-title: "Async handlers: await compiled into a task and a continuation"
+title: 'Async handlers: await compiled into a task and a continuation'
 status: active
 priority: should
 type: feature
