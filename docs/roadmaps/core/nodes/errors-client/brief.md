@@ -1,7 +1,7 @@
 ---
 id: errors-client
 title: Errors: client swap, throwing handlers and chunk retry
-status: todo
+status: active
 priority: should
 type: feature
 story:
