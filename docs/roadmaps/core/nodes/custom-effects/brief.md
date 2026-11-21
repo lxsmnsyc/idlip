@@ -1,7 +1,7 @@
 ---
 id: custom-effects
 title: 'Async handlers: await compiled into a task and a continuation'
-status: active
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-20
-spent:
+spent: 261751
 owns:
   - packages/idlip/src/compiler/update/segments.ts
   - packages/idlip/src/compiler/update/tasks.ts
@@ -60,9 +60,9 @@ Remove `handler-await`. A handler's chunk exports one function per segment (`per
 
 ## Acceptance
 
-- [ ] An `effects` fixture (the 0002 `persist` with `try`/`catch`, plus two sequential awaits with carried locals) has golden chunks, manifest and task chunk. The fixture tests pass.
-- [ ] Semantics tests: state read after an `await` reads the model of that moment; carried locals arrive in order; the catch runs on `{ ok: false }`.
-- [ ] The todo and counter fixtures are byte for byte unchanged.
+- [x] An `effects` fixture (the 0002 `persist` with `try`/`catch`, plus two sequential awaits with carried locals) has golden chunks, manifest and task chunk. The fixture tests pass.
+- [x] Semantics tests: state read after an `await` reads the model of that moment; carried locals arrive in order; the catch runs on `{ ok: false }`.
+- [x] The todo and counter fixtures are byte for byte unchanged.
 
 ## Sizing
 

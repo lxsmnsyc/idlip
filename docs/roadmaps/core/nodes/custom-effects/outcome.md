@@ -76,3 +76,7 @@ export function persist$1(model, [$outcome, props$step]) {
 ## Size
 
 - Estimated M, actual M.
+
+## Landing
+
+Landed as 71ab858 on `batch/core` after one clean fresh review. Accepted changes outside owned paths: `test/compiler/update/handlers.test.ts`, `test/compiler/view/codegen/codegen.test.ts`. The task change request is open until the curator applies it.
