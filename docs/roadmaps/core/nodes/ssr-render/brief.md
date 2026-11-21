@@ -1,7 +1,7 @@
 ---
 id: ssr-render
 title: Server renderer and state serialization
-status: active
+status: done
 priority: must
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added:
-spent:
+spent: 184442
 owns:
   - packages/idlip/src/server/**
   - packages/idlip/test/server/**
@@ -57,3 +57,5 @@ depends_on:
 ## Sizing
 
 M: format is fixed, escaping and seroval output need care.
+
+Landed on `batch/core` as 0ac7c1a.
