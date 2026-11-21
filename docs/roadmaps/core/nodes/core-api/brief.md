@@ -1,7 +1,7 @@
 ---
 id: core-api
 title: Freeze the public runtime surface and the package layout
-status: active
+status: done
 priority: must
 type: contract
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: true
 added:
-spent:
+spent: 151809
 owns:
   - pnpm-workspace.yaml
   - package.json
@@ -84,3 +84,5 @@ M: known pattern, but core types and the export map are shared by every node.
 ## Notes for the worker
 
 - Nothing exported from `idlip` may exist only for the compiler, except `For` (0002, Decisions).
+
+Landed on `batch/core` as b4cf59d. The deletion of `packages/idlip/test/messages.test.ts` is outside the owned paths and accepted: the contract Stub section requires it. The contract freeze (v7) waits for the user at the contract gate.
