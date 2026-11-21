@@ -60,3 +60,7 @@ Codegen for `child` nodes and prop-target events, matching the nested fixtures: 
 ## Sizing
 
 One codegen module over a fixed fixture; shared files are touched in small places.
+
+## From nesting-format (orchestrator)
+
+`Step` gains an explicit `$step: true` discriminant (`contracts/compiled-format-nesting.change-request.md`). `nesting-compile` makes the compiler emit `$step` on every step and updates the goldens (including `effects`); `nesting-runtime` makes `resume.ts` `isStep` test `$step`. Read the change request, not only the contract, until the curator applies it.

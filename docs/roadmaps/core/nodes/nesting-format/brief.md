@@ -1,7 +1,7 @@
 ---
 id: nesting-format
 title: Compiled format for nested components
-status: active
+status: done
 priority: should
 type: contract
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: true
 added: 2026-11-21
-spent:
+spent: 269048
 owns:
   - packages/idlip/test/fixtures/nested/**
   - docs/roadmaps/core/contracts/compiled-format-nesting.change-request.md
@@ -53,11 +53,13 @@ Define the Reserved nested-components item of `compiled-format` and add golden f
 
 ## Acceptance
 
-- [ ] The nested fixtures pass the existing fixture checks.
-- [ ] The change request names each section it changes: Interface, DOM encoding, State script, Manifest, Server module, Patching, Reserved.
-- [ ] The user confirms the slot-removal rule at the gate.
-- [ ] Fast check passes: `pnpm --filter idlip exec vitest run test/fixtures`
+- [x] The nested fixtures pass the existing fixture checks.
+- [x] The change request names each section it changes: Interface, DOM encoding, State script, Manifest, Server module, Patching, Reserved.
+- [x] The user confirms the slot-removal rule at the gate.
+- [x] Fast check passes: `pnpm --filter idlip exec vitest run test/fixtures`
 
 ## Sizing
 
 Format design plus fixtures; no runtime code. Gate because every later nesting node follows it.
+
+Landed as 19d08d0 on `batch/core` after one fresh review round (explicit slot lifecycle, reorder, `$step` discriminant). Gate decided in the one-shot run: a slot is dropped when its block is removed and restarts from props; `key` is optional (position by default, the loop key counts inside `<For>`).
