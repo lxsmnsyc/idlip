@@ -3,8 +3,11 @@ import { DEV, warnDeepQueue } from '../../core/dev.ts';
 import { getChunkId } from '../../core/format.ts';
 import { runAfter } from '../dom/run.ts';
 import { HAS_CHILDREN, HAS_REFS, HAS_SUBS, HAS_TASKS } from '../features.ts';
-import { installNesting } from '../nesting.ts';
+import { connectHot } from '../hot.ts';
+import type { Hot } from '../hot.ts';
+import { getChildren, installNesting } from '../nesting.ts';
 import { startSubs } from '../subs/index.ts';
+import type { SubsHost } from '../subs/index.ts';
 import { runTask } from '../tasks/run.ts';
 import type {
   After,
@@ -115,6 +118,10 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
 
   const nest = HAS_CHILDREN ? installNesting(patch) : undefined;
 
+  // Set below, since the loader functions that read it come first.
+  // oxlint-disable-next-line prefer-const
+  let hot: Hot | undefined;
+  let stopHotSubs: (() => void) | undefined;
   const queue: Pending[] = [];
   const roots = new Map<number, Root>();
   const loads = new Map<string, Promise<unknown>>();
@@ -130,6 +137,10 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
   }
 
   async function load(url: string): Promise<unknown> {
+    if (import.meta.hot) {
+      // Dev only: a chunk that an edit changed loads from a new URL.
+      url = hot!.rewrite(url);
+    }
     let promise = loads.get(url);
     if (promise === undefined) {
       // A browser may keep a failed import, so a retry asks for the URL with a fragment.
@@ -171,6 +182,39 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
       },
     };
   }
+
+  // Dev only. `import.meta.hot` is undefined in a build, so this and its import are dropped.
+  hot = import.meta.hot
+    ? connectHot(import.meta.hot, {
+        boot,
+        roots,
+        createRoot,
+        patch: async (root) => {
+          if (HAS_CHILDREN) {
+            await nest!.patch(root);
+          } else {
+            await patch(root.page, root.rendered, root.model);
+            root.rendered = root.model;
+          }
+        },
+        children: HAS_CHILDREN ? getChildren : undefined,
+        subs: HAS_SUBS
+          ? {
+              stop: () => {
+                // oxlint-disable-next-line no-use-before-define
+                stopSubs?.();
+                stopHotSubs?.();
+              },
+              start: () => {
+                // oxlint-disable-next-line no-use-before-define
+                stopHotSubs = startSubs(subsHost);
+              },
+            }
+          : undefined,
+        settled: async () => settled(),
+        report,
+      })
+    : undefined;
 
   function findRoot(target: Element): Root | undefined {
     for (const root of roots.values()) {
@@ -444,35 +488,37 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
   for (const event of early) {
     enqueue(event);
   }
-  const stopSubs = HAS_SUBS
-    ? startSubs({
-        load: async (marker, name) => {
-          const root = findRoot(marker);
-          if (root === undefined) {
-            throw new Error(`idlip: no state for the source ${name}`);
-          }
-          // A marker inside a child names a source of the child's module.
-          const unit = HAS_CHILDREN
-            ? nest!.target(root, {
-                message: { t: '', p: [] },
-                target: marker,
-                type: 'value',
-                latest: false,
-              })
-            : root;
-          const { page } = unit ?? root;
-          return page.load(page.manifest.module, `source=${name}`);
-        },
-        push: (event) => {
-          events.push(event);
-        },
-        report,
-      })
-    : undefined;
+  const subsHost: SubsHost = {
+    load: async (marker, name) => {
+      const root = findRoot(marker);
+      if (root === undefined) {
+        throw new Error(`idlip: no state for the source ${name}`);
+      }
+      // A marker inside a child names a source of the child's module.
+      const unit = HAS_CHILDREN
+        ? nest!.target(root, {
+            message: { t: '', p: [] },
+            target: marker,
+            type: 'value',
+            latest: false,
+          })
+        : root;
+      const { page } = unit ?? root;
+      return page.load(page.manifest.module, `source=${name}`);
+    },
+    push: (event) => {
+      events.push(event);
+    },
+    report,
+  };
+  const stopSubs = HAS_SUBS ? startSubs(subsHost) : undefined;
   flush().catch(report);
 
   function stop(): void {
     stopSubs?.();
+    if (import.meta.hot) {
+      stopHotSubs?.();
+    }
     stopped = true;
     queue.length = 0;
     Reflect.deleteProperty(events, 'push');

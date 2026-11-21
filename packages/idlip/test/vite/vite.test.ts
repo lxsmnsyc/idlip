@@ -330,7 +330,7 @@ describe('vite dev', () => {
     expect(missing.ok).toBe(false);
   });
 
-  it('reloads the page when a module changes', async () => {
+  it('keeps the page when a module changes without a change of output', async () => {
     if (server === undefined) {
       throw new Error('The dev server did not start');
     }
@@ -365,7 +365,7 @@ describe('vite dev', () => {
       ],
     );
     expect(result).toEqual([]);
-    expect(send).toHaveBeenCalledWith({ type: 'full-reload' });
+    expect(send).not.toHaveBeenCalled();
     send.mockRestore();
   });
 });

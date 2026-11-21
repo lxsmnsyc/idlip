@@ -4,6 +4,7 @@ import { defineConfig, devices } from '@playwright/test';
 const port = Number(process.env.E2E_PORT ?? 4173);
 const countersPort = Number(process.env.E2E_COUNTERS_PORT ?? 4174);
 const subsPort = Number(process.env.E2E_SUBS_PORT ?? 4175);
+const hotPort = Number(process.env.E2E_HOT_PORT ?? 4576);
 
 // `example` (default) serves the built `examples/todo`, `examples/counters` and
 // `examples/counters-subs`: run `pnpm build` first. `fixture` serves the golden todo fixture and
@@ -55,6 +56,22 @@ const subsServer = createServer(
   subsPort,
 );
 
+// `vite dev` of copies of the todo and of `counters-subs` (`fixture/hot-app.ts`), for the hot
+// update tests, which edit the copies. The dev server answers a page only to a request that
+// accepts HTML, so the check reads its client.
+function createHotServer(example: string, at: number): ReturnType<typeof createServer> {
+  return {
+    ...createServer(
+      `node e2e/fixture/hot-app.ts ${example} && cd e2e/.hot/${example} && ./node_modules/.bin/vite --port ${at} --strictPort --host 127.0.0.1`,
+      '..',
+      at,
+    ),
+    url: `http://127.0.0.1:${at}/@vite/client`,
+  };
+}
+const hotServer = createHotServer('todo', hotPort);
+const hotChildrenServer = createHotServer('counters-subs', hotPort + 1);
+
 export default defineConfig({
   testDir: './tests',
   fullyParallel: true,
@@ -64,11 +81,21 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      testIgnore: /nested(-subscribe)?\.spec\.ts/,
+      testIgnore: /(nested(-subscribe)?|hot|hot-children)\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], baseURL: `http://127.0.0.1:${port}` },
     },
     ...(withApps
       ? [
+          {
+            name: 'hot',
+            testMatch: /hot\.spec\.ts/,
+            use: { ...devices['Desktop Chrome'], baseURL: `http://127.0.0.1:${hotPort}` },
+          },
+          {
+            name: 'hot-children',
+            testMatch: /hot-children\.spec\.ts/,
+            use: { ...devices['Desktop Chrome'], baseURL: `http://127.0.0.1:${hotPort + 1}` },
+          },
           {
             name: 'counters',
             testMatch: /nested\.spec\.ts/,
@@ -82,5 +109,7 @@ export default defineConfig({
         ]
       : []),
   ],
-  webServer: withApps ? [todoServer, countersServer, subsServer] : [todoServer],
+  webServer: withApps
+    ? [todoServer, countersServer, subsServer, hotServer, hotChildrenServer]
+    : [todoServer],
 });

@@ -16,6 +16,7 @@ import type { CompileOptions } from '../compiler/index.ts';
 import type { ChunkUrls, Compile, CompileDiagnostic, CompileResult } from '../core/format.ts';
 import { getChunkFile, getChunkId } from '../core/format.ts';
 import { findDroppedFeatures, getDefines, getFeatures, replaceFeatures } from './features.ts';
+import { HOT_EVENT, classifyEdit } from './hot.ts';
 import { isChunkUrls, listChunks, parseChunkId, replaceChunkUrls } from './chunks.ts';
 
 const MODULE_FILE = /\.idlip\.tsx$/;
@@ -300,10 +301,15 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
     return found;
   }
 
-  function compileFile(reporter: Reporter, file: string, code?: string): CompileResult {
+  function compileFile(
+    reporter: Reporter,
+    file: string,
+    code?: string,
+    known?: boolean,
+  ): CompileResult {
     const source = code ?? readFileSync(file, 'utf8');
     // A module that is also a root takes the child output, which only adds the view chunk.
-    const child = children?.has(file) === true;
+    const child = known ?? children?.has(file) === true;
     const cached = cache.get(file);
     if (cached?.source === source && cached.child === child) {
       return cached.result;
@@ -502,7 +508,7 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       }
     },
 
-    hotUpdate({ file, modules, timestamp }) {
+    async hotUpdate({ file, modules, timestamp, read }) {
       if (!MODULE_FILE.test(file)) {
         return undefined;
       }
@@ -511,14 +517,36 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       if (this.environment.config.consumer !== 'client') {
         return undefined;
       }
-      // The page's DOM came from the old view, so a new chunk cannot patch it.
+      // The edit is a chunk swap when the markup and the manifest stay, and a remount otherwise.
+      const before = cache.get(file)?.result;
+      let message: ReturnType<typeof classifyEdit>;
+      try {
+        const after = compileFile(
+          {
+            warn() {},
+            error(text) {
+              throw new Error(text);
+            },
+          },
+          file,
+          await read(),
+          cache.get(file)?.child,
+        );
+        message = classifyEdit(before, after, base, timestamp);
+      } catch {
+        // A module that does not compile: the page loads again and shows the server's error.
+        this.environment.hot.send({ type: 'full-reload' });
+        return [];
+      }
       // Vite lists every chunk of the file that the client loaded.
       const graph = this.environment.moduleGraph;
       const invalidated = new Set<(typeof modules)[number]>();
       for (const module of modules) {
         graph.invalidateModule(module, invalidated, timestamp, true);
       }
-      this.environment.hot.send({ type: 'full-reload' });
+      if (message !== undefined) {
+        this.environment.hot.send({ type: 'custom', event: HOT_EVENT, data: message });
+      }
       return [];
     },
 

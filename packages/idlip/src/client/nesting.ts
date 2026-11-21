@@ -49,6 +49,17 @@ function getTable(top: Root): Map<string, Entry> {
   return table;
 }
 
+/** The live children of a root, with the ones that patches added. */
+export function getChildren(top: Root): Child[] {
+  const children: Child[] = [];
+  for (const entry of getTable(top).values()) {
+    if (entry.kind === 'live') {
+      children.push(entry);
+    }
+  }
+  return children;
+}
+
 function getLive(top: Root, path: string): Child | undefined {
   const entry = getTable(top).get(path);
   return entry?.kind === 'live' ? entry : undefined;
