@@ -65,7 +65,7 @@ depends_on:
 
 ## Goal
 
-`examples/todo`: the todo app from `docs/proposals/0002-modules.md`, written as a `defineModule` module in `*.idlip.tsx` and built with `idlip/vite`. The e2e tests run against it instead of the fixture. This node closes the first milestone.
+`examples/todo`: the todo app from `docs/proposals/0002-modules.md`, written as a function component in `*.idlip.tsx` and built with `idlip/vite`. The e2e tests run against it instead of the fixture. This node closes the first milestone.
 
 ## Acceptance
 

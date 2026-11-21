@@ -1,6 +1,6 @@
 ---
 id: nesting
-title: Nested modules routed by model path
+title: Nested components routed by model path
 status: todo
 priority: should
 type: feature
@@ -31,8 +31,8 @@ depends_on:
     why: builds on the finished compiler and runtime
 ---
 
-# Nested modules routed by model path
+# Nested components routed by model path
 
 ## Goal
 
-Child modules routed by model path, as in `docs/proposals/0002-modules.md`, section Nesting: `children()` and `list()` in `update`, `<Child.View model={...} />` in the view, and message props with `cmd.send`. No mapping closures.
+Child components as in `docs/proposals/0002-modules.md`, section Props and nesting. `<Counter start={0} />` in a parent's JSX gets a slot in the parent's model, named by `key`, by the `<For>` key or by position. A child's messages carry its model path. A callback prop such as `onRemove={() => remove(c.id)}` compiles to a message prop, dispatched with the parent's path. Decide whether `key` is required on stateful children (0002, Open questions).

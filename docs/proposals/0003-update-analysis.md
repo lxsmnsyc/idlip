@@ -2,7 +2,7 @@
 
 Status: draft
 
-This proposal adds four refinements to the MVU core of [0001](0001-dsl.md) and [0002](0002-modules.md). It does not change the authoring API of `defineModule`. All four come from the same idea: the compiler already knows what each view hole reads, so it should also know what each handler writes.
+This proposal adds four refinements to the MVU core of [0001](0001-dsl.md) and [0002](0002-modules.md). Its examples predate the 2026-11-21 revision of 0002 and use the `defineModule` form. The analyses apply to the compiled handlers of function components, where a write set comes from the assignments to state. The Form fields section is redesigned by the `form-fields` node. All four come from the same idea: the compiler already knows what each view hole reads, so it should also know what each handler writes.
 
 ## Decisions
 

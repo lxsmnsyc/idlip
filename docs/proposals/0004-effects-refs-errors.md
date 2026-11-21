@@ -1,137 +1,91 @@
-# 0004: Custom effects, refs, error boundaries and other gaps
+# 0004: Effects, files, refs, error boundaries and other gaps
 
 Status: draft
 
-This proposal fills gaps found by a feature review of the core roadmap on 2026-11-20. It builds on [0002](0002-modules.md) and does not change how a module is written, apart from the new optional `catch` and `head` properties.
+This proposal fills gaps found by a feature review of the core roadmap on 2026-11-20. Revised 2026-11-21 for function components and the rule against compile-time APIs in [0002](0002-modules.md): `task()`, `defineSub()` and the `catch` and `head` module properties are removed.
 
 ## Decisions
 
-- **Custom effects.** `task()` and `defineSub()` wrap module-level functions. A command or subscription refers to them by id and to its result by message constructor, so it stays plain data and type-checked. One mechanism covers promises, server calls, sockets, timers and third-party libraries.
-- **Refs.** A `ref` attribute names an element. Commands, tasks and subscriptions take the ref, and the runtime resolves it to the element when they run.
-- **Error boundaries per module.** A module can declare `catch`, a fallback view. Each module is a boundary. There is no boundary component.
-- **Global events** are subscriptions: `Browser.on('keydown', msg.key)`.
-- **Document head** comes from the root module's `head(m)`.
+- **Effects are `await` in a handler.** An async handler awaits an imported or module-level async function. The compiler runs the call as a task on the client and dispatches the rest of the handler as a continuation message.
+- **Files** may be held in state on the client. They leave the client only as form data parts, as in brumate.
+- **Refs.** A `ref` attribute names an element. Runtime functions called in handlers take the name, and the runtime resolves it to the element.
 - **SVG and MathML** keep their namespace in templates and item templates.
 - **Raw HTML** goes through `html={trusted(value)}`. A plain string is a type error.
 - **Imported and module-level constants** are allowed in holes. Their path set is empty.
+- **Open:** subscriptions and global events, error boundaries and the document head. Each lost its API in the 2026-11-21 revision. See Open questions.
 
-## Custom effects
-
-### Tasks
-
-A task wraps an async function declared at module level. The compiler gives it a stable id and its own chunk, like an update handler. The function never enters the model or the DOM.
+## Effects
 
 ```ts
-// user.ts
-import { task } from 'idlip';
-
-export const loadUser = task(async (id: string, signal: AbortSignal) => {
-  const res = await fetch(`/api/users/${id}`, { signal });
+// api.ts
+export async function loadUser(id: string): Promise<User> {
+  const res = await fetch(`/api/users/${id}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return (await res.json()) as User;
-});
+}
 ```
 
-Calling a task returns a command. It takes the input and the constructor that receives the result, as in Elm's `Http.get { expect = Http.expectJson GotUser decoder }`. The loading state is an explicit union in the model that the handlers set.
+```tsx
+// profile.idlip.tsx
+import { loadUser } from './api';
 
-```ts
 type UserState =
   | { state: 'notAsked' }
   | { state: 'loading'; id: string }
   | { state: 'failure'; error: string }
   | { state: 'success'; user: User };
 
-interface Model { user: UserState }
-interface Msg { open: string; gotUser: Result<User> }
+export default function Profile() {
+  let user = { state: 'notAsked' } satisfies UserState as UserState;
 
-export default defineModule<Model, Msg>()({
-  init: () => ({ user: { state: 'notAsked' } }),
-  update: {
-    open: (m, id, msg) => [{ ...m, user: { state: 'loading', id } }, loadUser(id, msg.gotUser)],
-    gotUser: (m, r) => ({ ...m, user: r.ok ? { state: 'success', user: r.value } : { state: 'failure', error: r.error } }),
-  },
-  view: (m, msg) => ...,
-});
-```
+  async function open(id: string) {
+    user = { state: 'loading', id };
+    try {
+      user = { state: 'success', user: await loadUser(id) };
+    } catch (error) {
+      user = { state: 'failure', error: String(error) };
+    }
+  }
 
-- The command runs right after the handler returns. Its result is dispatched to the constructor's tag as `Result<T>`.
-- `loadUser(id, msg.open)` is a type error, because `open` takes `string`, not `Result<User>`. Checked with `tsc` 7.0.2.
-- `task()` must be called at module level. The compiler rejects a call inside a function.
-- Concurrency is set on the task: `task(fn, { mode })` with `mode` one of `'all'` (default), `'latest'` (a new run aborts the previous run of the same task) or `'queue'`. `Task.cancel(loadUser)` is a command that aborts running instances through the `AbortSignal`. An aborted run dispatches nothing.
-- `Time.after(ms, msg.done)` is a built-in task. A debounce is a `'latest'` task that waits first.
-- The built-in `Http` and `Storage` commands are tasks inside the runtime, so there is one executor path.
-- Tasks run only on the client. `init` returns a model and no command, so the server never runs a task. Data loading on the server stays a non-goal.
-
-Prior art: Elm's `Cmd` with `Http.expectJson GotUser`, Lustre's `lustre_http.expect_json`, Iced's `Task::perform(future, Message::Loaded)`. redux-loop's `Cmd.run(fn, { successActionCreator })` is the negative case: result handlers named in an options object read like Node callbacks.
-
-### Subscriptions
-
-A custom subscription wraps start, update and stop functions.
-
-```ts
-import { defineSub } from 'idlip';
-
-export const socket = defineSub({
-  start(url: string, send: (data: string) => void) {
-    const ws = new WebSocket(url);
-    ws.onmessage = (e) => send(e.data);
-    return ws;
-  },
-  stop(ws) {
-    ws.close();
-  },
-});
-
-subscriptions(m, msg) {
-  return [m.online && socket.listen(m.url, msg.received)];
+  return ...;
 }
 ```
 
-- `listen(args, constructor)` returns a `Sub`. It takes a message constructor, not a message, because the value it sends becomes the payload.
-- The runtime compares active subscriptions by id and args. New ones start, missing ones stop. When only the args change and the subscription has `update(state, args)`, the runtime calls it instead of restarting. A widget then gets new data without being mounted again.
+- `open("u1")` runs up to the `await` as one message, so the view shows the loading state at once.
+- `loadUser(id)` runs on the client as a task, in its own chunk. When it settles, the runtime dispatches the continuation `open$1` with the result or the error as payload. The continuation runs the `try` or the `catch` branch.
+- The lifecycle is one explicit union that the handler sets. The runtime adds no hidden state.
+- `tsc` checks the call and the result types as ordinary TypeScript. There is no `Result<T>` and no constructor to pass.
+- Tasks run only on the client. Handlers never run on the server, so the server never runs a task. Data loading on the server stays a non-goal.
+- Built-in effects are plain functions too. A handler calls `fetch`, `localStorage` or a library through an async function that it awaits. idlip ships no `Http` or `Storage` commands.
+
+Prior art: brumate runs an async handler whole in the browser as a closure, and splits only a browser render at `await` into a continuation (`$$b.wait`, `../brumate/docs/decisions.md`). idlip splits handlers, because a continuation must be a named message with a serializable payload. Elm's `Task.attempt GotUser` and Iced's `Task::perform(future, Message::Loaded)` are the same split, written by hand.
+
+## Files
+
+`File` and `Blob` values can be held in state on the client, for example `let upload = { state: 'none' } satisfies Upload as Upload` with `{ state: 'picked'; file: File }` as one of the cases.
+
+- The server never has a file. A server render whose model holds a blob throws, as brumate's page state does.
+- A file leaves the client only as a part of multipart form data. `@seroval/transport/web` has `toFormRequest` and `fromFormRequest`: each file or blob anywhere in the value gets its own form field, and the value holds only its index, type, name and `lastModified`. Brumate does the same in `uploadPlugin` (`../brumate/packages/brumate/src/runtime/serial.ts`) and `../brumate/packages/brumate/src/runtime/rpc.ts`.
+- An upload is an async function that sends a request built with `toFormRequest`, awaited in a handler.
+- HMR sends the model to the server with `toFormRequest` too, so a model that holds a file keeps it across a markup edit.
 
 ## Refs
 
 ```tsx
-<input ref="search" value={m.query} on:input={msg.setQuery(event.value)} />
-<For each={m.rows} key="id">
+<input ref="search" value={query} on:input={(e) => setQuery(e.currentTarget.value)} />
+<For each={rows} key="id">
   {(row) => <tr ref={['row', row.id]}>...</tr>}
 </For>
 ```
 
-- A ref name is a string literal, or a tuple of a literal and a loop variable path inside `<For>`. It is local to the module instance.
-- `ref('search')` builds a ref value for commands: `Dom.focus(ref('search'))`, `Dom.scrollIntoView(ref(['row', id]))`, `Dom.measure(ref('chart'), 'measured')`. `Dom.measure` sends the element's bounding box as the payload.
-- A task or subscription input may hold refs. The runtime resolves each to its `Element` before calling the function, so a chart library can mount on `ref('chart')` from a custom subscription.
-- `Dom.focus` from [0003](0003-update-analysis.md) takes a ref instead of a selector.
-
-## Error boundaries
-
-```tsx
-export default defineModule<Model>()({
-  init, update,
-  view(m, msg) { ... },
-  catch(error) {
-    return <p class="error">This panel failed to load.</p>;
-  },
-});
-```
-
-- On the server, when a hole, helper or child module throws while rendering, the nearest module with `catch` renders its fallback in place. A module without `catch` passes the error to its parent. At the root, the render fails as it does today.
-- On the client, when a binding chunk throws while patching, the runtime replaces the nearest boundary's region with its fallback, loaded as its own chunk. The model is kept, and `idlip:error` fires with the module path.
-- When a chunk fails to load, the runtime retries once. If it fails again, the runtime fires `idlip:error`, which `deploy-skew` can handle. A handler that throws keeps the model, as before.
-- `catch(error)` takes no model and no `msg`, so the fallback cannot depend on the state that failed. It is static markup.
-
-## Global events
-
-`Browser.on(name, constructor, options)` is a built-in subscription for `window` and `document` events: `keydown`, `resize`, `popstate`, `online`, `visibilitychange`. The payload uses the same placeholders as `event` (`event.key`), resolved when the event fires. Options take the key filters from `compiled-format`.
-
-## Document head
-
-The root module may declare `head(m)`, which returns `{ title, meta }`. Its holes follow the closed grammar. The server writes them into `<head>`, and they patch like bindings. A nested module's `head` is a compile error.
+- A ref name is a string literal, or a tuple of a literal and a loop variable path inside `<For>`. It is local to the component instance.
+- Handlers call runtime functions with the name: `Dom.focus('search')`, `Dom.scrollIntoView(['row', id])`, `await Dom.measure('chart')`. They resolve the name to the element in the current DOM.
+- `Dom.focus` from [0003](0003-update-analysis.md) takes a ref name instead of a selector.
 
 ## SVG, MathML and raw HTML
 
 - Elements inside `<svg>` and `<math>` keep their namespace. A `<For>` or condition block inside them gets a template parsed in that context, so rows created on the client use the right namespace.
-- `html={trusted(value)}` sets the element's content from a string. `trusted()` returns a branded `TrustedHtml`, so a plain string is a type error. The element must have no children. The server writes the string as is, and the patcher sets `innerHTML`.
+- `html={trusted(value)}` sets the element's content from a string. `trusted()` is a runtime function that returns a branded `TrustedHtml`, so a plain string is a type error. The element must have no children. The server writes the string as is, and the patcher sets `innerHTML`.
 
 ## Constants in holes
 
@@ -139,8 +93,9 @@ A hole may read imported values and module-level `const` bindings, such as `clas
 
 ## Open questions
 
-- **Explicit subscriptions.** `subscriptions(m, msg)` is diffed by the runtime, as in Elm, which hides start and stop. An explicit alternative is a start and a stop command per subscription. Not decided.
-- **Purity of update handlers.** The examples call `createId()` inside a handler. Either allow impure handlers, or make randomness and time commands (`Random.id('added')`, `Time.now('gotTime')`). This affects devtools replay and deterministic tests. Not decided.
-- **File payloads.** `File` objects do not serialize, so they cannot enter the model. One option is that an `event.files` placeholder may only be passed to a task, not stored. Not decided.
+- **Subscriptions and global events.** A timer, a socket or a `keydown` listener lives across messages. One option without an API: a handler calls a runtime function such as `Time.every(1000, tick)` or `Browser.on('keydown', onKey)`, which starts the subscription and returns a plain handle. The handle is kept in an explicit union in state and passed to `stop(handle)` in another handler. On resume, the runtime restarts every handle in the state script. A subscription that runs from the first render would be a `let` whose initial value is such a call. Not decided.
+- **Error boundaries.** The `catch` property is gone. The markup DSL can have a `#try` block, as brumate does. For the TSX proof of concept, the options are a convention, such as an exported `fallback` component in the same file, or no boundaries until the DSL. Not decided. Chunk load failures retry once and then fire `idlip:error` in either case.
+- **Document head.** The `head` property is gone. A root component can render the whole document, `<html>` with `<head>` and `<title>{...}</title>`, and its holes patch like any other. A nested component's head, brumate's `#head` block, waits for the DSL. Not decided.
+- **Purity of handlers.** See [0002](0002-modules.md).
 - **Transitions.** Enter and exit animations for condition blocks and list items. Later.
-- **Custom elements.** Hosting widgets as custom elements, with rules for attributes and properties. Custom subscriptions with refs cover the same need for now.
+- **Custom elements.** Hosting widgets as custom elements, with rules for attributes and properties. A ref and an awaited setup function cover the same need for now.

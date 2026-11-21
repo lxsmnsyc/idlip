@@ -1,6 +1,6 @@
 ---
 id: document-head
-title: Document title and meta from the root module
+title: Document head
 status: todo
 priority: should
 type: feature
@@ -34,8 +34,8 @@ depends_on:
     why: head values patch like bindings
 ---
 
-# Document title and meta from the root module
+# Document head
 
 ## Goal
 
-The root module's `head(m)` from `docs/proposals/0004-effects-refs-errors.md`, Document head. The server writes `<title>` and meta tags, and they patch when their paths change. `head` on a nested module is a compile error.
+`docs/proposals/0004-effects-refs-errors.md`, Open questions, Document head. The candidate: a root component renders the whole document, `<html>` with `<head>` and `<title>`, and its holes patch like any other. `<title>` text changes as whole content. A nested component's head waits for the markup DSL. Write the full brief after the design is accepted.

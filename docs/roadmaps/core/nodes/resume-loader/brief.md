@@ -52,7 +52,7 @@ The resume entry of `idlip/client`: one delegated listener per event type, decod
 
 - [ ] In happy-dom, a click on the counter fixture loads only the `increment` chunk and calls the patcher with the old and new model.
 - [ ] Two clicks before the chunk resolves apply in order.
-- [ ] `$event.value` decodes from an `input` event.
+- [ ] An event path placeholder (`e.currentTarget.value`) decodes from an `input` event.
 - [ ] Three `input` events before the chunk resolves dispatch three messages with the three values typed, because placeholders resolve when the event fires.
 - [ ] `prevent` and `stop` modifiers apply before the chunk loads. A form submit with `prevent` does not navigate.
 - [ ] `focus` and `blur` messages fire through delegation.

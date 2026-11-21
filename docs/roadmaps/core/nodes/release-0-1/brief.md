@@ -49,7 +49,7 @@ depends_on:
     why: 0.1.0 ships the first milestone
   - on: commands-subs
     kind: hard
-    why: 0.1.0 includes the built-in effects
+    why: 0.1.0 includes subscriptions
   - on: prefetch
     kind: hard
     why: 0.1.0 includes prefetching

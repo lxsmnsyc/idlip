@@ -1,13 +1,13 @@
 ---
 id: function-components
 title: Function components compiled to defineModule
-status: todo
+status: dropped
 priority: should
 type: feature
 story:
 early: false
 outline: true
-milestone: components
+milestone:
 target:
 ship: auto
 land: auto
@@ -38,4 +38,4 @@ depends_on:
 
 ## Goal
 
-Compile a function component into the `defineModule` form, as in `docs/proposals/0002-modules.md`, section Function components. `state` declarations become model fields and named functions become handlers. Free variables that are not state become payload fields. Child components get slots in the parent model. Split into a closure conversion spike and feature nodes when `plan.py refine` lists it.
+Dropped on 2026-11-21. Function components became the only way to write a module (`docs/proposals/0002-modules.md`, revised 2026-11-21), so there is no `defineModule` form to compile to. The work moved into `spike-view-analysis` (the component body), `compile-update` (handler functions), `nesting` (child components in JSX) and `custom-effects` (`await` in handlers).

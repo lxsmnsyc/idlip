@@ -1,6 +1,6 @@
 ---
 id: custom-effects
-title: Custom effects: tasks and subscriptions from module-level functions
+title: Async handlers: await compiled into a task and a continuation
 status: todo
 priority: should
 type: feature
@@ -26,16 +26,16 @@ shared: []
 reserves: []
 provides: []
 depends_on:
-  - on: commands-subs
+  - on: example-todo
     kind: hard
-    why: built-in commands become tasks on the same executor path
+    why: builds on the finished handler compiler and loader
   - on: compile-update
     kind: hard
     why: the compiler gives each task and subscription an id and a chunk
 ---
 
-# Custom effects: tasks and subscriptions from module-level functions
+# Async handlers: `await` compiled into a task and a continuation
 
 ## Goal
 
-`task()` and `defineSub()` from `docs/proposals/0004-effects-refs-errors.md`, Custom effects. A task wraps a module-level async function. Calling it, `loadUser(id, msg.gotUser)`, returns a command whose result reaches the constructor as `Result<T>`. It supports the `all`, `latest` and `queue` modes and `Task.cancel`. A custom subscription has `start`, optional `update` and `stop`, and the runtime diffs active subscriptions by id and args. `Time.after` and the built-in `Http` and `Storage` commands run as tasks. Tasks never run on the server.
+`docs/proposals/0004-effects-refs-errors.md`, Effects, and the `await` rule of `docs/proposals/0002-modules.md`. The compiler splits an async handler at each `await`: the part before is the handler's message, the awaited call is a task chunk that runs on the client, and the rest is a continuation message (`persist$1`) whose payload is the result or the error and the locals that live across the `await`. `try` and `catch` around an `await` route a rejection. `runTask` from `contracts/compiled-format.md` runs tasks. Tasks never run on the server.

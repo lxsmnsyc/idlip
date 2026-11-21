@@ -1,6 +1,6 @@
 ---
 id: form-fields
-title: Form field placeholders and Dom commands
+title: Form fields in event arrows
 status: todo
 priority: should
 type: feature
@@ -26,18 +26,13 @@ shared: []
 reserves: []
 provides: []
 depends_on:
-  - on: commands-subs
+  - on: dom-refs
     kind: hard
-    why: Dom.reset and Dom.focus are commands with lazy executors
+    why: Dom.reset and Dom.focus take ref names
 ---
 
-# Form field placeholders and Dom commands
+# Form fields in event arrows
 
 ## Goal
 
-Implement the Form fields section of `docs/proposals/0003-update-analysis.md`. It covers:
-
-- the `["$form", name]` placeholder, read from `FormData` at dispatch
-- the `event.form` types
-- default `preventDefault()` on `on:submit`
-- the `Dom.reset` and `Dom.focus` commands (`Dom.focus` switches from a selector to a ref when `dom-refs` lands, see `docs/proposals/0004-effects-refs-errors.md`)
+Redesign and implement the Form fields section of `docs/proposals/0003-update-analysis.md` for event arrows (`docs/proposals/0002-modules.md`, revised 2026-11-21). The `event.form` placeholder no longer exists. Decide how a submit handler gets field values, for example property paths on `e.currentTarget.elements`, read at dispatch like other event paths. Default `preventDefault()` on `on:submit`. `Dom.reset` and `Dom.focus` come from `dom-refs`.

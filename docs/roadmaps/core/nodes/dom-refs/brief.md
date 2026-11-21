@@ -1,6 +1,6 @@
 ---
 id: dom-refs
-title: Element refs for commands, tasks and subscriptions
+title: Refs and Dom functions
 status: todo
 priority: should
 type: feature
@@ -28,14 +28,14 @@ provides: []
 depends_on:
   - on: custom-effects
     kind: hard
-    why: tasks and subscriptions receive resolved elements
+    why: `await Dom.measure` uses the task path
   - on: patch-lists
     kind: hard
     why: refs inside <For> are keyed by item
 ---
 
-# Element refs for commands, tasks and subscriptions
+# Refs and `Dom` functions
 
 ## Goal
 
-`ref` attributes and `ref()` values from `docs/proposals/0004-effects-refs-errors.md`, Refs. The runtime resolves a ref to its element, scoped by module path and list key. Commands: `Dom.focus`, `Dom.scrollIntoView`, `Dom.measure`. `Dom.focus` from 0003 takes a ref instead of a selector, so `form-fields` adopts it.
+`ref` attributes from `docs/proposals/0004-effects-refs-errors.md`, Refs, and the runtime functions `Dom.focus`, `Dom.scrollIntoView`, `Dom.measure` and `Dom.reset`, called in handlers with a ref name. The runtime resolves a name to its element, scoped by component path and list key. `Dom.measure` is awaited, so it runs through the task path of `custom-effects`.

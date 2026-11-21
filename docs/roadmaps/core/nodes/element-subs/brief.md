@@ -35,4 +35,4 @@ depends_on:
 
 ## Goal
 
-Subscriptions for elements, such as `Dom.visible(selector, msg)` and `Dom.idle(msg)`, for third-party widgets and measuring. Brumate's `load`, `idle` and `visible` triggers are in `../brumate/packages/brumate/src/runtime/boot.ts`.
+Subscriptions for elements, such as visibility and idle triggers on a ref, in the subscription design of `commands-subs`, for third-party widgets and measuring. Brumate's `load`, `idle` and `visible` triggers are in `../brumate/packages/brumate/src/runtime/boot.ts`.

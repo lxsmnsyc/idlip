@@ -1,6 +1,6 @@
 ---
 id: compile-update
-title: Compiler: split update handlers into chunks
+title: Compiler: compile handler functions into update chunks
 status: todo
 priority: must
 type: feature
@@ -36,11 +36,11 @@ depends_on:
     via: compiled-format
 ---
 
-# Compiler: split update handlers into chunks
+# Compiler: compile handler functions into update chunks
 
 ## Goal
 
-An oxc pass that finds the `update` property of the `defineModule` default export in a `*.idlip.tsx` module. It emits one client module per handler, each with only the imports that handler uses.
+An oxc pass that compiles each handler, a function declaration in a component body (`docs/proposals/0002-modules.md`), into an update function over the model. Reads of state become model reads, assignments to state build the next model, and calls to other handlers run inline. It emits one client module per handler, each with only the imports that handler uses. In-place mutation of state is an error with a rule id. Async handlers are split later by `custom-effects`; until then an `await` in a handler is an error.
 
 ## Context
 
@@ -51,4 +51,5 @@ An oxc pass that finds the `update` property of the `defineModule` default expor
 
 - [ ] For both fixtures, the emitted handler modules match the expected chunks.
 - [ ] A handler that calls a module-level helper gets the helper in its chunk; an unused helper is left out.
+- [ ] A handler that reads a prop gets it as a payload field, and a handler that calls another handler runs both in one message.
 - [ ] Fast check passes: `pnpm --filter idlip test`

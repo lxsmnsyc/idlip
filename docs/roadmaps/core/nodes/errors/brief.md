@@ -1,6 +1,6 @@
 ---
 id: errors
-title: Errors from handlers, effects, rendering and chunk loads
+title: Errors: throwing handlers, chunk loads and boundaries
 status: todo
 priority: should
 type: feature
@@ -40,10 +40,8 @@ depends_on:
     why: client fallbacks replace a region when a patch throws
 ---
 
-# Errors from handlers, effects, rendering and chunk loads
+# Errors: throwing handlers, chunk loads and boundaries
 
 ## Goal
 
-When a handler throws, the model stays as it was and the client fires an `idlip:error` window event with the tag and the error. A chain of `cmd.send` messages stops after a fixed number of rounds with an error, as brumate stops after 10,000 binding rounds.
-
-Error boundaries per module (`docs/proposals/0004-effects-refs-errors.md`, Error boundaries): a module's `catch(error)` view renders in place on the server when its render throws, and replaces its region on the client when a patch throws. A failed chunk load retries once, then fires `idlip:error`. A task rejection with no `err` tag fires `idlip:error`.
+When a handler throws, the model stays as it was and the client fires an `idlip:error` window event with the tag and the error. A chunk that fails to load is retried once, then fires `idlip:error`, which `deploy-skew` can handle. Error boundaries wait for their design: `docs/proposals/0004-effects-refs-errors.md`, Open questions.

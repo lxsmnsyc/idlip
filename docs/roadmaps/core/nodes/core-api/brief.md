@@ -1,6 +1,6 @@
 ---
 id: core-api
-title: Freeze the core API and the package layout
+title: Freeze the public runtime surface and the package layout
 status: todo
 priority: must
 type: contract
@@ -42,25 +42,23 @@ provides:
 depends_on: []
 ---
 
-# Freeze the core API and the package layout
+# Freeze the public runtime surface and the package layout
 
 ## Goal
 
-Freeze the types every other node builds on: messages, update handlers, commands, subscriptions and the serializable model constraint. Also create every subpath entry of the package, so later nodes only fill in their own folders.
+Freeze the public surface every other node builds on: the runtime exports of `idlip` and the JSX types' shape. Components are plain functions with no module API (`docs/proposals/0002-modules.md`, revised 2026-11-21). Also create every subpath entry of the package, so later nodes only fill in their own folders.
 
 ## Context
 
-- Source: `docs/proposals/0002-modules.md` (Module, Messages, Commands and subscriptions, Event placeholder) and `docs/proposals/0001-dsl.md` (Model).
-- `packages/idlip/src/index.ts` already has `Message`, `createMessage`, the constructor types, `createConstructors` and a `defineModule` stub, typed from inferred handlers. Retype them from a declared `Msg`, move them to `src/core/` and re-export. Update `test/messages.test.ts` to match.
+- Source: `docs/proposals/0002-modules.md` (Example, Rules, Messages) and `docs/proposals/0004-effects-refs-errors.md` (Refs, raw HTML).
+- `packages/idlip/src/index.ts` has `Message`, `createMessage`, constructor types, `createConstructors` and a `defineModule` stub from an older design. Delete them, move `Message` (`{ t, p }`) to `src/core/format.ts` as an internal type, and delete `test/messages.test.ts`.
 - Contract to freeze: `contracts/core-api.md`.
 
 ## Steps
 
-- [ ] `defineModule<Model, Msg, Props>()(spec)` with `init`, `update`, `view`, `subscriptions`, and the `View` component on the result. Handlers are typed from `Msg` and receive `msg`. `ModelOf` and `MsgOf`.
-- [ ] `Cmd` as plain data `{ kind, args, to }`, where `to` is the tag of the constructor passed by value. `Result<T>`. `cmd.none`, `cmd.batch`, `cmd.send`. `Sub` as `{ kind, args, message }`.
-- [ ] `event` placeholder with `value`, `checked` and `key`.
-- [ ] Type tests: a missing handler, an extra handler, a wrong payload annotation and a constructor whose payload is not the command's `Result<T>` are type errors. The proof is `docs/proposals/0002-modules.md`, Module.
-- [ ] `Serializable` type that rejects functions, class instances and DOM nodes in a model, and accepts the seroval types (Date, Map, Set, bigint).
+- [ ] `For`, `trusted` and `TrustedHtml` as in `contracts/core-api.md`. `For` throws when called at runtime, since the compiler replaces it.
+- [ ] `EventFor` and `EventProp` types for `idlip/jsx-runtime`, so `e.currentTarget` has the element's type. `jsx-types` fills in the intrinsic elements.
+- [ ] Type tests for the todo component of 0002, Example: it compiles; `toggle(1)` in an event, a missing prop on a child, a `For` key that is not a field, and a wrong initial value in `satisfies T as T` fail. A test with `let x: T = v` shows TS2367, as the reason for the `let` rule.
 - [ ] Subpath entries, each an empty `index.ts` with a doc block: `idlip` (core), `idlip/server`, `idlip/client`, `idlip/compiler`, `idlip/vite`, `idlip/jsx-runtime`. Add them to `exports` and to the tsdown entries.
 - [ ] Install every dependency the milestone needs, so later nodes never edit `package.json` or the lockfile: `seroval` and `oxc-parser` as dependencies, `vite` as an optional peer and dev dependency, `fast-check`, `happy-dom` and `@oxc-project/types` as dev dependencies. Use `@latest` for each.
 - [ ] Add `examples/*` and `e2e` to `pnpm-workspace.yaml`, so `e2e-harness` and `example-todo` only add their own folders.
@@ -76,7 +74,7 @@ Freeze the types every other node builds on: messages, update handlers, commands
 ## Acceptance
 
 - [ ] `pnpm build` emits all six entries and `pnpm typecheck` passes.
-- [ ] Type tests show that `msg` in `view` is inferred from `update`, and that a wrong payload, an unknown tag and a model with a function each fail to compile.
+- [ ] The type tests above pass with `expectTypeOf` and `@ts-expect-error`.
 - [ ] Fast check passes: `pnpm --filter idlip test`
 
 ## Sizing
@@ -85,5 +83,4 @@ M: known pattern, but core types and the export map are shared by every node.
 
 ## Notes for the worker
 
-- Tags are camelCase. A tag with no payload has the payload type `undefined`. Do not use `void`, the lint config rejects it.
-- Do not copy Elm's API names when a TypeScript-shaped name reads better.
+- Nothing exported from `idlip` may exist only for the compiler, except `For` (0002, Decisions).

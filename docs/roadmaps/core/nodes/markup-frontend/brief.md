@@ -40,6 +40,6 @@ Replace the TSX view syntax with an own DSL that has real control-flow blocks (`
 ## Notes
 
 - Decided in `debate/debate.md` (user overrule): TSX for the proof of concept, then the DSL.
-- Open design: how the TS parts of a module (`defineModule`, `update`, `msg`, imports) sit beside the markup without script blocks. Styles are an imported sidecar CSS file.
+- Open design: how the TS parts of a component (state, derived values, handlers, imports) sit beside the markup without script blocks. Since 2026-11-21 a component is a plain function, so the DSL may only need to replace the `return` JSX. Styles are an imported sidecar CSS file.
 - The file stops being valid TS. Tooling follows brumate's route: a `toTypeScript()` emitter, Volar language-core, a `tsc` wrapper and an editor extension (`../brumate/packages/language-core`, `tsc`, `vscode`). oxlint and oxfmt will not read the files.
 - Refine into a story with child nodes when `plan.py refine` lists it.

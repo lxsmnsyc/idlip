@@ -1,5 +1,5 @@
 ---
-milestones: [todo-resumes, apps, '0.1', components, '0.2']
+milestones: [todo-resumes, apps, '0.1', '0.2']
 run: parallel
 review: auto
 merge:
@@ -29,13 +29,14 @@ A todo app written in the idlip DSL renders on the server and resumes in the bro
 ## Priorities
 
 - must: needed for the `todo-resumes` milestone, the todo app resuming end to end.
-- should: needed before the `0.1` release (nesting, effects, docs, benchmarks), or in the `components` milestone after it (function components).
+- should: needed before the `0.1` release (nesting, effects, docs, benchmarks).
 - could: worth doing when agents are free (devtools).
 - later: parked.
 
 ## Constraints
 
 - MVU concept, not Elm's API. Names follow TypeScript conventions.
+- A module is a function component: `let` is state, `const` is derived, function declarations are handlers, `return` is the view. No compile-time APIs, apart from `<For>` until the DSL. See `docs/proposals/0002-modules.md`.
 - Views are TSX for the proof of concept, with a closed hole grammar and `<For>` as the only control-flow component. A markup DSL with blocks follows as `markup-frontend`. See `debate/debate.md`.
 - Nothing the client resumes is a closure. Models, messages, commands and subscriptions are plain data.
 - Serialization uses seroval.

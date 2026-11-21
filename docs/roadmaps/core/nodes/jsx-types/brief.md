@@ -1,6 +1,6 @@
 ---
 id: jsx-types
-title: JSX types that reject closures in events
+title: JSX types for intrinsic elements and events
 status: todo
 priority: must
 type: feature
@@ -34,20 +34,20 @@ depends_on:
     via: core-api
 ---
 
-# JSX types that reject closures in events
+# JSX types for intrinsic elements and events
 
 ## Goal
 
-`idlip/jsx-runtime` types: intrinsic elements whose `on:*` props accept only a `Message`, the `event` placeholder from `idlip`, and the `For` component. Conditions are plain JSX ternaries and `&&`, so there is no `Show`, `Switch` or `Match`.
+`idlip/jsx-runtime` types: intrinsic elements whose `on:*` props take a function of the element's event (`EventProp` from `contracts/core-api.md`), so `e.currentTarget` has the element's type. Attributes `ref`, `html` (`TrustedHtml` only) and `key`. Conditions are plain JSX ternaries and `&&`, so there is no `Show`, `Switch` or `Match`. The compiler, not the types, restricts event props to handler calls.
 
 ## Context
 
-- Source: `docs/proposals/0001-dsl.md`, View rules table, and `docs/proposals/0002-modules.md`, Event placeholder.
+- Source: `docs/proposals/0001-dsl.md`, View rules table, and `docs/proposals/0002-modules.md`, Example and Rules.
 - Core types: `contracts/core-api.md`.
 
 ## Acceptance
 
-- [ ] Type tests: `on:click={msg.add()}` compiles, `on:click={() => 1}` fails, `msg.setDraft(event.value)` compiles.
+- [ ] Type tests: `on:click={add}` and `on:input={(e) => setDraft(e.currentTarget.value)}` compile; `e.currentTarget.checked` on a `<button>` fails; `html="<b>"` fails and `html={trusted('<b>')}` compiles.
 - [ ] Fast check passes: `pnpm --filter idlip test`
 
 ## Sizing
