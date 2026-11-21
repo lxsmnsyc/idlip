@@ -282,6 +282,10 @@ class Analyzer {
   /** Diagnostics go here while trying to inline a helper. */
   sink: Diagnostic[] | undefined;
   holes: Hole[] = [];
+  /** The `key` of each `<For>`, by its printed list path. Filled by the first pass. */
+  listKeys = new Map<string, string>();
+  /** Set when a `find` was lowered, so a second pass can use the keys. */
+  hasFind = false;
   childPosition = 0;
   inlineStack: string[] = [];
 
@@ -812,6 +816,12 @@ class Analyzer {
           );
         }
       }
+      if (root === undefined && callee.property.name === 'find') {
+        const found = this.lowerFind(node, callee.object, scope);
+        if (found !== undefined) {
+          return found;
+        }
+      }
       if (root === undefined && isMethod(callee.property.name)) {
         return {
           kind: 'method',
@@ -839,6 +849,56 @@ class Analyzer {
       }
     }
     return { kind: 'call', callee: root, args, helper: 'args' };
+  }
+
+  /**
+   * Lowers `list.find((t) => t.field === value)` to the path `list[field=value]`. The value
+   * must be a path to a state field, so the manifest can name it. Anything else is not in the
+   * closed grammar.
+   */
+  lowerFind(node: CallExpression, listNode: AstNode, scope: Scope): Expr | undefined {
+    const [arrow] = node.arguments;
+    const body = arrow.type === 'ArrowFunctionExpression' ? arrow.body : undefined;
+    if (
+      node.arguments.length !== 1 ||
+      arrow.type !== 'ArrowFunctionExpression' ||
+      arrow.params.length !== 1 ||
+      arrow.params[0].type !== 'Identifier' ||
+      body?.type !== 'BinaryExpression' ||
+      body.operator !== '==='
+    ) {
+      return undefined;
+    }
+    const param = arrow.params[0].name;
+    const sides = [body.left, body.right];
+    for (const [index, side] of sides.entries()) {
+      // One side reads a field of the item, the other does not read the item.
+      if (
+        side.type !== 'MemberExpression' ||
+        side.computed ||
+        side.object.type !== 'Identifier' ||
+        side.object.name !== param
+      ) {
+        continue;
+      }
+      const other = sides[1 - index];
+      if (other.type === 'Identifier' && other.name === param) {
+        return undefined;
+      }
+      const list = this.lower(listNode, scope);
+      if (list.kind !== 'path' || (list.root.kind !== 'state' && list.root.kind !== 'props')) {
+        return undefined;
+      }
+      this.hasFind = true;
+      const value = this.lower(other, scope);
+      return {
+        kind: 'path',
+        root: list.root,
+        segments: [...list.segments, { kind: 'keyed', field: side.property.name, value }],
+        optional: list.optional,
+      };
+    }
+    return undefined;
   }
 
   lowerArgs(node: CallExpression, scope: Scope): Expr[] {
@@ -905,21 +965,63 @@ class Analyzer {
     return minimizePaths(found);
   }
 
+  /** Tells whether a keyed segment can stay keyed: the list has a `<For>` with that key. */
+  isKeyedList(root: Root, before: Segment[], segment: { field: string; value: Expr }): boolean {
+    if (root.kind !== 'state' && root.kind !== 'props') {
+      return false;
+    }
+    for (const item of before) {
+      if (typeof item !== 'string') {
+        return false;
+      }
+    }
+    // The manifest names the key's source as a model path.
+    const value = segment.value;
+    if (value.kind !== 'path' || value.root.kind !== 'state') {
+      return false;
+    }
+    for (const item of value.segments) {
+      if (typeof item !== 'string') {
+        return false;
+      }
+    }
+    const list = printPath({
+      root: root.kind,
+      segments: root.kind === 'state' ? [root.name, ...before] : [...before],
+    });
+    return this.listKeys.get(list) === segment.field;
+  }
+
   collectPaths(expr: Expr, out: Path[]): void {
     switch (expr.kind) {
       case 'literal':
         return;
       case 'path': {
         const segments: Segment[] = [];
+        const root = expr.root;
         for (const segment of expr.segments) {
           if (typeof segment === 'object' && segment.kind === 'index') {
             this.collectPaths(segment.value, out);
+            segments.push({ kind: 'item' });
+          } else if (typeof segment === 'object' && segment.kind === 'keyed') {
+            this.collectPaths(segment.value, out);
+            if (this.isKeyedList(root, segments, segment)) {
+              segments.push(segment);
+              continue;
+            }
+            // Without a `<For>` key, the item is any item and the test reads its field.
+            if (root.kind === 'state' || root.kind === 'props') {
+              const base = root.kind === 'state' ? [root.name, ...segments] : [...segments];
+              out.push({
+                root: root.kind,
+                segments: [...base, { kind: 'item' }, segment.field],
+              });
+            }
             segments.push({ kind: 'item' });
           } else {
             segments.push(segment);
           }
         }
-        const root = expr.root;
         if (root.kind === 'state') {
           out.push({ root: 'state', segments: [root.name, ...segments] });
         } else if (root.kind === 'props') {
@@ -1935,6 +2037,9 @@ class Analyzer {
       if (own.length === 1) {
         base = own[0];
       }
+    }
+    if (base !== undefined && keyNode?.type === 'Literal' && typeof keyNode.value === 'string') {
+      this.listKeys.set(printPath({ root: base.root, segments: base.segments }), keyNode.value);
     }
     const inner = createScope(scope);
     const itemParam = render.params[0];
@@ -3551,7 +3656,7 @@ function minimizePaths(paths: Path[]): Path[] {
     }
     let covered = false;
     for (const other of printed) {
-      if (other !== text && text.startsWith(`${other}.`)) {
+      if (other !== text && (text.startsWith(`${other}.`) || text.startsWith(`${other}[`))) {
         covered = true;
       }
     }
@@ -3564,20 +3669,10 @@ function minimizePaths(paths: Path[]): Path[] {
   return out;
 }
 
-/** Reads one `*.idlip.tsx` file into the view IR. */
-export function analyze(file: string, source: string, options: AnalyzeOptions = {}): ModuleIR {
-  const parsed = parseSync(file, source, { lang: 'tsx' });
-  const analyzer = new Analyzer(file, source, parsed.program, options);
-  for (const error of parsed.errors) {
-    analyzer.diagnostics.push({
-      rule: 'parse',
-      severity: 'error',
-      message: error.message,
-      span: { start: error.labels[0]?.start ?? 0, end: error.labels[0]?.end ?? 0 },
-    });
-  }
+/** Reads the components of a parsed file into the IR. */
+function readComponents(analyzer: Analyzer, program: Program): Component[] {
   const components: Component[] = [];
-  for (const statement of parsed.program.body) {
+  for (const statement of program.body) {
     const exported =
       statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration';
     const declaration = exported ? statement.declaration : statement;
@@ -3589,5 +3684,31 @@ export function analyze(file: string, source: string, options: AnalyzeOptions = 
       components.push(analyzer.analyzeComponent(declaration.id.name, declaration, exported));
     }
   }
+  return components;
+}
+
+/** Reads one `*.idlip.tsx` file into the view IR. */
+export function analyze(file: string, source: string, options: AnalyzeOptions = {}): ModuleIR {
+  const parsed = parseSync(file, source, { lang: 'tsx' });
+  let analyzer = new Analyzer(file, source, parsed.program, options);
+  let components = readComponents(analyzer, parsed.program);
+  // A `find` may come before the `<For>` that keys its list, so the first pass collects the
+  // keys and a second pass uses them.
+  if (analyzer.hasFind && analyzer.listKeys.size > 0) {
+    const second = new Analyzer(file, source, parsed.program, options);
+    second.listKeys = analyzer.listKeys;
+    analyzer = second;
+    components = readComponents(analyzer, parsed.program);
+  }
+  const parseDiagnostics: Diagnostic[] = [];
+  for (const error of parsed.errors) {
+    parseDiagnostics.push({
+      rule: 'parse',
+      severity: 'error',
+      message: error.message,
+      span: { start: error.labels[0]?.start ?? 0, end: error.labels[0]?.end ?? 0 },
+    });
+  }
+  analyzer.diagnostics.unshift(...parseDiagnostics);
   return { file, components, diagnostics: analyzer.diagnostics };
 }

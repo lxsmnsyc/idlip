@@ -1,0 +1,31 @@
+// keyed.idlip.tsx
+import { For } from 'idlip';
+
+interface Todo {
+  id: string;
+  text: string;
+  done: boolean;
+}
+
+export default function Keyed(props: { initial: Todo[]; notes: Todo[] }) {
+  let todos = props.initial;
+  let selected = '';
+  let notes = props.notes;
+  let other = '';
+
+  function select(id: string) {
+    selected = id;
+  }
+
+  return (
+    <main>
+      <p>{todos.find((t) => t.id === selected).text}</p>
+      <p>{todos.find((t) => selected === t.id)?.done}</p>
+      <p>{notes.find((n) => n.id === other).text}</p>
+      <p>{todos.find((t) => t.text === selected).done}</p>
+      <For each={todos} key="id">
+        {(t) => <li on:click={() => select(t.id)}>{t.text}</li>}
+      </For>
+    </main>
+  );
+}

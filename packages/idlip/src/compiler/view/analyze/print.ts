@@ -19,10 +19,12 @@ export function printPath(path: Path): string {
   if (path.root === 'props') {
     parts.push('props');
   }
+  let text = parts.join('.');
   for (const segment of path.segments) {
-    parts.push(printSegment(segment));
+    const printed = printSegment(segment);
+    text += printed.startsWith('[') ? printed : `${text === '' ? '' : '.'}${printed}`;
   }
-  return parts.join('.');
+  return text;
 }
 
 function printRoot(root: Root): string {

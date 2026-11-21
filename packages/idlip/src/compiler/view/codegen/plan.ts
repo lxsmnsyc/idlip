@@ -1,5 +1,5 @@
 // Plans the bindings of a component: which holes and events patch, their ids, groups and lists.
-import type { Component, Event, Hole, Node, Path, Span } from '../analyze/index.ts';
+import type { Component, Event, Expr, Hole, Node, Path, Span } from '../analyze/index.ts';
 import type { Frame, Report } from './expr.ts';
 
 export type Source =
@@ -55,6 +55,20 @@ export interface Plan {
   events: string[];
 }
 
+/** Prints the source of a keyed segment: the model path of its value. */
+function printPathSource(expr: Expr): string {
+  const parts: string[] = [];
+  if (expr.kind === 'path' && expr.root.kind === 'state') {
+    parts.push(expr.root.name);
+    for (const segment of expr.segments) {
+      if (typeof segment === 'string') {
+        parts.push(segment);
+      }
+    }
+  }
+  return parts.join('.');
+}
+
 /** Prints a path as the manifest writes it: `todos.*.done`. */
 export function printPathKey(path: Path, report: Report, span: Span): string {
   const parts: string[] = [];
@@ -63,6 +77,10 @@ export function printPathKey(path: Path, report: Report, span: Span): string {
       parts.push(segment);
     } else if (segment.kind === 'item') {
       parts.push('*');
+    } else if (segment.kind === 'keyed') {
+      // The analysis keeps a keyed segment only when its value is a state path.
+      const last = parts.length - 1;
+      parts[last] = `${parts[last]}[${segment.field}=${printPathSource(segment.value)}]`;
     } else {
       report('codegen-unsupported', `A ${segment.kind} path segment is not generated yet`, span);
     }

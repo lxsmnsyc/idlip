@@ -1,0 +1,50 @@
+file keyed.idlip.tsx
+
+component Keyed (stateful, exported)
+  props: props
+  state:
+    todos = props.initial
+    selected = ""
+    notes = props.notes
+    other = ""
+  handlers:
+    select(id)
+      free: -
+      writes: selected
+  view:
+    <main>
+      <p>
+        {#0}
+      <p>
+        {#1}
+      <p>
+        {#2}
+      <p>
+        {#3}
+      for #4 key=id item=t
+        <li [on:click -> select(t.id)  render reads todos.*.id]>
+          {#5}
+  holes:
+    #0 todos.find((t) => t.id === selected).text
+        expr  todos[id=selected].text
+        paths selected, todos[id=selected].text
+    #1 todos.find((t) => selected === t.id)?.done
+        expr  todos[id=selected].done
+        paths selected, todos[id=selected].done
+    #2 notes.find((n) => n.id === other).text
+        expr  notes[id=other].text
+        paths other, notes.*.id, notes.*.text
+    #3 todos.find((t) => t.text === selected).done
+        expr  todos[text=selected].done
+        paths selected, todos.*.text, todos.*.done
+    #4 todos
+        expr  todos
+        paths todos
+    #5 t.text
+        expr  t.text
+        paths todos.*.text
+
+diagnostics: 3
+  11:7 warning let-unassigned: The state field todos is never assigned; make it a const
+  13:7 warning let-unassigned: The state field notes is never assigned; make it a const
+  14:7 warning let-unassigned: The state field other is never assigned; make it a const

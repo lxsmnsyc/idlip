@@ -273,11 +273,17 @@ export class Emitter {
       }
     }
     let out = this.printRoot(expr.root);
+    // After a `find` the item may be missing, so the rest of the path is optional.
+    let optional = expr.optional;
     for (const segment of expr.segments) {
       if (typeof segment === 'string') {
-        out += getAccessor(segment, expr.optional);
+        out += getAccessor(segment, optional);
       } else if (segment.kind === 'index') {
-        out += `${expr.optional ? '?.' : ''}[${this.expr(segment.value)}]`;
+        out += `${optional ? '?.' : ''}[${this.expr(segment.value)}]`;
+      } else if (segment.kind === 'keyed') {
+        const value = this.expr(segment.value, 9);
+        out += `${optional ? '?.' : '.'}find(($i) => $i${getAccessor(segment.field, false)} === ${value})`;
+        optional = true;
       } else {
         return this.fail('codegen-unsupported', `A ${segment.kind} segment is not an expression`);
       }

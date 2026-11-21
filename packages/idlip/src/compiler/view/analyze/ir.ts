@@ -10,7 +10,9 @@ export interface Span {
  * One segment of a path. A string is a field name. `item` is any element of a list or any
  * value of a record, printed `*`; it appears in path sets only. `index` is a computed access
  * (`labels[filter]`) in an expression; in the path set it becomes `*` plus the key's paths.
- * `keyed` is reserved for `keyed-paths` and never emitted yet.
+ * `keyed` is `list.find((t) => t.field === value)`: the item whose `field` equals `value`.
+ * A path set keeps it only for a list whose `<For>` has that `key` and a state path as value.
+ * Otherwise it becomes `*`, plus a path to the field.
  */
 export type Segment =
   | string

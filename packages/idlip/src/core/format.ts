@@ -265,11 +265,17 @@ export interface CompileResult {
 export type Compile = (source: string, id: string) => CompileResult;
 
 /**
- * Returns the file name of a chunk: `binding=todos.*.done` is `binding.todos._.done.js`.
- * The fixtures use it, and so does the Vite plugin for the `name` of an emitted chunk.
+ * Returns the file name of a chunk: `binding=todos.*.done` is `binding.todos._.done.js`. The
+ * first `=` separates the kind. A keyed segment keeps URL-safe characters: `[` is `(`, `]` is `)`
+ * and the `=` inside is `~`, so `binding=todos[id=selected].text` is
+ * `binding.todos(id~selected).text.js`. The fixtures use it, and so does the Vite plugin for the
+ * `name` of an emitted chunk.
  */
 export function getChunkFile(chunk: string): string {
-  return `${chunk.replaceAll('=', '.').replaceAll('*', '_').replaceAll(',', '+')}.js`;
+  const at = chunk.indexOf('=');
+  const kind = at === -1 ? chunk : `${chunk.slice(0, at)}.${chunk.slice(at + 1)}`;
+  const text = kind.replaceAll('=', '~').replaceAll('[', '(').replaceAll(']', ')');
+  return `${text.replaceAll('*', '_').replaceAll(',', '+')}.js`;
 }
 
 /**
