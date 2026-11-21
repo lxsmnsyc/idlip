@@ -41,3 +41,11 @@
 ## Size
 
 - Estimated M, actual M.
+
+## Gate decision (orchestrator, one-shot run, 2026-11-21)
+
+Landed as d0d6bf6 on `batch/core`. The contract `markup-grammar` v1 is frozen as proposed. Decided, for the user to revisit:
+
+- Packages: option B. The parser and lowering stay in `idlip/compiler`; the editor tooling ships as `@idlip/language-core` and `@idlip/tsc`, with a private VS Code extension.
+- `#switch` keeps the condition form (no discriminant), as in brumate.
+- No `#for ... #else`; text whitespace follows JSX rules; the `.idlip` suffix as proposed.

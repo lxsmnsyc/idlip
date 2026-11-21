@@ -41,7 +41,7 @@ A todo app written in the idlip DSL renders on the server and resumes in the bro
 - Nothing the client resumes is a closure. Models, messages, commands and subscriptions are plain data.
 - Serialization uses seroval.
 - Build integration is a Vite plugin (`idlip/vite`). The compiler uses `oxc-parser`.
-- One published package, `idlip`, with subpaths: `idlip`, `idlip/server`, `idlip/client`, `idlip/compiler`, `idlip/vite`, `idlip/jsx-runtime`.
+- One published runtime and compiler package, `idlip`, with subpaths (editor tooling for the markup DSL ships separately as `@idlip/language-core` and `@idlip/tsc`, decided at the `markup-syntax` gate): `idlip`, `idlip/server`, `idlip/client`, `idlip/compiler`, `idlip/vite`, `idlip/jsx-runtime`.
 - Code follows the ts-style skill. Prose follows the plain-writing skill.
 
 ## Non-goals

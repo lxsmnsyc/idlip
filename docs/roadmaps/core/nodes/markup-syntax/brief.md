@@ -1,7 +1,7 @@
 ---
 id: markup-syntax
 title: Markup syntax proposal and fixtures
-status: active
+status: done
 priority: should
 type: contract
 story: markup-frontend
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: true
 added: 2026-11-21
-spent:
+spent: 151894
 owns:
   - docs/proposals/0005-markup.md
   - packages/idlip/test/compiler/markup/fixtures/**
@@ -47,10 +47,10 @@ Write `docs/proposals/0005-markup.md` and the grammar for `.idlip` files, with p
 
 ## Acceptance
 
-- [ ] Every expected TSX fixture passes `analyze()` with no errors.
-- [ ] The grammar covers each block above, with one fixture each, and says how errors and spans map.
-- [ ] The open package question is stated for the gate.
-- [ ] Fast check passes: `pnpm --filter idlip exec vitest run test/compiler/markup`
+- [x] Every expected TSX fixture passes `analyze()` with no errors.
+- [x] The grammar covers each block above, with one fixture each, and says how errors and spans map.
+- [x] The open package question is stated for the gate.
+- [x] Fast check passes: `pnpm --filter idlip exec vitest run test/compiler/markup`
 
 ## Sizing
 
