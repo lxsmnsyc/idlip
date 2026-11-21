@@ -1,7 +1,7 @@
 ---
 id: custom-effects
 title: "Async handlers: await compiled into a task and a continuation"
-status: todo
+status: active
 priority: should
 type: feature
 story:

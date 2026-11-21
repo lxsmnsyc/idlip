@@ -1,7 +1,7 @@
 ---
 id: keyed-paths
 title: Keyed path segments in view analysis and diff
-status: todo
+status: active
 priority: should
 type: feature
 story:

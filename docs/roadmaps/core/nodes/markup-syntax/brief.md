@@ -1,7 +1,7 @@
 ---
 id: markup-syntax
 title: Markup syntax proposal and fixtures
-status: todo
+status: active
 priority: should
 type: contract
 story: markup-frontend
