@@ -1,7 +1,7 @@
 ---
 id: spike-chunk-split
 title: Spike: per-handler and per-binding chunks through Vite and Rolldown
-status: active
+status: done
 priority: must
 type: spike
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added:
-spent:
+spent: 207848
 owns:
   - docs/roadmaps/core/nodes/spike-chunk-split/**
 shared: []
@@ -53,3 +53,5 @@ M with high uncertainty, time-boxed.
 ## Notes for the worker
 
 - Check whether Rolldown merges tiny chunks by default and how to stop it for these entries.
+
+Landed on `batch/core` as 6a8b0ec.
