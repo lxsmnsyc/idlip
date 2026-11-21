@@ -1,0 +1,61 @@
+file edges.idlip.tsx
+
+component Edges (stateful, exported)
+  props: props
+  state:
+    items = props.items
+    byId = {  }
+    selected = ""
+    index = 0
+    query = ""
+  derived:
+    list = items
+    current = items[index]
+    chosen = byId[selected]
+  handlers:
+    select(id)
+      free: items:state byId:state
+      writes: selected index byId items query
+  view:
+    <main>
+      <p>
+        {#0}
+      <p>
+        {#1}
+      <p>
+        {#2}
+      <p>
+        {#3}
+      for #4 key=id item=item
+        <button [on:click -> select(item.id)  render reads items, query]>
+          {#5}
+      for #6 key=id item=item
+        <span>
+          {#7}
+  holes:
+    #0 current.name
+        expr  items[index].name
+        paths index, items.*.name
+    #1 chosen?.name
+        expr  byId[selected].name
+        paths selected, byId.*.name
+    #2 name(index > 0 ? items[0] : items[1])
+        expr  name(((index > 0) ? items.0 : items.1))
+        paths index, items.0, items.1
+    #3 name(list[index])
+        expr  name(items[index]) => items[index].name
+        paths index, items.*.name
+    #4 visible(items, query)
+        expr  visible(items, query)
+        paths items, query
+    #5 item.name
+        expr  item.name
+        paths items, query
+    #6 list
+        expr  items
+        paths items
+    #7 item.name
+        expr  item.name
+        paths items.*.name
+
+diagnostics: 0

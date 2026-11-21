@@ -1,0 +1,43 @@
+file counter.idlip.tsx
+
+component Counter (stateful, exported)
+  props: props
+  state:
+    count = props.start
+  derived:
+    even = ((count % 2) === 0)
+  handlers:
+    increment()
+      free: count:state
+      writes: count
+    add(step)
+      free: count:state
+      writes: count
+    reset()
+      free: props:props(props.start)
+      writes: count
+  view:
+    <div>
+      <button [on:click -> increment()]>
+        "+1"
+      <button [on:click -> add(10)]>
+        "+10"
+      <button [on:click -> reset()]>
+        "Reset"
+      <output class={#0}>
+        {#1}
+      if #2
+        <span>
+          "even"
+  holes:
+    #0 { even }
+        expr  { even: ((count % 2) === 0) }
+        paths count
+    #1 count
+        expr  count
+        paths count
+    #2 even
+        expr  ((count % 2) === 0)
+        paths count
+
+diagnostics: 0

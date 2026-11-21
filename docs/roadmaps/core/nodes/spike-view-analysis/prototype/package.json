@@ -1,0 +1,11 @@
+{
+  "name": "spike-view-analysis",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "analyze": "node analyze.ts"
+  },
+  "dependencies": {
+    "oxc-parser": "0.154.0"
+  }
+}

@@ -1,0 +1,300 @@
+file features.idlip.tsx
+
+component Badge (stateless)
+  props: props
+  derived:
+    tone = (props.on ? styles.on : styles.off)
+  view:
+    <span class={#0}>
+      {#1}
+  holes:
+    #0 tone
+        expr  (props.on ? styles.on : styles.off)
+        paths props.on
+    #1 props.label
+        expr  props.label
+        paths props.label
+
+component CardRow (stateless)
+  props: { card, onPick }
+  view:
+    <li class={#0} [on:click -> props.onPick()]>
+      <span class={#2}>
+        {#3}
+        <em>
+          {#1}
+  holes:
+    #0 { done: card.done }
+        expr  { done: props.card.done }
+        paths props.card.done
+    #1 card.author.name
+        expr  props.card.author.name
+        paths props.card.author.name
+    #2 tone
+        expr  (props.card.done ? styles.on : styles.off)
+        paths props.card.done
+    #3 props.label
+        expr  title(props.card) => `${props.card.title} (${props.card.tags.length})`
+        paths props.card.title, props.card.tags.length
+
+component Counter (stateful, exported)
+  props: props
+  state:
+    count = props.start
+  handlers:
+    increment()
+      free: count:state
+      writes: count
+  view:
+    <button title={#0} [on:click -> increment()]>
+      {#1}
+  holes:
+    #0 `${count}`
+        expr  `${count}`
+        paths count
+    #1 count
+        expr  count
+        paths count
+
+component Board (stateful, exported)
+  props: props
+  state:
+    columns = props.columns
+    filter = "all"
+    selected = ""
+    load = { state: "idle" }
+    ticks = 0
+    live = false
+  derived:
+    active = filter
+    heading = `${LABELS[filter]} cards`
+    done = countDone(columns)
+    first = columns.0
+  handlers:
+    setFilter(next)
+      free: -
+      writes: filter
+    pick(id)
+      free: -
+      writes: selected
+    tick(now)
+      free: ticks:state
+      writes: ticks
+    toggleLive()
+      free: live:state
+      writes: live
+    key(name)
+      free: -
+      writes: selected
+    moved(x)
+      free: -
+      writes: -
+    async reload()
+      free: selected:state fmt:import String:global
+      writes: load columns
+      segment reload$1 after await fmt.fetchColumns, carries: -
+  view:
+    <main class={#0}>
+      head
+        <title>
+          {#1}
+        <meta name="description" content={#2}>
+      window [on:keydown -> key($event.key)] [latest:pointermove -> moved($event.clientX)]
+      if #3
+        subscribe every input=#4 [on:value -> tick($event)]
+      <h1 ref=heading>
+        {#5}
+      <p>
+        {#6}
+        " "
+        {#7}
+      <nav>
+        <button aria-pressed={#8} [on:click -> setFilter("all")]>
+          "All"
+        <button aria-pressed={#9} [on:click -> setFilter("done")]>
+          "Done"
+        <button [on:click -> toggleLive()]>
+          {#10}
+        <button disabled={#11} [on:click -> reload()]>
+          "Reload"
+      if #12
+        <p>
+          "Loading"
+      else
+        if #13
+          <p class={#14}>
+            {#15}
+      try
+        for #16 key=id item=column index=index
+          <section>
+            <h2>
+              {#17}
+              ". "
+              {#18}
+            <ul>
+              for #19 key=id item=card
+                if #20
+                  <li class={#21} [on:click -> pick(card.id)  render reads columns.*.cards.*.id]>
+                    <span class={#23}>
+                      {#24}
+                      <em>
+                        {#22}
+            child Counter slot=for-key start={#25} [on:onDone -> pick(column.id)  render reads columns.*.id]
+      catch (error, reset)
+        <p>
+          "Failed: "
+          {#26}
+          " "
+          <button [on:click -> reset()]>
+            "Retry"
+      for #27 key=id item=$item
+        <div class={#28} ref=[card, $item.id]>
+          child Avatar slot=for-key name={#29}
+          <div html={#30}>
+      <svg ns=svg viewBox="0 0 10 10">
+        <title ns=svg>
+          {#31}
+        if #32
+          <circle ns=svg r={#33}>
+      child Counter slot=key #34 start={#35} [on:onDone -> toggleLive()]
+      <p>
+        {#36}
+        " "
+        {#37}
+        " "
+        {#38}
+        " "
+        {#39}
+      <footer>
+        {#40}
+        " · "
+        {#41}
+  holes:
+    #0 styles.board
+        expr  styles.board
+        paths (static)
+    #1 heading
+        expr  `${LABELS[filter]} cards`
+        paths filter
+    #2 `${done} done`
+        expr  `${countDone(columns)} done`
+        paths columns
+    #3 live
+        expr  live
+        paths live
+    #4 1000
+        expr  1000
+        paths (static)
+    #5 upper(heading)
+        expr  upper(`${LABELS[filter]} cards`) => `${LABELS[filter]} cards`.toUpperCase()
+        paths filter
+    #6 LABELS[active]
+        expr  LABELS[filter]
+        paths filter
+    #7 first?.name
+        expr  columns.0.name
+        paths columns.0.name
+    #8 active === 'all'
+        expr  (filter === "all")
+        paths filter
+    #9 filter === 'done'
+        expr  (filter === "done")
+        paths filter
+    #10 live ? 'Stop' : 'Live'
+        expr  (live ? "Stop" : "Live")
+        paths live
+    #11 load.state === 'loading'
+        expr  (load.state === "loading")
+        paths load.state
+    #12 load.state === 'loading'
+        expr  (load.state === "loading")
+        paths load.state
+    #13 load.state === 'failed'
+        expr  (load.state === "failed")
+        paths load.state
+    #14 styles.error
+        expr  styles.error
+        paths (static)
+    #15 load.error
+        expr  load.error
+        paths load.error
+    #16 columns
+        expr  columns
+        paths columns
+    #17 index + 1
+        expr  (index + 1)
+        paths columns
+    #18 column.name
+        expr  column.name
+        paths columns.*.name
+    #19 column.cards
+        expr  column.cards
+        paths columns.*.cards
+    #20 isVisible(card, filter)
+        expr  isVisible(card, filter) => ((filter === "all") || ((filter === "done") ? card.done : !card.done))
+        paths filter, columns.*.cards.*.done
+    #21 { done: card.done }
+        expr  { done: card.done }
+        paths columns.*.cards.*.done
+    #22 card.author.name
+        expr  card.author.name
+        paths columns.*.cards.*.author.name
+    #23 tone
+        expr  (card.done ? styles.on : styles.off)
+        paths columns.*.cards.*.done
+    #24 props.label
+        expr  title(card) => `${card.title} (${card.tags.length})`
+        paths columns.*.cards.*.title, columns.*.cards.*.tags.length
+    #25 column.cards.length
+        expr  column.cards.length
+        paths columns.*.cards.length
+    #26 fmt.message(error)
+        expr  fmt.message(error)
+        paths (static)
+    #27 columns[0].cards
+        expr  columns.0.cards
+        paths columns.0.cards
+    #28 selected === id ? styles.selected : undefined
+        expr  ((selected === $item.id) ? styles.selected : undefined)
+        paths selected, columns.0.cards.*.id
+    #29 author.name
+        expr  $item.author.name
+        paths columns.0.cards.*.author.name
+    #30 author.bio
+        expr  $item.author.bio
+        paths columns.0.cards.*.author.bio
+    #31 `${ticks} ticks`
+        expr  `${ticks} ticks`
+        paths ticks
+    #32 ticks > 0
+        expr  (ticks > 0)
+        paths ticks
+    #33 ticks
+        expr  ticks
+        paths ticks
+    #34 "main"
+        expr  "main"
+        paths (static)
+    #35 done
+        expr  countDone(columns)
+        paths columns
+    #36 String(ticks)
+        expr  String(ticks)
+        paths ticks
+    #37 Math.max(ticks, 1)
+        expr  Math.max(ticks, 1)
+        paths ticks
+    #38 heading.trim()
+        expr  `${LABELS[filter]} cards`.trim()
+        paths filter
+    #39 heading.length
+        expr  `${LABELS[filter]} cards`.length
+        paths filter
+    #40 fmt.count(done, columns.length)
+        expr  fmt.count(countDone(columns), columns.length)
+        paths columns
+    #41 ticks
+        expr  ticks
+        paths ticks
+
+diagnostics: 0
