@@ -37,8 +37,11 @@ function watchState(): void {
   }
   const store: unknown[] = [];
   function pushRecords(...records: unknown[][]): number {
-    return store.push(...records.map(wrap));
+    return Array.prototype.push.apply(store, records.map(wrap));
   }
+  // The listener gives the queue an own `push`, and the loader checks for it. The proxy's traps
+  // serve reads and writes of `push`, so this property only answers `Object.hasOwn`.
+  Object.defineProperty(store, 'push', { value: pushRecords, writable: true, configurable: true });
   const boot = new Proxy<unknown[]>(store, {
     get(target, key, receiver) {
       if (key !== 'push') {
@@ -74,6 +77,8 @@ export const test = base.extend<{ problems: string[]; expectedProblems: number }
       page.on('console', (message) => {
         if (message.type() === 'error') {
           problems.push(`console error: ${message.text()}`);
+        } else if (message.type() === 'warning' && message.text().startsWith('idlip:')) {
+          problems.push(`console warning: ${message.text()}`);
         }
       });
       page.on('pageerror', (error) => {
@@ -115,6 +120,72 @@ export async function collectRequests(page: Page, action: () => Promise<void>): 
   await action();
   page.off('request', onRequest);
   return names;
+}
+
+/**
+ * Returns a label for a request: its resource type, path and query, such as `script /assets/a.js`.
+ */
+export function labelRequest(request: Request): string {
+  const url = new URL(request.url());
+  return `${request.resourceType()} ${url.pathname}${url.search}`;
+}
+
+function resolveImport(specifier: string, from: string, map: Record<string, string>): string {
+  return new URL(map[specifier] ?? specifier, from).href;
+}
+
+function readImports(json: string): Record<string, string> {
+  const parsed: unknown = JSON.parse(json);
+  const imports: Record<string, string> = {};
+  const given: unknown =
+    typeof parsed === 'object' && parsed !== null ? Reflect.get(parsed, 'imports') : {};
+  for (const [name, target] of typeof given === 'object' && given !== null
+    ? Object.entries(given)
+    : []) {
+    if (typeof target === 'string') {
+      imports[name] = target;
+    }
+  }
+  return imports;
+}
+
+function findStaticImports(code: string): string[] {
+  const found: string[] = [];
+  const pattern = /(?:^|[;}\s])(?:import|export)\s*(?:[^'"()]*?\bfrom\s*)?(['"])([^'"]+)\1/g;
+  for (const match of code.matchAll(pattern)) {
+    found.push(match[2]);
+  }
+  return found;
+}
+
+/**
+ * Returns the loader module of a page and its static imports, as URLs with their code. The loader
+ * is the page's module script. Imports resolve through the page's import map.
+ */
+export async function readLoaderFiles(
+  page: Page,
+  html: string,
+  baseURL: string,
+): Promise<Map<string, string>> {
+  const map = /<script type="importmap"[^>]*>([\s\S]*?)<\/script>/.exec(html);
+  const imports = readImports(map?.[1] ?? '{}');
+  const entry = /<script type="module"[^>]*src="([^"]+)"/.exec(html)?.[1];
+  if (entry === undefined) {
+    throw new Error('The page has no module script');
+  }
+  const files = new Map<string, string>();
+  const queue = [resolveImport(entry, `${baseURL}/`, {})];
+  for (let url = queue.pop(); url !== undefined; url = queue.pop()) {
+    if (files.has(url)) {
+      continue;
+    }
+    const code = await (await page.request.get(url)).text();
+    files.set(url, code);
+    for (const specifier of findStaticImports(code)) {
+      queue.push(resolveImport(specifier, url, imports));
+    }
+  }
+  return files;
 }
 
 /**

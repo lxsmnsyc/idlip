@@ -1,8 +1,11 @@
 import { gzipSync } from 'node:zlib';
+import type { Request } from '@playwright/test';
 import {
   collectRequests,
   expect,
   initial,
+  labelRequest,
+  readLoaderFiles,
   readMain,
   renderFresh,
   settle,
@@ -56,14 +59,26 @@ test.describe('csp probe', () => {
   });
 });
 
-test('nothing loads or decodes before the first event', async ({ page }) => {
-  await page.goto('/', { waitUntil: 'networkidle' });
-  const requests = await collectRequests(page, async () => {
-    // Pointer movement and focus are not handled events.
-    await page.getByRole('checkbox').first().hover();
-    await settle(page);
-  });
-  expect(requests).toEqual([]);
+test('only the page and the loader load before the first event', async ({ page, baseURL }) => {
+  // Every request from the navigation on, so an eager import in the loader shows up too.
+  const requests: string[] = [];
+  function onRequest(request: Request): void {
+    requests.push(labelRequest(request));
+  }
+  page.on('request', onRequest);
+  const response = await page.goto('/', { waitUntil: 'networkidle' });
+  // Pointer movement and focus are not handled events.
+  await page.getByRole('checkbox').first().hover();
+  await settle(page);
+  page.off('request', onRequest);
+
+  const html = (await response?.text()) ?? '';
+  const expected = ['document /'];
+  for (const url of (await readLoaderFiles(page, html, baseURL ?? '')).keys()) {
+    const { pathname, search } = new URL(url);
+    expected.push(`script ${pathname}${search}`);
+  }
+  expect(requests.toSorted()).toEqual(expected.toSorted());
   expect(await page.evaluate(() => window.idlipDecoded)).toBe(0);
 });
 
@@ -133,36 +148,34 @@ test('the DOM after each action equals a fresh server render', async ({ page }) 
   expect(await readMain(page)).toBe(await renderFresh(page, afterSecond));
 });
 
+test('typing, Escape and submit add a todo that toggles', async ({ page }) => {
+  // The fixture's stub loader does not patch lists.
+  test.skip(process.env.E2E_TARGET === 'fixture', 'needs the real list patcher');
+  await page.goto('/', { waitUntil: 'networkidle' });
+  const input = page.locator('main input').first();
+
+  await input.fill('Dropped');
+  await input.press('Escape');
+  await expect(input).toHaveValue('');
+  await expect(page.locator('button')).toBeDisabled();
+
+  await input.fill('Ship <it>');
+  await expect(page.locator('button')).toBeEnabled();
+  await input.press('Enter');
+  await expect(page.locator('li')).toHaveCount(3);
+  await expect(input).toHaveValue('');
+  await expect(page.locator('p')).toHaveText('2 left');
+  const added = [...initial, { id: 't3', text: 'Ship <it>', done: false }];
+  expect(await readMain(page)).toBe(await renderFresh(page, added));
+
+  await page.getByRole('checkbox').nth(2).click();
+  await expect(page.locator('p')).toHaveText('1 left');
+  const toggled = [...initial, { id: 't3', text: 'Ship <it>', done: true }];
+  expect(await readMain(page)).toBe(await renderFresh(page, toggled));
+});
+
 function gzipSize(code: string): number {
   return gzipSync(code, { level: 9 }).length;
-}
-
-function resolveImport(specifier: string, from: string, map: Record<string, string>): string {
-  return new URL(map[specifier] ?? specifier, from).href;
-}
-
-function readImports(json: string): Record<string, string> {
-  const parsed: unknown = JSON.parse(json);
-  const imports: Record<string, string> = {};
-  const given: unknown =
-    typeof parsed === 'object' && parsed !== null ? Reflect.get(parsed, 'imports') : {};
-  for (const [name, target] of typeof given === 'object' && given !== null
-    ? Object.entries(given)
-    : []) {
-    if (typeof target === 'string') {
-      imports[name] = target;
-    }
-  }
-  return imports;
-}
-
-function findStaticImports(code: string): string[] {
-  const found: string[] = [];
-  const pattern = /(?:^|[;}\s])(?:import|export)\s*(?:[^'"()]*?\bfrom\s*)?(['"])([^'"]+)\1/g;
-  for (const match of code.matchAll(pattern)) {
-    found.push(match[2]);
-  }
-  return found;
 }
 
 test('the listener and the loader stay within their gzip budgets', async ({ page, baseURL }) => {
@@ -177,23 +190,9 @@ test('the listener and the loader stay within their gzip budgets', async ({ page
   expect(gzipSize(inline[0][1])).toBeLessThanOrEqual(listenerBudget);
 
   // The loader is the module script, counted with its static imports.
-  const map = /<script type="importmap"[^>]*>([\s\S]*?)<\/script>/.exec(html);
-  const imports = readImports(map?.[1] ?? '{}');
-  const entry = /<script type="module"[^>]*src="([^"]+)"/.exec(html)?.[1];
-  expect(entry).toBeDefined();
-  const seen = new Set<string>();
-  const queue = [resolveImport(entry ?? '', `${baseURL}/`, {})];
   let total = 0;
-  for (let url = queue.pop(); url !== undefined; url = queue.pop()) {
-    if (seen.has(url)) {
-      continue;
-    }
-    seen.add(url);
-    const code = await (await page.request.get(url)).text();
+  for (const code of (await readLoaderFiles(page, html, baseURL ?? '')).values()) {
     total += gzipSize(code);
-    for (const specifier of findStaticImports(code)) {
-      queue.push(resolveImport(specifier, url, imports));
-    }
   }
   expect(total).toBeGreaterThan(0);
   expect(total).toBeLessThanOrEqual(loaderBudget);

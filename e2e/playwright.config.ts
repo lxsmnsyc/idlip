@@ -2,14 +2,14 @@ import { defineConfig, devices } from '@playwright/test';
 
 const port = 4173;
 
-// `fixture` serves the golden todo fixture. `example` serves the built `examples/todo`.
-// Both answer `GET /?props=<json>` with the page rendered for those props.
+// `example` (default) serves the built `examples/todo`: run `pnpm build` first. `fixture` serves
+// the golden todo fixture. Both answer `GET /?props=<json>` with the page rendered for those props.
 const targets = {
   fixture: { command: 'node fixture/server.ts', cwd: '.' },
   example: { command: 'pnpm --filter todo preview --port 4173 --strictPort', cwd: '..' },
 };
 
-const name = process.env.E2E_TARGET ?? 'fixture';
+const name = process.env.E2E_TARGET ?? 'example';
 if (name !== 'fixture' && name !== 'example') {
   throw new Error(`E2E_TARGET must be "fixture" or "example", got "${name}"`);
 }

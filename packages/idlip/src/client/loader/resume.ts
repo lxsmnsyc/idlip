@@ -38,6 +38,13 @@ function logError(error: unknown): void {
   console.error(error);
 }
 
+// oxlint-disable-next-line typescript/promise-function-async
+function importChunk(url: string): Promise<unknown> {
+  // The import stays alone in its function, so the build keeps the comment. Without it Vite
+  // wraps the import in its preload helper, which puts the loader over its budget.
+  return import(/* @vite-ignore */ url);
+}
+
 function isStep(result: Model | Step): result is Step {
   return 'task' in result && 'model' in result;
 }
@@ -83,7 +90,7 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
     if (promise === undefined) {
       // A browser may keep a failed import, so a retry asks for the URL with a fragment.
       const retry = failures.get(url);
-      promise = import(/* @vite-ignore */ retry === undefined ? url : `${url}#${retry}`);
+      promise = importChunk(retry === undefined ? url : `${url}#${retry}`);
       loads.set(url, promise);
       // A failed load is forgotten, so the next event tries again.
       promise.catch(() => {
