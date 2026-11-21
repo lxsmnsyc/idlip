@@ -36,6 +36,9 @@ shared:
 reserves: []
 provides: []
 depends_on:
+  - on: runtime-flags
+    kind: hard
+    why: loader code goes behind a flag in src/client/features.ts, to keep the loader budget
   - on: compile-update
     kind: hard
     why: the write analysis reads the handler closure that handlers.ts builds and extends its exports

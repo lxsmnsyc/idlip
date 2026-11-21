@@ -40,6 +40,9 @@ shared:
 reserves: []
 provides: []
 depends_on:
+  - on: runtime-flags
+    kind: hard
+    why: loader code goes behind a flag in src/client/features.ts, to keep the loader budget
   - on: custom-effects
     kind: hard
     why: Dom.measure is a built-in site in the segment compiler
