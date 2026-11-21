@@ -1,7 +1,7 @@
 ---
 id: bench-brumate-latest
 title: Benchmark against the latest brumate
-status: active
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: [bench]
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 261000
 owns:
   - benchmarks/brumate/**
   - benchmarks/harness/**
