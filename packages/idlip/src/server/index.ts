@@ -5,3 +5,4 @@
 export { attr, on, text } from './helpers.ts';
 export { render } from './render.ts';
 export type { RenderOptions } from './render.ts';
+export { renderListener } from '../client/loader/listener.ts';
