@@ -2,7 +2,16 @@
 import { DEV, warnDeepQueue } from '../../core/dev.ts';
 import { getChunkId } from '../../core/format.ts';
 import { runAfter } from '../dom/run.ts';
-import { HAS_CHILDREN, HAS_HEAD, HAS_REFS, HAS_SUBS, HAS_TASKS } from '../features.ts';
+import { RESET, fireError, keepModel, resetRegion } from '../errors.ts';
+import {
+  HAS_CHILDREN,
+  HAS_ERRORS,
+  HAS_HEAD,
+  HAS_REFS,
+  HAS_RETRY,
+  HAS_SUBS,
+  HAS_TASKS,
+} from '../features.ts';
 import { startHead } from '../head.ts';
 import { connectHot } from '../hot.ts';
 import type { Hot } from '../hot.ts';
@@ -146,7 +155,11 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
     if (promise === undefined) {
       // A browser may keep a failed import, so a retry asks for the URL with a fragment.
       const retry = failures.get(url);
-      promise = importChunk(retry === undefined ? url : `${url}#${retry}`);
+      const target = retry === undefined ? url : `${url}#${retry}`;
+      // A chunk that fails is asked for once more at once, under another URL.
+      promise = HAS_RETRY
+        ? importChunk(target).catch(async () => importChunk(`${url}#r${retry ?? 0}`))
+        : importChunk(target);
       loads.set(url, promise);
       // A failed load is forgotten, so the next event tries again.
       promise.catch(() => {
@@ -294,7 +307,11 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
   }
 
   async function loadUpdate(item: Pending): Promise<void> {
-    item.update = await getUpdate(item.unit, item.event.message.t);
+    // A reset has no handler chunk: it keeps the model and renders a region in `runBatch`.
+    item.update =
+      HAS_ERRORS && item.event.message.t === RESET
+        ? keepModel
+        : await getUpdate(item.unit, item.event.message.t);
   }
 
   // Loads the chunks of the waiting events. An event that cannot run is dropped, and an event
@@ -313,6 +330,9 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
       const result = results[index];
       if (result.status === 'rejected') {
         report(result.reason);
+        if (HAS_ERRORS) {
+          fireError(result.reason, waiting[index].unit.page.path);
+        }
         // A subscription asks for its next value only after this one, so it must not wait.
         if (HAS_SUBS) {
           waiting[index].event.done?.();
@@ -403,9 +423,16 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
         continue;
       }
       try {
-        await apply(unit, update!, event.message);
+        if (HAS_ERRORS && event.message.t === RESET) {
+          await resetRegion(unit.page, unit.model, event.target, event.message.p[0]);
+        } else {
+          await apply(unit, update!, event.message);
+        }
       } catch (error) {
         report(error);
+        if (HAS_ERRORS) {
+          fireError(error, unit.page.path);
+        }
       }
     }
     for (const unit of touched) {
@@ -423,6 +450,9 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
       } catch (error) {
         patched = false;
         report(error);
+        if (HAS_ERRORS) {
+          fireError(error, unit.page.path);
+        }
       }
       if (HAS_REFS) {
         const calls = unit.after?.splice(0);

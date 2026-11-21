@@ -8,7 +8,8 @@ import type {
   PropBinding,
   Scope,
 } from '../../core/format.ts';
-import { HAS_CHILDREN } from '../features.ts';
+import { failRegion } from '../errors.ts';
+import { HAS_CHILDREN, HAS_ERRORS } from '../features.ts';
 import { isComment, isElement } from '../patch/guards.ts';
 import { addBlock, findInnerBlocks, parseHtml, readField, removeBlock } from '../patch/index.ts';
 
@@ -189,8 +190,21 @@ async function patchRow(
       continue;
     }
     if (name[0] !== 'l') {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-      (binding as NodeBinding)(node, next);
+      if (HAS_ERRORS) {
+        try {
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+          (binding as NodeBinding)(node, next);
+        } catch (error) {
+          if (!(await failRegion(context.page, node, error, next))) {
+            throw error;
+          }
+          // The swap replaced the nodes of the row, so they are looked up again.
+          nodes = undefined;
+        }
+      } else {
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+        (binding as NodeBinding)(node, next);
+      }
       continue;
     }
     // A nested list: patch its rows with the scopes of this row. All chosen bindings go through,

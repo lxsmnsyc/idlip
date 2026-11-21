@@ -29,6 +29,9 @@ const DETECTORS: Readonly<Record<string, Detector>> = {
   CHILDREN: hasChildren,
   SUBS: ({ manifest }) => manifest.sources !== undefined,
   HEAD: ({ manifest }) => manifest.head === true,
+  ERRORS: ({ manifest }) => manifest.fallback !== undefined,
+  // `deploy-skew` turns this on for apps without `<Try>` too.
+  RETRY: ({ manifest }) => manifest.fallback !== undefined,
 };
 
 /** Returns the flags that the compiled modules turn on. */

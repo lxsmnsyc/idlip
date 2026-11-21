@@ -233,6 +233,50 @@ export function setBranch$(
   addBlock$(start);
 }
 
+/** Reads the rows around a region from the DOM: `reset` has no binding scope. `paths` maps a list id to its `each` path. */
+function getRows$(
+  start: Node,
+  model: unknown,
+  paths: Record<string, string>,
+): { item: unknown; index: number }[] {
+  const levels: { id: string; index: number }[] = [];
+  let node: Node | null = start;
+  while (node !== null) {
+    let depth = 0;
+    let row = false;
+    let index = 0;
+    let list: Node | undefined;
+    for (
+      let item = node.previousSibling;
+      item !== null && list === undefined;
+      item = item.previousSibling
+    ) {
+      const data = item.nodeType === 8 ? (item.nodeValue ?? '') : '';
+      if (data === '/i') {
+        index += row && depth === 0 ? 1 : 0;
+        depth++;
+      } else if (data === 'i') {
+        row ||= depth === 0;
+        depth -= depth === 0 ? 0 : 1;
+      } else if (row && depth === 0 && /^l\d/.test(data)) {
+        levels.push({ id: data.slice(1), index });
+        list = item;
+      }
+    }
+    node = list ?? node.parentNode;
+  }
+  const rows: { item: unknown; index: number }[] = [];
+  for (const { id, index } of levels.toReversed()) {
+    let value: unknown = model;
+    let star = 0;
+    for (const key of paths[id].split('.')) {
+      value = Reflect.get(Object(value), key === '*' ? rows[star++].index : key);
+    }
+    rows.push({ item: Reflect.get(Object(value), index), index });
+  }
+  return rows;
+}
+
 type Source = (...args: never[]) => unknown;
 
 interface Helper {
@@ -251,6 +295,7 @@ const HELPERS: Record<string, Helper | undefined> = {
   joinClass$: { source: joinClass$, uses: [], client: [] },
   encode$: { source: encode$, uses: [], client: [] },
   findEnd$: { source: findEnd$, uses: [], client: [] },
+  getRows$: { source: getRows$, uses: [], client: [] },
   text$: { source: text$, uses: ['getText$', 'escapeText$'], client: [] },
   safeUrl$: { source: safeUrl$, uses: [], client: [] },
   attr$: { source: attr$, uses: ['getText$', 'escapeAttr$', 'joinClass$'], client: [] },

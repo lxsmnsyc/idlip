@@ -11,7 +11,8 @@ import type {
   PropBinding,
   Scope,
 } from '../../core/format.ts';
-import { HAS_CHILDREN } from '../features.ts';
+import { failRegion } from '../errors.ts';
+import { HAS_CHILDREN, HAS_ERRORS } from '../features.ts';
 import { diffPaths, getListKeys } from './diff.ts';
 import { isBinding, isComment, isRecord } from './guards.ts';
 import { findNode } from './nodes.ts';
@@ -157,8 +158,20 @@ export function createPatch(patchList: PatchList): Patch {
         continue;
       }
       if (name[0] !== 'l') {
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-        (binding as NodeBinding)(start, nextScope);
+        if (HAS_ERRORS) {
+          try {
+            // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+            (binding as NodeBinding)(start, nextScope);
+          } catch (error) {
+            // A throw inside a `<Try>` swaps its region. Anywhere else it goes on to the loader.
+            if (!(await failRegion(page, start, error, nextScope))) {
+              throw error;
+            }
+          }
+        } else {
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+          (binding as NodeBinding)(start, nextScope);
+        }
         continue;
       }
       const id = name.slice(1);

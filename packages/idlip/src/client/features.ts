@@ -14,6 +14,8 @@ declare const __IDLIP_HAS_REFS__: boolean | undefined;
 declare const __IDLIP_HAS_CHILDREN__: boolean | undefined;
 declare const __IDLIP_HAS_SUBS__: boolean | undefined;
 declare const __IDLIP_HAS_HEAD__: boolean | undefined;
+declare const __IDLIP_HAS_ERRORS__: boolean | undefined;
+declare const __IDLIP_HAS_RETRY__: boolean | undefined;
 
 /** Handlers that `await`, which the task runner serves. */
 export const HAS_TASKS: boolean = typeof __IDLIP_HAS_TASKS__ === 'undefined' || __IDLIP_HAS_TASKS__;
@@ -30,3 +32,8 @@ export const HAS_CHILDREN: boolean =
 export const HAS_SUBS: boolean = typeof __IDLIP_HAS_SUBS__ === 'undefined' || __IDLIP_HAS_SUBS__;
 /** `<Head>` blocks, which the loader adds to and removes from `<head>` with their markers. */
 export const HAS_HEAD: boolean = typeof __IDLIP_HAS_HEAD__ === 'undefined' || __IDLIP_HAS_HEAD__;
+/** `<Try>` regions, which the loader swaps to their catch view and resets. */
+export const HAS_ERRORS: boolean =
+  typeof __IDLIP_HAS_ERRORS__ === 'undefined' || __IDLIP_HAS_ERRORS__;
+/** A chunk that fails to load is imported once more at once, before the loader reports it. */
+export const HAS_RETRY: boolean = typeof __IDLIP_HAS_RETRY__ === 'undefined' || __IDLIP_HAS_RETRY__;

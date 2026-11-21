@@ -28,7 +28,7 @@ import { ModuleSource } from './module.ts';
 import { getTaskChunk, isBuiltinTask } from '../../update/tasks.ts';
 import { emitSourceChunk } from './subscribe.ts';
 import { getStatePaths, planBindings, planGroups } from './plan.ts';
-import type { Binding, Group, Plan } from './plan.ts';
+import type { Binding, Group, ListInfo, Plan } from './plan.ts';
 import { getAccessor, getKey, getLocalName, printHelperImport, quote, toLiteral } from './text.ts';
 
 export interface GenerateResult {
@@ -140,15 +140,7 @@ function buildManifest(
         bindings.push(binding.name);
       }
     }
-    // The path is known when `each` is a plain path that reads one state path.
-    const each = info.node.each;
-    let path: string | undefined;
-    if (each.expr.kind === 'path' && each.paths !== 'dynamic') {
-      const paths = getStatePaths(each.paths, () => {}, each.span, child);
-      if (paths.length === 1) {
-        path = paths[0];
-      }
-    }
+    const path = getListPath(info, child);
     lists[String(info.id)] = {
       key: info.node.key,
       ...(path === undefined ? {} : { path }),
@@ -174,6 +166,18 @@ function buildManifest(
     lists,
     ...(child ? { view: { chunk: 'view' } } : {}),
   };
+}
+
+/** The path of `each` when it is a plain path that reads one state path. */
+function getListPath(info: ListInfo, child: boolean): string | undefined {
+  const each = info.node.each;
+  if (each.expr.kind === 'path' && each.paths !== 'dynamic') {
+    const paths = getStatePaths(each.paths, () => {}, each.span, child);
+    if (paths.length === 1) {
+      return paths[0];
+    }
+  }
+  return undefined;
 }
 
 /** Generates the server module, the client chunks and the manifest of one `*.idlip.tsx` file. */
@@ -250,8 +254,15 @@ export function generate(
     mergeUsage(clientUsage, chunk.usage);
   }
 
+  const listPaths: Record<string, string> = {};
+  for (const info of plan.lists) {
+    const path = getListPath(info, child);
+    if (path !== undefined) {
+      listPaths[String(info.id)] = path;
+    }
+  }
   for (const info of plan.tries) {
-    const chunk = emitTryChunk(info, context);
+    const chunk = emitTryChunk(info, context, listPaths);
     client.push(chunk.module);
     mergeUsage(clientUsage, chunk.usage);
   }

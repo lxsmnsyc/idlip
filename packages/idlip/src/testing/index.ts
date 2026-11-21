@@ -36,6 +36,12 @@ export interface MountOptions {
   id?: string;
   /** Written on the state script. */
   nonce?: string;
+  /**
+   * Lets a `<Try>` catch errors. By default `settled` rethrows an error that a region caught
+   * (the `idlip:error` event of a binding that threw), so a test does not pass over a swapped
+   * region by mistake. Set it to `true` in a test that expects the catch view. Default `false`.
+   */
+  expectCaught?: boolean;
 }
 
 export interface MountedPage {
@@ -50,8 +56,9 @@ export interface MountedPage {
   /** Types a value into a field and fires `input`. */
   input: (selector: string, value: string) => void;
   /**
-   * Waits until chunk loads and patches have settled. With `check`, then compares the page
-   * with a server render of the current model and throws on a difference.
+   * Waits until chunk loads and patches have settled. Throws the first error the loader
+   * reported, or that a `<Try>` caught unless `expectCaught` is set. With `check`, then compares
+   * the page with a server render of the current model and throws on a difference.
    */
   settled: () => Promise<void>;
   /** The names of the chunks evaluated so far, in order: `handler=toggle`. */
@@ -123,7 +130,7 @@ export async function mount(
   props: Record<string, unknown>,
   options: MountOptions = {},
 ): Promise<MountedPage> {
-  const { check = true, id = '/src/app.idlip.tsx', nonce } = options;
+  const { check = true, id = '/src/app.idlip.tsx', nonce, expectCaught = false } = options;
   const key = `$idlipTesting${mounts++}`;
   const compiled = compile(source, id);
   const messages: string[] = [];
@@ -140,7 +147,7 @@ export async function mount(
   }
   live = true;
   try {
-    return await start(compiled, key, props, check, nonce);
+    return await start(compiled, key, props, check, nonce, expectCaught);
   } catch (error) {
     live = false;
     Reflect.deleteProperty(globalThis, key);
@@ -154,6 +161,7 @@ async function start(
   props: Record<string, unknown>,
   check: boolean,
   nonce: string | undefined,
+  expectCaught: boolean,
 ): Promise<MountedPage> {
   // Chunks and the server module read the runtime through one object, instead of a bare import.
   const names: string[] = [];
@@ -227,6 +235,17 @@ async function start(
   const loader = resume(boot, patch, (error) => {
     failures.push(error);
   });
+  // A region that caught a binding error fires the event and does not report it.
+  function recordCaught(event: Event): void {
+    const error: unknown =
+      event instanceof CustomEvent ? Reflect.get(Object(event.detail), 'error') : undefined;
+    if (!failures.includes(error)) {
+      failures.push(error);
+    }
+  }
+  if (!expectCaught) {
+    document.addEventListener('idlip:error', recordCaught);
+  }
   let stopped = false;
 
   function getElement(selector: string): HTMLElement {
@@ -281,6 +300,7 @@ async function start(
       if (!stopped) {
         stopped = true;
         loader.stop();
+        document.removeEventListener('idlip:error', recordCaught);
         listeners.stop();
         root.remove();
         for (const element of document.head.querySelectorAll('[i-head]')) {

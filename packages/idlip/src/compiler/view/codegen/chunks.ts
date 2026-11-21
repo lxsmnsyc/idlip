@@ -352,10 +352,17 @@ export function emitListChunk(info: ListInfo, context: ChunkContext): GroupChunk
 }
 
 /**
- * Emits the chunk of a `<Try>` region: `render(error, scope)` returns the catch view. `error`
- * is the message of what was thrown, a string. The rows around the region come from `rows`.
+ * Emits the chunk of a `<Try>` region. `render(error, scope)` returns the catch view, with
+ * `error` the message of what was thrown, a string. A catch view with `reset` also gets
+ * `region(scope, start)`: the whole region with its markers, built the way the server builds
+ * it, for the reset. A region inside a `<For>` reads its rows from the DOM around `start`, with
+ * `listPaths`, the `each` path of each list.
  */
-export function emitTryChunk(info: TryInfo, context: ChunkContext): GroupChunk {
+export function emitTryChunk(
+  info: TryInfo,
+  context: ChunkContext,
+  listPaths: Readonly<Record<string, string>>,
+): GroupChunk {
   const usage = createUsage();
   const emitter = new Emitter('client', usage, context.report);
   emitter.frames = info.frames;
@@ -363,8 +370,26 @@ export function emitTryChunk(info: TryInfo, context: ChunkContext): GroupChunk {
   const built = builder.buildCatch(info.node, info.id);
   const body = [...built.pre, `return ${toExpression({ pre: [], parts: built.parts })};`];
   const error = getLocalName(info.node.error);
-  const render = `export function render(${printParams(error, usage)}) {\n${body.join('\n')}\n}`;
-  const sections = [render];
+  const sections = [
+    `export function render(${printParams(error, usage)}) {\n${body.join('\n')}\n}`,
+  ];
+  if (info.node.reset !== undefined) {
+    const whole = builder.build([info.node]);
+    const lines = [...whole.pre, `return ${toExpression({ pre: [], parts: whole.parts })};`];
+    const inRow = info.frames.length > 0;
+    if (inRow) {
+      // The rows are read at the reset, not passed in.
+      usage.helpers.add('getRows');
+      usage.scope.delete('rows');
+      usage.scope.add('model');
+      lines.unshift('const rows = getRows$(start, model, lists$);');
+      sections.push(`const lists$ = ${JSON.stringify(listPaths)};`);
+    }
+    const params = printParams(undefined, usage);
+    sections.push(
+      `export function region(${params}${inRow ? `${params === '' ? '' : ', '}start` : ''}) {\n${lines.join('\n')}\n}`,
+    );
+  }
   if (info.node.namespace !== 'html') {
     sections.push(`export const namespace = ${quote(info.node.namespace)};`);
   }
