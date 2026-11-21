@@ -1,6 +1,6 @@
 ---
 name: compiled-format
-version: 12
+version: 13
 status: frozen
 defined_by: compiled-format
 ---
@@ -132,7 +132,7 @@ Authoring: an event arrow may have a block body that reads as plain TypeScript a
 
 ### Delegated listening
 
-- `<window>` and `<document>` render `<template i-global="window" on:keydown='…'></template>` at their position in the view. The listener adds those listeners on `window` or `document`, and finds the messages in the templates.
+- `<window>` and `<document>` render `<template i-global="window" on:keydown='…'></template>` at their position in the view. The listener adds those listeners on `window` or `document`, and finds the messages in the templates. The type is listed as `<type>:window` or `<type>:document` in `manifest.events` and in the record, even when the element sits in a condition, and the listener adds the window or document listener at record time, so a global element that a patch inserts later is heard. A global event is never passive: its token has no `:passive` suffix.
 - Other events use one listener per event type on `document`, in the bubble phase. It walks from the target outwards and takes the first element with `on:<type>`, unless `stop` ends the walk earlier.
 - The listener adds a capture-phase and a bubble-phase document listener per event type and handles each event in one of them by `event.bubbles`. An event that does not bubble (`focus`, `mouseenter`, media events, a `CustomEvent` without `bubbles`) is matched only on `event.target`, with no outward walk. A walk would fire an ancestor's `on:focus` when a child takes focus. Choosing by `event.bubbles` instead of a fixed list covers every type, custom events included (from the `resume-loader` review).
 - A type whose handlers are all `passive` is listed as `<type>:passive` in the state record, and its document listener is passive.
@@ -460,6 +460,8 @@ The golden fixtures are the stub for both sides: `counter`, `todo`, `effects`, `
 ## Changes
 
 - v11 (2026-11-21, curator pass after wave 8; contracts `compiled-format-*.change-request.md` of `write-sets`, `nesting-format`, `dom-refs`, `commands-subs`, `errors`, `errors-client`, `document-head`, `svg-and-html`, `deploy-skew`, `dynamic-paths`, `form-fields`, `hmr`, `prefetch`, merged from the code on `batch/core`): write sets and `bindings` on handler entries; nested components (boundaries, slots, `p` bindings, `view` chunk, `uses`, owners); `i-ref` and `Step.after`; `<Subscribe>` markers and `sources`; `<Try>` regions, `try=<id>` chunks, `reset`, `idlip:error` and the retry; `<Head>` markers and `renderPage`; raw HTML as an `a` binding; build id, `build.js` and retention; dynamic holes and the `$dynamic` group; form fields as event paths (`$form` removed); `idlip:hot`; `manifest.listens`; the feature flags. Where the requests and the code differ the code wins: `$step` is optional and tested with `in`, `Step.send` and `let-reserved` are not built, `ComponentState` lives in `server/render.ts`.
+- v12 (2026-11-21, `perf-ssr-state`, `compiled-format.v12.change-request.md`): `PageState.modules` holds `ChildManifest` (no `events`, `listens`, `view`, handler `writes`); child `view` chunks leave `chunks`; key order `manifest, chunks, model, props, slots, dynamic, modules`; the server caches the parts of the state that do not change between requests.
+- v13 (2026-11-21, `fix-global-late-listener`, `compiled-format.v13.change-request.md`): global events are listed as `<type>:window` and `<type>:document` in `manifest.events` and the record; the listener adds them at record time.
 - v10 (2026-11-21, `contracts/compiled-format-tasks.change-request.md`, from `custom-effects` and `run-tasks`): `task` chunk kind and `manifest.tasks` (built-in sites point to the handler chunk), continuation tags and payloads, `runTask(host, task)` replaces `RunTask` (removed from `format.ts` and from this contract), task chunk file ids.
 - v10 (2026-11-21, `contracts/compiled-format-keyed.change-request.md`, from `keyed-paths`): `getChunkFile` maps `[`, `]` and `=` in a path to `(`, `)` and `~`; `diffPaths` compares a keyed segment by key.
 - v10 (2026-11-21, from `runtime-flags`): `HAS_*` runtime feature flags; the loader budget of 4096 B gzip is the loader with no optional features.

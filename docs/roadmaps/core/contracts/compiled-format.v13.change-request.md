@@ -1,7 +1,7 @@
 # Change request: compiled-format v12 to v13
 
 - From node: fix-global-late-listener
-- Status: proposed
+- Status: applied
 
 ## Problem
 
@@ -11,9 +11,16 @@ The early listener added a window or document listener for an event type only wh
 
 - `manifest.events` lists an event of a `<window>` or `<document>` as `<type>:window` or `<type>:document`, in place of the bare type. Other elements keep the bare type. A module that uses `keydown` on `<window>` and on a button lists both `keydown` and `keydown:window`.
 - The record's event string carries the same tokens. The early listener adds a window or document listener for a `:window` or `:document` token, and no document delegation for it. It adds the listener at record time, so a global element that a patch inserts later is heard.
-- Contract text, Delegated listening (line ~135): after the `<template i-global=...>` sentence add "The type is listed as `<type>:window` or `<type>:document` in `manifest.events` and in the record, even when the element sits in a condition."
+- Contract text, Delegated listening (line ~135): after the `<template i-global=...>` sentence add "The type is listed as `<type>:window` or `<type>:document` in `manifest.events` and in the record, even when the element sits in a condition." Add: "A global event is never passive: its token has no `:passive` suffix."
+- Version history: add a v13 line.
 
 ## Affected nodes
 
 - `listens` stays keyed by the bare type, so `renderPreload` is unaffected.
+- `nesting`: `buildPart` in `server/render.ts` unions `manifest.events` from the full child manifests before `ChildManifest` drops `events`, so a child's global token reaches the record.
+- No code outside the compiler's codegen plan and the early listener parses these tokens.
 - Fixtures with a `<window>` or `<document>` list the new tokens in their manifest.
+
+## Decision
+
+Accepted by the orchestrator on 2026-11-21 after the fresh review, with the passive line, the version entry and the `nesting` note added. Applied as `compiled-format` v13.

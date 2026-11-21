@@ -1,7 +1,7 @@
 ---
 id: fix-global-late-listener
 title: Listen for window and document events added by a patch
-status: active
+status: done
 priority: should
 type: fix
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 230000
 owns:
   - packages/idlip/src/client/loader/listener.ts
   - packages/idlip/test/client/global/**
