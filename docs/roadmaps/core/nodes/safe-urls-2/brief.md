@@ -1,7 +1,7 @@
 ---
 id: safe-urls-2
 title: Close the remaining URL attribute gaps
-status: active
+status: done
 priority: should
 type: fix
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 83522
 owns:
   - packages/idlip/test/security/**
   - packages/idlip/src/core/url.ts
@@ -43,9 +43,11 @@ depends_on:
 
 ## Acceptance
 
-- [ ] Each gap has a test that fails on the base and passes on the branch.
-- [ ] `test/security/urls.idlip.tsx` type checks without `@ts-nocheck`.
+- [x] Each gap has a test that fails on the base and passes on the branch.
+- [x] `test/security/urls.idlip.tsx` type checks without `@ts-nocheck`.
 
 ## Sizing
 
 S: extends one check.
+
+Landed as d948793 on `batch/core` after self-review. Each gap failed on the base and passes on the branch: SVG animation targets, `data:` in iframe/object/embed (raster `data:image/*` kept, `svg+xml` dropped), bound `srcdoc` needs `trusted(...)`. Loader +0 B.
