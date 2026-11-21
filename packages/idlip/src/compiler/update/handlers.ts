@@ -121,7 +121,8 @@ function listDeclaredNames(declaration: AstNode): string[] {
   return [];
 }
 
-function pickComponent(ir: ModuleIR): Component | undefined {
+/** The root component: the first exported stateful one, else the first stateful one. */
+export function pickComponent(ir: ModuleIR): Component | undefined {
   for (const component of ir.components) {
     if (component.exported && component.mode === 'stateful') {
       return component;

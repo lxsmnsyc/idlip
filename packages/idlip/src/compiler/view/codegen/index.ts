@@ -9,6 +9,7 @@ import type {
   Manifest,
   Module,
 } from '../../../core/format.ts';
+import { pickComponent } from '../../update/index.ts';
 import type { Component, ModuleIR, Span } from '../analyze/index.ts';
 import { emitBindings, emitGroupChunk, emitListChunk } from './chunks.ts';
 import type { ChunkContext } from './chunks.ts';
@@ -30,21 +31,6 @@ export interface GenerateResult {
 
 function createEmptyManifest(id: string): Manifest {
   return { module: id, events: [], handlers: {}, groups: {}, lists: {} };
-}
-
-/** The root component: the first exported stateful one, as `compile-update` picks it. */
-function pickComponent(ir: ModuleIR): Component | undefined {
-  for (const component of ir.components) {
-    if (component.exported && component.mode === 'stateful') {
-      return component;
-    }
-  }
-  for (const component of ir.components) {
-    if (component.mode === 'stateful') {
-      return component;
-    }
-  }
-  return ir.components.at(0);
 }
 
 function buildManifest(id: string, component: Component, plan: Plan, groups: Group[]): Manifest {
@@ -118,7 +104,7 @@ export function generate(ir: ModuleIR, source: string, id: string): GenerateResu
       return empty();
     }
   }
-  const component = pickComponent(ir);
+  const component = pickComponent(ir) ?? ir.components.at(0);
   if (component === undefined) {
     report('codegen-component', 'The file has no component', { start: 0, end: 0 });
     return empty();

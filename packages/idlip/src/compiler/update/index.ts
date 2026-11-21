@@ -1,2 +1,2 @@
-export { compileHandlers, listHandlerProps } from './handlers.ts';
+export { compileHandlers, listHandlerProps, pickComponent } from './handlers.ts';
 export type { CompileHandlersResult } from './handlers.ts';
