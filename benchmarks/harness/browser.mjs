@@ -1,5 +1,6 @@
 import { gzipSync } from 'node:zlib';
 import { COUNT_ARG } from './count.mjs';
+import { CLICKS, expected, widgets } from './dashboard.mjs';
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -265,4 +266,109 @@ export function measureWaterfall(browser, base, options) {
     url: `${base}/?n=3`,
     step: { arg: null, ...INTERACTIONS.counter },
   });
+}
+
+// --- Dashboard -------------------------------------------------------------------
+
+// A click on the "run" or "mode" button of a widget, done when the widget shows what the
+// same handler computes in Node.
+function click(key, button) {
+  const widget = widgets()[CLICKS[key]];
+  const want = expected(widget, button);
+  return {
+    name: key,
+    run: (page) => page.locator(`#${widget.id} .${button === 'run' ? 'run' : 'mode'}`).click(),
+    arg: { id: widget.id, ...want },
+    // The output, the mode, the summary and every list item must match the Node result.
+    done: ({ id, output, mode, summary, items }) => {
+      const root = document.getElementById(id);
+      const shown = [];
+      for (const li of root.querySelectorAll('ul li')) {
+        shown.push(li.textContent.trim());
+      }
+      return (
+        root.querySelector('.out').textContent === output &&
+        root.querySelector('.mode').textContent.trim() === mode &&
+        root.querySelector('.summary').textContent.trim() === summary &&
+        shown.join(',') === items.join(',')
+      );
+    },
+  };
+}
+
+// Scrolls a widget into view. The session then waits 1 s, as it does after every step, so code
+// that loads when an element comes near the viewport has time to arrive before the click.
+function scroll(key) {
+  const { id } = widgets()[CLICKS[key]];
+  return {
+    name: `scroll-${key}`,
+    run: (page) => page.locator(`#${id}`).scrollIntoViewIfNeeded(),
+    arg: null,
+    done: () => true,
+  };
+}
+
+function MAIN() {
+  return [
+    click('above', 'run'),
+    scroll('below'),
+    click('below', 'run'),
+    scroll('third'),
+    click('third', 'cycle'),
+  ];
+}
+
+function summary(s) {
+  return (
+    s && {
+      boot: s.phases.boot,
+      idle: s.phases.idle,
+      above: s.phases.above,
+      scrollBelow: s.phases['scroll-below'],
+      below: s.phases.below,
+      scrollThird: s.phases['scroll-third'],
+      third: s.phases.third,
+      total: s.all,
+      checks: s.checks,
+    }
+  );
+}
+
+function sessionErrors(sessions) {
+  const errors = [];
+  for (const s of sessions) {
+    errors.push(...s.errors);
+  }
+  return errors;
+}
+
+export async function measureDashboard(browser, base, { idleMs, preloadOption }) {
+  const options = { idleMs };
+  const main = await run(browser, base, `${base}/`, MAIN(), options);
+  const below = await run(browser, base, `${base}/`, [scroll('below'), click('below', 'run')], {
+    idleMs,
+  });
+  const off = preloadOption
+    ? await run(browser, base, `${base}/?preload=off`, MAIN(), options)
+    : undefined;
+  const sessions = [main, below];
+  if (off) {
+    sessions.push(off);
+  }
+  return {
+    ...summary(main),
+    belowFirst: {
+      scroll: below.phases['scroll-below'],
+      click: below.phases.below,
+      checks: below.checks,
+    },
+    preloadOff: summary(off),
+    failed: failures(sessions),
+    errors: [...new Set(sessionErrors(sessions))],
+    sessions: { main, belowFirst: below, preloadOff: off },
+  };
+}
+
+export function measureDashboardWaterfall(browser, base, options) {
+  return waterfall(browser, base, { ...options, url: `${base}/`, step: click('above', 'run') });
 }

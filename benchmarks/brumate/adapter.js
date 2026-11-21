@@ -30,3 +30,23 @@ export async function load() {
     render: (n) => server.page(n, scripts, bundles),
   };
 }
+
+export async function loadDashboard() {
+  const server = await import(`${dir}dashboard/dist/server/server.js`);
+  const { scripts, bundles } = await entry(`${dir}dashboard`);
+  return {
+    staticDir: `${dir}dashboard/dist/client`,
+    // The code of the page loads when it starts. There is no preload to turn off.
+    preloadOption: false,
+    render: () => server.page(scripts, bundles),
+  };
+}
+
+export async function loadRows() {
+  const server = await import(`${dir}rows/dist/server/server.js`);
+  const { scripts, bundles } = await entry(`${dir}rows`);
+  return {
+    staticDir: `${dir}rows/dist/client`,
+    render: (n) => server.page(n, scripts, bundles),
+  };
+}

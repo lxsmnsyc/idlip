@@ -7,14 +7,22 @@ import os from 'node:os';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { gzipSync } from 'node:zlib';
-import { measureBrowser, measureWaterfall } from './browser.mjs';
+import { measureRows } from './client.mjs';
+import {
+  measureBrowser,
+  measureDashboard,
+  measureDashboardWaterfall,
+  measureWaterfall,
+} from './browser.mjs';
 import { MISSING_CHROME, findChrome } from './chrome.mjs';
+import { CLICKS, COUNT } from './dashboard.mjs';
 import {
   SCENARIOS,
   appDir,
   benchDir,
   discover,
   loadAdapter,
+  hasScenario,
   loadApp,
   repoDir,
   versions,
@@ -34,6 +42,8 @@ const HELP = `Usage: pnpm -C benchmarks/harness bench [options]
   --duration <ms>     Length of one SSR throughput round (default: 1000).
   --idle <ms>         Idle wait after load in the browser (default: 3000).
   --latency <ms>      Round trip latency of the throttled waterfall (default: 150).
+  --runs <n>          Runs of each operation of the rows scenario (default: 10).
+  --cpu <rate>        CPU slowdown of the rows scenario's measured clicks (default: 1).
   --install-browser   Download Playwright's Chromium when no Chrome is found.
   --help              Show this message.
 
@@ -56,6 +66,8 @@ const { values: flags } = parseArgs({
     duration: { type: 'string', default: '1000' },
     idle: { type: 'string', default: '3000' },
     latency: { type: 'string', default: '150' },
+    runs: { type: 'string', default: '10' },
+    cpu: { type: 'string', default: '1' },
     'install-browser': { type: 'boolean', default: false },
     help: { type: 'boolean', default: false },
   },
@@ -105,6 +117,8 @@ const options = {
   duration: Number(flags.duration),
   idleMs: Number(flags.idle),
   latency: Number(flags.latency),
+  runs: Number(flags.runs),
+  cpu: Number(flags.cpu),
 };
 
 const children = new Set();
@@ -176,9 +190,22 @@ async function build() {
     pnpm(['--filter', 'idlip', 'build'], repoDir);
   }
   for (const name of frameworks) {
-    log(`building ${name}`);
-    await rm(path.join(appDir(name), 'dist'), { recursive: true, force: true });
-    pnpm(['run', 'build'], appDir(name));
+    const builds = scenarioNames[name];
+    if (builds.includes('todos')) {
+      log(`building ${name}`);
+      await rm(path.join(appDir(name), 'dist'), { recursive: true, force: true });
+      pnpm(['run', 'build'], appDir(name));
+    }
+    if (builds.includes('dashboard')) {
+      log(`building ${name} dashboard`);
+      await rm(path.join(appDir(name), 'dashboard/dist'), { recursive: true, force: true });
+      pnpm(['run', 'build:dashboard'], appDir(name));
+    }
+    if (builds.includes('rows')) {
+      log(`building ${name} rows`);
+      await rm(path.join(appDir(name), 'rows/dist'), { recursive: true, force: true });
+      pnpm(['run', 'build:rows'], appDir(name));
+    }
   }
 }
 
@@ -198,7 +225,7 @@ function walk(dir) {
 }
 
 async function distSize(name, scenario) {
-  const { staticDir } = await loadApp(name);
+  const { staticDir } = await loadApp(name, scenario);
   const files = [];
   for (const file of walk(staticDir)) {
     if (/\.m?js$/.test(file)) {
@@ -282,11 +309,29 @@ const result = {
     scenarios,
     frameworks,
     metrics: [...metrics],
+    dashboardWidgets: COUNT,
+    dashboardClicks: CLICKS,
   },
   versions: {},
   frameworks: {},
   notes: [],
 };
+// The scenarios of each framework, and the frameworks of each scenario.
+const scenarioNames = {};
+const scenarioFrameworks = {};
+for (const scenario of scenarios) {
+  scenarioFrameworks[scenario] = [];
+}
+for (const name of frameworks) {
+  scenarioNames[name] = [];
+  for (const scenario of scenarios) {
+    if (await hasScenario(name, scenario)) {
+      scenarioNames[name].push(scenario);
+      scenarioFrameworks[scenario].push(name);
+    }
+  }
+}
+result.options.scenarioFrameworks = scenarioFrameworks;
 for (const name of frameworks) {
   result.versions[name] = await versions(name);
   result.frameworks[name] = { label: (await loadAdapter(name)).label ?? name };
@@ -313,20 +358,21 @@ function prefix(scenario) {
 
 for (const scenario of scenarios) {
   if (metrics.has('dist')) {
-    for (const name of frameworks) {
+    for (const name of scenarioFrameworks[scenario]) {
       slot(name, scenario).dist = await distSize(name, scenario);
     }
   }
 }
 
-// The SSR sizes and speeds, in todos.
-const SSR_SIZES = { todos: [0, 3, 100] };
-const SSR_SPEEDS = { todos: [3, 100] };
+// The SSR sizes: 0, 3 and 100 todos, or the one dashboard page.
+const SSR_SIZES = { todos: [0, 3, 100], dashboard: [0], rows: [1000] };
+const SSR_SPEEDS = { todos: [3, 100], dashboard: [0], rows: [1000] };
 
 for (const scenario of scenarios) {
   if (!metrics.has('ssr-size') && !metrics.has('ssr-speed')) {
     break;
   }
+  const frameworks = scenarioFrameworks[scenario];
   const workers = {};
   for (const name of frameworks) {
     workers[name] = startWorker(name, scenario);
@@ -421,15 +467,25 @@ if (metrics.has('browser') || metrics.has('waterfall')) {
     };
     try {
       for (const scenario of scenarios) {
-        for (const name of frameworks) {
+        for (const name of scenarioFrameworks[scenario]) {
+          if (scenario === 'rows' && !metrics.has('browser')) {
+            continue;
+          }
           const { child, base } = await startServer(name, scenario);
           try {
             if (metrics.has('browser')) {
               log(`${prefix(scenario)}browser: ${name}`);
-              const measured = await measureBrowser(browser, base, {
-                idleMs: options.idleMs,
-                n: 3,
-              });
+              let measured;
+              if (scenario === 'todos') {
+                measured = await measureBrowser(browser, base, { idleMs: options.idleMs, n: 3 });
+              } else if (scenario === 'rows') {
+                measured = await measureRows(browser, base, options);
+              } else {
+                measured = await measureDashboard(browser, base, {
+                  idleMs: options.idleMs,
+                  preloadOption: (await loadApp(name, scenario)).preloadOption,
+                });
+              }
               const tag = `${name}${scenario === 'todos' ? '' : ` ${scenario}`}`;
               if (measured.failed.length)
                 result.notes.push(`${tag}: interactions failed: ${measured.failed.join(', ')}`);
@@ -437,9 +493,12 @@ if (metrics.has('browser') || metrics.has('waterfall')) {
                 result.notes.push(`${tag}: page errors: ${measured.errors.join(' | ')}`);
               slot(name, scenario).browser = measured;
             }
-            if (metrics.has('waterfall')) {
+            if (metrics.has('waterfall') && scenario !== 'rows') {
               log(`${prefix(scenario)}waterfall: ${name}`);
-              slot(name, scenario).waterfall = await measureWaterfall(browser, base, options);
+              slot(name, scenario).waterfall =
+                scenario === 'todos'
+                  ? await measureWaterfall(browser, base, options)
+                  : await measureDashboardWaterfall(browser, base, options);
             }
           } finally {
             child.kill();
