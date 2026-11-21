@@ -1,7 +1,7 @@
 ---
 id: ssr-render
 title: Server renderer and state serialization
-status: todo
+status: active
 priority: must
 type: feature
 story:
