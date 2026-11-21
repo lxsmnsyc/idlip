@@ -1,7 +1,7 @@
 ---
 id: safe-urls
 title: Block javascript URLs in URL attributes
-status: todo
+status: active
 priority: should
 type: fix
 story:
