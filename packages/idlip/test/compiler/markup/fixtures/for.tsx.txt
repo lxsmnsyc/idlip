@@ -1,0 +1,51 @@
+import type { JSX } from 'idlip/jsx-runtime';
+
+interface Tag {
+  id: string;
+  label: string;
+}
+interface Row {
+  id: string;
+  name: string;
+  tags: Tag[];
+}
+
+export default function Table(props: { rows: Row[] }): JSX.Element {
+  let rows = props.rows;
+  let selected = '';
+
+  function pick(id: string) {
+    selected = id;
+  }
+  function remove(id: string) {
+    rows = rows.filter((row) => row.id !== id);
+  }
+
+  return (
+    <table>
+      <tbody>
+        <For each={rows} key="id">
+          {(row, i) => (
+            <tr class={{ on: selected === row.id }} on:click={() => pick(row.id)}>
+              <td>{i + 1}</td>
+              <td>{row.name}</td>
+              <td>
+                <button on:click={() => remove(row.id)}>Remove</button>
+              </td>
+              <td>
+                <For each={row.tags} key="id">
+                  {(tag) => (
+                    <>
+                      <span>{tag.label}</span>
+                    </>
+                  )}
+                </For>
+              </td>
+            </tr>
+          )}
+        </For>
+      </tbody>
+    </table>
+  );
+}
+import { For } from 'idlip';
