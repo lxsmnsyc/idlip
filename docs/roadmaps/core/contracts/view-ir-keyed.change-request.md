@@ -1,7 +1,7 @@
 # Change request: view-ir v9 to v10
 
 - From node: keyed-paths
-- Status: open
+- Status: applied on 2026-11-21 by the curator, from the landed code
 
 ## Problem
 

@@ -1,6 +1,6 @@
 ---
 name: compiled-format
-version: 9
+version: 10
 status: frozen
 defined_by: compiled-format
 ---
@@ -15,20 +15,20 @@ The seam between the compiler (`compile-update`, `compile-view-codegen`, `compil
 
 `src/core/format.ts` exports:
 
-| Type or function                                                                            | What it is                                                |
-| ------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| `Message`                                                                                   | `{ t, p }`: a tag and the payload array.                  |
-| `DomMessage`, `Placeholder`                                                                 | The JSON in an `on:<event>` attribute.                    |
-| `Model`, `Props`                                                                            | State fields by name, props by name.                      |
-| `Manifest`, `HandlerEntry`, `BindingGroup`, `ListEntry`                                     | The manifest of one module.                               |
-| `PageState`, `ChunkUrls`, `StateRecord`, `QueuedEvent`, `Boot`                              | The state script, the listener's queue and `self.$idlip`. |
-| `RenderContext`, `ServerRender`, `ServerModule`                                             | The compiled server module.                               |
-| `Scope`, `Row`, `NodeBinding`, `ListBinding`, `Binding`                                     | What client chunks read and export.                       |
-| `Update`, `Step`, `Task`, `Outcome`                                                         | Handler exports and the async seam.                       |
-| `HandlerChunk`, `BindingChunk`, `ListChunk`                                                 | The three client chunk shapes.                            |
-| `LoadChunk`, `Page`, `Patch`, `DiffPaths`, `ListContext`, `PatchList`, `OnBlock`, `RunTask` | Runtime seams.                                            |
-| `Module`, `CompileDiagnostic`, `CompileResult`, `Compile`                                   | The compiler API.                                         |
-| `getChunkFile(chunk)`, `getChunkId(module, chunk)`                                          | File name and Vite module id of a chunk.                  |
+| Type or function                                                                 | What it is                                                |
+| -------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `Message`                                                                        | `{ t, p }`: a tag and the payload array.                  |
+| `DomMessage`, `Placeholder`                                                      | The JSON in an `on:<event>` attribute.                    |
+| `Model`, `Props`                                                                 | State fields by name, props by name.                      |
+| `Manifest`, `HandlerEntry`, `BindingGroup`, `ListEntry`                          | The manifest of one module.                               |
+| `PageState`, `ChunkUrls`, `StateRecord`, `QueuedEvent`, `Boot`                   | The state script, the listener's queue and `self.$idlip`. |
+| `RenderContext`, `ServerRender`, `ServerModule`                                  | The compiled server module.                               |
+| `Scope`, `Row`, `NodeBinding`, `ListBinding`, `Binding`                          | What client chunks read and export.                       |
+| `Update`, `Step`, `Task`, `Outcome`                                              | Handler exports and the async seam.                       |
+| `HandlerChunk`, `BindingChunk`, `ListChunk`                                      | The three client chunk shapes.                            |
+| `LoadChunk`, `Page`, `Patch`, `DiffPaths`, `ListContext`, `PatchList`, `OnBlock` | Runtime seams.                                            |
+| `Module`, `CompileDiagnostic`, `CompileResult`, `Compile`                        | The compiler API.                                         |
+| `getChunkFile(chunk)`, `getChunkId(module, chunk)`                               | File name and Vite module id of a chunk.                  |
 
 The runtime seams:
 
@@ -48,7 +48,6 @@ type PatchList = (
   context: ListContext,
 ) => Promise<void>; // patch-lists
 type OnBlock = (add: (start: Comment) => void, remove: (start: Comment) => void) => void; // patch-bindings
-type RunTask = (task: Task, dispatch: (message: Message) => void) => Promise<void>; // custom-effects
 type Compile = (source: string, id: string) => CompileResult; // idlip/compiler
 ```
 
@@ -159,7 +158,7 @@ The server writes one state script per rendered root, after its markup, on one l
 - `self.$idlip` is a `Boot`: an array of state records with a queue `q`. The listener replaces `push`, so it adds the listeners of each record's event types as soon as the record is pushed, and adds those of records pushed before it ran.
 - On an event, the listener finds the element, applies the key filter and the modifiers synchronously, resolves placeholders, and pushes a `QueuedEvent` to `q`.
 - The loader takes over `q`: it handles the queued events in order and replaces `q.push`, so later events go straight to it. Taking over an array by draining it and replacing its `push` is the one hand-off rule for both arrays.
-- Budgets, checked by `e2e-harness` on the production build with `gzip -9`: the listener script at most 1024 B gzip, the loader module with its static imports at most 4096 B gzip, measured fully minified (rolldown `minify: true`). Chunks are not counted. The loader's static graph includes `idlip/client` with `patch`, `patchList`, `diffPaths`, `parseHtml` and the block hooks. The DOM and render helpers (`setAttr`, `setText`, `setOn`, `setBranch`, `attr`, `on`, `text`) are not in the loader: the compiler copies the ones a chunk uses into that chunk, from one source, the way it copies module helpers. A chunk may import from `idlip/client` only what the loader already holds, so the first click costs no third request. Why: with the helpers in the loader, the measured loader was 4877 B gzip, 781 B over budget.
+- Budgets, checked by `e2e-harness` on the production build with `gzip -9`: the listener script at most 1024 B gzip, the loader module with its static imports at most 4096 B gzip for the loader with no optional features (see Runtime feature flags), measured fully minified (rolldown `minify: true`). Chunks are not counted. The loader's static graph includes `idlip/client` with `patch`, `patchList`, `diffPaths`, `parseHtml` and the block hooks. The DOM and render helpers (`setAttr`, `setText`, `setOn`, `setBranch`, `attr`, `on`, `text`) are not in the loader: the compiler copies the ones a chunk uses into that chunk, from one source, the way it copies module helpers. A chunk may import from `idlip/client` only what the loader already holds, so the first click costs no third request. Why: with the helpers in the loader, the measured loader was 4877 B gzip, 781 B over budget.
 
 ### Manifest
 
@@ -191,9 +190,14 @@ The server writes one state script per rendered root, after its markup, on one l
 - `handlers`: every message tag to its chunk. Continuation tags (`add$1`) have their own entries with their handler's chunk, so the loader never parses a tag. Reserved for `write-sets`: `writes` and `bindings` on an entry. Reserved for `update-ops`: an entry with `ops` instead of `chunk`.
 - `groups`: one per distinct path set among the bindings. The key is the paths joined by `,`. `bindings` lists the export names of the group's own bindings.
 - `lists`: each `<For>` by binding id, written as a string key. An entry has the `key` prop, `path` (the path of `each` when it is a path, such as `todos` or `columns.*.cards`; absent for a helper call), the item template chunk, and the bindings directly inside a row. A nested list also has `parent`, the id of the enclosing list as a string.
-- Chunk names: `handler=<tag>`, `binding=<group key>`, `list=<id>`. The file name is `getChunkFile(chunk)`: `=` becomes `.`, `*` becomes `_` and `,` becomes `+`, so `binding=todos.*.done` is `binding.todos._.done.js`. The fixtures and the `name` of an emitted chunk use it.
-- Path sets use `*` for list items. Reserved for `keyed-paths`: `name[key=source]`, where `source` is `$p`, `$p.<field>` or a model path, such as `todos[id=$p].done`. Parsers reject it until that node lands.
-- Reserved fields: `tasks` (awaited call site id to chunk, `custom-effects`) and `fallback` on a `<Try>` region (`errors`).
+- Chunk names: `handler=<tag>`, `binding=<group key>`, `list=<id>`, `task=<site>`. The file name is `getChunkFile(chunk)`: the first `=` becomes `.`. In the rest, `*` becomes `_`, `,` becomes `+`, `[` becomes `(`, `]` becomes `)` and `=` becomes `~`, so `binding=todos.*.done` is `binding.todos._.done.js` and `binding=todos[id=selected].text` is `binding.todos(id~selected).text.js`. The fixtures and the `name` of an emitted chunk use it. Chunk ids (`getChunkId`) keep the raw chunk name.
+- Path sets use `*` for list items. A keyed segment is `name[field=source]`: `name` is read from the value reached so far, and `source` is a model path read from the root of each model, such as `todos[id=selected].text`. `diffPaths` finds the item whose `field` equals the source value in `prev` and in `next`, and compares the rest of the path on the two items. An item found on one side only is a change, an item missing on both sides is not, and a reorder is not a change. Paths split at dots outside brackets, so a source may contain dots. `$p` sources are reserved for `keyed-writes`.
+- `tasks`: the continuation tag (`persist$1`) of each awaited call to its chunk. It is absent when no handler awaits. For an import or a module function the value is `task=<site>`. For a built-in site (`Random.id`, `Random.number`, `Time.now`, `Time.sleep`, imported from `idlip`) the value is the handler chunk, `handler=<name>`, which exports `task$<site>(...args)` (`task$add$1`), so built-ins load nothing extra. The loader treats the `handler=` prefix as built-in.
+- Reserved fields: `fallback` on a `<Try>` region (`errors`).
+
+### Runtime feature flags
+
+Loader code that only some apps use sits behind a `HAS_*` constant from `src/client/features.ts` (`HAS_TASKS`, `HAS_KEYED`). Each is `typeof __IDLIP_HAS_X__ === 'undefined' || __IDLIP_HAS_X__`, so every flag is on without the Vite plugin (tests, `idlip/testing`, dev). In a client build the plugin compiles every module in `buildStart`, unions the features its detectors report (`src/vite/features.ts`: `TASKS` when a manifest has `tasks`, `KEYED` when a group path has a `[` segment) and replaces the globals with literals, so the bundler folds the dead branch. A component outside the plugin's `modules` globs that needs a flag that is off fails the build and the error names the file and the flag. The 4096 B budget is the loader with no optional features. Each feature's cost is reported by `e2e-harness` or a test, not capped: tasks +274 B, keyed paths +124 B (measured on the `effects` and `keyed` fixtures). `HAS_KEYED` gates only the keyed segment; the pairing of `*` items by key under a keyed `<For>` stays on. A new flag takes one `declare const` and export in `features.ts`, one line in `DETECTORS`, and an `if (HAS_NAME)` around the loader code.
 
 ### Chunk URLs
 
@@ -272,7 +276,9 @@ export function toggle(model, [id]) {
 - An `Update` takes the model and the payload, and returns the next model or a `Step`. It reads the state it uses into locals, runs the body, and returns a new model with the written fields. Every `return` in the body returns that new model.
 - Props values come before the arguments in the payload, named `props$<segments joined by $>` (`reset(model, [props$start])`). Props first keeps a rest parameter last: a handler that calls itself is `export function down(model, [props$k, ...$args])`.
 - A handler called by another handler runs inline in the same chunk. Module-level helpers it reaches are copied in. Imports stay imports.
-- Async handlers, implemented by `custom-effects`: a segment that ends at an `await` returns `{ model, task }`. `task.site` names the awaited call, `task.then` the continuation tag, `task.carried` the carried locals. The continuation's payload is `[outcome, ...carried]`, where `outcome` is `{ ok: true, value }` or `{ ok: false, error }`. All segments share the handler's chunk. When a segment awaits `Random` or `Time`, the loader waits for the continuation before it patches. `runTask(task, dispatch)` runs the task and dispatches the continuation.
+- Async handlers, implemented by `custom-effects`: a segment that ends at an `await` returns `{ model, task }`. `task.site` is the continuation tag (`persist$1`, unique per handler, no `:`) and a key of `manifest.tasks`. `task.then` has the same value. `task.args` are the call arguments and `task.carried` lists the locals of `segments[n].carried` in order, then the props values (`props$step`) that the continuation or a later one reads, in the order of the handler's payload. The continuation's payload is `[outcome, ...carried]`, where `outcome` is `{ ok: true, value }` or `{ ok: false, error }`. A rejected task outside a `try` arrives as `{ ok: false, error }`, and the continuation throws it as its first statement, so the loader reports it. A continuation tag has a `manifest.handlers` entry whose `chunk` is the handler's own chunk (`handler=add`), not `handler=add$1`. All segments share the handler's chunk.
+- A task chunk, `task=<site>`, exports `run(...args)`, which calls the awaited function and returns its promise. It copies the import, or the module-level function with the helpers it reaches. `vite/chunks.ts` accepts the `task` kind and `listChunks` includes the chunks of `manifest.tasks`.
+- `runTask(host, task)` (`src/client/tasks/run.ts`) takes a host object (`page`, `apply`, `push`, `report`). A site in `manifest.tasks` with a `task=` chunk loads it, calls `run`, and when the task settles pushes the continuation to `boot.q` as an event with no DOM target, so it joins the next batch. The batch does not wait for it, and every run continues (no latest-wins). A built-in site (`handler=` value) runs `task$<site>` from the handler chunk inside the current batch, so one patch covers the step and its continuation. A chunk that fails to load rejects, the loader reports it and keeps the step's model.
 
 ### Binding chunks
 
@@ -370,6 +376,9 @@ The golden fixtures are the stub for both sides. Each of `test/fixtures/counter/
 
 ## Changes
 
+- v10 (2026-11-21, `contracts/compiled-format-tasks.change-request.md`, from `custom-effects` and `run-tasks`): `task` chunk kind and `manifest.tasks` (built-in sites point to the handler chunk), continuation tags and payloads, `runTask(host, task)` replaces `RunTask` (removed from `format.ts` and from this contract), task chunk file ids.
+- v10 (2026-11-21, `contracts/compiled-format-keyed.change-request.md`, from `keyed-paths`): `getChunkFile` maps `[`, `]` and `=` in a path to `(`, `)` and `~`; `diffPaths` compares a keyed segment by key.
+- v10 (2026-11-21, from `runtime-flags`): `HAS_*` runtime feature flags; the loader budget of 4096 B gzip is the loader with no optional features.
 - v9 (2026-11-21, from `testing-mount`): the server render takes an optional model.
 - v9 (2026-11-21, from the `resume-loader` review): DOM and render helpers are copied into chunks instead of living in the loader; `stop` uses `stopImmediatePropagation`; more non-bubbling events.
 - v9 (2026-11-21, from the `compile-view-codegen` review): groups are ordered topologically by covers; a chosen row binding runs on every kept row.

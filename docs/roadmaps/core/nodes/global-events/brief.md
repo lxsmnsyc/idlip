@@ -63,3 +63,8 @@ Add a dev-only warning when one element's pending queue for one event name grows
 ## Sizing
 
 Small: one dev module, a few lines in the loader, tests over existing behavior.
+
+## Updates after wave 7
+
+- The Vite plugin already replaces `__IDLIP_HAS_*__` globals (`runtime-flags`). A dev flag is a different kind: it must be on in dev and off in a production build, whatever the app uses. Choose between `NODE_ENV` and a `DETECTORS` entry that depends on the build mode, and prove it with a build test as the brief says. Do not add a flag that depends on the manifest.
+- The budget is the loader with no optional features, so a production build with no warning text is the case to measure.

@@ -63,3 +63,8 @@ The loader resolves a message's model path, runs the child update on its slot an
 ## Sizing
 
 Loader, patch and diff changes plus a new client module.
+
+## Updates after wave 7
+
+- Put the loader code behind a `HAS_<NAME>` flag (`HAS_NESTING`), following the recipe in `nodes/runtime-flags/outcome.md`: a `declare const` and export in `src/client/features.ts`, one line in `DETECTORS` of `src/vite/features.ts`, and `if (HAS_NESTING)` around the code. The 4096 B gzip budget is the loader with no optional features, so the flag removes your cost from apps that do not use it. Report the feature's cost; it is not capped. The detector is on when a manifest has a child entry (see the nesting change request once accepted).
+- `resume.ts` now has `runTask(host, task)` in `apply` and a `HAS_TASKS` gate. Keep nesting's slot logic outside `apply` where possible.

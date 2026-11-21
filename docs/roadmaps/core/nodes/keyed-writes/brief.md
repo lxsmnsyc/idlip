@@ -57,3 +57,8 @@ depends_on:
 ## Sizing
 
 S: one pattern, two runtime lines.
+
+## Updates after wave 7
+
+- `keyed-paths` landed. A keyed path prints `todos[id=selected].text`, the manifest keeps it, `getChunkFile` maps `[`, `]` and `=` to `(`, `)` and `~`, and `diffPaths` in `src/client/patch/diff.ts` reads the source as a model path from each model root, with `HAS_KEYED` gating the code. This node adds `$p.<n>` and `$p.<n>.<field>` sources: the loader replaces them with the payload value before it diffs. Read `test/client/patch/keyed.test.ts` first, and reuse its cases.
+- `HAS_KEYED` already covers the keyed segment, so the new loader code goes behind it. Its detector looks for `[` in a group path, which also matches a write set path. Check that the `writes` of a handler are counted by the detector, or add them.

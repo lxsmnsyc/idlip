@@ -81,3 +81,8 @@ M: compiler plus loader, about 8 files, known pattern.
 - `custom-effects` and `run-tasks` may edit `resume.ts`, `handlers.ts` and the codegen manifest in the same wave. Keep your logic in `writes.ts` and keep the edits to shared files small.
 - Preloading a chunk that ends up unused is fine (the proposal accepts it).
 - The loader has about 195 B gzip left and several nodes add loader code. Spend as little of it as you can.
+
+## Updates after wave 7
+
+- Replace "currently 3901 B" and "about 195 B left": the budget is the loader with no optional features (3897 B on the test fixtures, 3926 B on the todo build). Put the loader code behind a `HAS_<NAME>` flag (`HAS_WRITES`), following the recipe in `nodes/runtime-flags/outcome.md`: a `declare const` and export in `src/client/features.ts`, one line in `DETECTORS` of `src/vite/features.ts`, and `if (HAS_WRITES)` around the code. The 4096 B gzip budget is the loader with no optional features, so the flag removes your cost from apps that do not use it. Report the feature's cost; it is not capped. The detector is on when a manifest handler has `writes`.
+- `resume.ts` now calls `runTask(host, task)` from `src/client/tasks/run.ts` and gates the task path with `HAS_TASKS`. Read the current `apply` before you edit it. `diff.ts` reads the keyed segment only when `HAS_KEYED`.

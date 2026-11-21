@@ -1,7 +1,7 @@
 # Change request: compiled-format v10 to v11
 
 - From node: custom-effects
-- Status: open
+- Status: applied on 2026-11-21 by the curator, from the landed code
 
 ## Problem
 

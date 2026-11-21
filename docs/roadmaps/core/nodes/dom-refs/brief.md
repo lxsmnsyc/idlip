@@ -76,3 +76,9 @@ depends_on:
 ## Sizing
 
 M: codegen, handler rewrite and runtime, each small; context load is medium.
+
+## Updates after wave 7
+
+- `Dom.measure` is a built-in site. `compiled-format` v10 lists a built-in in `manifest.tasks` with the value `handler=<name>`, and the handler chunk exports `task$<site>(...args)`. The loader runs it in the current batch through `runTask(host, task)` (`src/client/tasks/run.ts`), so one patch covers the step and its continuation. Add the site to `emitBuiltinTask` in `src/compiler/update/tasks.ts`. `Step.after` is a new field: read how `apply` in `resume.ts` runs a step first.
+- Loader size: the budget is the loader with no optional features. Put the loader code behind a `HAS_<NAME>` flag (`HAS_REFS`), following the recipe in `nodes/runtime-flags/outcome.md`: a `declare const` and export in `src/client/features.ts`, one line in `DETECTORS` of `src/vite/features.ts`, and `if (HAS_REFS)` around the code. The 4096 B gzip budget is the loader with no optional features, so the flag removes your cost from apps that do not use it. Report the feature's cost; it is not capped. The detector is on when a handler has an after-patch `Dom` call or a view has `i-ref`.
+- The `mount` test with `await Random.id()` can reuse `test/client/tasks/tasks.test.ts` and `test/compiler/update/effects.test.ts` as models. `Random` and `Time` are exported from `idlip` now.

@@ -2,6 +2,8 @@
 
 From: `stock-sources`. Target: the Interface section of `contracts/core-api.md`.
 
+Status: applied on 2026-11-21 by the curator (core-api v10), from the landed code.
+
 ## Change
 
 `Random`, `Time` and `until` are exported from `idlip` as the contract states. Add the stock sources, exported from `idlip` with no new subpath. Each is an async generator `(input, signal)`.
