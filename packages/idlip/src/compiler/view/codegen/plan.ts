@@ -9,6 +9,7 @@ export type TryNode = Extract<Node, { kind: 'try' }>;
 
 export type Source =
   | { kind: 'attr'; name: string; hole: Hole }
+  | { kind: 'html'; node: Extract<Node, { kind: 'element' }>; hole: Hole }
   | { kind: 'prop'; child: ChildNode; name: string; hole: Hole }
   | { kind: 'message'; child: ChildNode; event: Event }
   | { kind: 'event'; event: Event }
@@ -366,7 +367,14 @@ class Planner {
           }
           ids.push(...this.bindEvents(node.events, context));
           if (node.html !== undefined) {
-            this.report('codegen-unsupported', 'html is not generated yet', node.span);
+            const id = this.bindHole(node.html, 'a', context, {
+              kind: 'html',
+              node,
+              hole: node.html,
+            });
+            if (id !== undefined) {
+              ids.push(id);
+            }
           }
           if (ids.length > 0) {
             this.anchors.set(node, ids);

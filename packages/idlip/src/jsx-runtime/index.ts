@@ -1,4 +1,4 @@
-import type { GlobalElements, HtmlElements } from '../jsx/elements.ts';
+import type { GlobalElements, HtmlElements, MathElements, SvgElements } from '../jsx/elements.ts';
 import type { JSX as CoreJSX } from '../core/jsx.ts';
 
 // oxlint-disable typescript/no-namespace, typescript/no-empty-object-type
@@ -12,7 +12,7 @@ export declare namespace JSX {
   type Element = CoreJSX.Element;
   interface ElementChildrenAttribute extends CoreJSX.ElementChildrenAttribute {}
   interface IntrinsicAttributes extends CoreJSX.IntrinsicAttributes {}
-  interface IntrinsicElements extends HtmlElements, GlobalElements {}
+  interface IntrinsicElements extends HtmlElements, SvgElements, MathElements, GlobalElements {}
 }
 
 export type { EventFor, EventProp } from '../core/events.ts';

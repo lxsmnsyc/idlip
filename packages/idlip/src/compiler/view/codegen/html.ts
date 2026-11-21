@@ -4,6 +4,7 @@ import { addChildNode } from './child.ts';
 import { getMessage, printModifiers } from './events.ts';
 import type { Emitter } from './expr.ts';
 import type { Plan } from './plan.ts';
+import { addRawHtml } from './raw.ts';
 import {
   escapeAttribute,
   escapeSingleQuoted,
@@ -298,6 +299,11 @@ export class HtmlBuilder {
     this.addAnchor(node, built);
     addText(built, '>');
     if (VOID_TAGS.has(node.tag)) {
+      return;
+    }
+    if (node.html !== undefined) {
+      addRawHtml(emitter, node, built);
+      addText(built, `</${node.tag}>`);
       return;
     }
     // The parser drops a newline that starts a textarea.

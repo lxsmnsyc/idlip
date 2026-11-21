@@ -3,6 +3,7 @@ import type { Component, Expr } from '../analyze/index.ts';
 import type { Module } from '../../../core/format.ts';
 import { printHelpers } from '../../../core/helpers.ts';
 import { printSlot } from './child.ts';
+import { printHtmlBody } from './raw.ts';
 import { emitSubscribeBinding } from './subscribe.ts';
 import { getMessage } from './events.ts';
 import { Emitter, createUsage, mergeUsage } from './expr.ts';
@@ -73,6 +74,13 @@ function emitBinding(binding: Binding, context: ChunkContext): Emitted {
       usage.helpers.add('setAttr');
       const value = emitter.expr(source.hole.expr, 1);
       const body = `setAttr$(el, ${quote(source.name)}, ${value});`;
+      return {
+        code: `export function ${binding.name}(${printParams('el', usage)}) {\n${body}\n}`,
+        usage,
+      };
+    }
+    case 'html': {
+      const body = printHtmlBody(source, emitter);
       return {
         code: `export function ${binding.name}(${printParams('el', usage)}) {\n${body}\n}`,
         usage,
@@ -342,8 +350,12 @@ export function emitTryChunk(info: TryInfo, context: ChunkContext): GroupChunk {
   const body = [...built.pre, `return ${toExpression({ pre: [], parts: built.parts })};`];
   const error = getLocalName(info.node.error);
   const render = `export function render(${printParams(error, usage)}) {\n${body.join('\n')}\n}`;
+  const sections = [render];
+  if (info.node.namespace !== 'html') {
+    sections.push(`export const namespace = ${quote(info.node.namespace)};`);
+  }
   return {
-    module: { chunk: `try=${info.id}`, code: assemble(usage, [render], context) },
+    module: { chunk: `try=${info.id}`, code: assemble(usage, sections, context) },
     usage,
   };
 }

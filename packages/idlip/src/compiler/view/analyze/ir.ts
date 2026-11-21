@@ -171,7 +171,14 @@ export type Node =
       body: Node[];
     }
   | { kind: 'condition'; test: Hole; then: Node[]; else: Node[]; namespace: Namespace }
-  | { kind: 'try'; body: Node[]; error: string; reset: string | undefined; catch: Node[] }
+  | {
+      kind: 'try';
+      body: Node[];
+      error: string;
+      reset: string | undefined;
+      catch: Node[];
+      namespace: Namespace;
+    }
   | { kind: 'head'; children: Node[] }
   | {
       kind: 'subscribe';

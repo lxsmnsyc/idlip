@@ -214,3 +214,57 @@ export interface GlobalElements {
   window: WindowProps;
   document: DocumentProps;
 }
+
+type Letter =
+  | 'a'
+  | 'b'
+  | 'c'
+  | 'd'
+  | 'e'
+  | 'f'
+  | 'g'
+  | 'h'
+  | 'i'
+  | 'j'
+  | 'k'
+  | 'l'
+  | 'm'
+  | 'n'
+  | 'o'
+  | 'p'
+  | 'q'
+  | 'r'
+  | 's'
+  | 't'
+  | 'u'
+  | 'v'
+  | 'w'
+  | 'x'
+  | 'y'
+  | 'z';
+
+/** The plain `onload` style names. They would set an event handler attribute, so they are errors. */
+type PlainHandlers = { [Name in `on${Letter}${string}`]?: never };
+
+type NamespacedProps<El extends EventTarget, Map> = CommonAttributes &
+  EventProps<El, Map> &
+  PlainHandlers & { [attribute: string]: unknown };
+
+/**
+ * The SVG elements that are not HTML elements. They take any attribute, since the SVG
+ * attributes are many, and `html` stays `TrustedHtml`.
+ */
+export type SvgElements = {
+  [Tag in Exclude<keyof SVGElementTagNameMap, keyof HTMLElementTagNameMap>]: NamespacedProps<
+    SVGElementTagNameMap[Tag],
+    SVGElementEventMap
+  >;
+};
+
+/** The MathML elements, typed like the SVG ones. */
+export type MathElements = {
+  [Tag in Exclude<keyof MathMLElementTagNameMap, keyof HTMLElementTagNameMap>]: NamespacedProps<
+    MathMLElementTagNameMap[Tag],
+    MathMLElementEventMap
+  >;
+};

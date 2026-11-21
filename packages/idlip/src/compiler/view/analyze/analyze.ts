@@ -174,6 +174,9 @@ function isMethod(name: string): name is Method {
 // ---------------------------------------------------------------------------------------------
 // Scopes
 
+/** Elements whose content the parser reads as text, so `html` would change what runs or shows. */
+const RAW_HTML_FORBIDDEN = new Set(['script', 'style', 'textarea', 'title', 'noscript']);
+
 interface ModuleScope {
   /** `imported` is the exported name, `default` for a default import, `*` for a namespace. */
   imports: Map<string, { source: string; imported: string; typeOnly: boolean }>;
@@ -1695,6 +1698,14 @@ class Analyzer {
       const attrName =
         name.type === 'JSXNamespacedName' ? `${name.namespace.name}:${name.name.name}` : name.name;
       const value = attribute.value;
+      if (/^on[a-z]/i.test(attrName)) {
+        this.reportError(
+          'attr-event',
+          `${attrName} would set an event handler attribute. Use on:${attrName.slice(2).toLowerCase()}`,
+          attribute,
+        );
+        continue;
+      }
       if (attrName.startsWith('i-')) {
         this.reportError(
           'attr-reserved',
@@ -1708,6 +1719,10 @@ class Analyzer {
         continue;
       }
       if (attrName === 'html') {
+        if (namespace === 'html' && RAW_HTML_FORBIDDEN.has(tag)) {
+          this.reportError('html-element', `html is not allowed on <${tag}>`, attribute);
+          continue;
+        }
         html = this.lowerHtml(value, scope, attribute);
         continue;
       }
@@ -1832,6 +1847,12 @@ class Analyzer {
     return undefined;
   }
 
+  /** Whether a local name is the `trusted` export of `idlip`, under any local name. */
+  isTrusted(local: string): boolean {
+    const found = this.module.imports.get(local);
+    return found?.source === 'idlip' && found.imported === 'trusted';
+  }
+
   lowerHtml(
     value: JSXAttributeValue | null,
     scope: Scope,
@@ -1841,8 +1862,7 @@ class Analyzer {
     if (
       expression?.type === 'CallExpression' &&
       expression.callee.type === 'Identifier' &&
-      expression.callee.name === 'trusted' &&
-      this.module.imports.get('trusted')?.source === 'idlip' &&
+      this.isTrusted(expression.callee.name) &&
       expression.arguments.length === 1
     ) {
       return this.createHole(expression.arguments[0], scope);
@@ -1951,7 +1971,14 @@ class Analyzer {
         }
         const catchView = this.lowerBranch(handler.body, inner, context);
         return [
-          { kind: 'try', body, error: errorParam.name, reset: resetParam?.name, catch: catchView },
+          {
+            kind: 'try',
+            body,
+            error: errorParam.name,
+            reset: resetParam?.name,
+            catch: catchView,
+            namespace: context.namespace,
+          },
         ];
       }
       case 'Head':
