@@ -1,7 +1,7 @@
 ---
 id: deploy-skew
 title: Recover when cached HTML meets a newer client build
-status: active
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-20
-spent:
+spent: 364832
 owns:
   - packages/idlip/src/client/skew.ts
   - packages/idlip/src/vite/skew.ts
@@ -62,11 +62,11 @@ Behind `HAS_SKEW`, set by the plugin option `skew` (default on in a production b
 
 ## Acceptance
 
-- [ ] A failed chunk with a different server build reloads once; the same build twice does not loop (test with `sessionStorage` in happy-dom).
-- [ ] A client build keeps the previous build's chunk files and drops older ones.
-- [ ] Todo loader grows at most 10 B over the `loader-trim` result when `skew` is off.
-- [ ] Fast check passes: `pnpm --filter idlip test`
-- [ ] Change request: `contracts/compiled-format-skew.change-request.md` (build id attribute, build file).
+- [x] A failed chunk with a different server build reloads once; the same build twice does not loop (test with `sessionStorage` in happy-dom).
+- [x] A client build keeps the previous build's chunk files and drops older ones.
+- [x] Todo loader grows at most 10 B over the `loader-trim` result when `skew` is off.
+- [x] Fast check passes: `pnpm --filter idlip test`
+- [x] Change request: `contracts/compiled-format-skew.change-request.md` (build id attribute, build file).
 
 ## Sizing
 
@@ -75,3 +75,5 @@ Small runtime, plus plugin output handling and one asset-retention rule.
 ## Notes for the worker
 
 - One explicit state per tab and build: `'fresh' | 'reloaded'`. No inference from timing.
+
+Landed as 77f6158 on `batch/core` after one fresh review round. The build check lives in `build.js`, loaded only at a final chunk failure; `skew` on by default costs +60 B in the loader. Retention keeps one previous build and needs `outDir` kept between deploys. `build.js` must be served `no-store`. The model is dropped on the reload.
