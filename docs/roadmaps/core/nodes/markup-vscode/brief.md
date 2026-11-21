@@ -1,7 +1,7 @@
 ---
 id: markup-vscode
 title: VS Code extension and language server
-status: active
+status: done
 priority: should
 type: feature
 story: markup-frontend
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 160523
 owns:
   - packages/vscode/**
   - packages/language-server/**
@@ -47,10 +47,12 @@ Create `packages/vscode` (private extension) and `packages/language-server` that
 
 ## Acceptance
 
-- [ ] The language server returns diagnostics for a broken `.idlip` file and hover for a state variable, in a test.
-- [ ] The extension builds to a `.vsix`.
-- [ ] Fast check passes: `pnpm --filter @idlip/language-server test`
+- [x] The language server returns diagnostics for a broken `.idlip` file and hover for a state variable, in a test.
+- [x] The extension builds to a `.vsix`.
+- [x] Fast check passes: `pnpm --filter @idlip/language-server test`
 
 ## Sizing
 
 Two packages, mostly glue to Volar.
+
+Landed as a666a6b on `feat/markup-frontend` after one clean fresh review. Follow-up: `markup-ts-plugin`.
