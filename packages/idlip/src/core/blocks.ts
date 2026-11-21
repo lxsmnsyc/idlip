@@ -13,7 +13,7 @@ function failBlock(name: string): never {
 export function For<T>(_props: {
   each: readonly T[];
   key: keyof T & string;
-  children: (item: T) => JSX.Element;
+  children: (item: T, index: number) => JSX.Element;
 }): JSX.Element {
   return failBlock('For');
 }

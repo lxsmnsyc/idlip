@@ -1,7 +1,7 @@
 ---
 name: core-api
-version: 6
-status: draft
+version: 7
+status: frozen
 defined_by: core-api
 ---
 
@@ -16,12 +16,13 @@ The public surface of `idlip`: the runtime values a component imports, the JSX t
 ```ts
 // idlip
 // Block components for the proof of concept. The markup DSL replaces them with blocks.
-function For<T>(props: { each: readonly T[]; key: keyof T & string; children: (item: T) => JSX.Element }): JSX.Element;
-// Reserved, implemented by `errors`, `document-head` and `commands-subs`.
+function For<T>(props: { each: readonly T[]; key: keyof T & string; children: (item: T, index: number) => JSX.Element }): JSX.Element;
+// Exported as throwing stubs, like `For`. Implemented by `errors`, `document-head` and `commands-subs`.
 function Try(props: { catch: (error: unknown, reset: () => void) => JSX.Element; children: JSX.Element }): JSX.Element;
 function Head(props: { children: JSX.Element }): JSX.Element;
 function Subscribe<I, V>(props: { to: (input: I, signal: AbortSignal) => AsyncIterable<V>; input: I; 'on:value': (value: V) => unknown }): JSX.Element;
 
+// Not exported yet: `commands-subs` and `custom-effects` add `Random`, `Time` and `until`, each with its own export line in `src/index.ts`.
 // Impure values, awaited in handlers so the log records them. Run in the runtime core.
 const Random: { id(): Promise<string>; number(): Promise<number> };
 const Time: { now(): Promise<number>; sleep(ms: number, signal?: AbortSignal): Promise<void> };
@@ -32,7 +33,7 @@ function until<T>(signal: AbortSignal, promise: Promise<T>): Promise<T>;
 type TrustedHtml = string & { readonly __trusted: unique symbol };
 function trusted(html: string): TrustedHtml;
 
-// Reserved, implemented by `dom-refs`. A ref name is a string literal or a tuple of a literal and a loop variable.
+// Not exported yet. Reserved, implemented by `dom-refs`. A ref name is a string literal or a tuple of a literal and a loop variable.
 type RefName = string | readonly [string, string | number];
 const Dom: {
   focus(ref: RefName): void;
@@ -46,6 +47,7 @@ const Dom: {
 // or an arrow whose body is one handler call (rule ids in contracts/view-ir.md).
 type EventFor<El extends Element, E extends Event> = E & { readonly currentTarget: El };
 type EventProp<El extends Element, E extends Event> = (event: EventFor<El, E>) => unknown;
+// Exports the types `JSX`, `EventFor` and `EventProp`. `IntrinsicElements` is empty until `jsx-types` fills it.
 // Intrinsic elements: attributes, `class` as a string or a record of booleans, `ref`, `html`, `key`, on:* props.
 // Also `<window>` and `<document>`, which take only on:* and latest:* props.
 // latest:* props take the same functions as on:* and opt into latest-wins delivery.
@@ -69,7 +71,7 @@ Subpaths: `idlip`, `idlip/server`, `idlip/client`, `idlip/compiler`, `idlip/vite
 
 ## Stub
 
-`packages/idlip/src/index.ts` has `Message`, `createMessage`, constructor types, `createConstructors` and `defineModule` from the design before v6. `core-api` deletes them, moves `Message` to `src/core/format.ts`, and deletes `test/messages.test.ts`.
+Done by `core-api`: the old exports and `test/messages.test.ts` are deleted, and `Message` is in `src/core/format.ts`.
 
 ## Contract tests
 
@@ -85,6 +87,7 @@ Subpaths: `idlip`, `idlip/server`, `idlip/client`, `idlip/compiler`, `idlip/vite
 
 ## Changes
 
+- v7 (frozen 2026-11-21 by `core-api` and `spike-view-analysis`): `For` children take `(item, index)`. `Try`, `Head` and `Subscribe` are exported as throwing stubs. `Random`, `Time`, `until` and `Dom` are not exported until their nodes. `jsx-runtime` exports `JSX`, `EventFor` and `EventProp`. The stub is removed.
 - v6 (amended 2026-11-21 by the subscriptions debate): `until`, `Time.sleep` with a signal, `latest:` props.
 - v6: function components replace `defineModule`. Block components `Try`, `Head` and `Subscribe`, the `<window>` and `<document>` elements, and `Random` and `Time`. Removes `defineModule`, the `Msg` types, `Handlers`, `ModelOf`, `MsgOf`, `Cmd`, `cmd`, `Sub`, `Result`, `task`, `defineSub`, `ref()` and the `event` placeholder. Event props take functions of the element's event. Adds `render` as a reserved signature. Source: `docs/proposals/0002-modules.md` and `docs/proposals/0004-effects-refs-errors.md`, revised 2026-11-21.
 - v5: messages declared first as `Msg`; commands take constructors by value; `Result<T>`; `task` returns a function. Source: 0002 and 0004, 2026-11-20.

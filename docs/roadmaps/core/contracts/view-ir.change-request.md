@@ -1,7 +1,7 @@
 # Change request: view-ir v6 to v7
 
 - From node: spike-view-analysis
-- Status: open
+- Status: accepted by the orchestrator on 2026-11-21, after two fresh review rounds. Applied to `contracts/view-ir.md` with two clarifications from the second review: `.length` on a path stays a field segment, and the parse fixture is stored as `parse.idlip.tsx.txt`.
 
 ## Problem
 

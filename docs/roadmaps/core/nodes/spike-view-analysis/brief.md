@@ -1,7 +1,7 @@
 ---
 id: spike-view-analysis
 title: Spike: analyze function components and view model paths with oxc
-status: active
+status: done
 priority: must
 type: spike
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added:
-spent:
+spent: 351763
 owns:
   - docs/roadmaps/core/nodes/spike-view-analysis/**
 shared: []
@@ -60,3 +60,5 @@ M with high uncertainty, time-boxed. The code is a prototype, not shipped.
 - Path sets use `*` for a list item: `todos.*.done`.
 - Record which element nestings the HTML parser rewrites (`<div>` inside `<p>`, `<li>` outside a list, table rows outside table sections). The analysis should report them as diagnostics. Brumate's list is in `../brumate/website/docs/page-format.md`, section Elements.
 - Destructuring (`const { todos } = m`) and aliases must either resolve or be rejected. Record which.
+
+Landed on `batch/core` as e0183b3. The change request was accepted, and `contracts/view-ir.md` is frozen at v7.
