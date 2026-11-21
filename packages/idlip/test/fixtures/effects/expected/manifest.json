@@ -6,28 +6,86 @@
   ],
   "handlers": {
     "setDraft": {
-      "chunk": "handler=setDraft"
+      "chunk": "handler=setDraft",
+      "writes": [
+        "draft"
+      ],
+      "bindings": [
+        "draft"
+      ]
     },
     "add": {
-      "chunk": "handler=add"
+      "chunk": "handler=add",
+      "writes": [
+        "todos",
+        "draft"
+      ],
+      "bindings": [
+        "draft"
+      ]
     },
     "add$1": {
-      "chunk": "handler=add"
+      "chunk": "handler=add",
+      "writes": [
+        "todos",
+        "draft"
+      ],
+      "bindings": [
+        "draft"
+      ]
     },
     "persist": {
-      "chunk": "handler=persist"
+      "chunk": "handler=persist",
+      "writes": [
+        "save",
+        "saved",
+        "label"
+      ],
+      "bindings": [
+        "save.state",
+        "label",
+        "saved"
+      ]
     },
     "persist$1": {
-      "chunk": "handler=persist"
+      "chunk": "handler=persist",
+      "writes": [
+        "save",
+        "saved",
+        "label"
+      ],
+      "bindings": [
+        "save.state",
+        "label",
+        "saved"
+      ]
     },
     "rename": {
-      "chunk": "handler=rename"
+      "chunk": "handler=rename",
+      "writes": [
+        "label"
+      ],
+      "bindings": [
+        "label"
+      ]
     },
     "rename$1": {
-      "chunk": "handler=rename"
+      "chunk": "handler=rename",
+      "writes": [
+        "label"
+      ],
+      "bindings": [
+        "label"
+      ]
     },
     "rename$2": {
-      "chunk": "handler=rename"
+      "chunk": "handler=rename",
+      "writes": [
+        "label"
+      ],
+      "bindings": [
+        "label"
+      ]
     }
   },
   "tasks": {

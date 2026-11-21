@@ -175,7 +175,8 @@ describe('todo', () => {
     harness.start();
     input(field(), 'milk');
     await settle();
-    expect(getLoaded()).toEqual(['handler=setDraft']);
+    // The binding chunk of the write set starts with the handler chunk.
+    expect(getLoaded().toSorted()).toEqual(['binding=draft', 'handler=setDraft']);
     expect(harness.patch.mock.calls[0][2]).toMatchObject({ draft: 'milk' });
   });
 
@@ -228,12 +229,12 @@ describe('todo', () => {
     expect(harness.patch.mock.calls[1][2]).toMatchObject({ draft: '' });
   });
 
-  it('toggles a todo with the chunk of toggle only', async () => {
+  it('toggles a todo with the chunks of toggle and its write set only', async () => {
     harness = setup('todo');
     harness.start();
     document.querySelector<HTMLInputElement>('input[type=checkbox]')!.click();
     await settle();
-    expect(getLoaded()).toEqual(['handler=toggle']);
+    expect(getLoaded().toSorted()).toEqual(['binding=todos.*.done', 'handler=toggle']);
     const [, prev, next] = harness.patch.mock.calls[0];
     expect((prev.todos as { done: boolean }[])[0].done).toBe(true);
     expect((next.todos as { done: boolean }[])[0].done).toBe(false);

@@ -58,9 +58,9 @@ export interface Manifest {
 
 export interface HandlerEntry {
   readonly chunk: string;
-  /** Reserved for `write-sets`: the state paths the handler writes. */
+  /** The model paths the handler can change, such as `todos.*.done`. Absent: diff every path. */
   readonly writes?: readonly string[];
-  /** Reserved for `write-sets`: the groups whose paths meet `writes`. */
+  /** The group keys the loader starts with the chunk: groups that meet `writes`, minus covered ones. */
   readonly bindings?: readonly string[];
 }
 

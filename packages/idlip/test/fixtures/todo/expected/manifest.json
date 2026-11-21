@@ -8,16 +8,45 @@
   ],
   "handlers": {
     "setDraft": {
-      "chunk": "handler=setDraft"
+      "chunk": "handler=setDraft",
+      "writes": [
+        "draft"
+      ],
+      "bindings": [
+        "draft"
+      ]
     },
     "clear": {
-      "chunk": "handler=clear"
+      "chunk": "handler=clear",
+      "writes": [
+        "draft"
+      ],
+      "bindings": [
+        "draft"
+      ]
     },
     "add": {
-      "chunk": "handler=add"
+      "chunk": "handler=add",
+      "writes": [
+        "todos",
+        "next",
+        "draft"
+      ],
+      "bindings": [
+        "todos.*.done",
+        "todos.*.id",
+        "todos.*.text",
+        "draft"
+      ]
     },
     "toggle": {
-      "chunk": "handler=toggle"
+      "chunk": "handler=toggle",
+      "writes": [
+        "todos.*.done"
+      ],
+      "bindings": [
+        "todos.*.done"
+      ]
     }
   },
   "groups": {

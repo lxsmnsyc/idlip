@@ -11,6 +11,7 @@ import type {
 } from '../../../core/format.ts';
 import { HELPER_NAMES } from '../../../core/helpers.ts';
 import { pickComponent } from '../../update/index.ts';
+import { listWrites, meetsPath } from '../../update/writes.ts';
 import type { Component, ModuleIR, Span } from '../analyze/index.ts';
 import { emitBindings, emitGroupChunk, emitListChunk } from './chunks.ts';
 import type { ChunkContext } from './chunks.ts';
@@ -35,13 +36,56 @@ function createEmptyManifest(id: string): Manifest {
   return { module: id, events: [], handlers: {}, groups: {}, lists: {} };
 }
 
-function buildManifest(id: string, component: Component, plan: Plan, groups: Group[]): Manifest {
+/** Tells whether a path of the group meets a write. */
+function meetsWrites(group: Group, writes: readonly string[]): boolean {
+  for (const path of group.paths) {
+    for (const write of writes) {
+      if (meetsPath(path, write)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/** Lists the groups to load with a handler: those that meet a write, minus covered ones. */
+function listBindings(groups: readonly Group[], writes: readonly string[]): string[] {
+  const met: Group[] = [];
+  const covered = new Set<string>();
+  for (const group of groups) {
+    if (meetsWrites(group, writes)) {
+      met.push(group);
+      for (const key of group.covers) {
+        covered.add(key);
+      }
+    }
+  }
+  const keys: string[] = [];
+  for (const group of met) {
+    if (!covered.has(group.key)) {
+      keys.push(group.key);
+    }
+  }
+  return keys;
+}
+
+function buildManifest(
+  id: string,
+  component: Component,
+  plan: Plan,
+  groups: Group[],
+  writes: ReadonlyMap<string, readonly string[] | undefined>,
+): Manifest {
   const handlers: Record<string, HandlerEntry> = {};
   const tasks: Record<string, string> = {};
   for (const handler of component.handlers) {
+    const own = writes.get(handler.name);
     for (const segment of handler.segments) {
-      // A continuation lives in the chunk of its handler.
-      handlers[segment.tag] = { chunk: `handler=${handler.name}` };
+      // A continuation lives in the chunk of its handler, and has its write set.
+      handlers[segment.tag] =
+        own === undefined
+          ? { chunk: `handler=${handler.name}` }
+          : { chunk: `handler=${handler.name}`, writes: own, bindings: listBindings(groups, own) };
       const root = segment.awaits;
       if (root !== undefined) {
         const builtin = root.kind === 'import' && isBuiltinTask(root.name, root.source);
@@ -160,7 +204,13 @@ export function generate(ir: ModuleIR, source: string, id: string): GenerateResu
     mergeUsage(clientUsage, chunk.usage);
   }
 
-  const manifest = buildManifest(id, component, plan, groupList);
+  const manifest = buildManifest(
+    id,
+    component,
+    plan,
+    groupList,
+    listWrites(ir.file, source, component),
+  );
   const server = emitServer(id, component, plan, manifest, clientUsage.props, moduleSource, report);
   for (const diagnostic of diagnostics) {
     if (diagnostic.severity === 'error') {

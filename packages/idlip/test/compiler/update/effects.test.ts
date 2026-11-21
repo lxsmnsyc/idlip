@@ -79,8 +79,16 @@ describe('effects fixture', () => {
   });
 
   it('puts continuations in the chunk of their handler and maps each site to a task chunk', () => {
-    expect(result.manifest.handlers.persist$1).toEqual({ chunk: 'handler=persist' });
-    expect(result.manifest.handlers.rename$2).toEqual({ chunk: 'handler=rename' });
+    expect(result.manifest.handlers.persist$1).toEqual({
+      chunk: 'handler=persist',
+      writes: ['save', 'saved', 'label'],
+      bindings: ['save.state', 'label', 'saved'],
+    });
+    expect(result.manifest.handlers.rename$2).toEqual({
+      chunk: 'handler=rename',
+      writes: ['label'],
+      bindings: ['label'],
+    });
     expect(result.manifest.tasks).toEqual({
       add$1: 'task=add$1',
       persist$1: 'task=persist$1',

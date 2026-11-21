@@ -186,6 +186,10 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
     if (url === undefined) {
       throw new DropError(`idlip: no chunk for ${tag}`);
     }
+    // The binding chunks start with the handler chunk, not after it. A failure surfaces in the patch.
+    for (const key of entry?.bindings ?? []) {
+      load(chunks[getChunkId(manifest.module, manifest.groups[key].chunk)]).catch(() => {});
+    }
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion
     const module = (await load(url)) as HandlerChunk;
     if (!Object.hasOwn(module, tag) || typeof module[tag] !== 'function') {

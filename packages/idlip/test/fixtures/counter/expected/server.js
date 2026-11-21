@@ -1,18 +1,6 @@
 import { attr, on, text } from 'idlip/server';
 
-export const manifest = {
-  module: '/src/counter.idlip.tsx',
-  events: ['click'],
-  handlers: {
-    increment: { chunk: 'handler=increment' },
-    add: { chunk: 'handler=add' },
-    reset: { chunk: 'handler=reset' },
-  },
-  groups: {
-    count: { paths: ['count'], chunk: 'binding=count', bindings: ['a0', 't1', 'c2'], covers: [] },
-  },
-  lists: {},
-};
+export const manifest = { module: '/src/counter.idlip.tsx', events: ['click'], handlers: { increment: { chunk: 'handler=increment', writes: ['count'], bindings: ['count'] }, add: { chunk: 'handler=add', writes: ['count'], bindings: ['count'] }, reset: { chunk: 'handler=reset', writes: ['count'], bindings: ['count'] } }, groups: { count: { paths: ['count'], chunk: 'binding=count', bindings: ['a0', 't1', 'c2'], covers: [] } }, lists: {} };
 
 // `vite-plugin` replaces the URLs in a build.
 export const chunks = {

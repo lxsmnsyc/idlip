@@ -801,7 +801,11 @@ describe('manifest', () => {
     const result = generate(ir, source, '/src/test.idlip.tsx');
     for (const segment of component.handlers[0].segments) {
       // A continuation lives in the chunk of its handler.
-      expect(result.manifest.handlers[segment.tag]).toEqual({ chunk: 'handler=save' });
+      expect(result.manifest.handlers[segment.tag]).toEqual({
+        chunk: 'handler=save',
+        writes: ['n'],
+        bindings: ['n'],
+      });
     }
     expect(result.manifest.tasks).toEqual({ save$1: 'task=save$1' });
   });
