@@ -1,7 +1,7 @@
 ---
 id: fix-rows-collision
 title: State names collide with server render locals
-status: todo
+status: active
 priority: should
 type: fix
 story:
