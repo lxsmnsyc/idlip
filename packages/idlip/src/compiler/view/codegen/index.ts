@@ -164,6 +164,7 @@ function buildManifest(
   return {
     module: id,
     events: plan.events,
+    ...(plan.listens.size === 0 ? {} : { listens: Object.fromEntries(plan.listens) }),
     handlers,
     ...(Object.keys(tasks).length === 0 ? {} : { tasks }),
     ...(plan.sources.size === 0 ? {} : { sources: [...plan.sources.keys()] }),

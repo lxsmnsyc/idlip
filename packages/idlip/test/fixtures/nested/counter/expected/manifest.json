@@ -3,6 +3,11 @@
   "events": [
     "click"
   ],
+  "listens": {
+    "click": [
+      "increment"
+    ]
+  },
   "handlers": {
     "increment": {
       "chunk": "handler=increment",

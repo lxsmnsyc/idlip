@@ -6,3 +6,5 @@ export { attr, on, slot, text } from './helpers.ts';
 export { render } from './render.ts';
 export type { RenderOptions } from './render.ts';
 export { renderListener } from '../client/loader/listener.ts';
+export { renderPreload } from './preload.ts';
+export type { PreloadOptions } from './preload.ts';

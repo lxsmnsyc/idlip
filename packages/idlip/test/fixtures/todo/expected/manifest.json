@@ -6,6 +6,20 @@
     "keydown",
     "submit"
   ],
+  "listens": {
+    "click": [
+      "toggle"
+    ],
+    "input": [
+      "setDraft"
+    ],
+    "keydown": [
+      "clear"
+    ],
+    "submit": [
+      "add"
+    ]
+  },
   "handlers": {
     "setDraft": {
       "chunk": "handler=setDraft",

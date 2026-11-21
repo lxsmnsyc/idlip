@@ -7,7 +7,7 @@ function check(value) {
   return value;
 }
 
-export const manifest = { module: '/src/board.idlip.tsx', events: ['click'], handlers: { add: { chunk: 'handler=add', writes: ['items'], bindings: ['items.*.n'] }, toggle: { chunk: 'handler=toggle', writes: ['shown'], bindings: ['shown'] } }, fallback: { 0: 'try=0', 1: 'try=1', 2: 'try=2' }, groups: { 'items.*.n': { paths: ['items.*.n'], chunk: 'binding=items.*.n', bindings: ['t6'], covers: ['items'] }, items: { paths: ['items'], chunk: 'binding=items', bindings: ['l5'], covers: [] }, shown: { paths: ['shown'], chunk: 'binding=shown', bindings: ['c2'], covers: [] } }, lists: { 5: { key: 'id', path: 'items', chunk: 'list=5', bindings: ['t6'] } } };
+export const manifest = { module: '/src/board.idlip.tsx', events: ['click'], listens: { click: ['add', 'toggle'] }, handlers: { add: { chunk: 'handler=add', writes: ['items'], bindings: ['items.*.n'] }, toggle: { chunk: 'handler=toggle', writes: ['shown'], bindings: ['shown'] } }, fallback: { 0: 'try=0', 1: 'try=1', 2: 'try=2' }, groups: { 'items.*.n': { paths: ['items.*.n'], chunk: 'binding=items.*.n', bindings: ['t6'], covers: ['items'] }, items: { paths: ['items'], chunk: 'binding=items', bindings: ['l5'], covers: [] }, shown: { paths: ['shown'], chunk: 'binding=shown', bindings: ['c2'], covers: [] } }, lists: { 5: { key: 'id', path: 'items', chunk: 'list=5', bindings: ['t6'] } } };
 
 // `vite-plugin` replaces the URLs in a build.
 export const chunks = {

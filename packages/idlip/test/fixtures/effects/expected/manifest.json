@@ -4,6 +4,16 @@
     "click",
     "input"
   ],
+  "listens": {
+    "click": [
+      "add",
+      "persist",
+      "rename"
+    ],
+    "input": [
+      "setDraft"
+    ]
+  },
   "handlers": {
     "setDraft": {
       "chunk": "handler=setDraft",

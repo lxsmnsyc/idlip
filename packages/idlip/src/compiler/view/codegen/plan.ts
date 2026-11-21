@@ -89,6 +89,8 @@ export interface Plan {
   lists: ListInfo[];
   /** Event types the view listens to, sorted. */
   events: string[];
+  /** Event type to the names of the handlers that elements of the view dispatch on it. */
+  listens: Map<string, string[]>;
   /** The place of every child node. */
   children: Map<Node, ChildInfo>;
   /** The child components the view renders, once each, in source order. */
@@ -170,6 +172,7 @@ class Planner {
   anchors = new Map<Node, number[]>();
   lists: ListInfo[] = [];
   events = new Set<string>();
+  listens = new Map<string, Set<string>>();
   children = new Map<Node, ChildInfo>();
   uses: Used[] = [];
   subs = new Map<Node, number>();
@@ -250,6 +253,11 @@ class Planner {
       // The loader reads `on:value` of a subscription itself, so no listener is needed.
       if (listen) {
         this.events.add(event.name);
+        if (event.target.kind === 'handler') {
+          const names = this.listens.get(event.name) ?? new Set<string>();
+          names.add(event.target.name);
+          this.listens.set(event.name, names);
+        }
       }
       const paths = this.getEventPaths(event);
       if (paths.length === 0) {
@@ -455,6 +463,7 @@ export function planBindings(component: Component, report: Report, child = false
     anchors: planner.anchors,
     lists: planner.lists,
     events: [...planner.events].sort(),
+    listens: sortListens(planner.listens),
     children: planner.children,
     uses: planner.uses,
     subs: planner.subs,
@@ -462,6 +471,15 @@ export function planBindings(component: Component, report: Report, child = false
     tries: planner.tries,
     tryIds: planner.tryIds,
   };
+}
+
+/** Sorts the event types and the handler names of each. */
+function sortListens(listens: ReadonlyMap<string, ReadonlySet<string>>): Map<string, string[]> {
+  const sorted = new Map<string, string[]>();
+  for (const type of [...listens.keys()].sort()) {
+    sorted.set(type, [...(listens.get(type) ?? [])].sort());
+  }
+  return sorted;
 }
 
 function countSegments(key: string): number {

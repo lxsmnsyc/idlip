@@ -3,6 +3,12 @@
   "events": [
     "click"
   ],
+  "listens": {
+    "click": [
+      "add",
+      "toggle"
+    ]
+  },
   "handlers": {
     "add": {
       "chunk": "handler=add",

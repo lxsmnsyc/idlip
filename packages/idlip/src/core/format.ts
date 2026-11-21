@@ -42,6 +42,11 @@ export interface Manifest {
   readonly module: string;
   /** Event types the view listens to, sorted. */
   readonly events: readonly string[];
+  /**
+   * Event type to the names of the handlers that the view dispatches on it, sorted. The server
+   * reads it to preload chunks without the markup. Absent when no element dispatches a handler.
+   */
+  readonly listens?: Readonly<Record<string, readonly string[]>>;
   /** Message tag to its update chunk. Continuation tags have entries too. */
   readonly handlers: Readonly<Record<string, HandlerEntry>>;
   /**
