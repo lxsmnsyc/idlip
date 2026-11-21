@@ -49,3 +49,10 @@ Seventeen change requests are `applied`. The nested `CLAUDE.md` files of `client
 ## What waits on what
 
 Everything left waits on the batch cut into `main` (PR #1). After it merges: `fix-flaky-tests-2` closes, `markup-ts-plugin` starts (after the story merges), then `website-scaffold`, the docs nodes (`docs-start`, `docs-effects`, `docs-nesting`, `docs-reference`, `docs-platform`, `docs-benchmarks`), `website` (gate: the user deploys), `release-0-1`. `keyed-writes` and `update-ops` (0.2) are held by the release fence. Briefs of the todo nodes carry "Updates after wave 9".
+
+## After wave 9 (2026-11-21)
+
+- PR #1 merged into `main` (c818d4c): the first cut, 31 nodes. `main` is merged back into `batch/core`.
+- Debate `debates/dsl` settled on TSX as the one source syntax. The `markup-frontend` story, its children and `markup-ts-plugin` are dropped; `feat/markup-frontend` stays as history.
+- Nothing is active. Ready next: `website-scaffold`, then the docs nodes and `website` (gated: the user deploys). `keyed-writes` and `update-ops` wait for `release-0-1`.
+- `batch/core` carries 6 roadmap-only commits since the cut (the DSL debate and drops). They reach `main` with the next cut.
