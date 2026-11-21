@@ -144,7 +144,13 @@ Prior art: brumate's `<window>` and `<document>` elements, Svelte's `<svelte:win
 ## Error boundaries
 
 ```tsx
-<Try catch={(error, reset) => <p>The chart failed. <button on:click={reset}>Retry</button></p>}>
+<Try
+  catch={(error, reset) => (
+    <p>
+      The chart failed. <button on:click={reset}>Retry</button>
+    </p>
+  )}
+>
   <Chart rows={rows} />
 </Try>
 ```

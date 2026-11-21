@@ -94,19 +94,19 @@ Checked with `tsc` 7.0.2 in strict mode on 2026-11-21: `toggle(1)` in an event i
 
 ## What compiles to what
 
-| Source                                             | Compiles to                                                                                                      |
-| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `let x = v`                                        | Model field `x`, with initial value `v`.                                                                         |
-| `const d = expr`                                   | `expr` over the model, inlined into the view and into each handler that reads `d`.                               |
-| `function h(a, b)`                                 | Message tag `h` with payload `[a, b]`, and an update chunk. Reads of state are model reads. Assignments build the next model. |
-| `async function h()` with `await f(x)`             | The part before the `await` is message `h`. `f(x)` runs as a task on the client. The rest is a continuation message. |
-| `on:click={h}`                                     | Message `h` with no arguments.                                                                                   |
-| `on:click={() => toggle(t.id)}`                    | Message `toggle` with payload `[t.id]`, computed at render.                                                      |
-| `on:input={(e) => setDraft(e.currentTarget.value)}` | Message `setDraft` whose payload is read from the event when it fires.                                           |
-| A handler's free variables that are props           | Payload fields computed at render.                                                                               |
-| `return <jsx>`                                     | The view.                                                                                                        |
-| `<Counter start={0} />` in a parent                | A child slot in the parent model.                                                                                |
-| `onRemove={() => remove(c.id)}` on a child         | A message prop, dispatched with the parent's path.                                                               |
+| Source                                              | Compiles to                                                                                                                   |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `let x = v`                                         | Model field `x`, with initial value `v`.                                                                                      |
+| `const d = expr`                                    | `expr` over the model, inlined into the view and into each handler that reads `d`.                                            |
+| `function h(a, b)`                                  | Message tag `h` with payload `[a, b]`, and an update chunk. Reads of state are model reads. Assignments build the next model. |
+| `async function h()` with `await f(x)`              | The part before the `await` is message `h`. `f(x)` runs as a task on the client. The rest is a continuation message.          |
+| `on:click={h}`                                      | Message `h` with no arguments.                                                                                                |
+| `on:click={() => toggle(t.id)}`                     | Message `toggle` with payload `[t.id]`, computed at render.                                                                   |
+| `on:input={(e) => setDraft(e.currentTarget.value)}` | Message `setDraft` whose payload is read from the event when it fires.                                                        |
+| A handler's free variables that are props           | Payload fields computed at render.                                                                                            |
+| `return <jsx>`                                      | The view.                                                                                                                     |
+| `<Counter start={0} />` in a parent                 | A child slot in the parent model.                                                                                             |
+| `onRemove={() => remove(c.id)}` on a child          | A message prop, dispatched with the parent's path.                                                                            |
 
 ## Rules
 

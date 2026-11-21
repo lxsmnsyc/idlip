@@ -232,9 +232,7 @@
       "kind": "cost",
       "axis": "time",
       "severity": "high",
-      "answers": [
-        "P3"
-      ],
+      "answers": ["P3"],
       "text": "P3's 2 weeks counts only the Volar and toTypeScript() route (J4). brumate also needed its own parser (parser.ts 1140 lines) and analyzer (analyze.ts 3208 lines), and the check route kept changing after 2026-11-02 (17 more commits to check.ts and language-core). A markup frontend for idlip also needs its own view-ir producer beside the oxc JSX one, so two frontends must stay in step.",
       "estimate": {
         "value": 4348,
@@ -253,9 +251,7 @@
       "kind": "rebuttal",
       "axis": "time",
       "severity": "high",
-      "answers": [
-        "P3"
-      ],
+      "answers": ["P3"],
       "text": "P3's reason is wrong. keyed-paths and dynamic-paths are about paths in update handlers and model lookups (todos[id=$p].done, find-by-key writes), not about how the view marks keys or branches. A #for/#if shell changes neither node, and the restricted <For key> and <Show when> props already carry the same facts in JSX. So D buys no node cut.",
       "evidence": {
         "type": "source",
@@ -270,10 +266,7 @@
       "kind": "cost",
       "axis": "time",
       "severity": "high",
-      "answers": [
-        "P4",
-        "P3"
-      ],
+      "answers": ["P4", "P3"],
       "text": "Splitting the view out into a markup file breaks the module contract. 0002 has one default export from defineModule holding init, update, view and subscriptions; msg is the view's second parameter, and update must precede view so TS infers msg. P4's 'view(m: Model)' header drops msg typing and the compiler's way of finding message constructors, and compile-update's oxc pass on the defineModule export, core-api, view-ir and 0002 all need rewriting. The same split in option C moves the same cost.",
       "evidence": {
         "type": "source",
@@ -288,10 +281,7 @@
       "kind": "cost",
       "axis": "tokens",
       "severity": "medium",
-      "answers": [
-        "P3",
-        "P4"
-      ],
+      "answers": ["P3", "P4"],
       "text": "Every agent that writes or reviews markup must be given the grammar, since models know TSX but not brumate's #for/#if/$bind forms. grammar.md is 8.5 KB, about 2k tokens per worker prompt, on 36 nodes plus examples and docs. Models also write worse code in a language absent from their training data, which raises review loops. A JSX shell costs zero such tokens.",
       "estimate": {
         "value": 2100,
@@ -310,9 +300,7 @@
       "kind": "risk",
       "axis": "time",
       "severity": "medium",
-      "answers": [
-        "P1"
-      ],
+      "answers": ["P1"],
       "text": "'Calls to imported helpers marked pure' has no mechanism. oxc cannot verify purity, and path analysis through helper(m.todos, m.filter) needs the helper's body or an annotation, across files. The marker form, who checks it and what a wrong mark does are not defined, so the 'closed grammar' keeps an open hole. This lands on spike-view-analysis (must) and may need its own contract line.",
       "evidence": {
         "type": "source",
@@ -327,9 +315,7 @@
       "kind": "rebuttal",
       "axis": "time",
       "severity": "low",
-      "answers": [
-        "A1"
-      ],
+      "answers": ["A1"],
       "text": "A1's 3-day tsc plugin is optional and duplicates what the compiler already reports. A TS language-service plugin does not run under the tsc CLI, and both repos use TypeScript 7 (native). brumate needed a separate brumate-tsc package besides its typescript-plugin for exactly this. Drop the plugin from the plan and let the Vite plugin and one 'idlip check' pass over oxc report P1 violations.",
       "evidence": {
         "type": "measured",
@@ -344,10 +330,7 @@
       "kind": "alternative",
       "axis": "time",
       "severity": "high",
-      "answers": [
-        "P2",
-        "P3"
-      ],
+      "answers": ["P2", "P3"],
       "text": "Cheapest structure: A with P1's closed grammar for todo-resumes and 0.1, and make the view-ir contract the only seam. Park D as one outline node with a measured trigger: build it only if P1 violations or JSX noise show up in examples/todo and one more app. No new must node, no file-type tooling, no spec rewrite. B is dropped, as A2 says.",
       "evidence": {
         "type": "inferred",
@@ -361,10 +344,7 @@
       "by": "proponent",
       "kind": "proposal",
       "axis": "time",
-      "answers": [
-        "P1",
-        "O5"
-      ],
+      "answers": ["P1", "O5"],
       "text": "Amend P1 with a helper rule, no marker and no purity proof. A helper call is legal when the callee is an import or module-level function whose arguments are all in the closed grammar (a closure argument is a compile error). Its hole paths are the union of the argument paths, as 0001 already says. A whole-model argument is a warning. If the helper body is one return expression in the closed grammar, the analysis inlines it for exact paths, the same as partials. A hidden dependency in a helper (module state, Date.now) can only cause a stale binding, so dev mode re-evaluates each patched hole from the new model and reports a mismatch as an error naming the hole. The view-ir contract gets one line, helper: 'args' | 'inlined'.",
       "estimate": {
         "value": 1,
@@ -381,9 +361,7 @@
       "round": 2,
       "by": "proponent",
       "kind": "concession",
-      "answers": [
-        "P4"
-      ],
+      "answers": ["P4"],
       "why": "O3: a separate markup file drops msg typing and the single defineModule export, and a markup-in-TS shell needs a whole-file TS parser that oxc cannot give, so no script replacement beats having none",
       "text": "Withdraw the 'view(m: Model) header plus plain .ts' replacement of brumate's <script>. Keep two parts: styles stay an imported sidecar (import './todo.css') inside the *.idlip.tsx module, which option A already allows and needs no syntax change; if D is ever built, it replaces only the JSX expression inside view(m, msg) of the same defineModule file (block syntax for #if/#for, same view-ir), never the module."
     },
@@ -428,9 +406,7 @@
       "kind": "rebuttal",
       "axis": "time",
       "severity": "high",
-      "answers": [
-        "P6"
-      ],
+      "answers": ["P6"],
       "text": "P6's dev re-evaluation cannot catch the failure it targets. A hidden dependency in a helper makes a hole stale because its binding is not patched, and unpatched binding chunks are not loaded, so 'each patched hole' only re-evaluates holes that were already recomputed, and the check is circular. Catching a stale hole means evaluating every hole after each update, which loads every binding chunk in dev and changes the request pattern the acceptance test counts. It also flags Date.now holes on every update as mismatches.",
       "evidence": {
         "type": "source",
@@ -445,9 +421,7 @@
       "kind": "alternative",
       "axis": "time",
       "severity": "medium",
-      "answers": [
-        "P6"
-      ],
+      "answers": ["P6"],
       "text": "Cheaper and sound check for P6: run it in the must node testing-mount, in Node tests, not in the browser. After each message in a test, re-render the whole view on the server from the new model and compare it with the DOM the patcher produced. This catches stale holes from any cause, needs no dev chunk loading, and uses code that already exists (ssr-render plus patch-bindings). Also make a whole-model argument to a helper a compile error, not a warning: its path set is the root, so the hole rebinds on every patch and defeats the goal.",
       "evidence": {
         "type": "inferred",
@@ -462,9 +436,7 @@
       "kind": "rebuttal",
       "axis": "time",
       "severity": "medium",
-      "answers": [
-        "P8"
-      ],
+      "answers": ["P8"],
       "text": "P8's trigger is not measurable as stated. (1) Counting 'oxc tokens' of JSX against brumate block syntax compares two lexers, and the rewrite has to be done by hand or agent first, so it is a cost, not a script. (2) Compiler diagnostics do not record whether block syntax would make a shape unwritable, and J5 says D's holes are TS expressions, so closures and other hole errors would persist under D. With a todo view of tens of lines, '3 per 100 lines' is one error, which is noise. Thresholds of 25% and 3/100 have no basis, and 4.3k lines of upkeep and a token percentage are not on one scale.",
       "evidence": {
         "type": "source",
@@ -479,10 +451,7 @@
       "kind": "alternative",
       "axis": "time",
       "severity": "medium",
-      "answers": [
-        "P8",
-        "O7"
-      ],
+      "answers": ["P8", "O7"],
       "text": "Amend my O7 trigger to something a script can read: the compiler tags each closed-grammar diagnostic with a rule id, and the trigger counts only the ids that block syntax removes by construction (list rendered by .map instead of <For>, && or ternary instead of <Show>/<Switch>, missing or non-path key). D is built only if those ids total at least 10 across the todo app, one form-heavy app and agent-written drafts of both, and agents fail to fix them in one retry. Needs only an id field on diagnostics in the errors node. Drop the token-percentage test.",
       "evidence": {
         "type": "inferred",
@@ -497,9 +466,7 @@
       "kind": "risk",
       "axis": "time",
       "severity": "medium",
-      "answers": [
-        "P9"
-      ],
+      "answers": ["P9"],
       "text": "P9 omits three changes. (1) Inlining helper bodies in P6 is beyond the spike's scope, which covers partials only; it must be in spike-view-analysis acceptance before view-ir freezes at the contract gate, or the freeze has to be reopened. (2) P9 lists an 'errors node dev check' that O8 shows unsound, so it should become a testing-mount test (O9). (3) size-budgets and benchmarks must include a model-wide helper argument case, since it bloats binding path sets. Net still 0 new must nodes, but spike-view-analysis grows within its M size.",
       "evidence": {
         "type": "source",

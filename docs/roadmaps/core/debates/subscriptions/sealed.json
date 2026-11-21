@@ -240,9 +240,7 @@
       "kind": "risk",
       "axis": "time",
       "severity": "high",
-      "answers": [
-        "P4"
-      ],
+      "answers": ["P4"],
       "text": "P4 promises a compile or dev-time error when a source yields non-serializable data, but tsc gives none: a source yielding MessageEvent type-checked against a handler taking MessageEvent with no error. The check needs a new analysis pass over arbitrary imported generators (their yield type must be a seroval-safe type), which the draft does not cost. Without it, a socket source fails only at dispatch time, in the browser.",
       "estimate": {
         "value": 1,
@@ -261,9 +259,7 @@
       "kind": "cost",
       "axis": "time",
       "severity": "medium",
-      "answers": [
-        "P1"
-      ],
+      "answers": ["P1"],
       "text": "The single-input form (J6) makes every stock source need a wrapper: a WebSocket source (url, protocols?) or any (a, b) generator is rejected by tsc because its second parameter collides with the reserved signal slot. Authors must pack arguments into one object and unpack them, so the 'stock sources as plain generators' of P3 step 3 are not plain.",
       "evidence": {
         "type": "measured",
@@ -278,9 +274,7 @@
       "kind": "risk",
       "axis": "time",
       "severity": "high",
-      "answers": [
-        "P2"
-      ],
+      "answers": ["P2"],
       "text": "P2 makes input read-once, but the markup still reads as reactive: input={interval} compiles, type-checks and silently keeps the old value after interval changes. That is a stale-value trap with no diagnostic; the fix is a key the author must remember. The runtime also still compares the key between renders to decide remount, so it is an identity diff, only a smaller one. Cheaper: make the compiler reject an input expression that reads state unless a key reads the same state.",
       "estimate": {
         "value": 0,
@@ -299,10 +293,7 @@
       "kind": "cost",
       "axis": "time",
       "severity": "high",
-      "answers": [
-        "P1",
-        "P5"
-      ],
+      "answers": ["P1", "P5"],
       "text": "Start and stop 'when the block goes' must be wired into every patch path that creates or removes a block: conditional blocks, For rows (added from the item template chunk on the client, not only server markers), Try replacement, whole-component removal and HMR. Those paths are owned by wave-1 and later patch nodes, but commands-subs owns only src/effects/** and depends on resume-loader and compiled-format as contracts. The compiled-format seam is one sentence (line 31); it has no block-lifecycle hook, no marker format for client-created subscriptions and no nested-removal order. Expect cross-node contract work before commands-subs can start.",
       "estimate": {
         "value": 4,
@@ -321,9 +312,7 @@
       "kind": "risk",
       "axis": "device",
       "severity": "medium",
-      "answers": [
-        "P4"
-      ],
+      "answers": ["P4"],
       "text": "Every yielded value is one message through a loader that awaits patch() before the next queued message, and each lands in the message log. A resize, pointermove, socket burst or 16 ms timer enqueues unbounded messages with no coalescing rule in the contract, so a fast source can backlog the queue and grow the log in RAM. No proposal states a rate policy or log cap.",
       "estimate": {
         "value": 60,
@@ -342,9 +331,7 @@
       "kind": "risk",
       "axis": "time",
       "severity": "medium",
-      "answers": [
-        "A1"
-      ],
+      "answers": ["A1"],
       "text": "A1 is not resume-safe: a page rendered or restored with clock.state === 'running' (initial state, bfcache, HMR model transfer) has no pending sleep, so the timer never starts, while P5's marker restarts a Subscribe. Also tick() called after await reruns as part of the continuation message, so the log shows one growing chain. Do not adopt A1 as the timer form.",
       "evidence": {
         "type": "source",
@@ -358,10 +345,7 @@
       "by": "opponent",
       "kind": "alternative",
       "axis": "time",
-      "answers": [
-        "P1",
-        "P3"
-      ],
+      "answers": ["P1", "P3"],
       "text": "Cut v1 to what has no open contract: window and document intrinsics (P3 step 1) plus Subscribe limited to stock sources that live in the runtime core like Time and Random (timer, WebSocket, EventSource, media query), each with a fixed typed signature. That needs no source chunk id, no marker for user generators, no serializability analysis (O1) and no wrapper typing (O2). User-defined async generators then join as a later step once the block lifecycle hook (O4) is settled. Same explicit-union lifecycle, same rule set; delivers the listed use cases except custom sources.",
       "estimate": {
         "value": 2,
@@ -391,11 +375,7 @@
       "by": "proponent",
       "kind": "concession",
       "text": "Amend P2, P3, P4 to the upheld costs: (a) the compiler rejects a Subscribe `input` that reads state unless `key` reads the same state (O3); (b) stock sources with several parameters take one input object, e.g. socket({url, protocols}) (O2); (c) the serializability check runs at dispatch in dev builds, not at compile time (O1).",
-      "answers": [
-        "P2",
-        "P3",
-        "P4"
-      ],
+      "answers": ["P2", "P3", "P4"],
       "why": "O1 and O2 are measured with tsc 7.0.2 (TS2322, no error on a MessageEvent yield) and O3 shows input read-once is a silent stale-value trap."
     },
     "P7": {
@@ -414,9 +394,7 @@
         "value": 1,
         "unit": "in-flight message per subscription"
       },
-      "answers": [
-        "O5"
-      ]
+      "answers": ["O5"]
     },
     "P8": {
       "id": "P8",
@@ -424,9 +402,7 @@
       "by": "proponent",
       "kind": "concession",
       "text": "Concede option B (for await in an async handler). It cannot beat P1 on explicitness: the async iterator is a local that lives across awaits, and 0002 requires such locals to serialize, so the runtime must keep a hidden iterator handle outside the model. That is the state the user rejected as 'a bit too manual' or implicit. Stop is also late (the loop breaks only on the next value, so a quiet socket stays open), and the 'no await in loops' rule would have to be reversed. A resumed page with the union in 'running' has no loop unless an on:load handler restarts it by checking the union, a second, hand-written start path.",
-      "answers": [
-        "A1"
-      ],
+      "answers": ["A1"],
       "why": "J5 and 0002 line 122 make a loop iterator across awaits unserializable; the only escape is a hidden runtime handle, which breaks J4. A variant that starts from on:load/on:visible still needs that handle.",
       "evidence": {
         "type": "source",
@@ -440,9 +416,7 @@
       "by": "proponent",
       "kind": "rebuttal",
       "text": "Option C (body-level every(1000, tick, { when })) is not a competitor to P1: J3 makes it a compile-time API, because the component body never runs on the client, and no variant avoids that. Its useful part, the `when` condition, is exactly P1's visible conditional on the union. No claim is made for C.",
-      "answers": [
-        "P1"
-      ],
+      "answers": ["P1"],
       "evidence": {
         "type": "source",
         "source": "docs/proposals/0002-modules.md Decisions",
@@ -465,9 +439,7 @@
         "value": 2,
         "unit": "steps shipped before the hook"
       },
-      "answers": [
-        "O4"
-      ]
+      "answers": ["O4"]
     },
     "O7": {
       "id": "O7",
@@ -476,10 +448,7 @@
       "kind": "risk",
       "axis": "explicitness",
       "severity": "high",
-      "answers": [
-        "P1",
-        "P7"
-      ],
+      "answers": ["P1", "P7"],
       "text": "P1 says the runtime stops a source by aborting the signal and calling return(). On an async generator suspended in an await, return() is queued behind that await: a quiet-socket style source never cleans up. Measured on node: return() still pending after 500 ms and the finally block not run, while a source that rejects its await on the signal returned and cleaned. So stop works only if every source races its awaits against the signal, a rule the source author must follow and tsc cannot check. P7's pull model does not help, because the generator is mid-await, not at a yield.",
       "evidence": {
         "type": "measured",
@@ -494,9 +463,7 @@
       "kind": "risk",
       "axis": "time",
       "severity": "high",
-      "answers": [
-        "P7"
-      ],
+      "answers": ["P7"],
       "text": "P7's latest-wins per element and event name drops events that must all arrive. compiled-format says queued input events keep the value each one had, and P3 names keydown as the headline window case: two Escape or Enter presses during the first chunk load or a slow patch collapse into one, and typed keys are lost. Latest-wins is right for resize, scroll and pointermove only. The loader needs a per-event-name policy table (coalesce vs queue), which is a new hidden runtime decision unless the source markup states it.",
       "evidence": {
         "type": "source",
@@ -511,9 +478,7 @@
       "kind": "risk",
       "axis": "tokens",
       "severity": "medium",
-      "answers": [
-        "P7"
-      ],
+      "answers": ["P7"],
       "text": "A dev message log capped at 1000 entries breaks replay. Devtools replay compares each step with its recorded model and reports the first divergence, which needs the log from the first message or periodic model snapshots. One 60 Hz source fills the ring in about 17 s, after which replay from the start is impossible. P7 states neither a snapshot rule nor that replay covers only the window; the devtools node is affected.",
       "evidence": {
         "type": "source",
@@ -528,9 +493,7 @@
       "kind": "rebuttal",
       "axis": "explicitness",
       "severity": "low",
-      "answers": [
-        "P8"
-      ],
+      "answers": ["P8"],
       "text": "P8's main reason against B, that it needs a hidden iterator handle outside the model, does not separate B from P1: P1 also keeps a live generator and AbortController in the loader, keyed by marker. The conclusion against B still holds on the other reasons (late stop of a quiet source, a second hand-written start path on resume, reversing the no-await-in-loops rule), and O7 shows P1's stop is only as prompt as the source's signal handling. P8 also lists A1 under answers, but it concerns B, so A1's resume flaw (O6) stands separately.",
       "evidence": {
         "type": "source",
@@ -545,9 +508,7 @@
       "kind": "risk",
       "axis": "time",
       "severity": "high",
-      "answers": [
-        "P10"
-      ],
+      "answers": ["P10"],
       "text": "P10 puts the add/remove hook in the Head/Try node, but errors depends on commands-subs (it routes source errors to Try), so Subscribe depending on the errors node makes a cycle. document-head depends only on ssr-render and patch-bindings and can own the hook without a cycle, but then Try's region swap is not covered. Also the fallback 'runtime-only Subscribe on top-level blocks' cannot be conditional, and an always-on Subscribe cannot stop, so it gives no explicit-union lifecycle; it equals a window listener. State that the hook belongs to document-head or patch-bindings, not to errors, and drop the fallback.",
       "evidence": {
         "type": "source",
@@ -560,9 +521,7 @@
       "round": 2,
       "by": "opponent",
       "kind": "concession",
-      "answers": [
-        "O5"
-      ],
+      "answers": ["O5"],
       "why": "P7 answers O5 for pull-based sources: next() after patch gives one value in flight, so the flood risk for Subscribe sources is withdrawn. The risk remains for window and document events, now covered by O8, and for the log, now O9.",
       "text": "Withdraw the flood part of O5 for Subscribe sources; keep the window and document part under O8 and the log part under O9."
     },
@@ -606,9 +565,7 @@
         "value": 0,
         "unit": "handlers run after block removal"
       },
-      "answers": [
-        "P1"
-      ]
+      "answers": ["P1"]
     },
     "P12": {
       "id": "P12",
@@ -626,10 +583,7 @@
         "value": 0,
         "unit": "hidden per-event policies"
       },
-      "answers": [
-        "O8",
-        "P7"
-      ]
+      "answers": ["O8", "P7"]
     },
     "P13": {
       "id": "P13",
@@ -647,10 +601,7 @@
         "value": 1000,
         "unit": "messages kept in dev"
       },
-      "answers": [
-        "O9",
-        "P7"
-      ]
+      "answers": ["O9", "P7"]
     },
     "P14": {
       "id": "P14",
@@ -668,10 +619,7 @@
         "value": 1,
         "unit": "contract section in compiled-format"
       },
-      "answers": [
-        "O11",
-        "P10"
-      ]
+      "answers": ["O11", "P10"]
     },
     "P15": {
       "id": "P15",
@@ -679,10 +627,7 @@
       "by": "proponent",
       "kind": "concession",
       "text": "Amend P8: its hidden-handle reason does not separate B from P1, since P1 also keeps a live generator and AbortController in the loader (O10). The record is derived from the page's markers and not from the model. The conclusion against B rests on the remaining reasons: late stop of a quiet source, a second start path on resume, and the reversed await-in-loop rule. P8's answer to A1 is dropped; A1 stands rejected on O6.",
-      "answers": [
-        "P8",
-        "A1"
-      ],
+      "answers": ["P8", "A1"],
       "why": "O10 shows P1 keeps the same kind of runtime handle, so the argument would also reject P1.",
       "evidence": {
         "type": "source",
@@ -697,9 +642,7 @@
       "kind": "risk",
       "axis": "device",
       "severity": "medium",
-      "answers": [
-        "P11"
-      ],
+      "answers": ["P11"],
       "text": "P11 fixes delivery (no handler runs after removal) but not cleanup: return() is not awaited, so a custom source that forgets until(signal, ...) keeps its WebSocket or listener open for as long as its await stays pending, for example an idle socket for the life of the tab. The only guard is a dev warning after 1000 ms, and production has none. The leak is a resource on the user's machine, hidden from the author because the UI looks stopped. Likelihood is moderate for custom sources, nil for stock ones.",
       "evidence": {
         "type": "measured",
@@ -714,9 +657,7 @@
       "kind": "risk",
       "axis": "time",
       "severity": "medium",
-      "answers": [
-        "P12"
-      ],
+      "answers": ["P12"],
       "text": "latest: is not a compile-time API in the J3 sense, because it is attribute syntax next to on:, nothing is imported for the compiler. But it widens three contracts that the draft does not list: jsx-types (every event prop needs a latest: twin typed with the same EventProp), compiled-format (a marker, and the rule that marker names are reserved) and the loader queue (replace by element and event name, which is the diffing of pending messages the user rejected for inputs, now keyed by name). The draft also does not say what happens when on:x and latest:x are both present on one element, which needs a compile error.",
       "evidence": {
         "type": "source",
@@ -731,9 +672,7 @@
       "kind": "risk",
       "axis": "device",
       "severity": "medium",
-      "answers": [
-        "P12"
-      ],
+      "answers": ["P12"],
       "text": "Opt-in latest: makes the unsafe case the default: <window on:resize={r}> or on:pointermove on any element queues every event while each patch awaits chunk loads. At 60 Hz over the first 500 ms of a cold chunk fetch that is about 30 queued messages, each with its own recorded model in dev. A diagnostic that warns in dev when one event name has more than N pending messages would cost one counter and keep the default explicit.",
       "evidence": {
         "type": "estimate",
@@ -748,9 +687,7 @@
       "kind": "cost",
       "axis": "time",
       "severity": "medium",
-      "answers": [
-        "P14"
-      ],
+      "answers": ["P14"],
       "text": "P14 moves the hook into patch-bindings, a must-path node of size M, and adds children-before-parents order, For rows, Try swap and HMR removal to it. The hook's start must not be awaited by patch(), because starting a subscription loads a source chunk, and patch() is awaited before the next message: an awaited start would stall every patch behind a network fetch. P14 does not state this. Delivery of the must path now carries a contract it did not own, so compiled-format needs a version bump (v6 to v7) and a size review of patch-bindings.",
       "evidence": {
         "type": "source",
@@ -763,11 +700,7 @@
       "round": 3,
       "by": "opponent",
       "kind": "concession",
-      "answers": [
-        "O8",
-        "O9",
-        "O11"
-      ],
+      "answers": ["O8", "O9", "O11"],
       "why": "P12 removes the loader's per-event table (policy is in markup, default queues every event, so compiled-format line 36 holds). J13 and P13 show replay needs only a window of recorded models. J12 and P14 remove the errors-to-commands-subs edge; I rebuilt the dependency graph from the briefs without it and patch-bindings does not reach commands-subs, so there is no cycle.",
       "text": "Withdraw O8's hidden-table concern, O9 and O11."
     },
@@ -776,9 +709,7 @@
       "round": 3,
       "by": "opponent",
       "kind": "concession",
-      "answers": [
-        "O7"
-      ],
+      "answers": ["O7"],
       "why": "P11 stops handler delivery at block removal and drops later yields, so the stale-message risk is gone. The cleanup part stays as O13.",
       "text": "Withdraw the delivery part of O7."
     }

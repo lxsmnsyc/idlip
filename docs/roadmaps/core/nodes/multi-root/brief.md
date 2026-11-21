@@ -7,7 +7,7 @@ type: feature
 story:
 early: false
 outline: true
-milestone: 
+milestone:
 target:
 ship: auto
 land: auto
