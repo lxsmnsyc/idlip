@@ -1,0 +1,10 @@
+{
+  "id": "/src/board.idlip.tsx",
+  "source": "board.idlip.tsx",
+  "props": {
+    "items": [
+      { "id": "a1", "label": "First" },
+      { "id": "a2", "label": "Second" }
+    ]
+  }
+}

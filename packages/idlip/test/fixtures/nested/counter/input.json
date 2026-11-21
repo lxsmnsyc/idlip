@@ -1,0 +1,8 @@
+{
+  "id": "/src/counter.idlip.tsx",
+  "source": "counter.idlip.tsx",
+  "props": {
+    "label": "Spare",
+    "onRemove": ["clearAll", [], "", ""]
+  }
+}

@@ -1,10 +1,11 @@
 import { serialize } from 'seroval';
 import type {
+  ChunkUrls,
   DomMessage,
   Manifest,
   Model,
   PageState,
-  RenderContext,
+  Props,
 } from '../../src/core/format.ts';
 
 // Reference versions of the render helpers in contracts/compiled-format.md, Render helpers.
@@ -72,24 +73,133 @@ export function on(event: string, message: DomMessage): string {
   return ` on:${event}='${json}'`;
 }
 
+/** A child's state in the state script (`nesting-format`): the module, the model and the props. */
+export interface Slot {
+  readonly module: string;
+  readonly model: Model;
+  readonly props: Props;
+}
+
+/** A compiled server module as the render context sees it: its manifest, chunks and children. */
+export interface ModuleInfo {
+  readonly manifest: Manifest;
+  readonly chunks: ChunkUrls;
+  readonly uses?: readonly ModuleInfo[];
+}
+
+/** What a component passes to `context.state`. `uses` is the server modules of its children. */
+export interface ComponentState extends PageState {
+  readonly uses?: readonly ModuleInfo[];
+}
+
+/** `RenderContext` with the nesting additions of `nesting-format`. */
+export interface NestedContext {
+  state(state: ComponentState, path?: string): void;
+  /** The slots to render from, set when a test re-renders from a model. */
+  readonly slots?: Readonly<Record<string, Slot>>;
+}
+
+function escapePart(part: string): string {
+  return encodeURIComponent(part).replaceAll('-', '%2D');
+}
+
 /**
- * Returns a render context and a function that writes its state script.
+ * Returns the model path of a child: the parent's path, then `<site>` and one escaped key per
+ * enclosing loop (outermost first), or the explicit `key` when the child has one.
  */
-export function createContext(): { context: RenderContext; writeState: () => string } {
-  let recorded: PageState | undefined;
-  const context: RenderContext = {
-    state(state) {
-      recorded = state;
+export function slot(path: string, site: number, ...keys: unknown[]): string {
+  let id = String(site);
+  for (const key of keys) {
+    id += `:${escapePart(String(key))}`;
+  }
+  return path === '' ? id : `${path}/${id}`;
+}
+
+/** A client view chunk, as the item template chunk of a parent imports it. */
+export interface ViewChunk {
+  init: (props: Props) => Model;
+  render: (scope: { model: Model; props: Props; rows: []; path: string }) => string;
+}
+
+/** The slots `addChild` recorded in the reference client. */
+export const slots: Map<string, Slot> = new Map<string, Slot>();
+
+/**
+ * A reference `addChild` of `idlip/client`: makes the child's model, records the slot and returns
+ * the child's markup between its boundary comments.
+ */
+export function addChild(path: string, module: string, view: ViewChunk, props: Props): string {
+  const model = view.init(props);
+  slots.set(path, { module, model, props });
+  return `<!--n:${path}-->${view.render({ model, props, rows: [], path })}<!--/n-->`;
+}
+
+function collectModules(
+  uses: readonly ModuleInfo[],
+  modules: Map<string, Manifest>,
+  chunks: Record<string, string>,
+): void {
+  for (const info of uses) {
+    if (!modules.has(info.manifest.module)) {
+      modules.set(info.manifest.module, info.manifest);
+      Object.assign(chunks, info.chunks);
+      collectModules(info.uses ?? [], modules, chunks);
+    }
+  }
+}
+
+/**
+ * Returns a render context and a function that writes its state script. The root state comes
+ * from the call without a path, children from the calls with one. The chunk URLs, the manifests
+ * and the event types of the children are merged into the root's, as `ssr-render` does.
+ */
+export function createContext(): { context: NestedContext; writeState: () => string } {
+  let root: ComponentState | undefined;
+  const children = new Map<string, Slot>();
+  const modules = new Map<string, Manifest>();
+  const chunks: Record<string, string> = {};
+  const context: NestedContext = {
+    state(state, path) {
+      // The root has no path, or the empty one.
+      if (path === undefined || path === '') {
+        root = state;
+      } else {
+        children.set(path, {
+          module: state.manifest.module,
+          model: state.model,
+          props: state.props,
+        });
+        collectModules([state], modules, chunks);
+      }
+      collectModules(state.uses ?? [], modules, chunks);
     },
   };
   function writeState(): string {
-    if (recorded === undefined) {
+    if (root === undefined) {
       throw new Error('The module recorded no state');
     }
-    const events = recorded.manifest.events.join(' ');
+    modules.delete(root.manifest.module);
+    const events = new Set(root.manifest.events);
+    for (const manifest of modules.values()) {
+      for (const event of manifest.events) {
+        events.add(event);
+      }
+    }
+    const state: Record<string, unknown> = {
+      manifest: root.manifest,
+      chunks: { ...root.chunks, ...chunks },
+      model: root.model,
+      props: root.props,
+    };
+    if (modules.size > 0) {
+      state.modules = Object.fromEntries(modules);
+    }
+    if (children.size > 0) {
+      state.slots = Object.fromEntries(children);
+    }
+    const names = [...events].toSorted().join(' ');
     // seroval's output is a parenthesized expression, so it serves as the arrow body as it is.
-    const state = serialize(recorded);
-    return `<script i-state>(self.$idlip||=[]).push([${JSON.stringify(events)},()=>${state}])</script>`;
+    return `<script i-state>(self.$idlip||=[]).push([${JSON.stringify(names)},()=>${serialize(state)}])</script>`;
   }
   return { context, writeState };
 }
