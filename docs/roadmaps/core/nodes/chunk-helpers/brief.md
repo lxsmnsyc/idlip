@@ -1,6 +1,6 @@
 ---
 id: chunk-helpers
-title: Copy DOM and render helpers into chunks to fit the loader budget
+title: Fit the loader in its budget: helpers in chunks, then a size pass
 status: todo
 priority: must
 type: perf
@@ -27,8 +27,7 @@ owns:
   - packages/idlip/src/core/helpers.ts
   - packages/idlip/test/core/helpers.test.ts
 shared:
-  - packages/idlip/src/client/patch/dom.ts
-  - packages/idlip/src/client/patch/index.ts
+  - packages/idlip/src/client/**
   - packages/idlip/src/server/helpers.ts
   - packages/idlip/test/fixtures/**
 reserves: []
@@ -51,6 +50,10 @@ The `resume-loader` review measured the loader with the real patcher and list pa
 ## Evidence
 
 `nodes/resume-loader/outcome.md` (sizes) and the review numbers: `resume` 1319 B, + patcher 3617 B, + `patchList` 4659 B, + render helpers 4877 B.
+
+## Update after resume-loader
+
+With the helpers already out of the loader's exports, the wired loader measures 4407 B gzip -9, still 311 B over (`nodes/resume-loader/outcome.md`). This node also runs a size pass with the perf-pass skill over `src/client/**` (loader, patcher, list patcher) until the budget holds, keeping behavior: all client tests and the e2e request count must still pass.
 
 ## Acceptance
 
