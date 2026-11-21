@@ -1,5 +1,6 @@
 // oxlint-disable import/prefer-default-export
 import { getChunkId } from '../../core/format.ts';
+import { runTask } from '../tasks/run.ts';
 import type {
   Boot,
   HandlerChunk,
@@ -106,7 +107,8 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
     return (
       parent !== null &&
       parent.contains(target) &&
-      (script.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_PRECEDING) !== 0
+      (script === target ||
+        (script.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_PRECEDING) !== 0)
     );
   }
 
@@ -176,9 +178,8 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
     queue.push(item);
   }
 
-  async function loadUpdate(item: Pending): Promise<void> {
-    const tag = item.event.message.t;
-    const { manifest, chunks } = item.root.state;
+  async function getUpdate(root: Root, tag: string): Promise<Update> {
+    const { manifest, chunks } = root.state;
     const entry = Object.hasOwn(manifest.handlers, tag) ? manifest.handlers[tag] : undefined;
     const url = entry === undefined ? undefined : chunks[getChunkId(manifest.module, entry.chunk)];
     if (url === undefined) {
@@ -189,7 +190,11 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
     if (!Object.hasOwn(module, tag) || typeof module[tag] !== 'function') {
       throw new DropError(`idlip: no export ${tag}`);
     }
-    item.update = module[tag];
+    return module[tag];
+  }
+
+  async function loadUpdate(item: Pending): Promise<void> {
+    item.update = await getUpdate(item.root, item.event.message.t);
   }
 
   // Loads the chunks of the waiting events. An event that cannot run is dropped, and an event
@@ -244,19 +249,35 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
     return false;
   }
 
+  // Runs one message. A built-in task settles here, so its continuation joins the batch. Any
+  // other task runs on its own, and its continuation joins the queue when it settles.
+  async function apply(root: Root, update: Update, message: QueuedEvent['message']): Promise<void> {
+    const result = update(root.model, message.p);
+    if (!isStep(result)) {
+      root.model = result;
+      return;
+    }
+    root.model = result.model;
+    await runTask(
+      {
+        page: root.page,
+        apply: async (next, sent) => apply(root, next, sent),
+        // The state script stands for the target, since a continuation has no element.
+        push: (sent) => {
+          boot.q!.push({ message: sent, target: root.script, type: '', latest: false });
+        },
+        report,
+      },
+      result.task,
+    );
+  }
+
   async function runBatch(batch: readonly Pending[]): Promise<void> {
     const touched = new Set<Root>();
     for (const { event, root, update } of batch) {
       touched.add(root);
       try {
-        const result: Model | Step | undefined = update?.(root.model, event.message.p);
-        if (result === undefined) {
-          throw new Error(`idlip: ${event.message.t} returned nothing`);
-        }
-        if (isStep(result)) {
-          throw new Error('idlip: tasks are not supported');
-        }
-        root.model = result;
+        await apply(root, update!, event.message);
       } catch (error) {
         report(error);
       }

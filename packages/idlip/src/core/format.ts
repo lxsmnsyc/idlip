@@ -242,9 +242,6 @@ export type PatchList = (
 /** Owned by `patch-bindings`: registers code that runs when a block is added or removed. */
 export type OnBlock = (add: (start: Comment) => void, remove: (start: Comment) => void) => void;
 
-/** Implemented by `custom-effects`, called by the loader. */
-export type RunTask = (task: Task, dispatch: (message: Message) => void) => Promise<void>;
-
 /** A client module the compiler emits. */
 export interface Module {
   /** The chunk name, such as `handler=toggle` or `binding=todos.*.done`. */
