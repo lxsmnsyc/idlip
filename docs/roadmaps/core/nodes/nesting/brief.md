@@ -1,7 +1,7 @@
 ---
 id: nesting
 title: Nested components, end to end
-status: active
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 213396
 owns:
   - examples/counters/**
   - e2e/tests/nested.spec.ts
@@ -50,10 +50,10 @@ An example app with a list of `Counter` children and remove buttons, and an e2e 
 
 ## Acceptance
 
-- [ ] The first child click loads only child chunks.
-- [ ] The DOM equals a fresh server render after each step.
-- [ ] The todo e2e is unchanged.
-- [ ] Fast check passes: `pnpm --filter e2e test`
+- [x] The first child click loads only child chunks.
+- [x] The DOM equals a fresh server render after each step.
+- [x] The todo e2e is unchanged.
+- [x] Fast check passes: `pnpm --filter e2e test`
 
 ## Sizing
 
@@ -66,3 +66,5 @@ Example app and one spec; the work is in the dependencies.
 ## From commands-subs (orchestrator)
 
 A `<Subscribe>` inside a child component resolves its source chunk against the root's manifest. Fix it here so a child's subscription loads from the child's manifest, and cover it in the example if cheap.
+
+Landed as b4904f5 on `batch/core` after one fresh review round. First child click loads `handler=increment` and `binding=count` only. Counters loader 4918 B (children on); counters-subs 5771 B. e2e ports come from `E2E_PORT`, `E2E_COUNTERS_PORT`, `E2E_SUBS_PORT`.

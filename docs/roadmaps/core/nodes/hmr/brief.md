@@ -1,7 +1,7 @@
 ---
 id: hmr
 title: Hot updates that keep the model
-status: todo
+status: active
 priority: should
 type: feature
 story:
