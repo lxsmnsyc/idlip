@@ -12,7 +12,7 @@ target:
 ship: auto
 land: auto
 from:
-size: M
+size: L
 spike: false
 hypothesis:
 verify: pnpm --filter idlip exec vitest run test/compiler/view/analyze
