@@ -420,3 +420,73 @@ export default function App() {
     expect(kinds).toEqual(['child', 'child', 'child', 'child', 'element']);
   });
 });
+
+describe('props paths before a called method', () => {
+  const head = `import type { JSX } from 'idlip/jsx-runtime';\n`;
+
+  function readProps(source: string): string[] {
+    const ir = analyze('a.idlip.tsx', head + source);
+    expect(ir.diagnostics).toEqual([]);
+    const out: string[] = [];
+    for (const entry of ir.components[0].handlers[0].free) {
+      for (const path of entry.paths) {
+        out.push(printPath(path));
+      }
+    }
+    return out;
+  }
+
+  it('stops at the receiver of a method call', () => {
+    expect(
+      readProps(`export default function A(props: { list: string[] }): JSX.Element {
+  let at = -1;
+  function find(by: string) { at = props.list.indexOf(by); }
+  return <button on:click={() => find('b')}>{at}</button>;
+}`),
+    ).toEqual(['props.list']);
+    expect(
+      readProps(`export default function A({ list }: { list: string[] }): JSX.Element {
+  let at = -1;
+  function find(by: string) { at = list.indexOf(by); }
+  return <button on:click={() => find('b')}>{at}</button>;
+}`),
+    ).toEqual(['props.list']);
+    expect(
+      readProps(`export default function A(props: { user: { tags: string[] } }): JSX.Element {
+  let n = 0;
+  function count() { n = props.user.tags.map((t) => t).length; }
+  return <button on:click={() => count()}>{n}</button>;
+}`),
+    ).toEqual(['props.user.tags']);
+  });
+});
+
+describe('JSX attribute entities', () => {
+  it('decodes a string attribute and leaves a braced string alone', () => {
+    const source = `export default function A(): JSX.Element {
+  return <p title="a &amp; b &#65;" id={'a &amp; b'}>x</p>;
+}`;
+    const ir = analyze('a.idlip.tsx', source);
+    expect(ir.components[0].view).toMatchObject([
+      {
+        kind: 'element',
+        attrs: [
+          { name: 'title', value: { kind: 'static', value: 'a & b A' } },
+          { name: 'id', value: { kind: 'static', value: 'a &amp; b' } },
+        ],
+      },
+    ]);
+  });
+});
+
+describe('JSX text entities', () => {
+  it('decodes named, numeric and hex entities in text', () => {
+    const source = `export default function A(): JSX.Element {
+  return <p>a &lt; b &amp; c&nbsp;d &#65;&#x42; &unknown;</p>;
+}`;
+    const ir = analyze('a.idlip.tsx', source);
+    expect(ir.components[0].view).toMatchObject([
+      { kind: 'element', children: [{ kind: 'text', value: 'a < b & c d AB &unknown;' }] },
+    ]);
+  });
+});

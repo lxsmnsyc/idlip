@@ -436,9 +436,10 @@ function compileHandler(
 
   // The payload: the props values of the closure, then the handler's arguments.
   const propsPaths = listHandlerProps(component, handler);
+  const unlisted: string[] = [];
   function onProps(path: string): void {
-    if (!propsPaths.includes(path)) {
-      propsPaths.push(path);
+    if (!propsPaths.includes(path) && !unlisted.includes(path)) {
+      unlisted.push(path);
     }
   }
   const entry = scope.handlers.get(handler.name);
@@ -553,6 +554,19 @@ function compileHandler(
     if (statements.at(-1)?.type !== 'ReturnStatement') {
       out.push(`  return ${nextModel};`);
     }
+  }
+
+  // The event payload holds the listed props only, so an unlisted one would shift the arguments.
+  if (unlisted.length > 0) {
+    diagnostics.push(
+      makeDiagnostic(
+        'handler-props-unlisted',
+        'error',
+        `${handler.name} reads the props path ${unlisted.join(', ')} that the analysis did not list; the event payload would not carry it`,
+        handler,
+      ),
+    );
+    return undefined;
   }
 
   // The parameters: one variable per props path, then the handler's own.

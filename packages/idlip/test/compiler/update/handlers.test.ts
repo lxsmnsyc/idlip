@@ -2,6 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { getChunkFile } from '../../../src/core/format.ts';
+import { analyze } from '../../../src/compiler/view/analyze/index.ts';
 import { compileHandlers } from '../../../src/compiler/update/index.ts';
 
 const FIXTURES = join(import.meta.dirname, '..', '..', 'fixtures');
@@ -269,5 +270,38 @@ export default function A(props: { n: number }): JSX.Element {
 }
 `);
     expect(rules).toContain('handler-derived-props');
+  });
+});
+
+describe('method calls on props paths', () => {
+  const source = `${HEAD}
+export default function Finder(props: { list: string[] }): JSX.Element {
+  let at = -1;
+  function find(by: string) {
+    at = props.list.indexOf(by);
+  }
+  return <button on:click={() => find('b')}>{at}</button>;
+}
+`;
+
+  it('reads the receiver as the payload field and keeps the argument', () => {
+    const { code, rules } = compile(source);
+    expect(rules).toEqual([]);
+    expect(code['handler=find']).toContain('export function find(model, [props$list, by]) {');
+    expect(code['handler=find']).toContain('props$list.indexOf(by)');
+  });
+
+  it('reports a props path the IR does not list instead of appending it', () => {
+    const ir = analyze('/src/test.idlip.tsx', source);
+    for (const entry of ir.components[0].handlers[0].free) {
+      entry.paths = [];
+    }
+    const result = compileHandlers('/src/test.idlip.tsx', source, ir);
+    expect(result.client).toEqual([]);
+    const rules: string[] = [];
+    for (const diagnostic of result.diagnostics) {
+      rules.push(diagnostic.rule);
+    }
+    expect(rules).toEqual(['handler-props-unlisted']);
   });
 });

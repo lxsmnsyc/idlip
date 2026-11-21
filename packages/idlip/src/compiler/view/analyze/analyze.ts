@@ -1277,7 +1277,7 @@ class Analyzer {
     const out: Node[] = [];
     for (const child of children) {
       if (child.type === 'JSXText') {
-        const value = normalizeJsxText(child.value);
+        const value = decodeEntities(normalizeJsxText(child.value));
         if (value !== '') {
           this.checkTableText(context, child);
           out.push({ kind: 'text', value });
@@ -1608,7 +1608,9 @@ class Analyzer {
       if (value === null) {
         attrs.push({ name: attrName, value: { kind: 'static', value: true } });
       } else if (value.type === 'Literal') {
-        attrs.push({ name: attrName, value: { kind: 'static', value: value.value } });
+        // A string attribute decodes entities like text; a `{'...'}` string does not.
+        const text = typeof value.value === 'string' ? decodeEntities(value.value) : value.value;
+        attrs.push({ name: attrName, value: { kind: 'static', value: text } });
       } else if (value.type === 'JSXExpressionContainer') {
         if (value.expression.type === 'Literal' && typeof value.expression.value === 'string') {
           attrs.push({ name: attrName, value: { kind: 'static', value: value.expression.value } });
@@ -2481,7 +2483,7 @@ class Analyzer {
     };
 
     /** Records a props path read by the handler: `props.x.y` or a pattern field. */
-    const recordProps = (id: { name: string }, names: string[]): void => {
+    const recordProps = (id: { name: string }, names: string[], called = false): void => {
       if (resolveLocal(id.name) !== undefined) {
         return;
       }
@@ -2498,6 +2500,11 @@ class Analyzer {
       }
       if (base === undefined) {
         return;
+      }
+      // A called member is a method of the value (`props.list.indexOf`), so the path stops before
+      // it. `props.onSave()` keeps its name: the props object has no methods.
+      if (called && (base.length > 0 || names.length > 1)) {
+        names = names.slice(0, -1);
       }
       const list = propsPaths.get(id.name) ?? [];
       list.push({ root: 'props', segments: [...base, ...names] });
@@ -2739,7 +2746,9 @@ class Analyzer {
             }
             if (current.type === 'Identifier') {
               chained.add(current);
-              recordProps(current, names);
+              const parent = ancestors.at(-1);
+              const called = parent?.type === 'CallExpression' && parent.callee === node;
+              recordProps(current, names, called);
             }
           }
           visit(node.object, next, nested);
@@ -3438,6 +3447,37 @@ function normalizeJsxText(value: string): string {
     }
   }
   return kept.join(' ');
+}
+
+const ENTITIES: Record<string, string | undefined> = {
+  lt: '<',
+  gt: '>',
+  amp: '&',
+  quot: '"',
+  apos: "'",
+  nbsp: '\u00a0',
+  copy: '\u00a9',
+  reg: '\u00ae',
+  hellip: '\u2026',
+  mdash: '\u2014',
+  ndash: '\u2013',
+  middot: '\u00b7',
+  bull: '\u2022',
+  times: '\u00d7',
+  laquo: '\u00ab',
+  raquo: '\u00bb',
+};
+
+/** Decodes the entities of JSX text: named ones of a short table, `&#65;` and `&#x41;`. */
+function decodeEntities(text: string): string {
+  return text.replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z][a-z0-9]*);/gi, (match, body: string) => {
+    if (body.startsWith('#')) {
+      const code =
+        body[1] === 'x' || body[1] === 'X' ? parseInt(body.slice(2), 16) : Number(body.slice(1));
+      return code <= 0x10ffff ? String.fromCodePoint(code) : match;
+    }
+    return ENTITIES[body] ?? match;
+  });
 }
 
 /** Tells whether an expression calls an impure global such as `Math.random`. */
