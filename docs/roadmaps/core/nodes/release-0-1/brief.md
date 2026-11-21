@@ -26,6 +26,12 @@ shared: []
 reserves: []
 provides: []
 depends_on:
+  - on: errors-client
+    kind: hard
+    why: ships in 0.1.0
+  - on: loader-trim
+    kind: hard
+    why: ships in 0.1.0
   - on: markup-ts-plugin
     kind: hard
     why: ships in 0.1.0
