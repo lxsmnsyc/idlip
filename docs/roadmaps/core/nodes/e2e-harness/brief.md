@@ -1,7 +1,7 @@
 ---
 id: e2e-harness
 title: Playwright harness that counts chunks loaded on resume
-status: active
+status: done
 priority: must
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added:
-spent:
+spent: 182520
 owns:
   - e2e/**
   - .github/workflows/check.yml
@@ -68,3 +68,5 @@ An `e2e/` workspace package with Playwright tests for the todo app: the page wor
 ## Notes for the worker
 
 - Use `pnpm add -D @playwright/test@latest` in `e2e/`. Install browsers in CI with `playwright install --with-deps chromium`.
+
+Landed on `batch/core` as 92d61d9. Also edits `.github/workflows/check.yml` (e2e on Node 24, cached Chromium) and the lockfile.

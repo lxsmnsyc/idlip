@@ -1,7 +1,7 @@
 ---
 id: props-method-path
 title: Compiler: stop props paths before a called method
-status: active
+status: done
 priority: must
 type: fix
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 132199
 owns:
   - packages/idlip/src/compiler/view/analyze/**
   - packages/idlip/test/compiler/view/analyze/**
@@ -54,3 +54,5 @@ The second `compile-update` review (2026-11-21) reproduced it with a probe; see 
 - [ ] The analysis stops a props path (and a state path) before a called member: `props.list.map(f)` reads `list`.
 - [ ] `compileHandlers` reports an error when a chunk needs a props path that `listHandlerProps` does not list, instead of appending it.
 - [ ] JSX text entities are decoded in the analysis (`&lt;`, `&amp;`, `&nbsp;`, numeric forms), so codegen does not escape them twice. Found by `compile-view-codegen`.
+
+Landed on `batch/core` as facd28f. Known limits: 16 named entities; `(props.list.indexOf)(by)` still records the method, now caught by `handler-props-unlisted`.
