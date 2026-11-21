@@ -1,7 +1,7 @@
 ---
 id: commands-subs
 title: <Subscribe> blocks
-status: active
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 279822
 owns:
   - packages/idlip/src/compiler/view/codegen/subscribe.ts
   - packages/idlip/src/client/subs/**
@@ -67,13 +67,13 @@ depends_on:
 
 ## Acceptance
 
-- [ ] The 0004 Clock example starts, ticks and stops in happy-dom, and no handler runs after its block is removed.
-- [ ] A slow handler never has two values in flight.
-- [ ] A server page with a running clock resumes and ticks without an event.
-- [ ] A page with no `<Subscribe>` loads no source chunk.
-- [ ] A changed key stops the old run and starts a new one; `<For>` rows start and stop on their own.
-- [ ] The loader budget holds.
-- [ ] Fast check passes: `pnpm --filter idlip exec vitest run test/client/subs test/compiler/view/codegen/subscribe.test.ts`
+- [x] The 0004 Clock example starts, ticks and stops in happy-dom, and no handler runs after its block is removed.
+- [x] A slow handler never has two values in flight.
+- [x] A server page with a running clock resumes and ticks without an event.
+- [x] A page with no `<Subscribe>` loads no source chunk.
+- [x] A changed key stops the old run and starts a new one; `<For>` rows start and stop on their own.
+- [x] The loader budget holds.
+- [x] Fast check passes: `pnpm --filter idlip exec vitest run test/client/subs test/compiler/view/codegen/subscribe.test.ts`
 
 ## Sizing
 
@@ -84,3 +84,5 @@ Touches codegen, loader and a format change request; many shared files, one feat
 - `stock-sources` landed `timer`, `socket`, `eventSource` and `media` in `src/sources/`, and `Random`, `Time` and `until` in `src/core/`. Names and types are in `contracts/core-api.md` v10. Build on the `listen` bridge in `src/sources/channel.ts`, so abort ends a source without an awaited `return()`. Do not write another stock source.
 - Put the loader code behind a `HAS_<NAME>` flag (`HAS_SUBS`), following the recipe in `nodes/runtime-flags/outcome.md`: a `declare const` and export in `src/client/features.ts`, one line in `DETECTORS` of `src/vite/features.ts`, and `if (HAS_SUBS)` around the code. The 4096 B gzip budget is the loader with no optional features, so the flag removes your cost from apps that do not use it. Report the feature's cost; it is not capped. The detector is on when a manifest has a source chunk or a view has `i-sub`. Replace "The loader budget holds" with: the loader with no optional features stays within 4096 B gzip, and the app that uses subscriptions reports its cost.
 - `resume.ts` changed: `apply` runs tasks through `runTask(host, task)`. A subscription value is pushed to `boot.q` the way a settled custom task is (an event with no DOM target); read `src/client/tasks/run.ts` for that path.
+
+Landed as 50c04f5 on `batch/core` after one fresh review round (rebase, lint). Todo loader 4007 B gzip with the flag off; an app with `<Subscribe>` 5050 B. Deferred: dev warning for non-serializable payloads (debate item 6). Accepted changes outside paths: `vite/chunks.ts`, `vite/features.ts`, `testing/index.ts`.
