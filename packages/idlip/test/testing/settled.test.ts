@@ -17,6 +17,15 @@ async function tick(): Promise<void> {
   });
 }
 
+// The gate exists once the chunk's import has started, which takes as long as the machine allows.
+async function gated(chunk: string): Promise<void> {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+  const scope = globalThis as { idlipGates?: Record<string, unknown> };
+  while (typeof scope.idlipGates?.[chunk] !== 'function') {
+    await tick();
+  }
+}
+
 describe('resume().settled', () => {
   it('resolves at once when nothing waits', async () => {
     harness = setup('counter');
@@ -33,7 +42,7 @@ describe('resume().settled', () => {
     const waiting = settled().then(() => {
       done = true;
     });
-    await tick();
+    await gated('handler=add');
     expect(done).toBe(false);
     release('handler=add');
     await waiting;

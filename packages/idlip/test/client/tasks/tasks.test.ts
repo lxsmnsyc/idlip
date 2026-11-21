@@ -50,6 +50,7 @@ export function run(n) {
 interface Run {
   patch: ReturnType<typeof vi.fn<Patch>>;
   errors: unknown[];
+  settled: () => Promise<void>;
   click: (tag: string, payload?: unknown[]) => void;
   cleanup: () => void;
 }
@@ -93,6 +94,7 @@ function start(sources: Record<string, string> = SOURCES): Run {
   return {
     patch,
     errors,
+    settled: resumed.settled,
     click(tag) {
       document.querySelector<HTMLElement>(`#${tag}`)!.click();
     },
@@ -105,15 +107,24 @@ function start(sources: Record<string, string> = SOURCES): Run {
   };
 }
 
-async function settle(): Promise<void> {
-  for (let tick = 0; tick < 8; tick++) {
+let run: Run | undefined;
+
+// Waits for the state itself, since a chunk import takes as long as the machine allows.
+async function until(done: () => boolean): Promise<void> {
+  while (!done()) {
     await new Promise((resolve) => {
-      setTimeout(resolve, 10);
+      setTimeout(resolve, 2);
     });
   }
 }
 
-let run: Run | undefined;
+function patched(count: number): boolean {
+  return run!.patch.mock.calls.length >= count;
+}
+
+function lastLast(): unknown {
+  return (run!.patch.mock.calls.at(-1)?.[2] as { last?: unknown } | undefined)?.last;
+}
 
 afterEach(() => {
   run?.cleanup();
@@ -124,7 +135,8 @@ describe('built-in task', () => {
   it('runs the continuation before the patch and patches once', async () => {
     run = start();
     run.click('go');
-    await settle();
+    await until(() => patched(1));
+    await run.settled();
     expect(run.patch).toHaveBeenCalledTimes(1);
     expect(run.patch.mock.calls[0][1]).toEqual({ n: 0 });
     expect(run.patch.mock.calls[0][2]).toEqual({ n: 0, busy: true, id: 'id-1' });
@@ -136,7 +148,7 @@ describe('built-in task', () => {
       'handler=go': SOURCES['handler=go'].replace("return 'id-1';", "throw new Error('no');"),
     });
     run.click('go');
-    await settle();
+    await until(() => patched(1));
     expect(run.patch.mock.calls[0][2]).toEqual({ n: 0, busy: true, id: 'failed' });
   });
 });
@@ -147,7 +159,8 @@ describe('built-in without its function', () => {
       'handler=go': SOURCES['handler=go'].replace("export { rid as 'task$go$1' };", ''),
     });
     run.click('go');
-    await settle();
+    await until(() => run!.errors.length > 0);
+    await run.settled();
     expect(run.errors).toHaveLength(1);
     expect(String(run.errors[0])).toContain('no task for go$1');
   });
@@ -157,7 +170,8 @@ describe('task with its own chunk', () => {
   it('patches the step without waiting for the task', async () => {
     run = start();
     run.click('slow');
-    await settle();
+    await until(() => patched(1) && scope.taskCalls!.length > 0);
+    await run.settled();
     expect(scope.taskCalls).toEqual([[1]]);
     expect(run.patch).toHaveBeenCalledTimes(1);
     expect(run.patch.mock.calls[0][2]).toEqual({ n: 0, wait: true });
@@ -166,9 +180,9 @@ describe('task with its own chunk', () => {
   it('continues with { ok: true, value } and the carried locals', async () => {
     run = start();
     run.click('slow');
-    await settle();
+    await until(() => scope.taskGates!.length > 0);
     scope.taskGates![0]('v' as never);
-    await settle();
+    await until(() => lastLast() !== undefined);
     expect(run.patch.mock.calls.at(-1)![2]).toEqual({ n: 0, wait: true, last: [true, 'v', 'tag'] });
   });
 
@@ -178,7 +192,7 @@ describe('task with its own chunk', () => {
       'task=slow$1': 'export function run() { return Promise.reject(new Error("down")); }',
     });
     run.click('slow');
-    await settle();
+    await until(() => lastLast() !== undefined);
     expect(run.patch.mock.calls.at(-1)![2]).toEqual({
       n: 0,
       wait: true,
@@ -190,13 +204,13 @@ describe('task with its own chunk', () => {
     run = start();
     run.click('slow');
     run.click('slow');
-    await settle();
+    await until(() => scope.taskGates!.length === 2);
     expect(scope.taskCalls).toEqual([[1], [1]]);
     scope.taskGates![1]('b' as never);
-    await settle();
+    await until(() => lastLast() !== undefined);
     expect(run.patch.mock.calls.at(-1)![2]).toEqual({ n: 0, wait: true, last: [true, 'b', 'tag'] });
     scope.taskGates![0]('a' as never);
-    await settle();
+    await until(() => (lastLast() as unknown[])[1] === 'a');
     expect(run.patch.mock.calls.at(-1)![2]).toEqual({ n: 0, wait: true, last: [true, 'a', 'tag'] });
   });
 
@@ -206,13 +220,15 @@ describe('task with its own chunk', () => {
       'task=slow$1': 'throw new Error("chunk down");',
     });
     run.click('slow');
-    await settle();
+    await until(() => run!.errors.length > 0 && patched(1));
+    await run.settled();
     expect(run.errors).toHaveLength(1);
     expect(String(run.errors[0])).toContain('chunk down');
     expect(run.patch.mock.calls[0][2]).toEqual({ n: 0, wait: true });
     // The model is the step's model, and later events still run.
     run.click('go');
-    await settle();
+    await until(() => patched(2));
+    await run.settled();
     expect(run.patch.mock.calls.at(-1)![2]).toEqual({ n: 0, wait: true, busy: true, id: 'id-1' });
   });
 });
