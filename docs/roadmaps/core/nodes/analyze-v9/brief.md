@@ -1,7 +1,7 @@
 ---
 id: analyze-v9
 title: Compiler: event modifiers and the view-ir v9 rules in the analysis
-status: todo
+status: active
 priority: must
 type: feature
 story:
