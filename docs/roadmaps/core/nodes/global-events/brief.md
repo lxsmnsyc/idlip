@@ -1,7 +1,7 @@
 ---
 id: global-events
 title: Dev warning for deep event queues, and window and document events
-status: todo
+status: active
 priority: should
 type: feature
 story:
