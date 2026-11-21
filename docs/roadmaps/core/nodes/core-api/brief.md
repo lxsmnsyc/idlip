@@ -1,7 +1,7 @@
 ---
 id: core-api
 title: Freeze the public runtime surface and the package layout
-status: todo
+status: active
 priority: must
 type: contract
 story:

@@ -1,7 +1,7 @@
 ---
 id: spike-view-analysis
 title: Spike: analyze function components and view model paths with oxc
-status: todo
+status: active
 priority: must
 type: spike
 story:

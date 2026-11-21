@@ -1,7 +1,7 @@
 ---
 id: spike-chunk-split
 title: Spike: per-handler and per-binding chunks through Vite and Rolldown
-status: todo
+status: active
 priority: must
 type: spike
 story:
