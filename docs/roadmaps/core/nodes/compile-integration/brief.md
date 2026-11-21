@@ -1,7 +1,7 @@
 ---
 id: compile-integration
 title: 'Compiler: wire compile() end to end'
-status: active
+status: done
 priority: must
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added:
-spent:
+spent: 152810
 owns:
   - packages/idlip/src/compiler/index.ts
   - packages/idlip/test/compiler/compile/**
@@ -62,3 +62,5 @@ depends_on:
 ## Sizing
 
 S: glue code over three finished parts.
+
+Landed on `batch/core` as 427f79c. Also exports `pickComponent` from `compiler/update`.

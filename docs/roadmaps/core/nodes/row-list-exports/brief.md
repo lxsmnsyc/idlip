@@ -1,7 +1,7 @@
 ---
 id: row-list-exports
 title: Compiler: export list bindings from row group chunks
-status: todo
+status: active
 priority: must
 type: fix
 story:
