@@ -1,7 +1,7 @@
 ---
 id: commands-subs
 title: <Subscribe> blocks
-status: todo
+status: active
 priority: should
 type: feature
 story:
