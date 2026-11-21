@@ -1,0 +1,137 @@
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { splitFrontMatter } from './front-matter.ts';
+import type { FrontMatter } from './front-matter.ts';
+import { createRenderer } from './markdown.ts';
+import type { Heading, RenderEnv } from './markdown.ts';
+import { renderLanding, renderPage } from './layout.ts';
+
+const DOCS = fileURLToPath(new URL('../docs/', import.meta.url));
+const TODO_SOURCE = fileURLToPath(
+  new URL('../../examples/todo/src/todo.idlip.tsx', import.meta.url),
+);
+
+export interface Page extends FrontMatter {
+  /** The path of the Markdown file inside `docs`, such as `guide/state.md`. */
+  file: string;
+  /** The address of the page, relative to the base: `docs/guide/state/`. */
+  url: string;
+  html: string;
+  headings: Heading[];
+  description: string;
+}
+
+export interface NavSection {
+  name: string;
+  pages: Page[];
+}
+
+/** Every Markdown file under a folder, as paths relative to it, in a stable order. */
+function listMarkdown(folder: string, prefix = ''): string[] {
+  const files: string[] = [];
+  for (const entry of readdirSync(path.join(folder, prefix), { withFileTypes: true })) {
+    const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) {
+      files.push(...listMarkdown(folder, relative));
+    } else if (entry.name.endsWith('.md')) {
+      files.push(relative);
+    }
+  }
+  return files.toSorted();
+}
+
+/** The address of a Markdown file: `docs/` for `index.md`, `docs/a/b/` for `a/b.md`. */
+export function pageUrl(file: string): string {
+  const name = file.slice(0, -'.md'.length);
+  if (name === 'index') {
+    return 'docs/';
+  }
+  return name.endsWith('/index') ? `docs/${name.slice(0, -'index'.length)}` : `docs/${name}/`;
+}
+
+/** Reads and renders every page under `docs`. */
+export function loadPages(folder = DOCS, base = '/'): Page[] {
+  const renderer = createRenderer();
+  const pages: Page[] = [];
+  for (const file of listMarkdown(folder)) {
+    const { data, body } = splitFrontMatter(readFileSync(path.join(folder, file), 'utf8'), file);
+    const env: RenderEnv = {
+      headings: [],
+      lead: '',
+      link: (href) => resolveLink(href, file, base),
+    };
+    const html = renderer.render(body, env);
+    pages.push({
+      ...data,
+      file,
+      url: pageUrl(file),
+      html,
+      headings: env.headings,
+      description: data.description ?? env.lead,
+    });
+  }
+  return pages;
+}
+
+/** A link to another Markdown file becomes the address of its page. Other links stay as they are. */
+function resolveLink(href: string, from: string, base: string): string {
+  const match = /^([^#?]*\.md)(#.*)?$/.exec(href);
+  if (!match) {
+    return href.startsWith('/') ? base + href.slice(1) : href;
+  }
+  const target = path.posix.normalize(path.posix.join(path.posix.dirname(from), match[1]));
+  return `${base}${pageUrl(target)}${match[2]}`;
+}
+
+/** The sidebar: sections by their first page, pages by `order` and then by title. */
+export function buildNav(pages: readonly Page[]): NavSection[] {
+  const sections = new Map<string, Page[]>();
+  for (const page of pages) {
+    const list = sections.get(page.section) ?? [];
+    list.push(page);
+    sections.set(page.section, list);
+  }
+  const nav: NavSection[] = [];
+  for (const [name, list] of sections) {
+    list.sort((a, b) => a.order - b.order || a.title.localeCompare(b.title));
+    nav.push({ name, pages: list });
+  }
+  nav.sort((a, b) => a.pages[0].order - b.pages[0].order || a.name.localeCompare(b.name));
+  return nav;
+}
+
+/** Renders the whole site: the landing page and one page per Markdown file, by output path. */
+export function renderSite(pages: readonly Page[], base = '/'): Map<string, string> {
+  const nav = buildNav(pages);
+  const flat: Page[] = [];
+  for (const section of nav) {
+    flat.push(...section.pages);
+  }
+  const files = new Map<string, string>();
+  for (const [index, page] of flat.entries()) {
+    files.set(
+      `${page.url}index.html`,
+      renderPage({ page, nav, base, previous: flat[index - 1], next: flat[index + 1] }),
+    );
+  }
+  let example = '';
+  try {
+    example = readFileSync(TODO_SOURCE, 'utf8');
+  } catch {
+    // The landing page shows no sample when the example is missing.
+  }
+  files.set('index.html', renderLanding({ base, example, start: flat[0]?.url ?? 'docs/' }));
+  return files;
+}
+
+/** Writes the pages into a folder. The Vite build has already put the assets there. */
+export function writeSite(outDir: string, base = '/'): string[] {
+  const files = renderSite(loadPages(DOCS, base), base);
+  for (const [name, html] of files) {
+    const target = path.join(outDir, name);
+    mkdirSync(path.dirname(target), { recursive: true });
+    writeFileSync(target, html);
+  }
+  return [...files.keys()];
+}
