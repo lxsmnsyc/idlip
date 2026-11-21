@@ -110,6 +110,9 @@ depends_on:
   - on: perf-from-bench
     kind: hard
     why: 0.1.0 ships the fixes for the benchmark gaps
+  - on: fix-global-late-listener
+    kind: hard
+    why: 0.1.0 must not drop global listeners added by a patch
 ---
 
 # Release 0.1.0
