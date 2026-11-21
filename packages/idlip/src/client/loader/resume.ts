@@ -209,10 +209,10 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
       }
     }
     const unit = HAS_CHILDREN ? nest!.target(root, event) : root;
-    if (unit === undefined) {
+    if (HAS_CHILDREN && unit === undefined) {
       return;
     }
-    const item: Pending = { event, root, unit, update: undefined, failed: false };
+    const item: Pending = { event, root, unit: unit!, update: undefined, failed: false };
     if (event.latest) {
       // Latest wins: the pending event of this element and type is replaced.
       for (let index = 0; index < queue.length; index++) {
@@ -269,7 +269,9 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
       if (result.status === 'rejected') {
         report(result.reason);
         // A subscription asks for its next value only after this one, so it must not wait.
-        waiting[index].event.done?.();
+        if (HAS_SUBS) {
+          waiting[index].event.done?.();
+        }
         if (result.reason instanceof DropError) {
           queue.splice(queue.indexOf(waiting[index]), 1);
         } else {
@@ -352,7 +354,7 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
         continue;
       }
       touched.add(unit);
-      if (event.signal?.aborted) {
+      if (HAS_SUBS && event.signal?.aborted) {
         continue;
       }
       try {
@@ -384,8 +386,10 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
         }
       }
     }
-    for (const { event } of batch) {
-      event.done?.();
+    if (HAS_SUBS) {
+      for (const { event } of batch) {
+        event.done?.();
+      }
     }
   }
 

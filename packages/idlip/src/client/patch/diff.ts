@@ -14,7 +14,7 @@ interface Roots {
   readonly next: unknown;
 }
 
-function readField(value: unknown, field: string): unknown {
+export function readField(value: unknown, field: string): unknown {
   return isRecord(value) ? value[field] : undefined;
 }
 

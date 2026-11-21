@@ -60,7 +60,7 @@ function buildIndex(root: ParentNode, from?: Comment): Index {
   const index: Index = new Map();
   const walker = root.ownerDocument!.createTreeWalker(root, 1 | 128);
   let depth = 0;
-  if (from !== undefined) {
+  if (HAS_CHILDREN && from !== undefined) {
     // A child's bindings are between its boundary comments.
     walker.currentNode = from;
   }
@@ -93,7 +93,7 @@ function buildIndex(root: ParentNode, from?: Comment): Index {
 /** Returns the node of a binding outside rows. The first call walks the page. */
 // oxlint-disable-next-line import/prefer-default-export
 export function findNode(root: ParentNode, name: string, from?: Comment): Node | undefined {
-  if (cache?.root !== root || cache.from !== from) {
+  if (cache?.root !== root || (HAS_CHILDREN && cache.from !== from)) {
     cache = { root, from, index: buildIndex(root, from) };
   }
   return cache.index.get(name);

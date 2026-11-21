@@ -9,8 +9,8 @@ import type {
   Scope,
 } from '../../core/format.ts';
 import { HAS_CHILDREN } from '../features.ts';
-import { isComment } from '../patch/guards.ts';
-import { addBlock, findInnerBlocks, parseHtml, removeBlock } from '../patch/index.ts';
+import { isComment, isElement } from '../patch/guards.ts';
+import { addBlock, findInnerBlocks, parseHtml, readField, removeBlock } from '../patch/index.ts';
 
 interface Range {
   readonly start: Comment;
@@ -19,10 +19,6 @@ interface Range {
 
 function getData(node: Node | null): string | undefined {
   return isComment(node) ? node.data : undefined;
-}
-
-function isElement(node: Node): node is Element {
-  return node.nodeType === 1;
 }
 
 function walk(node: Node, nodes: Node[]): Node {
@@ -145,10 +141,6 @@ function getStayers(olds: readonly number[]): Set<number> {
   return stay;
 }
 
-function getKey(item: unknown, key: string): unknown {
-  return typeof item === 'object' && item !== null ? Reflect.get(item, key) : undefined;
-}
-
 function getRowScope(scope: Scope, item: unknown, index: number): Scope {
   return { ...scope, rows: [...scope.rows, { item, index }] };
 }
@@ -223,12 +215,12 @@ export async function patchList(...args: Parameters<PatchList>): Promise<void> {
   // A key that is new or repeated counts as an insert.
   const oldIndexes = new Map<unknown, number>();
   for (let i = 0; i < prev.length; i++) {
-    oldIndexes.set(getKey(prev[i], list.key), i);
+    oldIndexes.set(readField(prev[i], list.key), i);
   }
   const olds: number[] = [];
   const used = new Set<number>();
   for (const item of next) {
-    const old = oldIndexes.get(getKey(item, list.key));
+    const old = oldIndexes.get(readField(item, list.key));
     if (old === undefined || used.has(old)) {
       olds.push(-1);
     } else {

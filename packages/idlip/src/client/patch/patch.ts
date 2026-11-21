@@ -1,8 +1,10 @@
 import type {
   Binding,
+  ListBinding,
   ListContext,
   Manifest,
   Model,
+  NodeBinding,
   Page,
   Patch,
   PatchList,
@@ -15,7 +17,7 @@ import { isBinding, isComment, isRecord } from './guards.ts';
 import { findNode } from './nodes.ts';
 
 interface Plan {
-  /** The paths of every group, without root props, which never change. */
+  /** The paths of every group. */
   readonly paths: readonly string[];
   readonly keys: Readonly<Record<string, string>>;
   /** The export names of bindings inside rows. */
@@ -30,10 +32,7 @@ function getPlan(manifest: Manifest): Plan {
     const paths: string[] = [];
     for (const group of Object.values(manifest.groups)) {
       for (const path of group.paths) {
-        // A child's props change, so the paths stay when children exist.
-        if (HAS_CHILDREN || (path !== 'props' && !path.startsWith('props.'))) {
-          paths.push(path);
-        }
+        paths.push(path);
       }
     }
     const rowNames = new Set<string>();
@@ -110,8 +109,13 @@ function compareNames(a: string, b: string): number {
   return Number(a.slice(1)) - Number(b.slice(1));
 }
 
+function createScope(page: Page, model: Model): Scope {
+  return { model, props: page.props, rows: [], ...(HAS_CHILDREN && { path: page.path }) };
+}
+
 function readList(binding: Binding, scope: Scope): readonly unknown[] {
-  const list: unknown = Reflect.apply(binding, undefined, [scope]);
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+  const list: unknown = (binding as ListBinding)(scope);
   return Array.isArray(list) ? list : [];
 }
 
@@ -138,8 +142,8 @@ export function createPatch(patchList: PatchList): Patch {
     }
     // Ids follow view order, so a block runs before the bindings inside it.
     names.sort(compareNames);
-    const prevScope: Scope = { model: prev, props: page.props, rows: [], path: page.path };
-    const nextScope: Scope = { model: next, props: page.props, rows: [], path: page.path };
+    const prevScope = createScope(page, prev);
+    const nextScope = createScope(page, next);
     for (const name of names) {
       if (HAS_CHILDREN && name[0] === 'p') {
         // A props binding has no node.
@@ -153,7 +157,8 @@ export function createPatch(patchList: PatchList): Patch {
         continue;
       }
       if (name[0] !== 'l') {
-        Reflect.apply(binding, undefined, [start, nextScope]);
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+        (binding as NodeBinding)(start, nextScope);
         continue;
       }
       const id = name.slice(1);
