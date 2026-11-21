@@ -1,7 +1,7 @@
 ---
 id: markup-port
 title: Port every view module to the markup DSL
-status: todo
+status: active
 priority: should
 type: refactor
 story: markup-frontend
