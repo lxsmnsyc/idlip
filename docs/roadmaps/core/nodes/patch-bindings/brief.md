@@ -1,7 +1,7 @@
 ---
 id: patch-bindings
 title: Model path diff and binding patcher
-status: todo
+status: active
 priority: must
 type: feature
 story:

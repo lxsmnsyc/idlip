@@ -1,7 +1,7 @@
 ---
 id: analyze-v9
 title: Compiler: event modifiers and the view-ir v9 rules in the analysis
-status: active
+status: done
 priority: must
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 173608
 owns:
   - packages/idlip/src/compiler/view/analyze/**
   - packages/idlip/test/compiler/view/analyze/**
@@ -55,3 +55,5 @@ Bring the analysis from view-ir v8 to v9, which `compiled-format` added after `c
 - [ ] Other block bodies stay `event-closure`.
 - [ ] `attr-reserved`, `event-placeholder`, `html-raw-text` and `event-passive-prevent` exist, and each one the analysis can produce fires on a fixture marker. `html-nesting` covers text holes in table parts across blocks.
 - [ ] The todo fixture source of `compiled-format` analyzes with 0 diagnostics, and its hole ids and path sets match its manifest.
+
+Landed on `batch/core` as 36bc5e5. Also extends `handler-mutate` to writes through local aliases of state.
