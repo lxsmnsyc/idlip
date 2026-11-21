@@ -1,7 +1,7 @@
 ---
 id: docs-reference
 title: API reference and editor setup
-status: todo
+status: active
 priority: should
 type: docs
 story:

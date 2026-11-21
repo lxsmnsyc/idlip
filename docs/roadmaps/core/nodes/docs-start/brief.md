@@ -1,7 +1,7 @@
 ---
 id: docs-start
 title: Guide: getting started, components and state, views
-status: todo
+status: active
 priority: should
 type: docs
 story:
