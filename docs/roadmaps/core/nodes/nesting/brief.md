@@ -62,3 +62,7 @@ Example app and one spec; the work is in the dependencies.
 ## From nesting-compile (orchestrator)
 
 `generate(ir, source, id, { child, resolve })` takes a `child` option and a `resolve` function, but `compile()` in `src/compiler/index.ts` and the Vite plugin do not forward them yet. This node wires both, so the example builds through Vite.
+
+## From commands-subs (orchestrator)
+
+A `<Subscribe>` inside a child component resolves its source chunk against the root's manifest. Fix it here so a child's subscription loads from the child's manifest, and cover it in the example if cheap.
