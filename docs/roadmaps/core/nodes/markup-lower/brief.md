@@ -1,7 +1,7 @@
 ---
 id: markup-lower
 title: Lower markup to TSX with offset mappings
-status: active
+status: done
 priority: should
 type: feature
 story: markup-frontend
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 153801
 owns:
   - packages/idlip/src/compiler/markup/lower.ts
   - packages/idlip/test/compiler/markup/lower/**
@@ -46,10 +46,12 @@ depends_on:
 
 ## Acceptance
 
-- [ ] Output equals the expected TSX for every fixture.
-- [ ] Mappings round-trip: a position in each hole maps to the same text in the TSX.
-- [ ] Fast check passes: `pnpm --filter idlip exec vitest run test/compiler/markup/lower`
+- [x] Output equals the expected TSX for every fixture.
+- [x] Mappings round-trip: a position in each hole maps to the same text in the TSX.
+- [x] Fast check passes: `pnpm --filter idlip exec vitest run test/compiler/markup/lower`
 
 ## Sizing
 
 One emitter plus mappings.
+
+Landed as 6230f36 on `feat/markup-frontend` after one fresh review round.
