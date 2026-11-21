@@ -1,7 +1,7 @@
 ---
 id: svg-and-html
 title: SVG and MathML namespaces, and trusted raw HTML
-status: todo
+status: active
 priority: should
 type: feature
 story:
