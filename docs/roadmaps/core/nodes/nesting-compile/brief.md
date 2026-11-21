@@ -1,7 +1,7 @@
 ---
 id: nesting-compile
 title: Codegen for nested components
-status: todo
+status: active
 priority: should
 type: feature
 story:
