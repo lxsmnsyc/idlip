@@ -1,7 +1,7 @@
 ---
 id: compile-view-codegen
 title: Compiler: emit server template and binding chunks from the view IR
-status: active
+status: done
 priority: must
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added:
-spent:
+spent: 373976
 owns:
   - packages/idlip/src/compiler/view/codegen/**
   - packages/idlip/test/compiler/view/codegen/**
@@ -54,3 +54,5 @@ From the view IR, emit the server render module, the binding group chunks (group
 ## Notes for the worker
 
 - Build against a hand-written IR for each fixture. The analysis is built at the same time by `compile-view-analyze`.
+
+Landed on `batch/core` as f18dc6a. Follow-up for `compile-integration`: export one component picker from `compiler/update` and use it in codegen.
