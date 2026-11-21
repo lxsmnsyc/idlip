@@ -253,7 +253,7 @@ export default function Inbox(): JSX.Element {
 
 ### Subscribe
 
-`<Subscribe>` reads a stream of values while it is in the view and sends each value to a handler. Effects and subscriptions have their own guide page.
+`<Subscribe>` reads a stream of values while it is in the view and sends each value to a handler. See [Subscriptions](./subscriptions.md) and [Effects](./effects.md).
 
 ## Common errors
 
