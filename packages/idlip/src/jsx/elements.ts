@@ -57,9 +57,12 @@ export interface AnchorAttributes {
   target?: '_self' | '_blank' | '_parent' | '_top' | (string & {});
   rel?: string;
   download?: string | boolean;
+  /** On an SVG `<a>`. */
+  'xlink:href'?: string;
 }
 
 export interface ButtonAttributes {
+  formaction?: string;
   type?: 'button' | 'submit' | 'reset';
   disabled?: boolean;
   name?: string;
@@ -152,7 +155,26 @@ export interface LinkAttributes {
 /**
  * Attributes that are specific to a tag. Tags that are not listed take only the common ones.
  */
+export interface FrameAttributes {
+  src?: string;
+  /** A bound document must be `trusted(...)`. */
+  srcdoc?: string | TrustedHtml;
+}
+
+export interface ObjectAttributes {
+  data?: string;
+  type?: string;
+}
+
+export interface EmbedAttributes {
+  src?: string;
+  type?: string;
+}
+
 export interface SpecificAttributes {
+  iframe: FrameAttributes;
+  object: ObjectAttributes;
+  embed: EmbedAttributes;
   a: AnchorAttributes;
   button: ButtonAttributes;
   input: InputAttributes;

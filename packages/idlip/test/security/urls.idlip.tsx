@@ -1,4 +1,3 @@
-// @ts-nocheck: the JSX types lack formaction on button and xlink:href on svg a (jsx-types).
 // oxlint-disable no-script-url
 // URL attributes bound from the model, and one static literal.
 // oxlint-disable typescript/no-confusing-void-expression, typescript/explicit-function-return-type

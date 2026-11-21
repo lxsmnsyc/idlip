@@ -48,6 +48,7 @@ import type {
   Target,
   UnaryOp,
 } from './ir.ts';
+import { getUrlKind } from '../../../core/url.ts';
 import { findImpliedWrapper, findNestingProblem } from './nesting.ts';
 import { locate, printPath } from './print.ts';
 
@@ -1735,6 +1736,18 @@ class Analyzer {
       } else if (value.type === 'JSXExpressionContainer') {
         if (value.expression.type === 'Literal' && typeof value.expression.value === 'string') {
           attrs.push({ name: attrName, value: { kind: 'static', value: value.expression.value } });
+        } else if (namespace === 'html' && attrName === 'srcdoc') {
+          // A document written into a frame runs scripts, so a bound one must be trusted(...).
+          const hole = this.lowerTrusted(value.expression, scope);
+          if (hole === undefined) {
+            this.reportError(
+              'srcdoc-trusted',
+              'srcdoc takes a literal or trusted(value) from idlip',
+              attribute,
+            );
+          } else {
+            attrs.push({ name: attrName, value: { kind: 'hole', hole } });
+          }
         } else {
           attrs.push({
             name: attrName,
@@ -1745,6 +1758,7 @@ class Analyzer {
         this.reportError('attr-jsx', 'An attribute value cannot be JSX', value);
       }
     }
+    markUrls(tag, attrs);
     const inner: ViewContext = {
       ...context,
       namespace: tag === 'foreignObject' ? 'html' : namespace,
@@ -1853,19 +1867,28 @@ class Analyzer {
     return found?.source === 'idlip' && found.imported === 'trusted';
   }
 
+  /** The hole of `trusted(value)` from idlip, or undefined for any other expression. */
+  lowerTrusted(expression: JSXExpression, scope: Scope): Hole | undefined {
+    if (
+      expression.type === 'CallExpression' &&
+      expression.callee.type === 'Identifier' &&
+      this.isTrusted(expression.callee.name) &&
+      expression.arguments.length === 1
+    ) {
+      return this.createHole(expression.arguments[0], scope);
+    }
+    return undefined;
+  }
+
   lowerHtml(
     value: JSXAttributeValue | null,
     scope: Scope,
     attribute: JSXAttribute,
   ): Hole | undefined {
     const expression = value?.type === 'JSXExpressionContainer' ? value.expression : undefined;
-    if (
-      expression?.type === 'CallExpression' &&
-      expression.callee.type === 'Identifier' &&
-      this.isTrusted(expression.callee.name) &&
-      expression.arguments.length === 1
-    ) {
-      return this.createHole(expression.arguments[0], scope);
+    const hole = expression === undefined ? undefined : this.lowerTrusted(expression, scope);
+    if (hole !== undefined) {
+      return hole;
     }
     this.report('html-trusted', 'error', 'html takes trusted(value) from idlip', attribute);
     return undefined;
@@ -3774,4 +3797,20 @@ export function analyze(file: string, source: string, options: AnalyzeOptions = 
   }
   analyzer.diagnostics.unshift(...parseDiagnostics);
   return { file, components, diagnostics: analyzer.diagnostics };
+}
+
+/** Sets `url` on each bound attribute that holds a URL. */
+function markUrls(tag: string, attrs: Attr[]): void {
+  // The attribute an `<animate>` or `<set>` changes: its text, null when bound.
+  let target: string | null | undefined;
+  for (const attr of attrs) {
+    if (attr.name === 'attributeName') {
+      target = attr.value.kind === 'static' && attr.value.value !== true ? attr.value.value : null;
+    }
+  }
+  for (const attr of attrs) {
+    if (attr.value.kind === 'hole') {
+      attr.url = getUrlKind(tag, attr.name, target);
+    }
+  }
 }

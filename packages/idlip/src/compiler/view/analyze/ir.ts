@@ -1,5 +1,7 @@
 // The view IR, as frozen in docs/roadmaps/core/contracts/view-ir.md (v8).
 
+import type { UrlKind } from '../../../core/url.ts';
+
 /** A source range: byte offsets into the file. */
 export interface Span {
   start: number;
@@ -136,6 +138,8 @@ export type AttrValue = { kind: 'static'; value: string | true } | { kind: 'hole
 export interface Attr {
   name: string;
   value: AttrValue;
+  /** How a bound value is checked as a URL, from `getUrlKind`. */
+  url?: UrlKind;
 }
 
 export type Namespace = 'html' | 'svg' | 'mathml';

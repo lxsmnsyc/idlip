@@ -100,19 +100,31 @@ export function text$(value: unknown): string {
 
 /**
  * Returns a URL attribute's value, or `undefined` for a `javascript:` or `vbscript:` URL, so the
- * attribute is left out. An object or function is dropped too, since `attr$` would join its keys. A browser ignores control characters and spaces in a scheme, so they
- * are removed before the test. Wraps every bound value of a URL attribute, on the server and in
- * a chunk.
+ * attribute is left out. An object or function is dropped too, since `attr$` would join its keys.
+ * A browser ignores control characters and spaces in a scheme, so they are removed before the
+ * test. With `embed`, a `data:` URL is dropped too, unless it is a raster image. The `values` of
+ * an animation is a `;` list, so each part is tested. Wraps every bound value of a URL attribute,
+ * on the server and in a chunk.
  */
-export function safeUrl$(value: unknown, name: string): unknown {
+export function safeUrl$(value: unknown, name: string, embed?: boolean): unknown {
   if (value === null || value === undefined || typeof value === 'boolean') {
     return value;
   }
-  if (
-    typeof value === 'object' ||
-    typeof value === 'function' ||
-    /^(?:javascript|vbscript):/i.test(String(value).replace(/[\u0000- ]/g, ''))
-  ) {
+  let unsafe = typeof value === 'object' || typeof value === 'function';
+  if (!unsafe) {
+    for (const part of name === 'values' ? String(value).split(';') : [String(value)]) {
+      const url = part.replace(/[\u0000- ]/g, '');
+      if (
+        /^(?:javascript|vbscript):/i.test(url) ||
+        (embed === true &&
+          /^data:/i.test(url) &&
+          !/^data:image\/(?:png|gif|jpe?g|webp|avif|bmp)[;,]/i.test(url))
+      ) {
+        unsafe = true;
+      }
+    }
+  }
+  if (unsafe) {
     if (process.env.NODE_ENV !== 'production') {
       // oxlint-disable-next-line no-console
       console.warn(`idlip: dropped an unsafe URL from ${name}.`);

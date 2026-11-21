@@ -1,5 +1,6 @@
 // Plans the bindings of a component: which holes and events patch, their ids, groups and lists.
 import type { Component, Event, Expr, Hole, Node, Path, Root, Span } from '../analyze/index.ts';
+import type { UrlKind } from '../../../core/url.ts';
 import type { Frame, Report } from './expr.ts';
 
 type ForNode = Extract<Node, { kind: 'for' }>;
@@ -10,7 +11,7 @@ export type HeadNode = Extract<Node, { kind: 'head' }>;
 type ElementNode = Extract<Node, { kind: 'element' }>;
 
 export type Source =
-  | { kind: 'attr'; name: string; hole: Hole }
+  | { kind: 'attr'; name: string; hole: Hole; url?: UrlKind }
   | { kind: 'html'; node: Extract<Node, { kind: 'element' }>; hole: Hole }
   | { kind: 'prop'; child: ChildNode; name: string; hole: Hole }
   | { kind: 'message'; child: ChildNode; event: Event }
@@ -418,6 +419,7 @@ class Planner {
                 kind: 'attr',
                 name: attr.name,
                 hole: attr.value.hole,
+                url: attr.url,
               });
               if (id !== undefined) {
                 ids.push(id);
