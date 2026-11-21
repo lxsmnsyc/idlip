@@ -20,7 +20,7 @@ exclusive: [bench]
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent: 0
+spent: 124657
 owns:
   - benchmarks/idlip-merge/**
 shared: []
