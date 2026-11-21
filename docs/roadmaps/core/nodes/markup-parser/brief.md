@@ -1,7 +1,7 @@
 ---
 id: markup-parser
 title: Markup scanner and parser
-status: todo
+status: active
 priority: should
 type: feature
 story: markup-frontend
