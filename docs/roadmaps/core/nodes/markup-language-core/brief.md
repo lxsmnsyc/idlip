@@ -1,7 +1,7 @@
 ---
 id: markup-language-core
 title: Language core and tsc wrapper
-status: active
+status: done
 priority: should
 type: feature
 story: markup-frontend
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 145785
 owns:
   - packages/language-core/**
   - packages/tsc/**
@@ -48,10 +48,12 @@ Create `packages/language-core` (`@idlip/language-core`, a Volar language plugin
 
 ## Acceptance
 
-- [ ] `@idlip/tsc` reports a hole type error at the `.idlip` line and column.
-- [ ] A clean `.idlip` file typechecks with no output.
-- [ ] Fast check passes: `pnpm --filter @idlip/language-core test`
+- [x] `@idlip/tsc` reports a hole type error at the `.idlip` line and column.
+- [x] A clean `.idlip` file typechecks with no output.
+- [x] Fast check passes: `pnpm --filter @idlip/language-core test`
 
 ## Sizing
 
 Two small packages over an existing emitter.
+
+Landed as 00dc806 on `feat/markup-frontend` after one clean fresh review. Accepted change outside owned paths: re-export of `toTypeScript` from `packages/idlip/src/compiler/index.ts`.
