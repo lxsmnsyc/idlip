@@ -1,7 +1,7 @@
 ---
 id: benchmarks
 title: Benchmarks against Qwik, Marko and brumate
-status: active
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: [bench]
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 170193
 owns:
   - benchmarks/**
 shared:
@@ -49,10 +49,12 @@ Port brumate's todos scenario (`../brumate/benchmarks`, MIT, same author): the h
 
 ## Acceptance
 
-- [ ] Verify prints the todos table for all frameworks.
-- [ ] Root build, test and typecheck leave `benchmarks/*` out; results are git-ignored.
-- [ ] Fast check passes: `pnpm -C benchmarks/harness bench --scenario todos --only idlip,marko,qwik2 --rounds 1`
+- [x] Verify prints the todos table for all frameworks.
+- [x] Root build, test and typecheck leave `benchmarks/*` out; results are git-ignored.
+- [x] Fast check passes: `pnpm -C benchmarks/harness bench --scenario todos --only idlip,marko,qwik2 --rounds 1`
 
 ## Sizing
 
 Several framework apps and a harness port; mostly copying, with install and build time.
+
+Landed as a0c35be on `batch/core` after one fresh review (merge comparison deferred to `spike-chunk-merge`).
