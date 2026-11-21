@@ -1,0 +1,28 @@
+== story branch diff vs its base
+ 75 files changed, 7885 insertions(+), 147 deletions(-)
+== tooling packages size (story)
+language-core:      308
+tsc:      220
+language-server:      248
+vscode:      341
+compiler/markup src lines:     2274
+== story tokens spent
+spent:
+spent: 144951
+spent: 65069
+spent: 145785
+spent: 172017
+spent:
+spent:
+spent:
+spent: 153801
+spent: 151894
+spent:
+spent:
+spent: 160523
+== .idlip.tsx modules on batch
+27
+== analyze grammar rule ids count
+packages/idlip/src/compiler/view/analyze/nesting.ts:0
+packages/idlip/src/compiler/view/analyze/ir.ts:1
+packages/idlip/src/compiler/view/analyze/index.ts:0

@@ -1,7 +1,7 @@
 ---
 id: markup-lower
 title: Lower markup to TSX with offset mappings
-status: done
+status: dropped
 priority: should
 type: feature
 story: markup-frontend
@@ -55,3 +55,5 @@ depends_on:
 One emitter plus mappings.
 
 Landed as 6230f36 on `feat/markup-frontend` after one fresh review round.
+
+Dropped 2026-11-21 by debate `debates/dsl`: built on `feat/markup-frontend` only, never merged; the branch stays as history.

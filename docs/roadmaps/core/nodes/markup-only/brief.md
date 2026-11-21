@@ -1,7 +1,7 @@
 ---
 id: markup-only
 title: Remove TSX as a source syntax
-status: todo
+status: dropped
 priority: should
 type: refactor
 story: markup-frontend
@@ -58,3 +58,5 @@ After `markup-port`, `.idlip` is the only source format. Remove the TSX input pa
 ## Sizing
 
 M: removal plus docs.
+
+Dropped 2026-11-21 by debate `debates/dsl`: TSX stays the one source syntax (option B).

@@ -1,7 +1,7 @@
 ---
 name: markup-grammar
 version: 1
-status: frozen
+status: retired
 defined_by: markup-syntax
 ---
 

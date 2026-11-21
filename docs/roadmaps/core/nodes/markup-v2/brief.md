@@ -1,7 +1,7 @@
 ---
 id: markup-v2
 title: Parser, lowering and tools for markup v2
-status: todo
+status: dropped
 priority: should
 type: feature
 story: markup-frontend
@@ -55,3 +55,5 @@ Implement `contracts/markup-grammar.md` v2 (from `markup-syntax-v2`): the scanne
 ## Sizing
 
 L: rework of four story nodes against a new grammar. Split if the worker finds it too big.
+
+Dropped 2026-11-21 by debate `debates/dsl`: TSX stays the one source syntax (option B).

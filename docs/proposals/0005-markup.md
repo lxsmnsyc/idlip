@@ -1,6 +1,6 @@
 # 0005: Markup syntax
 
-Status: draft
+Status: rejected (2026-11-21, `docs/roadmaps/core/debates/dsl/debate.md`). TSX stays the one source syntax.
 
 This proposal defines the `.idlip` file: a plain TypeScript module whose components return markup with control-flow blocks. It follows brumate's grammar (`../brumate/docs/grammar.md`) without `<script>`, `<style>`, `#template`, `#loading`, `#portal`, `#client` and the other blocks idlip has no use for yet. Components stay plain functions as in [0002](0002-modules.md), and the effects, subscription, error and head rules of [0004](0004-effects-refs-errors.md) stay as they are.
 

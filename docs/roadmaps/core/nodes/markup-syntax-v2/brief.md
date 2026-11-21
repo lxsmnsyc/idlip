@@ -1,7 +1,7 @@
 ---
 id: markup-syntax-v2
 title: Markup DSL v2, the file is the component
-status: active
+status: dropped
 priority: should
 type: contract
 story: markup-frontend
@@ -58,3 +58,5 @@ Decide the details the user did not: the boundary rule between the last statemen
 ## Sizing
 
 M: a spec and fixtures, no compiler changes.
+
+Dropped 2026-11-21 by debate `debates/dsl`: TSX stays the one source syntax (option B).

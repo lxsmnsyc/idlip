@@ -1,7 +1,7 @@
 ---
 id: markup-language-core
 title: Language core and tsc wrapper
-status: done
+status: dropped
 priority: should
 type: feature
 story: markup-frontend
@@ -57,3 +57,5 @@ Create `packages/language-core` (`@idlip/language-core`, a Volar language plugin
 Two small packages over an existing emitter.
 
 Landed as 00dc806 on `feat/markup-frontend` after one clean fresh review. Accepted change outside owned paths: re-export of `toTypeScript` from `packages/idlip/src/compiler/index.ts`.
+
+Dropped 2026-11-21 by debate `debates/dsl`: built on `feat/markup-frontend` only, never merged; the branch stays as history.

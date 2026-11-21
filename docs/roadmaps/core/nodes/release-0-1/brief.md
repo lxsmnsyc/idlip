@@ -41,9 +41,6 @@ depends_on:
   - on: loader-trim
     kind: hard
     why: ships in 0.1.0
-  - on: markup-ts-plugin
-    kind: hard
-    why: ships in 0.1.0
   - on: runtime-flags
     kind: hard
     why: ships in 0.1.0
@@ -59,9 +56,6 @@ depends_on:
   - on: svg-and-html
     kind: hard
     why: ships in 0.1.0
-  - on: markup-frontend
-    kind: hard
-    why: 0.1.0 ships the final view syntax, so users do not migrate from TSX
   - on: website
     kind: hard
     why: 0.1.0 ships with docs
@@ -127,3 +121,7 @@ Set `idlip` to `0.1.0`, set up npm trusted publishing (`npm trust github idlip -
 - Defaults the changeset and the README must state: `skew` is on (serve `build.js` with `no-store`, keep `outDir` between deploys), prefetch is opt-in (`renderPreload`), `render()` drops head output (use `renderPage`), URL attributes drop `javascript:` URLs, form submits are prevented, `idlip/testing` rethrows an error a `<Try>` caught unless `expectCaught`.
 - Contracts are at `compiled-format` 11, `core-api` 11 and `view-ir` 11 and match the code. The loader with no optional features is 3881 B gzip against the 4096 B contract.
 - Not built, so not in 0.1 unless a node is added: `Step.send`, `let-reserved`, tracked dynamic holes in rows, branches and children.
+
+## After debate `debates/dsl` (2026-11-21)
+
+TSX stays the one source syntax. Pages and examples use `*.idlip.tsx`; no markup DSL, no `@idlip/language-core` or `@idlip/tsc`.

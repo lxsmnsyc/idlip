@@ -87,3 +87,7 @@ Options weighed: (A) TS subset with restricted JSX in `*.idlip.tsx`, (B) an own 
 The user: "we can't have two compilers in the same framework". The markup DSL replaces TSX as the only source syntax; `.idlip.tsx` input is removed by story children `markup-port` and `markup-only`.
 
 The user rejected markup v1 (a TS function that returns JSX with `#` blocks) as "sticking with TSX". v2: the file is the component, top-level TS statements then top-level markup, `props` typed by a top-level `Props` type, no `<script>` or `<style>` blocks. Node `markup-syntax-v2`.
+
+## Superseded, 2026-11-21
+
+Decision 7 and the P3 overrule are superseded by `debates/dsl/debate.md`: TSX stays the one source syntax.

@@ -1,7 +1,7 @@
 ---
 id: markup-example
 title: Todo example in the DSL
-status: done
+status: dropped
 priority: should
 type: feature
 story: markup-frontend
@@ -57,3 +57,5 @@ Rewrite the todo example in `.idlip` and run the existing e2e tests against it.
 A port of an existing example.
 
 Landed as 6198c80 on `feat/markup-frontend`. The orchestrator ran the full check and both e2e targets after the rebase. Accepted change outside owned paths: `e2e/playwright.config.ts` (a `todo-idlip` target). Gap: type-aware oxlint does not read `.idlip` files.
+
+Dropped 2026-11-21 by debate `debates/dsl`: built on `feat/markup-frontend` only, never merged; the branch stays as history.

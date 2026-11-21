@@ -36,12 +36,6 @@ shared:
 reserves: []
 provides: []
 depends_on:
-  - on: markup-only
-    kind: hard
-    why: the DSL is the only source syntax
-  - on: markup-frontend
-    kind: hard
-    why: the sample checker compiles every idlip block with toTypeScript from idlip/compiler
   - on: example-todo
     kind: hard
     why: the starter page shows the working todo example
@@ -88,3 +82,7 @@ M: new package of 6 to 10 files, a known pattern from brumate that is new to thi
 - No generated output is committed (`dist`).
 - Add `website` to the root scripts only if the root `build` needs it; keep `pnpm --filter idlip test` fast.
 - Follow the ui-style skill for the layout and states (focus, hover, empty search, dark mode).
+
+## After debate `debates/dsl` (2026-11-21)
+
+TSX stays the one source syntax. Pages and examples use `*.idlip.tsx`; no markup DSL, no `@idlip/language-core` or `@idlip/tsc`.

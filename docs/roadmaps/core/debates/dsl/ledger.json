@@ -1,0 +1,680 @@
+{
+  "goal": "Decide whether idlip pursues its own markup-first DSL (.idlip) as the one source syntax, or keeps TSX views (*.idlip.tsx) as the one source syntax",
+  "research": false,
+  "max_rounds": 3,
+  "roadmap": "docs/roadmaps/core",
+  "supersedes": "docs/roadmaps/core/debate",
+  "extra_axes": [
+    {
+      "name": "authoring",
+      "by": "proponent",
+      "why": "the user overruled the earlier debate because it weighed syntax only by node count, not authoring value (debate.md:79); A and B differ mostly in what an author writes and which errors they hit",
+      "status": "accepted",
+      "ruling_why": "A and B differ mostly in what authors write, and the user overruled the earlier debate for weighing syntax by node count only (debate.md:79)."
+    }
+  ],
+  "claims": [
+    {
+      "id": "J1",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "time",
+      "text": "TSX views work end to end on batch/core: 31 nodes landed this run; 682 unit and 18 e2e tests pass; todo, counters and counters-subs resume with one round trip on the first click.",
+      "evidence": {
+        "type": "measured",
+        "source": "pnpm build && pnpm test && pnpm --filter e2e test on batch/core",
+        "detail": "docs/roadmaps/core/reviews/wave-9.md"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "J2",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "tokens",
+      "text": "The v1 DSL story (7 children on feat/markup-frontend) added 7,885 lines across 75 files and cost about 994k tokens (markup-syntax 152k, parser 172k, lower 154k, compile 145k, language-core 146k, vscode 161k, example 65k).",
+      "evidence": {
+        "type": "measured",
+        "source": "git diff --shortstat; spent: fields of the markup-* briefs",
+        "detail": "evidence/baseline.txt"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "J3",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "time",
+      "text": "27 *.idlip.tsx modules exist on batch/core (examples, fixtures, e2e apps, benchmark app). A one-syntax DSL must port all of them and remove the TSX input path.",
+      "evidence": {
+        "type": "measured",
+        "source": "git ls-tree -r batch/core | grep -c .idlip.tsx",
+        "detail": "evidence/baseline.txt"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "J4",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "time",
+      "text": "The TSX view analysis is 4,699 lines and reports 83 rule ids, many of which police what TSX allows but the closed view grammar rejects (hole-*, attr-jsx, jsx-spread, derived-jsx, condition-operator, body-*). Block components in TSX: <For> 13 uses, <Head> 6, <Try> 5, <Subscribe> 2 across examples and fixtures.",
+      "evidence": {
+        "type": "measured",
+        "source": "grep rule ids in packages/idlip/src/compiler/view/analyze/analyze.ts; grep block tags in examples and fixtures",
+        "detail": "evidence/tsx.txt"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "J5",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "time",
+      "text": "Prior art by the same user: brumate ships its own .brm markup DSL with a Volar language core (210 lines), tsc wrapper (42), language server (109), VS Code extension (39) and a TypeScript plugin (40); 65 commits touch that tooling. The user built brumate's syntax and tooling in about a month.",
+      "evidence": {
+        "type": "prior-art",
+        "source": "../brumate/packages/*, git log; memory idlip-wants-dsl",
+        "detail": "evidence/brumate.txt"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "J6",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "time",
+      "text": "The user's recorded words: 2026-11-20, against repeated pushback for plain TS: \"we never had this kind of pushback with brumate\"; 2026-11-21: \"we can't have two compilers in the same framework\"; 2026-11-21, rejecting v1: \"if you're gonna stick with TSX then might as well stick with TSX and not the DSL anymore\"; 2026-11-21: asks for this debate: \"if we still need to pursue the DSL\". The earlier debate's user answer: \"Stick to TS for now while working on the proof of concept\".",
+      "evidence": {
+        "type": "source",
+        "source": "conversation; docs/roadmaps/core/debate/debate.md; memory idlip-wants-dsl",
+        "detail": ""
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "J7",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "time",
+      "text": "A .idlip file is not valid TS, so oxlint (type-aware) and oxfmt do not read it; markup-example recorded that type-aware lint does not read .idlip files and needed an oxlint-disable at the import. Type checking works through @idlip/tsc and the language server (tested on the story branch).",
+      "evidence": {
+        "type": "measured",
+        "source": "nodes/markup-example/outcome.md; nodes/markup-language-core/outcome.md",
+        "detail": ""
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "J8",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "device",
+      "text": "8 GB RAM, 8 cores; workers ran 4 to 5 at a time this run.",
+      "evidence": {
+        "type": "measured",
+        "source": "sysctl hw.memsize hw.ncpu",
+        "detail": ""
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "J9",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "tokens",
+      "text": "Calibration this run: M nodes cost 145k to 365k tokens each including review rounds; the roadmap has spent about 11M tokens.",
+      "evidence": {
+        "type": "calibration",
+        "source": "docs/roadmaps/CALIBRATION.md",
+        "detail": ""
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "J10",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "time",
+      "text": "GOAL.md lists the markup DSL as the view syntax for 0.1 (release-0-1 depends on markup-frontend: \"0.1.0 ships the final view syntax, so users do not migrate from TSX\"). No user deadline is recorded.",
+      "evidence": {
+        "type": "inferred",
+        "source": "docs/roadmaps/core/nodes/release-0-1/brief.md; GOAL.md",
+        "detail": ""
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "J11",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "time",
+      "text": "The user frames the two options: (A) a DSL whose component structure and compilation follow Elm rather than the TSX approach; JSX-style markup can stay, what goes is the current structure (a function component whose let/const/function declarations the compiler turns into state, derived values and handlers). (B) no DSL: keep the current TSX design as it is. A middle form (the current structure in a markup-first file) is not an option.",
+      "evidence": {
+        "type": "user",
+        "source": "the user, 2026-11-21",
+        "question": "Q2",
+        "detail": "Q1 and Q2"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "P1",
+      "round": 1,
+      "by": "proponent",
+      "kind": "proposal",
+      "text": "An option A .idlip file declares the component with language constructs: `props {}`, `model {}` (typed fields with initial values), `derived {}`, `msg Name(args)` declarations forming one explicit message union, `update {}` with one arm per message, optional `subscriptions`, and `view` with JSX-like markup and `#if/#for/#switch/#try/#head` blocks. Expressions and types inside are TypeScript, helpers stay in imported .ts files, and the file is type-checked by lowering to a virtual TS module through Volar, not by an own type checker, so the earlier debate's objection to an Elm-like language (HM inference, lost npm types) does not apply.",
+      "evidence": {
+        "type": "inferred",
+        "source": "J11; GOAL.md Constraints ('MVU concept, not Elm API', 'messages ... are plain data'); docs/roadmaps/core/debate/debate.md:45 (option B rejected for its own type checker); feat/markup-frontend markup-language-core outcome (virtual TS via Volar works)",
+        "detail": "evidence/proponent-r1.md (Sketch)"
+      },
+      "ruling": "rejected",
+      "ruling_why": "Withdrawn by P8 (J12, O1)."
+    },
+    {
+      "id": "P2",
+      "round": 1,
+      "by": "proponent",
+      "kind": "proposal",
+      "text": "Option A compiles to the resumable output that exists today: each `msg` is a message tag with payload `{ t, p }`, each `update` arm is one handler chunk, the fields an arm assigns are its write set read from syntax, and `view` lowers to view IR v8 unchanged. View codegen, client, server, core, vite and testing (about 9,175 of 16,876 src lines, 54%) survive; analyze.ts plus update/handlers.ts and writes.ts (about 5,280 lines) are rewritten as the new front end, and jsx/jsx-runtime (311) are removed. Child components keep message props as data (`onRemove={Remove(c.id)}`), dispatched with the parent path as now.",
+      "evidence": {
+        "type": "measured",
+        "source": "wc -l packages/idlip/src/**; packages/idlip/src/compiler/view/analyze/ir.ts; docs/proposals/0002-modules.md:16,130-138",
+        "detail": "evidence/proponent-r1.md (Size of the parts)"
+      },
+      "estimate": {
+        "value": 5280,
+        "unit": "src lines rewritten"
+      },
+      "ruling": "rejected",
+      "ruling_why": "Withdrawn by P8 (O1)."
+    },
+    {
+      "id": "P3",
+      "round": 1,
+      "by": "proponent",
+      "kind": "proposal",
+      "text": "What option A removes: 33 of the 83 analyzer rule ids exist only because a component is a TS function body (body-*, let-*, props-*, init-scope, derived-jsx), because handlers are closures and arrows (event-closure, event-param, hole-closure, handler-*), or because JSX is an expression and control flow is fake components (attr-jsx, hole-jsx, for-*, try-catch, condition-operator, view-map). Block-component imports go (For 13, Head 6, Try 5, Subscribe 2 uses), an event value is a message constructor so 'nothing resumed is a closure' holds by syntax, the `let x = v satisfies T as T` workaround for TS narrowing ends because model fields are declared with types, and the message union is the one explicit union the user's rules ask for.",
+      "evidence": {
+        "type": "measured",
+        "source": "evidence/tsx.txt rule list, classified; docs/proposals/0002-modules.md:116; J4",
+        "detail": "evidence/proponent-r1.md (Rule ids)"
+      },
+      "estimate": {
+        "value": 33,
+        "unit": "rule ids removed of 83"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "P4",
+      "round": 1,
+      "by": "proponent",
+      "kind": "proposal",
+      "text": "Ship order, each node gated by the full check and the e2e request sets: elm-spec (contract plus one fixture per landed feature), elm-parser (reusing v1 scan/parse, 1,421 lines), then elm-view, elm-update and elm-types in parallel, then elm-effects (commands, subscriptions, await split), then elm-port, then elm-only (delete the TSX path, rewrite proposals 0001/0002/0005 and GOAL.md). Nine nodes, about 2.7M tokens (range 2.2M to 3.4M, about 25% of the 11M spent so far), 6 waves on the critical path against 9 waves for the 31 nodes of this run; RAM is not a constraint at 4 to 5 workers on 8 GB.",
+      "evidence": {
+        "type": "calibration",
+        "source": "J9 (M 145k-365k); J2 (v1 7 nodes 994k); J1, J8; CALIBRATION.md L nodes 300k-463k",
+        "detail": "evidence/proponent-r1.md (Cost estimate)"
+      },
+      "estimate": {
+        "value": 2.7,
+        "unit": "M tokens"
+      },
+      "ruling": "rejected",
+      "ruling_why": "O3 calibrates the front end at 3.2M to 4.7M tokens from this roadmap's own spend; the 2.7M figure leans on v1, which reused analyze() unchanged."
+    },
+    {
+      "id": "P5",
+      "round": 1,
+      "by": "proponent",
+      "kind": "proposal",
+      "text": "The port covers 20 live modules (969 lines; the 7 docs spike and prototype modules stay as history) and about 89 component sources inline in 21 test files. The oracle is the existing output: the e2e request counts and chunk names must not change, which v1 already showed is reachable (todo-idlip built the same chunk names and loader size as the TSX todo). Every one of the 31 landed features gets a spec fixture first, so a gap is found in elm-spec and not during the port.",
+      "evidence": {
+        "type": "measured",
+        "source": "git ls-files | grep .idlip.tsx | xargs wc -l; grep -rl 'on:[a-z]+={' packages/idlip/test; git show feat/markup-frontend:docs/roadmaps/core/nodes/markup-example/outcome.md",
+        "detail": "evidence/proponent-r1.md (Port size)"
+      },
+      "estimate": {
+        "value": 500,
+        "unit": "k tokens for the port"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "P6",
+      "round": 1,
+      "by": "proponent",
+      "kind": "proposal",
+      "text": "Tooling reuses what is already built: @idlip/language-core, @idlip/tsc, the language server and the VS Code extension from feat/markup-frontend (about 307k tokens already spent, type errors and hover tested at .idlip positions) and brumate's Volar setup, which the same user shipped in about a month. Only the virtual-TS lowering changes (model becomes a type and an initial value, msg becomes a TS union, update arms become typed functions). The lint gap of J7 shrinks because logic-heavy helpers live in .ts files that oxlint reads.",
+      "evidence": {
+        "type": "prior-art",
+        "source": "J2, J5, J7; feat/markup-frontend nodes markup-language-core and markup-vscode outcomes",
+        "detail": "v1 tooling passed tsc and LSP tests on .idlip files; brumate ships the same stack in 440 lines"
+      },
+      "ruling": "rejected",
+      "ruling_why": "O4: only about 315 lines of v1 plumbing carry over; the virtual TS conversion is the costly part (brumate: 1,295 lines, 31 commits)."
+    },
+    {
+      "id": "P7",
+      "round": 1,
+      "by": "proponent",
+      "kind": "alternative",
+      "text": "Option B: keep function components in *.idlip.tsx as they are. It costs nothing now and keeps 682 unit and 18 e2e tests green (J1). Option A beats it on what P3 lists: a third of the analyzer rules, block components and closure-shaped events exist to fence TS and JSX into MVU semantics the compiler already uses underneath, and 0.1 is the last point to change source syntax without a user migration (J10). B wins if the user values zero further spend over those removals.",
+      "evidence": {
+        "type": "measured",
+        "source": "J1, J4, J10; evidence/tsx.txt",
+        "detail": "evidence/proponent-r1.md"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "O1",
+      "kind": "rebuttal",
+      "axis": "time",
+      "answers": ["P1", "P2"],
+      "text": "P2's rewrite size assumes update arms are TypeScript, but P1's own sketch arms are not (`{ draft = text }`, `cond ? {} : { todos = ... }`, `todos[t => t.id === id].done = !it`), while emit.ts, segments.ts and tasks.ts (1,036 lines) work on oxc AST nodes of TS handler bodies (emitRange, findAwaitSites, getPropsVariable). Either arms are TS statements, so 'Elm-like' is mostly renaming function declarations, or those files are rewritten too and the new front end is about 6,300 lines, not 5,280.",
+      "estimate": {
+        "value": 6316,
+        "unit": "src lines rewritten if arms are not TS"
+      },
+      "evidence": {
+        "type": "measured",
+        "source": "wc -l packages/idlip/src/compiler/update/*.ts; grep ^import and ^export function in emit.ts, segments.ts, tasks.ts; P1 sketch",
+        "detail": "evidence/opponent-r1.md (O1)"
+      },
+      "round": 1,
+      "by": "opponent",
+      "ruling": "rejected",
+      "ruling_why": "Settled by P8 and J12 (conceded in O10)."
+    },
+    {
+      "id": "O2",
+      "kind": "rebuttal",
+      "axis": "time",
+      "answers": ["P3"],
+      "text": "At least 13 of P3's 33 'removable' rule ids police semantics option A keeps: handler-mutate, handler-assign, init-scope, let-init (Math.random in an initial value), let-unassigned, helper-closure, hole-closure, hole-function-value, event-placeholder (P1's sketch reads event.currentTarget.value), for-each, for-param, try-catch and props-whole. They move to new names rather than vanish, and a new grammar adds its own ids (v1's parser alone added 12 markup-* ids, A adds arm exhaustiveness, msg arity and unknown-field checks), so the net removal is about 20 minus the new ones, not 33.",
+      "estimate": {
+        "value": 20,
+        "unit": "rule ids removed, at most, before new ones"
+      },
+      "evidence": {
+        "type": "measured",
+        "source": "analyze.ts error messages for each rule; git show feat/markup-frontend:packages/idlip/src/compiler/markup/parse.ts",
+        "detail": "evidence/opponent-r1.md (O2)"
+      },
+      "round": 1,
+      "by": "opponent",
+      "ruling": "upheld"
+    },
+    {
+      "id": "O3",
+      "kind": "rebuttal",
+      "axis": "tokens",
+      "answers": ["P4"],
+      "text": "P4 prices the whole new front end (parser 200k, view 300k, update 400k, effects 300k) at 1.2M, but the current front end's base nodes alone cost 1.24M on TSX with the oxc parser for free (spike-view-analysis, compile-view-analyze, compile-update, analyze-v9, props-method-path), and nine feature nodes that added front-end rules spent another 2.02M. Counting 25% to 100% of that feature spend puts the front end at 1.7M to 3.3M and A at 3.2M to 4.7M, mid about 3.8M (35% of the 11M so far). v1's 994k (J2) is no comparator: 0005 lowered to TSX and ran analyze() unchanged.",
+      "estimate": {
+        "value": 3.8,
+        "unit": "M tokens (range 3.2 to 4.7)"
+      },
+      "evidence": {
+        "type": "calibration",
+        "source": "docs/roadmaps/CALIBRATION.md rows; git log of analyze.ts and compiler/update; feat/markup-frontend docs/proposals/0005-markup.md",
+        "detail": "evidence/opponent-r1.md (O3). Basis: base 1.24M + 0.25 to 1.0 of 2.02M feature spend, plus P4 non-front-end nodes 1.5M. A rewrite from a spec may cost less than discovery; that is the downside of the range."
+      },
+      "round": 1,
+      "by": "opponent",
+      "ruling": "rejected",
+      "ruling_why": "Priced a full rewrite; conceded in O10 for P10 and O11."
+    },
+    {
+      "id": "O4",
+      "kind": "rebuttal",
+      "axis": "tokens",
+      "answers": ["P5", "P6"],
+      "text": "The v1 tooling that carries over is the Volar plumbing (about 315 lines: language-core 145, tsc 54, server 89, vscode 27); its virtual code is toTypeScript, the TSX lowering A drops. The costly piece is the lowering: brumate's toTypeScript (check.ts) is 1,295 lines over 31 commits, and P6's 440 lines count only plumbing; for A it must type update arms whose bodies are not TS, which copy-with-mapping cannot map. About 300 of v1's 1,167 parse.ts lines scan the function-component shape A drops. P5's oracle evidence also does not transfer: v1 got identical chunk names because it ran the same analyze() on lowered TSX.",
+      "evidence": {
+        "type": "prior-art",
+        "source": "git show feat/markup-frontend:packages/{language-core,tsc,language-server,vscode}/src, compiler/markup/parse.ts lines 873-1167, nodes/markup-example/outcome.md; ../brumate/packages/brumate/src/check.ts",
+        "detail": "evidence/opponent-r1.md (O4)"
+      },
+      "round": 1,
+      "by": "opponent",
+      "ruling": "rejected",
+      "ruling_why": "Conceded in O10: every fragment is TS or JSX, so copy-with-mapping works."
+    },
+    {
+      "id": "O5",
+      "kind": "risk",
+      "axis": "time",
+      "severity": "medium",
+      "answers": ["P2", "P4"],
+      "text": "Effects in A are undecided and the two readings conflict: an Elm update is pure and returns commands, which 0002 removed on 2026-11-21 in favour of `await` in a handler (the Elm-like Msg/commands-with-constructors design of 7c3300a lasted 11 hours, after 0001's defineMessages/defineUpdate); P2 says the output stays as today while P4's elm-effects lists 'commands, subscriptions, await split'. Commands change client/tasks and the continuation tags of compiled-format (persist$1), so 'client kept' fails; keeping await makes arms imperative async TS, not Elm. Likely, unless the user decides it before elm-spec (Q3).",
+      "evidence": {
+        "type": "prior-art",
+        "source": "git log 7c3300a, e76fce8; docs/proposals/0001-dsl.md; docs/proposals/0002-modules.md:12,130",
+        "detail": "evidence/opponent-r1.md (O5)"
+      },
+      "round": 1,
+      "by": "opponent",
+      "ruling": "rejected",
+      "ruling_why": "Settled by J12 (conceded in O10)."
+    },
+    {
+      "id": "O6",
+      "kind": "cost",
+      "axis": "time",
+      "severity": "medium",
+      "answers": ["P4"],
+      "text": "website-scaffold, docs-start, docs-reference, website and release-0-1 all wait on the markup chain (markup-only, markup-ts-plugin, markup-frontend). A replaces the current 3-wave chain (markup-v2, port, only) with 6 waves before the 7 docs and website nodes can start, so 0.1 slips about 3 more waves than the existing plan; under B those nodes can start next wave, about 6 waves sooner than A.",
+      "estimate": {
+        "value": 6,
+        "unit": "waves later than B before docs start"
+      },
+      "evidence": {
+        "type": "measured",
+        "source": "depends_on of docs/roadmaps/core/nodes/{markup-*,website*,docs-*,release-0-1}/brief.md; P4 critical path",
+        "detail": "evidence/opponent-r1.md (O6)"
+      },
+      "round": 1,
+      "by": "opponent",
+      "ruling": "upheld"
+    },
+    {
+      "id": "O7",
+      "kind": "cut",
+      "axis": "tokens",
+      "action": "drop",
+      "nodes": ["markup-v2"],
+      "text": "Drop markup-v2 (todo, L) under either option: its goal is a lowering to 'the internal TS module the analyzer reads', the current structure in a markup-first file, which J11 rules out. Under A its scope is P4's elm-parser and elm-types; under B nothing replaces it. markup-syntax-v2 and markup-frontend are active and stay.",
+      "estimate": {
+        "value": 350,
+        "unit": "k tokens saved (L 244k to 463k)"
+      },
+      "evidence": {
+        "type": "inferred",
+        "source": "docs/roadmaps/core/nodes/markup-v2/brief.md Goal; J11",
+        "detail": "evidence/opponent-r1.md (O7/O8)"
+      },
+      "round": 1,
+      "by": "opponent",
+      "ruling": "upheld"
+    },
+    {
+      "id": "O8",
+      "kind": "cut",
+      "axis": "tokens",
+      "action": "drop",
+      "nodes": ["markup-port", "markup-only", "markup-ts-plugin"],
+      "text": "Under B, drop markup-port (L), markup-only (M) and markup-ts-plugin (M): with no .idlip files there is nothing to port, no TSX path to delete and no .idlip import for a TS plugin; remove them from the depends_on of website-scaffold, docs-reference and release-0-1. Under A they are the same work as P4's elm-port, elm-only and elm-ts-plugin and should merge into them, not be counted twice.",
+      "estimate": {
+        "value": 800,
+        "unit": "k tokens saved under B (L + 2 M: 534k to 1,193k)"
+      },
+      "evidence": {
+        "type": "inferred",
+        "source": "docs/roadmaps/core/nodes/{markup-port,markup-only,markup-ts-plugin}/brief.md status and size; CALIBRATION.md size ranges",
+        "detail": "evidence/opponent-r1.md (O7/O8)"
+      },
+      "round": 1,
+      "by": "opponent",
+      "ruling": "upheld"
+    },
+    {
+      "id": "O9",
+      "kind": "alternative",
+      "axis": "tokens",
+      "answers": ["P4"],
+      "text": "Before committing 3M or more to A, run one capped spike (M, about 200k, like spike-chunk-split 208k): hand-write A versions of todo with an awaited effect, counters (child message props) and a keyed-writes case, lower them by hand to today's handler IR and to a virtual TS file checked by tsc. Kill A, or rescope it, if chunk names or write sets differ from the TSX build, or if arms need non-TS syntax that tsc cannot check through mappings. It settles O1, O4 and O5 for about 6% of A's cost.",
+      "estimate": {
+        "value": 200,
+        "unit": "k tokens"
+      },
+      "evidence": {
+        "type": "calibration",
+        "source": "docs/roadmaps/CALIBRATION.md spike-chunk-split 207,848, spike-view-analysis 351,763",
+        "detail": "evidence/opponent-r1.md"
+      },
+      "round": 1,
+      "by": "opponent",
+      "ruling": "rejected",
+      "ruling_why": "Option B is adopted, so no spike for A."
+    },
+    {
+      "id": "J12",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "time",
+      "text": "In option A, effects stay `await` in update arms, split by the compiler as today; the landed task runtime (custom-effects, run-tasks) is kept.",
+      "evidence": {
+        "type": "user",
+        "source": "the user, 2026-11-21",
+        "question": "Q3",
+        "detail": ""
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "P8",
+      "round": 2,
+      "by": "proponent",
+      "kind": "concession",
+      "text": "Drop the non-TS arm forms of P1's sketch (`{ draft = text }`, `cond ? {} : {...}`, `todos[t => ...].done = !it`) and P4's elm-effects node and commands: update arms are TS function bodies that may `await`, so the handler pipeline and task runtime stay as they are. P4's 2.7M and P6's tooling reuse are withdrawn; P11 and P12 replace them.",
+      "answers": ["P1", "P2", "P4", "P6"],
+      "why": "J12 keeps await in arms; O1 shows non-TS arms rewrite about 6,300 lines; O3 and O4 recalibrate the front end and the virtual TS conversion"
+    },
+    {
+      "id": "P9",
+      "round": 2,
+      "by": "proponent",
+      "kind": "proposal",
+      "text": "Revised option A file: `props {}`, `model {}` (one typed record, each field with its type and initial value), `derived {}`, `update {}` whose arms `Name(args) { ts body }` or `async Name() { ... }` each declare one message and its handler, and `view` with JSX-like markup and # blocks where an event value is a message (`on:click={Toggle(t.id)}`, `on:click={Save}`). What stays Elm-like against B: the model is one declared record rather than scattered `let`s, messages are a closed declared set the view names as values (never arrows or closures), and the view is separate from state and update. What is not Elm-like: arm bodies are imperative TS with assignment and await, the same as B's handlers (J12).",
+      "evidence": {
+        "type": "inferred",
+        "source": "J11, J12, Q2; docs/proposals/0002-modules.md:101-116",
+        "detail": "evidence/proponent-r2.md (Revised sketch)"
+      },
+      "ruling": "rejected",
+      "ruling_why": "O13: with TS-bodied, awaiting arms (J12) every construct lowers one-to-one to B, which is the middle form J11 excludes; O12 rates the authoring gain low against about 2.0M tokens (O11) and 5 waves of docs delay (O6)."
+    },
+    {
+      "id": "P10",
+      "round": 2,
+      "by": "proponent",
+      "kind": "proposal",
+      "text": "With arms as TS, the compiler reuses far more than P2 said: compiler/update (2,402 lines) unchanged, analyzeHandler (551) and the element, expression, path and keyed-list lowering of analyze.ts unchanged, fed with model fields as state and arm names as handlers. Rewritten: analyzeComponent, the closure-event part of createHole, lowerBlock's reading of block components, readModule and props helpers, about 800 of 3,916 analyzer lines (20%). New: a shell parser for the constructs, reusing about 870 lines of v1 parse.ts and v1 lower.ts (415) for # blocks, plus an IR adapter, about 1,000 to 1,400 lines in all. View IR, codegen, client, server, tasks unchanged.",
+      "evidence": {
+        "type": "measured",
+        "source": "method line spans of packages/idlip/src/compiler/view/analyze/analyze.ts; wc -l compiler/update; git show feat/markup-frontend:packages/idlip/src/compiler/markup/*.ts | wc -l",
+        "detail": "evidence/proponent-r2.md (Where analyze.ts changes)"
+      },
+      "estimate": {
+        "value": 800,
+        "unit": "analyzer lines rewritten of 3,916"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "P11",
+      "round": 2,
+      "by": "proponent",
+      "kind": "proposal",
+      "text": "Tooling plan for O4: since every fragment of an A file is TS or JSX, the virtual TS file is built by copy-with-mapping as in v1, not by translating a template language as brumate's 1,295-line check.ts does. Model fields become `let name!: T` with no initializer (so TS does not narrow them, which ends the `satisfies T as T` workaround) plus one `$init` object typed by the model for the initial values; arm headers are synthesized and bodies copied; message names in the view resolve to generated constructors returning a `$Msg` union; # blocks use v1 lower.ts. About 400 to 600 new lines over the 315 lines of v1 Volar plumbing, two M nodes including the TS plugin for .ts imports (merging markup-ts-plugin).",
+      "evidence": {
+        "type": "source",
+        "source": "feat/markup-frontend markup-lower and markup-language-core outcomes (copy and synth segments mapped to Volar); O4; docs/proposals/0002-modules.md:116",
+        "detail": "evidence/proponent-r2.md (Tooling plan)"
+      },
+      "estimate": {
+        "value": 500,
+        "unit": "new lines of virtual TS lowering"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "P12",
+      "round": 2,
+      "by": "proponent",
+      "kind": "proposal",
+      "text": "Re-estimate against O3: O3 prices today's front end at 3.26M for about 6,300 lines; under P10, A rewrites or adds about 25% to 35% of that, 0.8M to 1.2M at O3's rate. With the spike 200k, spec 250k, tooling 400k to 600k, port 500k (P5) and removal 250k, A costs about 2.4M to 3.0M tokens (22% to 27% of the 11M so far) over 5 waves (spike, spec, front with tooling in parallel, port, removal). That is still 4 to 5 waves before docs start, against B's next wave (O6).",
+      "evidence": {
+        "type": "calibration",
+        "source": "O3 (1.24M base + 2.02M feature spend); J9; P5; O6",
+        "detail": "evidence/proponent-r2.md (Cost against O3)"
+      },
+      "estimate": {
+        "value": 2.7,
+        "unit": "M tokens (range 2.4 to 3.0)"
+      },
+      "ruling": "rejected",
+      "ruling_why": "O11 reaches the same structure for about 2.0M by lowering to the existing analyzer (J13)."
+    },
+    {
+      "id": "P13",
+      "round": 2,
+      "by": "proponent",
+      "kind": "proposal",
+      "text": "Accept O9's spike as a gate before any other A node, capped at 200k tokens and one wave: hand-write A versions of todo with an awaited save, counters with child message props, and a keyed toggle; build them through a hand-written adapter into today's analyzer and handler pipeline, and a hand-built virtual TS file checked by tsc. Kill A if chunk names, write sets or e2e request sets differ from the TSX build, if an arm or event needs syntax tsc cannot check through copy mappings, or if the adapter for the three files points past 1,500 lines. Under A, markup-port, markup-only and markup-ts-plugin merge into elm-port, elm-only and elm-types (O8) and markup-v2 drops (O7).",
+      "evidence": {
+        "type": "prior-art",
+        "source": "O9; spike-chunk-split 208k in CALIBRATION.md; O7, O8",
+        "detail": "spikes in this roadmap settled chunk splitting and view analysis before their L nodes"
+      },
+      "estimate": {
+        "value": 200,
+        "unit": "k tokens cap"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "J13",
+      "round": 2,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "time",
+      "text": "Inferred: option A may lower its constructs internally to the function-component form today's analyzer reads, as long as authors never write or see it. The user's objections were to a second source syntax (\"we can't have two compilers in the same framework\") and to authors writing the TSX structure (J11), not to an internal compiler step.",
+      "evidence": {
+        "type": "inferred",
+        "source": "J6, J11, memory one-source-syntax",
+        "detail": "the one-source-syntax note already allows lowering as an internal step"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "O10",
+      "kind": "concession",
+      "answers": ["O1", "O3", "O4", "O5", "O6"],
+      "why": "P8 keeps arms as TS bodies and J12 keeps await, and P10's method spans check out against analyze.ts within 10% (evidence/opponent-r2.md)",
+      "text": "O1's 6,300-line rewrite and O5's effects risk no longer apply. O3's 3.2M to 4.7M priced a full front-end rewrite, so it is superseded by P10's smaller one; P12's 0.8M to 1.2M is consistent with O3's rate (about 460 tokens per line over 1,800 to 2,200 lines). O4's brumate comparison is withdrawn, since every fragment is TS or JSX and copy-with-mapping works. O6 becomes 5 waves, not 6.",
+      "round": 2,
+      "by": "opponent"
+    },
+    {
+      "id": "O11",
+      "kind": "alternative",
+      "axis": "tokens",
+      "answers": ["P10", "P12", "P13"],
+      "text": "Under J13 the cheaper front end is v1's route: lower each P9 construct one-to-one to today's input (model field to let, derived to const, arm to function declaration, view to return, `Toggle(t.id)` to `() => Toggle(t.id)`) and run analyze() unchanged, so none of P10's 800 analyzer lines and no IR adapter are written, and P5's oracle (same chunk names) holds again. Priced from v1's actual parser, lower and compile nodes (471k), a diagnostics rewording S (O12), P11's tooling and a port without the analyzer unit tests, which keep the internal form: about 1.9M to 2.1M against P12's 2.4M to 3.0M, same 5 waves. The P13 spike then tests the lowering, not an adapter, and fits an S cap (about 150k).",
+      "estimate": {
+        "value": 2.0,
+        "unit": "M tokens (range 1.9 to 2.1)"
+      },
+      "evidence": {
+        "type": "calibration",
+        "source": "J2 (markup-parser 172k, markup-lower 154k, markup-compile 146k); CALIBRATION.md S 83k-174k; analyze.ts:1184; feat/markup-frontend 0005-markup.md",
+        "detail": "evidence/opponent-r2.md (O11). Basis: spike 150k + spec 250k + front 471k + rewording 130k + tooling 400k-600k (P11) + port 250k + removal 250k."
+      },
+      "round": 2,
+      "by": "opponent",
+      "ruling": "upheld"
+    },
+    {
+      "id": "O12",
+      "kind": "cost",
+      "axis": "authoring",
+      "severity": "low",
+      "answers": ["P10", "O11"],
+      "text": "Both P10 (which keeps analyzeHandler) and O11 reuse diagnostics written for TSX: about 54 of 100 diagnostic sites in analyze.ts name <For>, arrows, let, const, return or .map() ('<For> takes one child: (item, index?) => <jsx>', 'make it a const'), and v1's mapMessage remapped only positions. Unless they are reworded, authors meet the internal form J13 says they never see; rewording is an S node, about 100k to 170k.",
+      "estimate": {
+        "value": 130,
+        "unit": "k tokens"
+      },
+      "evidence": {
+        "type": "measured",
+        "source": "grep of reportError/rule sites in analyze.ts; git show feat/markup-frontend:packages/idlip/src/compiler/markup/compile.ts:95-112",
+        "detail": "evidence/opponent-r2.md (O12)"
+      },
+      "round": 2,
+      "by": "opponent",
+      "ruling": "upheld"
+    },
+    {
+      "id": "O13",
+      "kind": "rebuttal",
+      "axis": "authoring",
+      "answers": ["P9"],
+      "text": "With TS bodies and await, P9 is the current structure with labelled sections: every construct lowers one-to-one to a B construct with no analysis (which is why O11 works), and of Elm's defining traits (a Msg type separate from update, a pure update returning the model, Cmd effects) P9 keeps none, since arms merge message and handler and J12 keeps await. 'Messages as values' is already B's compiled form: board.idlip.tsx's `onRemove={() => remove(c.id)}` renders as `onRemove:[\"remove\",[\"a1\"],\"\",\"\"]`. What A really adds is spelling: grouped model/derived/update sections, events written as `Toggle(t.id)` instead of an arrow, and one real gain, tested with tsc 7.0.2: `let s!: S` ends the `satisfies T as T` narrowing workaround (TS2367). Whether that is the Elm-like option of J11 or B in other punctuation is the user's call, but on this evidence it is closer to the middle form J11 excludes.",
+      "evidence": {
+        "type": "measured",
+        "source": "packages/idlip/test/fixtures/nested/board/{board.idlip.tsx,expected/page.html}; tsc --strict on scratch file; https://guide.elm-lang.org/architecture/",
+        "detail": "evidence/opponent-r2.md (O13)"
+      },
+      "round": 2,
+      "by": "opponent",
+      "ruling": "upheld"
+    }
+  ],
+  "questions": [
+    {
+      "id": "Q1",
+      "by": "judge",
+      "blocks": [],
+      "ask": "What does pursuing the DSL mean for the language's design?",
+      "answer": "If we make the DSL, we drop the TSX design semantics and design the language closer to how Elm is designed. If we do not make the DSL, we stick to what we have (the TSX design)."
+    },
+    {
+      "id": "Q2",
+      "by": "judge",
+      "blocks": ["J11"],
+      "ask": "Does option A drop JSX-style markup?",
+      "answer": "No. It is not about removing the JSX part. It is about how a component is compiled and structured in the TSX approach: the DSL would drop that structure (a function component whose let, const and function declarations become state, derived values and handlers) for an Elm-like structure."
+    },
+    {
+      "id": "Q3",
+      "by": "opponent",
+      "blocks": ["O5", "P2", "P4"],
+      "ask": "In the Elm-like idlip DSL, how does an update run an effect such as saving or fetching: (a) Elm style, the update returns a command that names the message to send with the result, or (b) as today, an `await` inside the update that the compiler splits into a task and a continuation?",
+      "answer": "Keep await: update arms may await, and the compiler splits them into a task and a continuation as today. The landed task runtime stays."
+    },
+    {
+      "id": "Q4",
+      "by": "proponent",
+      "blocks": ["P10", "P12"],
+      "ask": "In the Elm-like idlip DSL, may the compiler internally turn a component's model, update arms and view into the form today's analyzer reads (a hidden function with let, function and return that the author never sees or writes), or must the compiler's internal form drop that shape too? The first is cheaper (about 1.5M tokens against about 2.7M) because today's analyzer runs unchanged.",
+      "answer": "Not asked: inferred by the judge (J13). An internal lowering the author never sees is a step inside one compiler; the user objected to two source syntaxes and to authors writing the TSX structure."
+    },
+    {
+      "id": "Q5",
+      "by": "opponent",
+      "blocks": ["P9", "O13", "J11"],
+      "ask": "With update arms that are ordinary TypeScript and may await (your answer to the effects question), the Elm-like idlip file changes how a component is written: one model block with typed fields, a derived block, an update block whose arms are the handlers, events written as Toggle(id) instead of an arrow, and a separate view. It changes nothing about how it compiles or runs. Is that enough to count as the Elm-like DSL you want, or is it the TSX structure in different punctuation, in which case keep TSX?",
+      "answer": "The user: \"why would you make me choose, the purpose of the debate is to settle it\". The judge settles: option B."
+    }
+  ],
+  "proofs": [],
+  "hypothesis": null,
+  "spend": []
+}

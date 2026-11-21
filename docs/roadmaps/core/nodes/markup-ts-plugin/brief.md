@@ -1,7 +1,7 @@
 ---
 id: markup-ts-plugin
 title: TypeScript server plugin for .idlip imports
-status: todo
+status: dropped
 priority: should
 type: feature
 story:
@@ -75,3 +75,5 @@ M: a new package of 4 to 5 files plus edits to the extension's build; the patter
 - Do not change `packages/language-core` or `packages/language-server`. If the plugin needs a change there, write `contracts/` change request text in your `log.md` and adapt locally.
 - Bumping `oxc-parser` requires the matching wasm binding bump in `packages/vscode` (see `markup-vscode` gotchas).
 - Say in `outcome.md` how to test by hand: open a `.ts` file that imports a `.idlip` file in the extension host.
+
+Dropped 2026-11-21 by debate `debates/dsl`: TSX stays the one source syntax (option B).

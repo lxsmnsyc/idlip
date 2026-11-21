@@ -1,7 +1,7 @@
 ---
 id: markup-port
 title: Port every view module to the markup DSL
-status: todo
+status: dropped
 priority: should
 type: refactor
 story: markup-frontend
@@ -56,3 +56,5 @@ Where the DSL cannot express something a fixture needs (for example `<Subscribe>
 ## Sizing
 
 L: mechanical port of about 40 modules plus grammar gaps; one worker, the files are disjoint from other open work.
+
+Dropped 2026-11-21 by debate `debates/dsl`: TSX stays the one source syntax (option B).

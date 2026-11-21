@@ -1,7 +1,7 @@
 ---
 id: markup-frontend
 title: Markup DSL with control-flow blocks for views
-status: active
+status: dropped
 priority: should
 type: story
 story:
@@ -54,3 +54,5 @@ Replace the TSX view syntax with an own DSL that has real control-flow blocks (`
 ## Sizing
 
 XL: syntax design, three compiler stages, two tooling packages and an example; split into seven children.
+
+Dropped 2026-11-21 by debate `debates/dsl`: TSX stays the one source syntax (option B).

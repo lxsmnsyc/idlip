@@ -86,3 +86,7 @@ S: one config file. The deployment is a human step.
 ## Updates after wave 9
 
 - `build.js` of the client build must be served with `Cache-Control: no-store` or a short max age (`deploy-skew`). The `immutable` header for `/assets/` in `vercel.json` must not match it: check where the build writes `build.js` (next to the loader entry) and give it its own header rule.
+
+## After debate `debates/dsl` (2026-11-21)
+
+TSX stays the one source syntax. Pages and examples use `*.idlip.tsx`; no markup DSL, no `@idlip/language-core` or `@idlip/tsc`.

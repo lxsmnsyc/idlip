@@ -1,0 +1,16 @@
+== brumate tooling
+brumate
+content-mapper
+language-core
+language-server
+tsc
+typescript-plugin
+ui
+vscode
+language-core:      210 lines
+tsc:       42 lines
+vscode:       39 lines
+language-server:      109 lines
+typescript-plugin:       40 lines
+693d8967 feat: type-check .brm files
+      65
