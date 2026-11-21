@@ -1,7 +1,7 @@
 ---
 id: bench-rows
 title: Rendering benchmark scenarios (rows and dashboard)
-status: active
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: [bench]
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 420000
 owns:
   - benchmarks/**
 shared:
