@@ -38,3 +38,7 @@
 ## Size
 
 - Estimated M, actual M.
+
+## Landing
+
+Landed as 3a3ac63 on `batch/core` after one fresh review round (loader over budget, undefined key lookup; both fixed). Loader 4061 B gzip of 4096 B. Accepted change outside owned paths: `packages/idlip/src/compiler/view/analyze/ir.ts`.

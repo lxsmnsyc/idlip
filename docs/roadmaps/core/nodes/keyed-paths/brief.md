@@ -1,7 +1,7 @@
 ---
 id: keyed-paths
 title: Keyed path segments in view analysis and diff
-status: active
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-20
-spent:
+spent: 166682
 owns:
   - packages/idlip/test/compiler/view/analyze/fixtures/keyed.idlip.tsx.txt
   - packages/idlip/test/compiler/view/analyze/expected/keyed.txt
@@ -59,10 +59,10 @@ Read side only. A hole such as `todos.find((t) => t.id === selected).text` becom
 
 ## Acceptance
 
-- [ ] The analyze fixture `keyed` prints keyed paths for `find` over a `<For>` list and the `*` fallback for a list without one.
-- [ ] `keyed.test.ts`: changing `selected` or the selected item is a change. Changing another item is not a change. A missing key on one side is a change.
-- [ ] Group chunk names with keyed segments give valid file names and Vite ids. Covered by a test of `getChunkFile`.
-- [ ] Existing fixtures are unchanged.
+- [x] The analyze fixture `keyed` prints keyed paths for `find` over a `<For>` list and the `*` fallback for a list without one.
+- [x] `keyed.test.ts`: changing `selected` or the selected item is a change. Changing another item is not a change. A missing key on one side is a change.
+- [x] Group chunk names with keyed segments give valid file names and Vite ids. Covered by a test of `getChunkFile`.
+- [x] Existing fixtures are unchanged.
 
 ## Sizing
 
