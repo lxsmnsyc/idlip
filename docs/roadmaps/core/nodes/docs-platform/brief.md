@@ -1,7 +1,7 @@
 ---
 id: docs-platform
 title: Guide: head, SVG, forms, errors, testing, deploy
-status: todo
+status: active
 priority: should
 type: docs
 story:

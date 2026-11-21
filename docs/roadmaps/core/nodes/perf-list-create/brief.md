@@ -1,7 +1,7 @@
 ---
 id: perf-list-create
 title: Create list rows with one parse
-status: todo
+status: active
 priority: should
 type: refactor
 story:

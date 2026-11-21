@@ -1,7 +1,7 @@
 ---
 id: docs-effects
 title: Guide: effects, subscriptions, refs, global events
-status: todo
+status: active
 priority: should
 type: docs
 story:

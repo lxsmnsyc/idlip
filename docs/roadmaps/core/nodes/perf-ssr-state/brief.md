@@ -1,7 +1,7 @@
 ---
 id: perf-ssr-state
 title: Smaller state script and faster server render
-status: todo
+status: active
 priority: should
 type: refactor
 story:
