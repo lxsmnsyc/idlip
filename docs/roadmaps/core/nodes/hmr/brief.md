@@ -1,7 +1,7 @@
 ---
 id: hmr
 title: Hot updates that keep the model
-status: active
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-20
-spent:
+spent: 237800
 owns:
   - packages/idlip/src/vite/hot.ts
   - packages/idlip/src/client/hot.ts
@@ -58,11 +58,11 @@ Dev only. The client code sits behind `import.meta.hot` so the production build 
 
 ## Acceptance
 
-- [ ] An edit to a handler body loads the new chunk on the next event and the model is unchanged (dev server test).
-- [ ] An edit to markup remounts with the current model.
-- [ ] The production todo build is byte-identical in the loader with and without this node.
-- [ ] Fast check passes: `pnpm --filter idlip test`
-- [ ] Change request: `contracts/compiled-format-hot.change-request.md` (event name and payload).
+- [x] An edit to a handler body loads the new chunk on the next event and the model is unchanged (dev server test).
+- [x] An edit to markup remounts with the current model.
+- [x] The production todo build is byte-identical in the loader with and without this node.
+- [x] Fast check passes: `pnpm --filter idlip test`
+- [x] Change request: `contracts/compiled-format-hot.change-request.md` (event name and payload).
 
 ## Sizing
 
@@ -71,3 +71,5 @@ Dev plumbing with a classification step; no loader cost.
 ## Notes for the worker
 
 - Use `hotUpdate` of the client environment, where it exists now. The ssr environment keeps Vite's default handling.
+
+Landed as 7725942 on `batch/core` after one fresh review round (hot tests run on copies of the examples; remount keeps child models and restarts subscriptions). Production loader byte-identical.
