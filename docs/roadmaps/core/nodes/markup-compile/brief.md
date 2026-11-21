@@ -1,7 +1,7 @@
 ---
 id: markup-compile
 title: Compile .idlip files
-status: todo
+status: active
 priority: should
 type: feature
 story: markup-frontend

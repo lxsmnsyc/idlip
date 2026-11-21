@@ -1,7 +1,7 @@
 ---
 id: write-sets
 title: Write sets for update handlers and parallel chunk loading
-status: todo
+status: active
 priority: should
 type: feature
 story:

@@ -1,7 +1,7 @@
 ---
 id: markup-language-core
 title: Language core and tsc wrapper
-status: todo
+status: active
 priority: should
 type: feature
 story: markup-frontend
