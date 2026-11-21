@@ -1,7 +1,7 @@
 ---
 id: fix-rows-collision
 title: State names collide with server render locals
-status: active
+status: done
 priority: should
 type: fix
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 72916
 owns:
   - packages/idlip/test/compiler/view/codegen/locals.test.ts
 shared:
@@ -42,9 +42,11 @@ The `dom-refs` worker found that a state field named `rows` collides with the li
 
 ## Acceptance
 
-- [ ] A test with a state `let rows` (and other generated local names, for example `path`, `out`) compiles and renders the right HTML. It fails on the base.
-- [ ] Existing fixtures unchanged, or the change is explained.
+- [x] A test with a state `let rows` (and other generated local names, for example `path`, `out`) compiles and renders the right HTML. It fails on the base.
+- [x] Existing fixtures unchanged, or the change is explained.
 
 ## Sizing
 
 S: one naming rule in codegen.
+
+Landed as c097ee2 on `batch/core` after self-review. Proof: `let rows` in a `<For>` failed with "Identifier 'rows$' has already been declared" on the base and passes on the branch.
