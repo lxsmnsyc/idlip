@@ -3,25 +3,26 @@ id: perf-from-bench
 title: Performance work from the benchmark findings
 status: todo
 priority: should
-type: refactor
+type: docs
 story:
 early: false
-outline: true
+outline: false
 milestone: 0.1
 target:
 ship: auto
 land: auto
 from:
-size: L
+size: S
 spike: false
 hypothesis:
-verify:
+verify: pnpm -C benchmarks/harness test
 exclusive: [bench]
 fulfilled_by:
 gate: false
 added: 2026-11-21
 spent:
-owns: []
+owns:
+  - benchmarks/README.md
 shared: []
 reserves: []
 provides: []
@@ -32,10 +33,31 @@ depends_on:
   - on: bench-rows
     kind: hard
     why: works from the rendering numbers
+  - on: perf-list-create
+    kind: hard
+    why: records the numbers after it
+  - on: perf-list-kept
+    kind: hard
+    why: records the numbers after it
+  - on: perf-ssr-state
+    kind: hard
+    why: records the numbers after it
 ---
 
 # Performance work from the benchmark findings
 
 ## Goal
 
-Close the gaps the benchmarks show before 0.1, with measured gains. Known from the `benchmarks` outcome: SSR renders/s at 3 todos is about 61k against 140k for Marko, SSR HTML is 4.6 kB against 1.2 kB, and the cold first click takes 2 round trips. Refine into one node per gap once `bench-brumate-latest` and `bench-rows` report, each run with the perf-pass skill (baseline, change, `bench.py`, keep only gains above noise). A gap that is the cost of the design (resumability round trips) gets a sentence in the README instead of a node.
+Close out the benchmark-driven performance work: rerun all three scenarios (todos, rows, dashboard) for every column on a quiet machine after `perf-list-create`, `perf-list-kept` and `perf-ssr-state` land, and update `benchmarks/README.md` tables and the "Where idlip loses" list.
+
+## Context
+
+- Refined on 2026-11-21 from the outcomes of `bench-brumate-latest` and `bench-rows`. The three perf nodes hold the work; this node records the result.
+- Losses that are the cost of the design stay and get one sentence each in the README: the first click loads handler and binding chunks (1 round trip, 2 to 3 requests), so first-click latency and click to update on a cold page trail designs that load all code before `load`. Opt-in prefetch (`renderPreload`) is the answer there; give its number as a note, not in the main table.
+- Not taken up as nodes (could, for later triage in `inbox.md`): dashboard client JS gzip (about 7 small chunks per widget; module helpers copied into each chunk), rows SSR markers (+31% raw, smallest in gzip).
+
+## Acceptance
+
+- [ ] One full run of all scenarios with commit, date, machine and load in the README.
+- [ ] Each perf node's claimed gain shows in the run, or the README says it did not.
+- [ ] The "Where idlip loses" list matches the run; design costs are marked as such.
