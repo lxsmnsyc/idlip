@@ -9,7 +9,7 @@ import { Emitter, createUsage, mergeUsage } from './expr.ts';
 import type { Frame, Report, ScopeName, Usage } from './expr.ts';
 import { HtmlBuilder, toExpression } from './html.ts';
 import type { ModuleSource } from './module.ts';
-import type { Binding, Group, ListInfo, Plan } from './plan.ts';
+import type { Binding, Group, ListInfo, Plan, TryInfo } from './plan.ts';
 import { getKey, getLocalName, quote } from './text.ts';
 
 export interface ChunkContext {
@@ -325,6 +325,25 @@ export function emitListChunk(info: ListInfo, context: ChunkContext): GroupChunk
   }
   return {
     module: { chunk: `list=${info.id}`, code: assemble(usage, sections, context) },
+    usage,
+  };
+}
+
+/**
+ * Emits the chunk of a `<Try>` region: `render(error, scope)` returns the catch view. `error`
+ * is the message of what was thrown, a string. The rows around the region come from `rows`.
+ */
+export function emitTryChunk(info: TryInfo, context: ChunkContext): GroupChunk {
+  const usage = createUsage();
+  const emitter = new Emitter('client', usage, context.report);
+  emitter.frames = info.frames;
+  const builder = new HtmlBuilder(context.component, context.plan, emitter);
+  const built = builder.buildCatch(info.node, info.id);
+  const body = [...built.pre, `return ${toExpression({ pre: [], parts: built.parts })};`];
+  const error = getLocalName(info.node.error);
+  const render = `export function render(${printParams(error, usage)}) {\n${body.join('\n')}\n}`;
+  return {
+    module: { chunk: `try=${info.id}`, code: assemble(usage, [render], context) },
     usage,
   };
 }

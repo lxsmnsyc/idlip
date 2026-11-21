@@ -5,6 +5,7 @@ import type { Frame, Report } from './expr.ts';
 type ForNode = Extract<Node, { kind: 'for' }>;
 export type ChildNode = Extract<Node, { kind: 'child' }>;
 export type SubscribeNode = Extract<Node, { kind: 'subscribe' }>;
+export type TryNode = Extract<Node, { kind: 'try' }>;
 
 export type Source =
   | { kind: 'attr'; name: string; hole: Hole }
@@ -37,6 +38,14 @@ export interface ListInfo {
   /** The id of the enclosing list. */
   parent: number | undefined;
   /** The rows around the list block. */
+  frames: Frame[];
+}
+
+/** A `<Try>` region. Its id is the number of the region marker `<!--e<id>:<state>-->`. */
+export interface TryInfo {
+  id: number;
+  node: TryNode;
+  /** The rows around the region, outermost first. */
   frames: Frame[];
 }
 
@@ -88,6 +97,10 @@ export interface Plan {
   subs: Map<Node, number>;
   /** The sources the view subscribes to, by name, in source order. */
   sources: Map<string, Root>;
+  /** The `<Try>` regions of the view, in view order. */
+  tries: TryInfo[];
+  /** The region id of each `<Try>` node. */
+  tryIds: Map<Node, number>;
 }
 
 /** Prints the source of a keyed segment: the model path of its value. */
@@ -161,6 +174,8 @@ class Planner {
   uses: Used[] = [];
   subs = new Map<Node, number>();
   sources = new Map<string, Root>();
+  tries: TryInfo[] = [];
+  tryIds = new Map<Node, number>();
   nextEvent: number;
 
   constructor(
@@ -288,6 +303,37 @@ class Planner {
     }
   }
 
+  /**
+   * Checks the catch view. It is rendered once, from the state at the time of the failure, so
+   * nothing in it patches: it gets no bindings. It listens to the events it names, and it may
+   * hold elements, text, holes and conditions.
+   */
+  scanCatch(nodes: Node[]): void {
+    for (const node of nodes) {
+      switch (node.kind) {
+        case 'text':
+        case 'text-hole':
+          break;
+        case 'element':
+          for (const event of node.events) {
+            this.events.add(event.name);
+          }
+          this.scanCatch(node.children);
+          break;
+        case 'condition':
+          this.scanCatch(node.then);
+          this.scanCatch(node.else);
+          break;
+        default:
+          this.report(
+            'try-catch-node',
+            `A ${node.kind} block in the catch view of <Try> is not supported`,
+            { start: 0, end: 0 },
+          );
+      }
+    }
+  }
+
   walk(nodes: Node[], context: WalkContext): void {
     for (const node of nodes) {
       switch (node.kind) {
@@ -363,6 +409,15 @@ class Planner {
           }
           break;
         }
+        case 'try': {
+          // Regions count on their own, so a `<Try>` never renames the ids that follow it.
+          const id = this.tries.length;
+          this.tryIds.set(node, id);
+          this.tries.push({ id, node, frames: context.frames });
+          this.walk(node.body, context);
+          this.scanCatch(node.catch);
+          break;
+        }
         case 'global': {
           const ids = this.bindEvents(node.events, context);
           if (ids.length > 0) {
@@ -404,6 +459,8 @@ export function planBindings(component: Component, report: Report, child = false
     uses: planner.uses,
     subs: planner.subs,
     sources: planner.sources,
+    tries: planner.tries,
+    tryIds: planner.tryIds,
   };
 }
 

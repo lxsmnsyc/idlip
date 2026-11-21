@@ -14,7 +14,13 @@ import { HELPER_NAMES } from '../../../core/helpers.ts';
 import { pickComponent } from '../../update/index.ts';
 import { listWrites, meetsPath } from '../../update/writes.ts';
 import type { Component, ModuleIR, Span } from '../analyze/index.ts';
-import { emitBindings, emitGroupChunk, emitListChunk, emitViewChunk } from './chunks.ts';
+import {
+  emitBindings,
+  emitGroupChunk,
+  emitListChunk,
+  emitTryChunk,
+  emitViewChunk,
+} from './chunks.ts';
 import type { ChunkContext } from './chunks.ts';
 import { Emitter, createUsage, mergeUsage } from './expr.ts';
 import { HtmlBuilder, toExpression } from './html.ts';
@@ -151,12 +157,17 @@ function buildManifest(
       ...(info.parent === undefined ? {} : { parent: String(info.parent) }),
     };
   }
+  const fallback: Record<string, string> = {};
+  for (const info of plan.tries) {
+    fallback[String(info.id)] = `try=${info.id}`;
+  }
   return {
     module: id,
     events: plan.events,
     handlers,
     ...(Object.keys(tasks).length === 0 ? {} : { tasks }),
     ...(plan.sources.size === 0 ? {} : { sources: [...plan.sources.keys()] }),
+    ...(plan.tries.length === 0 ? {} : { fallback }),
     groups: groupEntries,
     lists,
     ...(child ? { view: { chunk: 'view' } } : {}),
@@ -233,6 +244,12 @@ export function generate(
   }
   for (const info of plan.lists) {
     const chunk = emitListChunk(info, context);
+    client.push(chunk.module);
+    mergeUsage(clientUsage, chunk.usage);
+  }
+
+  for (const info of plan.tries) {
+    const chunk = emitTryChunk(info, context);
     client.push(chunk.module);
     mergeUsage(clientUsage, chunk.usage);
   }
@@ -339,6 +356,9 @@ function emitServer(
   }
   for (const list of Object.values(manifest.lists)) {
     chunkNames.push(list.chunk);
+  }
+  for (const chunk of Object.values(manifest.fallback ?? {})) {
+    chunkNames.push(chunk);
   }
   if (manifest.view !== undefined) {
     chunkNames.push(manifest.view.chunk);

@@ -256,10 +256,12 @@ export class Emitter {
       case 'module':
         this.usage.modules.add(root.name);
         return root.name;
-      case 'event':
-        return this.fail('codegen-event', 'The event is read only as a whole event argument');
+      case 'local':
+        // The error of a `<Try>` catch view: a variable in the render code.
+        return getLocalName(root.name);
       default:
-        return this.fail('codegen-unsupported', `A ${root.kind} root is not generated yet`);
+        // The event root is the only one left.
+        return this.fail('codegen-event', 'The event is read only as a whole event argument');
     }
   }
 

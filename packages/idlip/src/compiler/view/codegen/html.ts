@@ -1,7 +1,7 @@
 // Turns view nodes into JS that builds their markup: the server render and client templates.
 import type { Component, Node } from '../analyze/index.ts';
 import { addChildNode } from './child.ts';
-import { getMessage } from './events.ts';
+import { getMessage, printModifiers } from './events.ts';
 import type { Emitter } from './expr.ts';
 import type { Plan } from './plan.ts';
 import {
@@ -74,6 +74,9 @@ export class HtmlBuilder {
    */
   target: 'server' | 'client';
 
+  /** The ids of the `<Try>` regions whose catch view is being built, innermost last. */
+  catching: number[] = [];
+
   constructor(
     readonly component: Component,
     readonly plan: Plan,
@@ -142,6 +145,9 @@ export class HtmlBuilder {
       case 'subscribe':
         this.addSubscribe(node, built);
         break;
+      case 'try':
+        this.addTry(node, built);
+        break;
       case 'global':
         addText(built, `<template i-global="${node.target}"`);
         this.addEvents(node.events, built);
@@ -180,9 +186,59 @@ export class HtmlBuilder {
     addText(built, '></template><!--/c-->');
   }
 
+  /**
+   * Writes a `<Try>` region: `<!--e<id>:0-->` around the body, or `<!--e<id>:1-->` around the
+   * catch view when something in the body throws. The code runs the body in a `try` block, so
+   * a throwing hole, helper or child leaves no half-written markup.
+   */
+  addTry(node: Extract<Node, { kind: 'try' }>, built: Built): void {
+    const id = this.plan.tryIds.get(node);
+    if (id === undefined) {
+      return;
+    }
+    const variable = `$try${id}`;
+    const body = this.build(node.body);
+    const catchBuilt = this.buildCatch(node, id);
+    const error = getLocalName(node.error);
+    const wrap = (state: number, parts: Part[]): string =>
+      joinParts([
+        { kind: 'text', value: `<!--e${id}:${state}-->` },
+        ...parts,
+        { kind: 'text', value: '<!--/e-->' },
+      ]);
+    built.pre.push(
+      `let ${variable};`,
+      'try {',
+      ...body.pre,
+      `${variable} = ${wrap(0, body.parts)};`,
+      '} catch ($e) {',
+      `const ${error} = $e instanceof Error ? $e.name + ': ' + $e.message : String($e);`,
+      ...catchBuilt.pre,
+      `${variable} = ${wrap(1, catchBuilt.parts)};`,
+      '}',
+    );
+    addCode(built, variable);
+  }
+
+  /** Builds the catch view of a region. A `reset` event in it names the region. */
+  buildCatch(node: Extract<Node, { kind: 'try' }>, id: number): Built {
+    this.catching.push(id);
+    const built = this.build(node.catch);
+    this.catching.pop();
+    return built;
+  }
+
   addEvents(events: Extract<Node, { kind: 'element' }>['events'], built: Built): void {
     const { emitter } = this;
     for (const event of events) {
+      const region = this.catching.at(-1);
+      if (event.target.kind === 'reset' && region !== undefined) {
+        // The loader handles the reserved tag `$reset` itself: it renders the region again.
+        const modifiers = printModifiers(event);
+        const message = modifiers === '' ? ['$reset', [region]] : ['$reset', [region], modifiers];
+        addText(built, ` on:${event.name}='${JSON.stringify(message)}'`);
+        continue;
+      }
       if (event.target.kind !== 'handler' && event.target.kind !== 'prop') {
         continue;
       }

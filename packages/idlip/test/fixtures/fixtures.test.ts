@@ -39,7 +39,7 @@ vi.mock('/src/counter.idlip.tsx?idlip-view&lang.js', async () =>
   vi.importActual<Record<string, unknown>>('./nested/counter/expected/client/view.js'),
 );
 
-const FIXTURES = ['counter', 'todo', 'effects', 'nested/counter', 'nested/board'];
+const FIXTURES = ['counter', 'todo', 'effects', 'nested/counter', 'nested/board', 'try'];
 
 type Exports = Record<string, unknown>;
 
@@ -167,6 +167,9 @@ function listChunks(manifest: Manifest): string[] {
   }
   for (const list of Object.values(manifest.lists)) {
     chunks.add(list.chunk);
+  }
+  for (const chunk of Object.values(manifest.fallback ?? {})) {
+    chunks.add(chunk);
   }
   // A module that a parent renders as a child has a view chunk (`nesting-format`).
   const view: unknown = Reflect.get(manifest, 'view');

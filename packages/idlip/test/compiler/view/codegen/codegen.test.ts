@@ -754,7 +754,7 @@ describe('client chunks', () => {
     expect(listExports(chunk?.code ?? '')).toEqual(['l0', 'l1']);
   });
 
-  it('reports blocks that are not generated yet', () => {
+  it('generates a <Try> block, which the errors node added', () => {
     const source = `
       import { Try } from 'idlip';
       export default function App() {
@@ -771,9 +771,9 @@ describe('client chunks', () => {
     `;
     const result = generateSource(source);
     const rules = result.diagnostics.map((diagnostic) => diagnostic.rule);
-    expect(rules).toContain('codegen-unsupported');
-    expect(result.server).toBe('');
-    expect(result.client).toEqual([]);
+    expect(rules).not.toContain('codegen-unsupported');
+    expect(result.manifest.fallback).toEqual({ '0': 'try=0' });
+    expect(result.server).toContain('<!--e0:0-->');
   });
 
   it('passes the analysis errors through and emits nothing', () => {

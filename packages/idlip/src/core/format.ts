@@ -58,6 +58,12 @@ export interface Manifest {
    * view has no `<Subscribe>`.
    */
   readonly sources?: readonly string[];
+  /**
+   * The `<Try>` regions of the view: the region id, as a string, to the chunk `try=<id>`. The
+   * chunk exports `render(error, scope)`, the catch view as HTML. Absent when the view has no
+   * `<Try>`.
+   */
+  readonly fallback?: Readonly<Record<string, string>>;
   /** Binding groups by key, ordered so a group comes before the groups it covers. */
   readonly groups: Readonly<Record<string, BindingGroup>>;
   /** `<For>` blocks by binding id, written as a string. */
