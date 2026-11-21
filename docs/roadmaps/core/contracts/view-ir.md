@@ -1,6 +1,6 @@
 ---
 name: view-ir
-version: 7
+version: 8
 status: frozen
 defined_by: spike-view-analysis
 ---
@@ -73,7 +73,7 @@ type Expr =
   | { kind: 'template'; quasis: string[]; exprs: Expr[] }
   | { kind: 'object'; entries: { key: string; value: Expr }[] }
   | { kind: 'array'; items: Expr[] }
-  | { kind: 'call'; callee: Root; args: Expr[]; helper: 'args' }
+  | { kind: 'call'; callee: Root; args: Expr[]; helper: 'args'; impure?: true }
   | { kind: 'call'; callee: Root; args: Expr[]; helper: 'inlined'; body: Expr }
   | { kind: 'method'; receiver: Expr; name: Method; args: Expr[] }
   | { kind: 'property'; receiver: Expr; name: 'length' };
@@ -129,7 +129,9 @@ type Segment =
 
 An inlined call keeps its `args` and adds `body`, the helper's return expression with the arguments substituted. Code generation emits `body`. Inlining falls back to `helper: 'args'` when the body leaves the closed grammar after substitution, for example when the helper reads a field of a parameter (`card.title`) and the argument is not a path (`cond ? a : b`).
 
-Pure globals: a hole may call `String`, `Number`, `Boolean` and `Math.*` except `Math.random` (a `call` with a `global` callee and `helper: 'args'`). It may call the `Method` list on any value, and read `.length` on any value. On a path, `.length` stays a field segment (`columns.*.cards.length`); on any other receiver it is a `property` node that reads the receiver's paths. Code generation handles both shapes. None of these methods takes a function argument. Their paths are the paths of the receiver and the arguments: `draft.trim()` reads `draft`. Any other global or method is an error. A `loop` root object is shared by every expression in its row, so code generation can tell two loops with the same variable name apart by identity.
+Pure globals: a hole may call `String`, `Number`, `Boolean` and `Math.*` (a `call` with a `global` callee and `helper: 'args'`). It may call the `Method` list on any value, and read `.length` on any value. On a path, `.length` stays a field segment (`columns.*.cards.length`); on any other receiver it is a `property` node that reads the receiver's paths. Code generation handles both shapes. None of these methods takes a function argument. Their paths are the paths of the receiver and the arguments: `draft.trim()` reads `draft`. Any other global or method is an error.
+
+Impure globals: a hole may also call `Math.random`, `Date.now`, `performance.now` and `crypto.randomUUID`. The call is marked `impure: true` and reads no paths. A hole patches only when one of its paths changes, so the value is computed on the server and again at each patch of that hole. When the hole's path set is empty, it renders once on the server and never patches, and no diagnostic is given. When the path set is not empty, the analysis gives the warning `hole-impure`, which names the paths that recompute the value. Handlers keep `handler-impure` as an error, because a handler's result enters the model and the message log. A `loop` root object is shared by every expression in its row, so code generation can tell two loops with the same variable name apart by identity.
 
 ### Holes and paths
 
@@ -269,21 +271,21 @@ interface Span {
 
 ### Diagnostics
 
-Every diagnostic carries a rule id. All are errors except `let-unassigned`.
+Every diagnostic carries a rule id. All are errors except `let-unassigned` and `hole-impure`.
 
-| Area     | Rule ids                                                                                                                                                                                                                                                                                                                                    |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Body     | `body-statement`, `body-var`, `body-destructure`, `body-return`, `props-count`, `props-pattern`, `props-whole`                                                                                                                                                                                                                              |
-| Paths    | `hole-dynamic` (not produced for the closed grammar)                                                                                                                                                                                                                                                                                        |
-| State    | `let-annotation`, `let-bare-as`, `let-init`, `let-unassigned` (warning), `init-scope`                                                                                                                                                                                                                                                       |
-| Derived  | `derived-jsx`, `derived-cycle`                                                                                                                                                                                                                                                                                                              |
-| Holes    | `hole-closure`, `hole-method`, `hole-global`, `hole-handler`, `hole-statement`, `hole-effect`, `hole-unknown`, `hole-operator`, `hole-literal`, `hole-object`, `hole-array`, `hole-spread`, `hole-call`, `hole-member`, `hole-jsx`, `hole-message`, `hole-children`, `hole-function-value`, `hole-grammar`, `hole-impure`, `helper-closure` |
-| View     | `view-map`, `condition-operator`, `for-each`, `for-key`, `for-render`, `for-param`, `ref-form`, `html-trusted`, `html-children`, `title-outside-head`, `attr-jsx`, `jsx-spread`, `jsx-namespace-tag`, `component-unknown`, `component-import`, `component-recursive`, `child-children`                                                      |
-| HTML     | `html-nesting` (the parser closes or moves the element, or text sits in a table part), `html-implied` (the parser inserts `<tbody>`, `<tr>` or `<colgroup>`)                                                                                                                                                                                |
-| Events   | `event-closure`, `event-target`, `event-param`, `event-mode-twice`, `event-message-args`                                                                                                                                                                                                                                                    |
-| Blocks   | `try-catch`, `subscribe-source`, `subscribe-input-key`, `subscribe-children`, `global-attr`, `global-children`                                                                                                                                                                                                                              |
-| Handlers | `handler-free`, `handler-assign`, `handler-mutate`, `handler-impure`, `handler-generator`, `await-placement`, `await-callee`                                                                                                                                                                                                                |
-| Parser   | `parse`                                                                                                                                                                                                                                                                                                                                     |
+| Area     | Rule ids                                                                                                                                                                                                                                                                                                                                              |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Body     | `body-statement`, `body-var`, `body-destructure`, `body-return`, `props-count`, `props-pattern`, `props-whole`                                                                                                                                                                                                                                        |
+| Paths    | `hole-dynamic` (not produced for the closed grammar)                                                                                                                                                                                                                                                                                                  |
+| State    | `let-annotation`, `let-bare-as`, `let-init`, `let-unassigned` (warning), `init-scope`                                                                                                                                                                                                                                                                 |
+| Derived  | `derived-jsx`, `derived-cycle`                                                                                                                                                                                                                                                                                                                        |
+| Holes    | `hole-closure`, `hole-method`, `hole-global`, `hole-handler`, `hole-statement`, `hole-effect`, `hole-unknown`, `hole-operator`, `hole-literal`, `hole-object`, `hole-array`, `hole-spread`, `hole-call`, `hole-member`, `hole-jsx`, `hole-message`, `hole-children`, `hole-function-value`, `hole-grammar`, `hole-impure` (warning), `helper-closure` |
+| View     | `view-map`, `condition-operator`, `for-each`, `for-key`, `for-render`, `for-param`, `ref-form`, `html-trusted`, `html-children`, `title-outside-head`, `attr-jsx`, `jsx-spread`, `jsx-namespace-tag`, `component-unknown`, `component-import`, `component-recursive`, `child-children`                                                                |
+| HTML     | `html-nesting` (the parser closes or moves the element, or text sits in a table part), `html-implied` (the parser inserts `<tbody>`, `<tr>` or `<colgroup>`)                                                                                                                                                                                          |
+| Events   | `event-closure`, `event-target`, `event-param`, `event-mode-twice`, `event-message-args`                                                                                                                                                                                                                                                              |
+| Blocks   | `try-catch`, `subscribe-source`, `subscribe-input-key`, `subscribe-children`, `global-attr`, `global-children`                                                                                                                                                                                                                                        |
+| Handlers | `handler-free`, `handler-assign`, `handler-mutate`, `handler-impure`, `handler-generator`, `await-placement`, `await-callee`                                                                                                                                                                                                                          |
+| Parser   | `parse`                                                                                                                                                                                                                                                                                                                                               |
 
 The keyed path type stays reserved: the analysis emits `keyed` segments only once `keyed-paths` lands.
 
@@ -332,6 +334,7 @@ holes:
 
 ## Changes
 
+- v8 (2026-11-21, `contracts/view-ir-v8.change-request.md`): impure globals in holes. `Math.random`, `Date.now`, `performance.now` and `crypto.randomUUID` are allowed in holes and marked `impure: true`. `hole-impure` becomes a warning, given only when the hole reads paths. Resumability has no hydration check, so a server value that differs from a later client value is not an error; the warning covers a value that changes only when unrelated paths change.
 - v7: frozen by `spike-view-analysis`. Fixes the types above. Adds `props` paths, `index` segments, minimal path sets, item paths through helper-computed lists, event `paths`, the `reset` and `prop` targets, the subscription value argument, handler `writes` and `carried` locals, `html-nesting` and `html-implied`, and the rule id list. Allows pure globals and a fixed list of methods in holes. Follows imported components. Reserves event `modifiers` and the `form` root. Records props paths read by handlers and the rename mapping of props patterns. `dynamic` is kept in the type but not produced for the closed grammar.
 - v6: reads function components instead of `defineModule`: state fields, derived values, handlers and the view. Event props are handler references or arrows with one handler call. Stateless components are inlined. The `catch` view is replaced by `<Try>` boundary blocks. Adds head blocks and subscription nodes. Source: `docs/proposals/0002-modules.md`, revised 2026-11-21.
 - v5: constants in holes, refs, raw HTML holes, namespaces, `catch` view. Source: `docs/proposals/0004-effects-refs-errors.md`.
