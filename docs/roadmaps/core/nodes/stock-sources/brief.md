@@ -1,7 +1,7 @@
 ---
 id: stock-sources
 title: Time, Random and the stock subscription sources
-status: todo
+status: active
 priority: should
 type: feature
 story:

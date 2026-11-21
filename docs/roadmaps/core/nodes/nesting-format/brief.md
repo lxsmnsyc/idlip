@@ -1,7 +1,7 @@
 ---
 id: nesting-format
 title: Compiled format for nested components
-status: todo
+status: active
 priority: should
 type: contract
 story:
