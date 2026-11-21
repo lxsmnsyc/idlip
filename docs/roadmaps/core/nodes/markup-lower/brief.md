@@ -1,7 +1,7 @@
 ---
 id: markup-lower
 title: Lower markup to TSX with offset mappings
-status: todo
+status: active
 priority: should
 type: feature
 story: markup-frontend
