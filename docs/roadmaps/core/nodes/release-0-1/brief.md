@@ -26,6 +26,9 @@ shared: []
 reserves: []
 provides: []
 depends_on:
+  - on: markup-ts-plugin
+    kind: hard
+    why: ships in 0.1.0
   - on: runtime-flags
     kind: hard
     why: ships in 0.1.0
