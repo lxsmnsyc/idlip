@@ -1,7 +1,7 @@
 ---
 id: form-fields
 title: Form fields in event arrows
-status: active
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-20
-spent:
+spent: 161054
 owns:
   - packages/idlip/src/compiler/view/codegen/events.ts
   - packages/idlip/test/compiler/view/form*.test.ts
@@ -59,11 +59,11 @@ Target flag-off cost 0 B and no flag: the design above adds no loader code. If a
 
 ## Acceptance
 
-- [ ] A form with `on:submit` reads a field at dispatch (test with the real listener and loader in happy-dom): the message payload holds the field value and the default is prevented.
-- [ ] A computed key (`elements[name]`) is a compile error with a rule id.
-- [ ] The todo loader and listener sizes are unchanged (e2e budget test).
-- [ ] Fast check passes: `pnpm --filter idlip test`
-- [ ] Change request: `contracts/compiled-format-form-fields.change-request.md` and `contracts/view-ir-form-fields.change-request.md`.
+- [x] A form with `on:submit` reads a field at dispatch (test with the real listener and loader in happy-dom): the message payload holds the field value and the default is prevented.
+- [x] A computed key (`elements[name]`) is a compile error with a rule id.
+- [x] The todo loader and listener sizes are unchanged (e2e budget test).
+- [x] Fast check passes: `pnpm --filter idlip test`
+- [x] Change request: `contracts/compiled-format-form-fields.change-request.md` and `contracts/view-ir-form-fields.change-request.md`.
 
 ## Sizing
 
@@ -76,3 +76,5 @@ Mostly analyzer and codegen work on a narrow path grammar; the loader is untouch
 ## Orchestrator decision (one-shot run)
 
 Reading fields through `e.currentTarget.elements.<name>.value` is accepted. The user can revisit.
+
+Landed as 4a8efac on `batch/core` after one fresh review round (typed `FormElement` for `on:submit`, one prevent rule, a `<For>` row test). Accepted change outside paths: `src/jsx/elements.ts`.
