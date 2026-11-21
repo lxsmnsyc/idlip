@@ -148,7 +148,8 @@ describe('vite build', () => {
         expect(listExports(readFileSync(file, 'utf8')), id).toEqual(listExports(source));
       }
     }
-    expect(Object.keys(urls).toSorted()).toEqual(expected.toSorted());
+    // The build id (`skew`) is the one key that is not a chunk.
+    expect(Object.keys(urls).toSorted()).toEqual([...expected, 'build'].toSorted());
     // Besides the chunks, only the loader (`idlip/client`) and the files it imports statically, which
     // the page loads at boot.
     const assets = path.join(client, 'assets');
@@ -166,7 +167,8 @@ describe('vite build', () => {
         pending.push(...listImports(readFileSync(path.join(assets, file), 'utf8')));
       }
     }
-    const chunkUrls = new Set(Object.values(urls));
+    // `build.js` is the module the loader imports to read the server's build.
+    const chunkUrls = new Set([...Object.values(urls), '/assets/build.js']);
     for (const file of readdirSync(assets)) {
       expect(chunkUrls.has(`/assets/${file}`) || loaded.has(file), file).toBe(true);
     }

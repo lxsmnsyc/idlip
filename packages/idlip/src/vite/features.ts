@@ -47,12 +47,14 @@ export function getFeatures(results: Iterable<CompileResult>): Set<string> {
   return on;
 }
 
-/** Returns the source text of each feature global, `true` for a feature the app uses. */
-export function getDefines(on: ReadonlySet<string>): Map<string, string> {
+/** Returns the source text of each feature global, `true` for a feature the app uses and for `skew`. */
+export function getDefines(on: ReadonlySet<string>, skew = true): Map<string, string> {
   const defines = new Map<string, string>();
   for (const name of Object.keys(DETECTORS)) {
     defines.set(`__IDLIP_HAS_${name}__`, String(on.has(name)));
   }
+  // SKEW is an option of the plugin, not something a module reports.
+  defines.set('__IDLIP_HAS_SKEW__', String(skew));
   return defines;
 }
 

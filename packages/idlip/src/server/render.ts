@@ -70,6 +70,8 @@ interface RecordedState extends PageState {
   readonly slots?: Readonly<Record<string, Slot>>;
   /** The event types of the root and of every module in `modules`. */
   readonly events: readonly string[];
+  /** The build id the plugin put in the chunk map. The state script carries it as `i-build`. */
+  readonly build?: string;
 }
 
 function joinPath(prefix: string, segment: string): string {
@@ -137,7 +139,7 @@ function writeState(state: RecordedState, nonce: string | undefined): string {
   // It writes `<` as `\x3C` and escapes U+2028 and U+2029, so a value cannot end the script.
   const body = serializeState(state);
   const script = `(self.$idlip||=[]).push([${events},()=>${body}])`;
-  return `<script i-state${attr('nonce', nonce)}>${script}</script>`;
+  return `<script i-state${attr('i-build', state.build)}${attr('nonce', nonce)}>${script}</script>`;
 }
 
 /** Adds the manifest and chunk URLs of the modules a component can render, and their children. */
@@ -175,9 +177,12 @@ function mergeState(root: ComponentState, children: Map<string, ComponentState>)
       events.add(event);
     }
   }
+  const merged = { ...root.chunks, ...chunks };
+  const { build, ...urls } = merged;
   return {
     manifest: root.manifest,
-    chunks: { ...root.chunks, ...chunks },
+    chunks: urls,
+    ...(Object.hasOwn(merged, 'build') ? { build } : {}),
     model: root.model,
     props: root.props,
     ...(modules.size === 0 ? {} : { modules: Object.fromEntries(modules) }),

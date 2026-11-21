@@ -62,7 +62,7 @@ it('builds a source chunk that imports idlip without a shared chunk, and sizes t
     const source = readFileSync(path.join(assets, sources[0]), 'utf8');
     expect(source).not.toMatch(/from\s*["']\.\//);
     // Every other file is a loader, a binding or a handler.
-    const loader = files.find((file) => !file.startsWith('clock.'));
+    const loader = files.find((file) => !file.startsWith('clock.') && file !== 'build.js');
     expect(loader).toBeDefined();
     const size = gzipSize(readFileSync(path.join(assets, loader ?? ''), 'utf8'));
     // oxlint-disable-next-line no-console

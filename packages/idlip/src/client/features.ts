@@ -16,6 +16,7 @@ declare const __IDLIP_HAS_SUBS__: boolean | undefined;
 declare const __IDLIP_HAS_HEAD__: boolean | undefined;
 declare const __IDLIP_HAS_ERRORS__: boolean | undefined;
 declare const __IDLIP_HAS_RETRY__: boolean | undefined;
+declare const __IDLIP_HAS_SKEW__: boolean | undefined;
 
 /** Handlers that `await`, which the task runner serves. */
 export const HAS_TASKS: boolean = typeof __IDLIP_HAS_TASKS__ === 'undefined' || __IDLIP_HAS_TASKS__;
@@ -37,3 +38,5 @@ export const HAS_ERRORS: boolean =
   typeof __IDLIP_HAS_ERRORS__ === 'undefined' || __IDLIP_HAS_ERRORS__;
 /** A chunk that fails to load is imported once more at once, before the loader reports it. */
 export const HAS_RETRY: boolean = typeof __IDLIP_HAS_RETRY__ === 'undefined' || __IDLIP_HAS_RETRY__;
+/** The reload when a chunk fails and the server runs another build. Set by the plugin option `skew`. */
+export const HAS_SKEW: boolean = typeof __IDLIP_HAS_SKEW__ === 'undefined' || __IDLIP_HAS_SKEW__;

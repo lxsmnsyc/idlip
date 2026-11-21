@@ -17,6 +17,15 @@ import type { ChunkUrls, Compile, CompileDiagnostic, CompileResult } from '../co
 import { getChunkFile, getChunkId } from '../core/format.ts';
 import { findDroppedFeatures, getDefines, getFeatures, replaceFeatures } from './features.ts';
 import { HOT_EVENT, classifyEdit } from './hot.ts';
+import {
+  BUILDS_FILE,
+  BUILD_FILE,
+  BUILD_KEY,
+  findLoaderFile,
+  getBuildId,
+  getBuildSource,
+  keepBuilds,
+} from './skew.ts';
 import { isChunkUrls, listChunks, parseChunkId, replaceChunkUrls } from './chunks.ts';
 
 const MODULE_FILE = /\.idlip\.tsx$/;
@@ -46,6 +55,19 @@ export interface IdlipOptions {
   client?: string;
   /** The compiler. Default: `compile` from `idlip/compiler`. */
   compile?: (source: string, id: string, options?: CompileOptions) => CompileResult;
+  /**
+   * Recover when a page cached from an older build meets this one: the pages carry a build id,
+   * the client build keeps the files of the previous build, and the loader reloads once when a
+   * chunk fails and the server runs another build. Default: on in a production build.
+   *
+   * The client build writes `build.js` next to the loader. Serve it with `Cache-Control:
+   * no-store` (or a short max age), since the loader imports it to learn the build the server
+   * runs, and a cached copy hides a new deploy. Retention reads `<build.outDir>/.idlip/builds.json`,
+   * so keep `build.outDir` between deploys, or restore the previous build before building.
+   * On a clean checkout the build keeps nothing, and a page cached from the last deploy finds its
+   * chunks gone and reloads. Only files of the build are deleted, never files from `publicDir`.
+   */
+  skew?: boolean;
 }
 
 /** The context methods the plugin reports diagnostics with. */
@@ -108,9 +130,12 @@ function createBuild(
   user: EnvironmentOptions | undefined,
   outDir: string,
   input: string | undefined,
+  keep = false,
 ): NonNullable<EnvironmentOptions['build']> {
   return {
     ...(user?.build?.outDir === undefined ? { outDir } : {}),
+    // The previous build's files stay for pages cached from it. `keepBuilds` drops older ones.
+    ...(keep && user?.build?.emptyOutDir === undefined ? { emptyOutDir: false } : {}),
     ...(input === undefined || user?.build?.rolldownOptions?.input !== undefined
       ? {}
       : { rolldownOptions: { input } }),
@@ -133,6 +158,7 @@ function createConfig(user: UserConfig, options: IdlipOptions): UserConfig {
           environments.client,
           path.join(outDir, 'client'),
           options.client ?? 'idlip/client',
+          options.skew !== false,
         ),
       },
       ssr: { build: createBuild(environments.ssr, path.join(outDir, 'server'), options.entry) },
@@ -254,6 +280,8 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
   let built: ChunkUrls | undefined;
   /** The feature globals of the client build and their values, set once its modules compile. */
   let defines: Map<string, string> | undefined;
+  /** The files of the client build, relative to its folder. */
+  let buildFiles: string[] = [];
 
   function getModuleId(file: string): string {
     return `/${path.relative(root, file).split(path.sep).join('/')}`;
@@ -372,6 +400,10 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
         throw new Error(`idlip: the client build has no chunk ${id}`);
       }
     }
+    // The server writes the build id on the state script and drops it from the chunk map.
+    if (all !== undefined && Object.hasOwn(all, BUILD_KEY)) {
+      urls[BUILD_KEY] = all[BUILD_KEY];
+    }
     return urls;
   }
 
@@ -431,7 +463,7 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
         }
       }
       // Every module is compiled before the loader is bundled, so the loader sees the defines.
-      defines = getDefines(getFeatures(results));
+      defines = getDefines(getFeatures(results), options.skew !== false);
     },
 
     async load(id) {
@@ -491,12 +523,29 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
         urls[id] = `${base}${file}`;
       }
       checkChunkImports(this, bundle, files);
+      if (options.skew !== false) {
+        const id = getBuildId(Object.keys(bundle));
+        urls[BUILD_KEY] = id;
+        // The loader imports this module from its own folder, to learn the server's build.
+        const buildFile = path.posix.join(
+          path.posix.dirname(findLoaderFile(bundle, files)),
+          BUILD_FILE,
+        );
+        this.emitFile({ type: 'asset', fileName: buildFile, source: getBuildSource(id) });
+        buildFiles = [...Object.keys(bundle), buildFile];
+      }
       built = urls;
     },
 
-    writeBundle() {
+    writeBundle(output) {
       if (this.environment.name !== 'client' || built === undefined) {
         return;
+      }
+      if (options.skew !== false) {
+        keepBuilds(path.resolve(root, outDir, BUILDS_FILE), output.dir ?? '', {
+          id: built[BUILD_KEY],
+          files: buildFiles,
+        });
       }
       mkdirSync(path.dirname(chunksFile), { recursive: true });
       writeFileSync(chunksFile, JSON.stringify(built, null, 2));

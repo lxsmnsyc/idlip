@@ -9,9 +9,11 @@ import {
   HAS_HEAD,
   HAS_REFS,
   HAS_RETRY,
+  HAS_SKEW,
   HAS_SUBS,
   HAS_TASKS,
 } from '../features.ts';
+import { checkSkew } from '../skew.ts';
 import { startHead } from '../head.ts';
 import { connectHot } from '../hot.ts';
 import type { Hot } from '../hot.ts';
@@ -165,6 +167,10 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
       promise.catch(() => {
         loads.delete(url);
         failures.set(url, (retry ?? 0) + 1);
+        // A chunk that is gone may mean a newer build.
+        if (HAS_SKEW) {
+          checkSkew();
+        }
       });
     }
     return promise;
