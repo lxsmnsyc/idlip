@@ -1,4 +1,5 @@
 // oxlint-disable import/prefer-default-export
+import { DEV, warnDeepQueue } from '../../core/dev.ts';
 import { getChunkId } from '../../core/format.ts';
 import { HAS_TASKS } from '../features.ts';
 import { runTask } from '../tasks/run.ts';
@@ -175,6 +176,9 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
           return;
         }
       }
+    }
+    if (DEV) {
+      warnDeepQueue(queue, event);
     }
     queue.push(item);
   }
