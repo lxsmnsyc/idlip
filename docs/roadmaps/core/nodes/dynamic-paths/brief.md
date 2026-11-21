@@ -1,7 +1,7 @@
 ---
 id: dynamic-paths
 title: Runtime path tracking for dynamic holes
-status: todo
+status: active
 priority: should
 type: feature
 story:
