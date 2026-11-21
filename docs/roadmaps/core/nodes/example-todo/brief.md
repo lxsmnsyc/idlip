@@ -29,6 +29,9 @@ shared:
 reserves: []
 provides: []
 depends_on:
+  - on: chunk-helpers
+    kind: hard
+    why: chunks and the loader change shape to fit the budget
   - on: row-list-exports
     kind: hard
     why: the example needs the fixed chunk exports

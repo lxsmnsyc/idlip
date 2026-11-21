@@ -30,6 +30,9 @@ shared:
 reserves: []
 provides: []
 depends_on:
+  - on: chunk-helpers
+    kind: hard
+    why: chunks and the loader change shape to fit the budget
   - on: ssr-render
     kind: hard
     why: mount renders through the server renderer

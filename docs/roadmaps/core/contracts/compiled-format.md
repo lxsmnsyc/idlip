@@ -105,7 +105,7 @@ on:keydown='["clear",[],"key:Escape"]'
 | Modifier       | Meaning                                                                                                                                          |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `prevent`      | The listener calls `preventDefault()` when the event fires.                                                                                      |
-| `stop`         | The listener calls `stopPropagation()` and does not look at outer elements for the same event.                                                   |
+| `stop`         | The listener calls `stopImmediatePropagation()` and does not look at outer elements for the same event.                                          |
 | `once`         | The listener removes the attribute after the first message. It stays removed: a later `setOn` for that element and event does not write it back. |
 | `capture`      | The handler runs in a capture-phase pass, outermost element first, before bubble-phase handlers.                                                 |
 | `passive`      | The listener never calls `preventDefault()` for it. `passive` with `prevent` is the compile error `event-passive-prevent`.                       |
@@ -132,7 +132,7 @@ Authoring: an event arrow may have a block body that reads as plain TypeScript a
 
 - `<window>` and `<document>` render `<template i-global="window" on:keydown='…'></template>` at their position in the view. The listener adds those listeners on `window` or `document`, and finds the messages in the templates.
 - Other events use one listener per event type on `document`, in the bubble phase. It walks from the target outwards and takes the first element with `on:<type>`, unless `stop` ends the walk earlier.
-- Events that do not bubble (`focus`, `blur`, `mouseenter`, `mouseleave`, `pointerenter`, `pointerleave`, `load`, `error`, `scroll`) use a capture-phase listener and match only `event.target`, with no outward walk. A walk would fire an ancestor's `on:focus` when a child takes focus, which the browser never does.
+- Events that do not bubble (`focus`, `blur`, `mouseenter`, `mouseleave`, `pointerenter`, `pointerleave`, `load`, `error`, `scroll`, `toggle`, `invalid`, `cancel`, `close`, and the media events `play`, `pause`, `ended`, `timeupdate`, `volumechange`, `seeked`, `seeking`, `canplay`, `loadeddata`, `loadedmetadata`, `durationchange`, `ratechange`, `waiting`, `playing`, `progress`, `stalled`, `suspend`, `emptied`, `abort`) use a capture-phase listener and match only `event.target`, with no outward walk. A walk would fire an ancestor's `on:focus` when a child takes focus, which the browser never does.
 - A type whose handlers are all `passive` is listed as `<type>:passive` in the state record, and its document listener is passive.
 
 ### State script
@@ -159,7 +159,7 @@ The server writes one state script per rendered root, after its markup, on one l
 - `self.$idlip` is a `Boot`: an array of state records with a queue `q`. The listener replaces `push`, so it adds the listeners of each record's event types as soon as the record is pushed, and adds those of records pushed before it ran.
 - On an event, the listener finds the element, applies the key filter and the modifiers synchronously, resolves placeholders, and pushes a `QueuedEvent` to `q`.
 - The loader takes over `q`: it handles the queued events in order and replaces `q.push`, so later events go straight to it. Taking over an array by draining it and replacing its `push` is the one hand-off rule for both arrays.
-- Budgets, checked by `e2e-harness` on the production build with `gzip -9`: the listener script at most 1024 B gzip, the loader module with its static imports at most 4096 B gzip. Chunks are not counted. The loader's static graph includes `idlip/client` with `patch`, `patchList`, `diffPaths` and the helpers (`setAttr`, `setText`, `setOn`, `setBranch`, `attr`, `on`, `text`), so a binding chunk's import of `idlip/client` is already loaded and the first click costs no third request.
+- Budgets, checked by `e2e-harness` on the production build with `gzip -9`: the listener script at most 1024 B gzip, the loader module with its static imports at most 4096 B gzip. Chunks are not counted. The loader's static graph includes `idlip/client` with `patch`, `patchList`, `diffPaths`, `parseHtml` and the block hooks. The DOM and render helpers (`setAttr`, `setText`, `setOn`, `setBranch`, `attr`, `on`, `text`) are not in the loader: the compiler copies the ones a chunk uses into that chunk, from one source, the way it copies module helpers. A chunk may import from `idlip/client` only what the loader already holds, so the first click costs no third request. Why: with the helpers in the loader, the measured loader was 4877 B gzip, 781 B over budget.
 
 ### Manifest
 
@@ -370,6 +370,7 @@ The golden fixtures are the stub for both sides. Each of `test/fixtures/counter/
 
 ## Changes
 
+- v9 (2026-11-21, from the `resume-loader` review): DOM and render helpers are copied into chunks instead of living in the loader; `stop` uses `stopImmediatePropagation`; more non-bubbling events.
 - v9 (2026-11-21, from the `compile-view-codegen` review): groups are ordered topologically by covers; a chosen row binding runs on every kept row.
 - v9 (2026-11-21, from the `compile-update` review): the payload puts props values before the arguments, so a rest parameter stays last, and includes the props paths of called handlers.
 - v8 (frozen by `compiled-format`): fixes the DOM encoding (binding ids, `i-a`, comment pairs, rows without keys), event JSON with placeholders and modifiers, key filters, the authoring forms for `prevent`, `stop` and key filters, the state script as a lazy seroval record, the head listener and the queue hand-off, the budgets (listener 1024 B, loader 4096 B gzip), the manifest with groups, covers and lists, chunk ids and the chunk URL map in the state record, key and index pairing in `diffPaths`, the module shapes, the render and patch helpers, the runtime seam types, the compiler API and the HTML parser rules. `patch` takes `(page, prev, next)` instead of `(root, oldModel, newModel, manifest)`, since it also needs the props and the chunk loader. Adds the counter and todo fixtures.
