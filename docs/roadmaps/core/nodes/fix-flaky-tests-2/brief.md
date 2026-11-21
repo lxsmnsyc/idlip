@@ -1,7 +1,7 @@
 ---
 id: fix-flaky-tests-2
 title: Find and fix the flaky loader and nesting tests
-status: active
+status: done
 priority: should
 type: fix
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 77632
 owns:
   - packages/idlip/test/client/loader/**
   - packages/idlip/test/client/nest/**
@@ -42,9 +42,11 @@ Under load, these failed once and passed on rerun: `test/client/loader/loader.te
 
 ## Acceptance
 
-- [ ] Each failure reproduced with command and rate in `log.md`, or not reproduced after 50 runs under load.
-- [ ] The verify loop passes 10 times in a row.
+- [x] Each failure reproduced with command and rate in `log.md`, or not reproduced after 50 runs under load.
+- [x] The verify loop passes 10 times in a row.
 
 ## Sizing
 
 S: three test files.
+
+Landed as c6be173 on `batch/core` after self-review. `nest.test.ts` reproduced (5 of 51) and fixed; the others not reproduced and fixed anyway. Every cause was a fixed wait in a test; tests now use `settled()`, `reached()` and `until()`. No code bug.
