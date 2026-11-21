@@ -121,7 +121,7 @@ export interface PageState {
   readonly model: Model;
   readonly props: Props;
   /** Manifests of the child modules on the page and of what they can render, by module. */
-  readonly modules?: Readonly<Record<string, Manifest>>;
+  readonly modules?: Readonly<Record<string, ChildManifest>>;
   /** Rendered children by model path. */
   readonly slots?: Readonly<Record<string, Slot>>;
   /**
@@ -131,6 +131,14 @@ export interface PageState {
    */
   readonly dynamic?: Record<string, string[]>;
 }
+
+/**
+ * A child manifest as the state script holds it: without `events` (the record has the union),
+ * `listens` (`renderPreload` reads it on the server), `view` and the `writes` of each handler.
+ */
+export type ChildManifest = Omit<Manifest, 'events' | 'listens' | 'view' | 'handlers'> & {
+  readonly handlers: Readonly<Record<string, Omit<HandlerEntry, 'writes'>>>;
+};
 
 /** A rendered child: its module, its model and the props the client reads. */
 export interface Slot {

@@ -153,3 +153,89 @@ describe('state values', () => {
     );
   });
 });
+
+describe('kept module data', () => {
+  const manifest = { module: '/k', events: ['click'], handlers: {}, groups: {}, lists: {} };
+  const chunks = { '/k?idlip-handler=go&lang.js': '/a/go.js', build: 'abc123' };
+
+  function recordModel(model: Record<string, unknown>) {
+    return (_props: unknown, context?: RenderContext): string => {
+      context?.state({ manifest, chunks, model, props: {} });
+      return '';
+    };
+  }
+
+  function decode(html: string): unknown {
+    const script = html.slice(html.indexOf('<script'));
+    const pushed: unknown[] = [];
+    const self = { $idlip: { push: (record: unknown) => pushed.push(record) } };
+    runInNewContext(script.replace(/^<script[^>]*>|<\/script>$/g, ''), { self });
+    const [record] = pushed;
+    const load: unknown = Array.isArray(record) ? record[1] : undefined;
+    if (typeof load !== 'function') {
+      throw new TypeError('bad record');
+    }
+    return Reflect.apply(load, undefined, []);
+  }
+
+  it('writes the model of each render next to the same manifest and chunks', async () => {
+    const first = await render(recordModel({ n: 1 }), {});
+    const second = await render(recordModel({ n: 2 }), {});
+    expect(decode(first)).toEqual({
+      manifest,
+      chunks: { '/k?idlip-handler=go&lang.js': '/a/go.js' },
+      model: { n: 1 },
+      props: {},
+    });
+    expect(decode(second)).toMatchObject({ model: { n: 2 } });
+    // The build id moves to the attribute on every render.
+    expect(first).toContain('<script i-state i-build="abc123">');
+    expect(second).toContain('<script i-state i-build="abc123">');
+    expect(first.replace('n:1', 'n:2')).toBe(second);
+  });
+
+  it('keeps a value that the model shares', async () => {
+    const shared = { x: 1 };
+    const state = decode(await render(recordModel({ a: shared, b: shared }), {}));
+    const model: unknown = Reflect.get(Object(state), 'model');
+    expect(Reflect.get(Object(model), 'a')).toBe(Reflect.get(Object(model), 'b'));
+    expect(Reflect.get(Object(state), 'manifest')).toEqual(manifest);
+  });
+  it('keeps a child of one render out of the next', async () => {
+    const childManifest = {
+      module: '/c',
+      events: ['input'],
+      handlers: {},
+      groups: {},
+      lists: {},
+    };
+    const child = { manifest: childManifest, chunks: { '/c?idlip-list=1&lang.js': '/a/c.js' } };
+    function withChild(has: boolean) {
+      return (
+        _props: unknown,
+        context?: RenderContext & { state(s: unknown, p?: string): void },
+      ) => {
+        context?.state({ manifest, chunks, model: {}, props: {} });
+        if (has) {
+          context?.state({ ...child, model: { c: 1 }, props: {} }, '0');
+        }
+        return '';
+      };
+    }
+    const first = decode(await render(withChild(true), {}));
+    expect(Reflect.get(Object(first), 'modules')).toHaveProperty(['/c']);
+    const html = await render(withChild(false), {});
+    const second = decode(html);
+    expect(second).not.toHaveProperty('modules');
+    expect(second).not.toHaveProperty('slots');
+    expect(JSON.stringify(Reflect.get(Object(second), 'chunks'))).not.toContain('/a/c.js');
+    expect(html).toContain('(["click",');
+  });
+
+  it('writes the nonce on a kept part', async () => {
+    await render(recordModel({}), {});
+    expect(await render(recordModel({}), {}, { nonce: 'n1' })).toContain(
+      '<script i-state i-build="abc123" nonce="n1">',
+    );
+  });
+});

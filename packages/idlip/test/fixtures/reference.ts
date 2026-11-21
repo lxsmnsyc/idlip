@@ -1,7 +1,10 @@
 import { serialize } from 'seroval';
+import { getChunkId } from '../../src/core/format.ts';
 import type {
+  ChildManifest,
   ChunkUrls,
   DomMessage,
+  HandlerEntry,
   Manifest,
   Model,
   PageState,
@@ -142,10 +145,30 @@ function collectModules(
   for (const info of uses) {
     if (!modules.has(info.manifest.module)) {
       modules.set(info.manifest.module, info.manifest);
-      Object.assign(chunks, info.chunks);
+      const { module, view } = info.manifest;
+      const viewId = view === undefined ? undefined : getChunkId(module, view.chunk);
+      for (const [id, url] of Object.entries(info.chunks)) {
+        if (id !== viewId) {
+          chunks[id] = url;
+        }
+      }
       collectModules(info.uses ?? [], modules, chunks);
     }
   }
+}
+
+/**
+ * A child manifest as the state script holds it: without `events`, `listens`, `view` and the
+ * `writes` of each handler, which the loader never reads.
+ */
+export function toClientManifest(manifest: Manifest): ChildManifest {
+  const { events: _events, listens: _listens, view: _view, handlers, ...rest } = manifest;
+  const slim: Record<string, HandlerEntry> = {};
+  for (const [tag, entry] of Object.entries(handlers)) {
+    const { writes: _writes, ...kept } = entry;
+    slim[tag] = kept;
+  }
+  return { ...rest, handlers: slim };
 }
 
 /**
@@ -191,11 +214,13 @@ export function createContext(): { context: NestedContext; writeState: () => str
       model: root.model,
       props: root.props,
     };
-    if (modules.size > 0) {
-      state.modules = Object.fromEntries(modules);
-    }
     if (children.size > 0) {
       state.slots = Object.fromEntries(children);
+    }
+    if (modules.size > 0) {
+      state.modules = Object.fromEntries(
+        [...modules].map(([module, manifest]) => [module, toClientManifest(manifest)]),
+      );
     }
     const names = [...events].toSorted().join(' ');
     // seroval's output is a parenthesized expression, so it serves as the arrow body as it is.

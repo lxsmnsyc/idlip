@@ -72,7 +72,7 @@ function findUrls(
 /**
  * Names the chunks of the first click so the browser fetches them with the page. It reads
  * `manifest.listens` of the root manifest, and of the child manifests when the page has
- * children (the values of `PageState.modules`): the handlers the view dispatches on each event
+ * children (the manifests of the server modules): the handlers the view dispatches on each event
  * and the binding chunks of their write sets. Nothing else is named. It needs no markup, so
  * the result can go out in a `Link` header as soon as the request is known. Put the `<link>`
  * tags in `<head>`, or send the `header` format with a 103 response. The loader imports the

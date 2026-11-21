@@ -1,0 +1,13 @@
+# Log: perf-ssr-state
+
+- 2026-11-21. Base: `batch/core` 9d42687, built in a second worktree. Script `ssr.mjs` loads the benchmarks/idlip builds (todos at 3 todos, dashboard) through the harness `loadApp`, and prints state script bytes, renders/s (1.5 s after 300 warmup renders) or a Node inspector profile (1,000 renders). A/B with perf-pass `bench.py`, interleaved, 10 runs (dashboard) and 20 runs (todos), 2 warmup, `--higher-is-better`. Load average 9 to 16 during the runs (`uptime`).
+- Base bytes: dashboard HTML 111,440 B (gzip 9,283), state script 75,741 B (gzip 5,642). Todos HTML 5,066 B (gzip 2,074), state 2,410 B (gzip 757).
+- Base profile, dashboard, 1.624 ms a render: `mergeState` 16.8%, `collectModules` 2.9%, seroval (`parsePlainObject` 10.8, `parseProperties` 9.2, `serializeString` 8.5, `serializeProperties` 6.6, `createIndexForValue`/`getNodeForIndexedValue` 6) about 45%. Reproduced.
+- Base profile, todos, 0.048 ms a render: seroval (`createIndexForValue`, `serializeProperties`, `parsePlainObject`, `parseProperties`, `serializeArrayItem`, `serializeString`) about 60%. The manifest and chunk map are 2.4 kB of the 5 kB and never change between renders.
+- Rerun: `benchmarks/harness/ssr-ab.mjs <repo> <dashboard|todos> <size|speed|prof>`, `ssr-ab.sh` for the A/B.
+- Review fix: the kept part is built from `uses` only; a child outside it builds a part for that render alone.
+- Design: serialize the manifest, chunk map and child manifests once per root module and keep them (`WeakMap` keyed by manifest, checked against the chunk map, `uses` and the children of the render). Each render serializes only model, props, slots and dynamic, and joins the parts as one object literal. Falls back to one seroval call when seroval writes a function (shared or cyclic values).
+- Child manifests in `modules` drop `events`, `listens`, handler `writes` and `view`, and the chunk map drops the view chunk URL of a child: the loader reads none of them. Root output is byte-identical (goldens `counter`, `todo` unchanged). Chunk-map re-keying was not done: it changes every golden and loader test.
+- Nested golden `test/fixtures/nested/board/expected/page.html`, `test/fixtures/reference.ts` and one expectation in `fixtures.test.ts` follow the new child shape and key order (`modules` after `slots`).
+- Branch: dashboard state 65,291 B (gzip 4,815), HTML 100,990 B (gzip 8,447). Todos bytes unchanged. Branch profile dashboard 0.255 ms a render.
+- Tests: `pnpm --filter idlip test` 661 pass. `pnpm --filter e2e test` 18 pass (default ports, run before the port note). lint, format:check, typecheck pass.

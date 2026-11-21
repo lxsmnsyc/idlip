@@ -1,5 +1,5 @@
 import { DEV } from '../core/dev.ts';
-import type { Model, Patch, Props, QueuedEvent, ViewChunk } from '../core/format.ts';
+import type { Manifest, Model, Patch, Props, QueuedEvent, ViewChunk } from '../core/format.ts';
 import type { Child, Nesting, Root, Unit } from './loader/resume.ts';
 import { isComment } from './patch/guards.ts';
 import { onBlock } from './patch/index.ts';
@@ -22,7 +22,8 @@ function createChild(
   model: Model,
   props: Props,
 ): Child {
-  const manifest = top.state.modules![module];
+  // The state script leaves out `events`, which the loader never reads.
+  const manifest: Manifest = { ...top.state.modules![module], events: [] };
   return {
     kind: 'live',
     path,

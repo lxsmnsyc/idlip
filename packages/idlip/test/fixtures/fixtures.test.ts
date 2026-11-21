@@ -6,7 +6,7 @@ import { parseSync } from 'oxc-parser';
 import { describe, expect, it, vi } from 'vitest';
 import { getChunkFile, getChunkId } from '../../src/core/format.ts';
 import type { Manifest, Model } from '../../src/core/format.ts';
-import { createContext, diffPaths, selectChunks, slot } from './reference.ts';
+import { createContext, diffPaths, selectChunks, slot, toClientManifest } from './reference.ts';
 import type { NestedContext } from './reference.ts';
 
 // Server modules import the render helpers from the package. The reference versions stand in
@@ -524,7 +524,7 @@ describe('nested components', () => {
     expect(events).toBe('click');
     expect(boardManifest.events).toEqual([]);
     expect(state.modules).toEqual({
-      '/src/counter.idlip.tsx': readManifest('nested/counter'),
+      '/src/counter.idlip.tsx': toClientManifest(readManifest('nested/counter')),
     });
   });
 
