@@ -1,7 +1,7 @@
 ---
 id: benchmarks
 title: Benchmarks against Qwik, Marko and brumate
-status: todo
+status: active
 priority: should
 type: feature
 story:
