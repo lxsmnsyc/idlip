@@ -393,7 +393,7 @@ describe('events', () => {
     expect(result.server).toContain(
       `<template i-global="window" on:keydown='["bump",[]]'></template>`,
     );
-    expect(result.manifest.events).toEqual(['keydown']);
+    expect(result.manifest.events).toEqual(['keydown:window']);
   });
 });
 

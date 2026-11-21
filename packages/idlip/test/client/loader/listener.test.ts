@@ -147,13 +147,23 @@ describe('delegation', () => {
   it('listens on window and document for i-global templates', () => {
     const boot = page(
       `<template i-global="window" on:keydown='["w",[]]'></template><template i-global="document" on:keydown='["d",[]]'></template>`,
-      'keydown',
+      'keydown:window keydown:document',
     );
     fire(document.body, key('a'));
     expect(messages(boot)).toEqual([
       { t: 'd', p: [] },
       { t: 'w', p: [] },
     ]);
+  });
+
+  it('adds no window or document listener for a type no global element uses', () => {
+    document.body.innerHTML = `<div on:pointermove='["s",[]]'></div>`;
+    const listener = installListener();
+    cleanup = listener.cleanup;
+    listener.boot.push(['pointermove', STATE]);
+    // Only the capture and bubble listeners on document, none with the default options.
+    const plain = listener.calls.filter((call) => call.options === undefined);
+    expect(plain).toEqual([]);
   });
 
   it('adds a non-passive listener when a later record needs one for the same type', () => {
@@ -202,7 +212,7 @@ describe('delegation', () => {
   it('resolves currentTarget to window or document for a global template', () => {
     const boot = page(
       `<template i-global="window" on:keydown='["w",[["$event","currentTarget","name"]]]'></template>`,
-      'keydown',
+      'keydown:window keydown:document',
     );
     (window as { name: string }).name = 'win';
     fire(document.body, key('a'));

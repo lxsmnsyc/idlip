@@ -287,7 +287,12 @@ class Planner {
   }
 
   /** Assigns ids to the events that read state at render. Returns the ids. */
-  bindEvents(events: Event[], context: WalkContext, listen = true): number[] {
+  bindEvents(
+    events: Event[],
+    context: WalkContext,
+    listen = true,
+    global?: 'window' | 'document',
+  ): number[] {
     const ids: number[] = [];
     for (const event of events) {
       if (event.target.kind !== 'handler' && event.target.kind !== 'prop') {
@@ -300,7 +305,9 @@ class Planner {
       }
       // The loader reads `on:value` of a subscription itself, so no listener is needed.
       if (listen) {
-        this.events.add(event.name);
+        // A global event lists as `type:window` or `type:document`, so the early listener adds
+        // its global listener only for the types a global element uses.
+        this.events.add(global === undefined ? event.name : `${event.name}:${global}`);
         if (event.target.kind === 'handler') {
           const names = this.listens.get(event.name) ?? new Set<string>();
           names.add(event.target.name);
@@ -562,7 +569,7 @@ class Planner {
           break;
         }
         case 'global': {
-          const ids = this.bindEvents(node.events, context);
+          const ids = this.bindEvents(node.events, context, true, node.target);
           if (ids.length > 0) {
             this.anchors.set(node, ids);
           }

@@ -61,9 +61,8 @@ Dev builds warn in the console when 20 events of one type wait for one element, 
 ## Server, resume and unmount
 
 - **Server.** The `<window>` above renders as `<template i-global="window" on:keydown='["close",[],"key:Escape"]' on:pointermove='["move",[["$event","clientX"]],"latest"]'>`. Each message is the same JSON as on a button, with the key test and `latest` as flags. Nothing else is serialized, and the element has no chunk of its own.
-- **Resume.** The early listener script in `<head>` adds one listener on `window` or `document` per event type. It does so at page load, for each `<window>` or `<document>` in the page. An event before the loader starts is queued like an early click.
+- **Resume.** The early listener script in `<head>` adds one listener on `window` or `document` per event type that a `<window>` or `<document>` in the module uses, even inside a condition, so an element that a patch adds later is heard too. A page with no such element gets none. An event before the loader starts is queued like an early click.
 - **Unmount.** When the block that holds the element is removed, its template goes with it, and the listener finds no message to queue. The test above shows that the events come back when the block returns.
-- **Limit.** The listener is added only at page load. A `<window>` or `<document>` with an event type that no `<window>` or `<document>` had at load gets no listener when a patch adds it later. Keep the element in the view from the start and put the condition in the handler.
 
 ## Common errors
 
