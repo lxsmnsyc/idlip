@@ -58,3 +58,7 @@ An example app with a list of `Counter` children and remove buttons, and an e2e 
 ## Sizing
 
 Example app and one spec; the work is in the dependencies.
+
+## From nesting-compile (orchestrator)
+
+`generate(ir, source, id, { child, resolve })` takes a `child` option and a `resolve` function, but `compile()` in `src/compiler/index.ts` and the Vite plugin do not forward them yet. This node wires both, so the example builds through Vite.

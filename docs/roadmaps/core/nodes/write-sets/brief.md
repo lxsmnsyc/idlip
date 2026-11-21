@@ -1,7 +1,7 @@
 ---
 id: write-sets
 title: Write sets for update handlers and parallel chunk loading
-status: active
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-20
-spent:
+spent: 251841
 owns:
   - packages/idlip/src/compiler/update/writes.ts
   - packages/idlip/test/compiler/update/writes.test.ts
@@ -65,12 +65,12 @@ Each `manifest.handlers` entry gets `writes` (the model paths the handler's clos
 
 ## Acceptance
 
-- [ ] `writes.test.ts`: `setDraft` gives `draft`; `toggle` gives `todos.*.done`; `add` gives `todos, next, draft`; a handler calling another unions both; a map that is not the pattern gives `todos`.
-- [ ] The todo fixture manifest has `toggle: { chunk, writes: ["todos.*.done"], bindings: ["todos.*.done"] }`. The fixture tests pass.
-- [ ] A loader test shows the `binding=todos.*.done` import starting before `handler=toggle` resolves. Within one batch, `patch` gets the union of the events' writes.
-- [ ] A manifest entry without `writes` patches with a full diff.
-- [ ] `pnpm build && pnpm --filter e2e test` still passes: the first toggle loads only `toggle` and `binding=todos.*.done`.
-- [ ] The loader stays within 4096 B gzip (currently 3901 B).
+- [x] `writes.test.ts`: `setDraft` gives `draft`; `toggle` gives `todos.*.done`; `add` gives `todos, next, draft`; a handler calling another unions both; a map that is not the pattern gives `todos`.
+- [x] The todo fixture manifest has `toggle: { chunk, writes: ["todos.*.done"], bindings: ["todos.*.done"] }`. The fixture tests pass.
+- [x] A loader test shows the `binding=todos.*.done` import starting before `handler=toggle` resolves. Within one batch, `patch` gets the union of the events' writes.
+- [x] A manifest entry without `writes` patches with a full diff.
+- [x] `pnpm build && pnpm --filter e2e test` still passes: the first toggle loads only `toggle` and `binding=todos.*.done`.
+- [x] The loader stays within 4096 B gzip (currently 3901 B).
 
 ## Sizing
 
@@ -86,3 +86,5 @@ M: compiler plus loader, about 8 files, known pattern.
 
 - Replace "currently 3901 B" and "about 195 B left": the budget is the loader with no optional features (3897 B on the test fixtures, 3926 B on the todo build). Put the loader code behind a `HAS_<NAME>` flag (`HAS_WRITES`), following the recipe in `nodes/runtime-flags/outcome.md`: a `declare const` and export in `src/client/features.ts`, one line in `DETECTORS` of `src/vite/features.ts`, and `if (HAS_WRITES)` around the code. The 4096 B gzip budget is the loader with no optional features, so the flag removes your cost from apps that do not use it. Report the feature's cost; it is not capped. The detector is on when a manifest handler has `writes`.
 - `resume.ts` now calls `runTask(host, task)` from `src/client/tasks/run.ts` and gates the task path with `HAS_TASKS`. Read the current `apply` before you edit it. `diff.ts` reads the keyed segment only when `HAS_KEYED`.
+
+Landed as 9703427 on `batch/core` after one fresh review round (unreadable writes fall back to a full diff; narrowing and `HAS_WRITES` dropped). Loader 3913 B gzip (+22 B). Cold first click at 150 ms RTT: 354 ms to 209 ms, 2 round trips to 1. Note: `test/client/tasks/tasks.test.ts` failed once with a timing-dependent read; it passed on reruns.
