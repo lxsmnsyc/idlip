@@ -12,3 +12,4 @@ Ideas and findings parked for later triage.
 - 2026-11-21, from `docs-start`: a function assigned to a `let` compiles with no diagnostic, though `docs/proposals/0002-modules.md` says it is a compile error. Needs an analyzer rule or a proposal fix.
 - 2026-11-21, from `docs-start`: `website/docs/getting-started.md` installs from `pnpm --filter idlip pack` because npm `idlip` is a `0.0.1-stage` placeholder. `release-0-1` should switch it to `pnpm add idlip`.
 - 2026-11-21, from `docs-start`: `website/docs/views.md` mentions the effects page without a link; `docs-effects` should add it.
+- 2026-11-21, from `docs-reference`: `contracts/view-ir.md` v11 does not list rule ids the compiler reports (`attr-event`, `html-element`, `srcdoc-trusted`, `head-title-twice`, `try-catch-node`, `handler-props-unlisted`, `codegen-*`) or the warning `handler-derived-stale`. Sync the contract with the source. No editor support exists on `batch/core` (no `packages/vscode`, no TS plugin).

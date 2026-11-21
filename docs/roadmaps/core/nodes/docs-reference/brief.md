@@ -1,7 +1,7 @@
 ---
 id: docs-reference
 title: API reference and editor setup
-status: active
+status: done
 priority: should
 type: docs
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 182000
 owns:
   - website/docs/reference/**
   - website/docs/editor.md
