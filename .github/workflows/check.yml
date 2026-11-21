@@ -44,3 +44,13 @@ jobs:
       - run: pnpm format:check
       - run: pnpm typecheck
       - run: pnpm test
+      # The e2e fixture server runs TypeScript with Node's type stripping (Node 22.18 or later).
+      - if: ${{ matrix.node == 24 }}
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - if: ${{ matrix.node == 24 }}
+        run: pnpm --filter e2e exec playwright install --with-deps chromium
+      - if: ${{ matrix.node == 24 }}
+        run: pnpm --filter e2e test
