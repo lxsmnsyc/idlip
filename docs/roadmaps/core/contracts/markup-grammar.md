@@ -4,8 +4,8 @@ version: 1
 status: frozen
 defined_by: markup-syntax
 ---
-> Retired 2026-11-21 by `debates/dsl/debate.md`: no markup DSL. Kept as history; no node uses it.
 
+> Retired 2026-11-21 by `debates/dsl/debate.md`: no markup DSL. Kept as history; no node uses it.
 
 # Contract: markup-grammar
 
