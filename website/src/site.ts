@@ -12,6 +12,16 @@ const TODO_SOURCE = fileURLToPath(
   new URL('../../examples/todo/src/todo.idlip.tsx', import.meta.url),
 );
 
+/** Drops the comment lines at the top of a file: they are notes for the repo, not for readers. */
+function dropLeadingComments(source: string): string {
+  const lines = source.split('\n');
+  let start = 0;
+  while (start < lines.length && lines[start].startsWith('//')) {
+    start += 1;
+  }
+  return lines.slice(start).join('\n');
+}
+
 export interface Page extends FrontMatter {
   /** The path of the Markdown file inside `docs`, such as `guide/state.md`. */
   file: string;
@@ -117,7 +127,7 @@ export function renderSite(pages: readonly Page[], base = '/'): Map<string, stri
   }
   let example = '';
   try {
-    example = readFileSync(TODO_SOURCE, 'utf8');
+    example = dropLeadingComments(readFileSync(TODO_SOURCE, 'utf8'));
   } catch {
     // The landing page shows no sample when the example is missing.
   }

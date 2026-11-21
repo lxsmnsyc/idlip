@@ -22,8 +22,17 @@ const light = readColors('@twinkleplop/theme-github/light').replace(
 );
 const dark = readColors('@twinkleplop/theme-github/dark');
 
+/** The rules after the `:root` block of a syntax theme, which give each token class its color. */
+function readTokenRules(file: string): string {
+  const css = readFileSync(new URL(import.meta.resolve(file)), 'utf8');
+  const start = css.indexOf(':root');
+  return css.slice(css.indexOf('}', start) + 1).replaceAll(/\s*\n\s*/g, '');
+}
+
+const tokenRules = readTokenRules('@twinkleplop/theme-github/light');
+
 /** The colors of code in both themes, inlined so a page paints highlighted before any file loads. */
-const SYNTAX = `<style>:root${light}:root[data-theme='dark']${dark}@media (prefers-color-scheme: dark){:root:not([data-theme='light'])${dark}}</style>`;
+const SYNTAX = `<style>:root${light}:root[data-theme='dark']${dark}@media (prefers-color-scheme: dark){:root:not([data-theme='light'])${dark}}${tokenRules}</style>`;
 
 /** Sets the saved theme before the first paint, so a page never flashes the other one. */
 const THEME_SCRIPT = `<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t}catch{}</script>`;
