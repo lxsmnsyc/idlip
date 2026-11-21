@@ -70,7 +70,7 @@ function loadRender(code: string, helpers: Record<string, unknown>): Render {
 /** Renders the server module with the reference helpers and appends the state script. */
 function runServer(code: string, props: unknown): string {
   const body = stripModule(code);
-  const name = /function (\w+)\(props, context\)/.exec(body)?.[1] ?? '';
+  const name = /function (\w+)\(props, context, model\)/.exec(body)?.[1] ?? '';
   const render = evaluate({ text$: text, attr$: attr, on$: on }, `${body}\nreturn ${name};`);
   if (!isRender(render)) {
     throw new TypeError('The server module has no render function');

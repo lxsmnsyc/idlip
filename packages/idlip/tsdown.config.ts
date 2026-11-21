@@ -7,6 +7,7 @@ export default defineConfig({
     'src/client/index.ts',
     'src/compiler/index.ts',
     'src/vite/index.ts',
+    'src/testing/index.ts',
     'src/jsx-runtime/index.ts',
   ],
   format: 'esm',

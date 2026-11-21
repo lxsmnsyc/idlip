@@ -91,7 +91,7 @@ function stripModule(code: string): string {
 /** Runs a generated server module with the reference helpers. */
 function runServer(code: string, props: Record<string, unknown>): string {
   const body = stripModule(code);
-  const name = /function (\w+)\(props, context\)/.exec(body)?.[1] ?? '';
+  const name = /function (\w+)\(props, context, model\)/.exec(body)?.[1] ?? '';
   const render = evaluate({ text$: text, attr$: attr, on$: on }, `${body}\nreturn ${name};`);
   if (!isRender(render)) {
     throw new Error('The server module has no render function');

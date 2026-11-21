@@ -120,7 +120,7 @@ export interface RenderContext {
 }
 
 /** The default export of a compiled server module. */
-export type ServerRender = (props: Props, context: RenderContext) => string;
+export type ServerRender = (props: Props, context: RenderContext, model?: Model) => string;
 
 export interface ServerModule {
   readonly default: ServerRender;

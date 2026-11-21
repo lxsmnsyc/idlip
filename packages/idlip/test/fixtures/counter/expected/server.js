@@ -22,8 +22,8 @@ export const chunks = {
   '/src/counter.idlip.tsx?idlip-binding=count&lang.js': '/src/counter.idlip.tsx?idlip-binding=count&lang.js',
 };
 
-export default function Counter(props, context) {
-  const count = props.start;
+export default function Counter(props, context, model) {
+  const count = model === undefined ? props.start : model.count;
   context.state({ manifest, chunks, model: { count }, props: {} });
   return (
     '<div>' +

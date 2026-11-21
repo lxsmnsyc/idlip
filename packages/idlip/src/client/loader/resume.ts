@@ -33,7 +33,7 @@ interface Pending {
 /** An error that loading again would not change: an unknown tag, or a chunk without its export. */
 class DropError extends Error {}
 
-function report(error: unknown): void {
+function logError(error: unknown): void {
   // oxlint-disable-next-line no-console
   console.error(error);
 }
@@ -42,17 +42,36 @@ function isStep(result: Model | Step): result is Step {
   return 'task' in result && 'model' in result;
 }
 
+export interface Resumed {
+  /** Hands the queue back to a plain array and drops the events that wait. */
+  readonly stop: () => void;
+  /**
+   * Resolves when no chunk is loading, no batch runs and no event waits for a chunk. Events
+   * behind a failed chunk stay queued and do not hold it.
+   */
+  readonly settled: () => Promise<void>;
+}
+
 /**
  * Takes over the listener's queue and runs each event through its handler chunk. Events
  * wait while chunks load, run through `update` in order, and the page patches once per
- * batch. A state record is decoded when its first event arrives.
+ * batch. A state record is decoded when its first event arrives. `onError` also gets each error that
+ * the loader reports. It returns `stop` and `settled`.
  */
-export function resume(boot: Boot, patch: Patch): void {
+export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => void): Resumed {
+  function report(error: unknown): void {
+    logError(error);
+    onError?.(error);
+  }
+
   const queue: Pending[] = [];
   const roots = new Map<number, Root>();
   const loads = new Map<string, Promise<unknown>>();
   const failures = new Map<string, number>();
   let running = false;
+  let stopped = false;
+  /** Wake-ups for `settled`, called when a flush ends. */
+  const idle: (() => void)[] = [];
 
   if (!Object.hasOwn(boot, 'push')) {
     // oxlint-disable-next-line no-console
@@ -236,6 +255,9 @@ export function resume(boot: Boot, patch: Patch): void {
       }
     }
     for (const root of touched) {
+      if (stopped) {
+        return;
+      }
       if (root.model !== root.rendered) {
         try {
           await patch(root.page, root.rendered, root.model);
@@ -259,7 +281,7 @@ export function resume(boot: Boot, patch: Patch): void {
           await loadWaiting();
         }
         const ready = takeReady();
-        if (ready.length === 0) {
+        if (stopped || ready.length === 0) {
           break;
         }
         await runBatch(ready);
@@ -268,6 +290,20 @@ export function resume(boot: Boot, patch: Patch): void {
       report(error);
     } finally {
       running = false;
+      for (const wake of idle.splice(0)) {
+        wake();
+      }
+    }
+  }
+
+  async function settled(): Promise<void> {
+    for (;;) {
+      if (!running && !hasWaiting()) {
+        return;
+      }
+      await new Promise<void>((resolve) => {
+        idle.push(resolve);
+      });
     }
   }
 
@@ -285,4 +321,12 @@ export function resume(boot: Boot, patch: Patch): void {
     enqueue(event);
   }
   flush().catch(report);
+
+  function stop(): void {
+    stopped = true;
+    queue.length = 0;
+    Reflect.deleteProperty(events, 'push');
+  }
+
+  return { stop, settled };
 }

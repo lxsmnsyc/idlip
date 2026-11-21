@@ -179,7 +179,10 @@ function emitServer(
   const model: string[] = [];
   for (const field of component.state) {
     const local = getLocalName(field.name);
-    lines.push(`const ${local} = ${emitter.expr(field.init)};`);
+    // A given model replaces the initial value, so a test can render the view of any model.
+    lines.push(
+      `const ${local} = model === undefined ? ${emitter.expr(field.init)} : model${getAccessor(field.name, false)};`,
+    );
     model.push(local === field.name ? local : `${getKey(field.name)}: ${local}`);
   }
   const props: string[] = [];
@@ -229,7 +232,7 @@ function emitServer(
     ...collected.code,
     `export const manifest = ${toLiteral(manifest)};`,
     `// \`vite-plugin\` replaces the URLs in a build.\nexport const chunks = {\n${urls.join('\n')}\n};`,
-    `export default function ${component.name}(props, context) {\n${lines.join('\n')}\n}`,
+    `export default function ${component.name}(props, context, model) {\n${lines.join('\n')}\n}`,
   );
   return `${blocks.join('\n\n')}\n`;
 }

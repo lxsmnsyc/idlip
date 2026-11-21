@@ -60,10 +60,10 @@ export const chunks = {
   '/src/todo.idlip.tsx?idlip-list=3&lang.js': '/src/todo.idlip.tsx?idlip-list=3&lang.js',
 };
 
-export default function TodoApp(props, context) {
-  const draft = '';
-  const todos = props.initial;
-  const next = props.initial.length + 1;
+export default function TodoApp(props, context, model) {
+  const draft = model === undefined ? '' : model.draft;
+  const todos = model === undefined ? props.initial : model.todos;
+  const next = model === undefined ? props.initial.length + 1 : model.next;
   context.state({ manifest, chunks, model: { draft, todos, next }, props: {} });
   let rows = '';
   for (const t of todos) {
