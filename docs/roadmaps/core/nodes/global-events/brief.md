@@ -1,7 +1,7 @@
 ---
 id: global-events
 title: Dev warning for deep event queues, and window and document events
-status: active
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 84385
 owns:
   - packages/idlip/src/core/dev.ts
   - packages/idlip/test/client/global/**
@@ -54,11 +54,11 @@ Add a dev-only warning when one element's pending queue for one event name grows
 
 ## Acceptance
 
-- [ ] `dev.ts` exports a dev flag that the production loader drops. The production loader stays at or under 4096 B gzip.
-- [ ] `<window on:keydown>` inside a condition stops getting keydown after the branch is removed.
-- [ ] `latest:pointermove` with a gated chunk delivers only the last event; a queued `on:input` keeps every value.
-- [ ] In a dev build, 20 queued events for one element and type warn once and name the event. A production build holds no warning text.
-- [ ] Fast check passes: `pnpm --filter idlip exec vitest run test/client/global`
+- [x] `dev.ts` exports a dev flag that the production loader drops. The production loader stays at or under 4096 B gzip.
+- [x] `<window on:keydown>` inside a condition stops getting keydown after the branch is removed.
+- [x] `latest:pointermove` with a gated chunk delivers only the last event; a queued `on:input` keeps every value.
+- [x] In a dev build, 20 queued events for one element and type warn once and name the event. A production build holds no warning text.
+- [x] Fast check passes: `pnpm --filter idlip exec vitest run test/client/global`
 
 ## Sizing
 
@@ -68,3 +68,5 @@ Small: one dev module, a few lines in the loader, tests over existing behavior.
 
 - The Vite plugin already replaces `__IDLIP_HAS_*__` globals (`runtime-flags`). A dev flag is a different kind: it must be on in dev and off in a production build, whatever the app uses. Choose between `NODE_ENV` and a `DETECTORS` entry that depends on the build mode, and prove it with a build test as the brief says. Do not add a flag that depends on the manifest.
 - The budget is the loader with no optional features, so a production build with no warning text is the case to measure.
+
+Landed as e8b1f84 on `batch/core` after self-review. Vite replaces `process.env.NODE_ENV` in dev and build; a dev-server test covers it. Loader 3913 B gzip.
