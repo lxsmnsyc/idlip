@@ -1,7 +1,7 @@
 ---
 id: nesting-compile
 title: Codegen for nested components
-status: active
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 303758
 owns:
   - packages/idlip/src/compiler/view/codegen/child.ts
   - packages/idlip/test/compiler/view/codegen/nesting.test.ts
@@ -53,9 +53,9 @@ Codegen for `child` nodes and prop-target events, matching the nested fixtures: 
 
 ## Acceptance
 
-- [ ] The nested fixture matches byte for byte; the counter and todo fixtures are unchanged.
-- [ ] No `codegen-unsupported` for `child` nodes.
-- [ ] Fast check passes: `pnpm --filter idlip exec vitest run test/compiler/view/codegen/nesting.test.ts test/fixtures`
+- [x] The nested fixture matches byte for byte; the counter and todo fixtures are unchanged.
+- [x] No `codegen-unsupported` for `child` nodes.
+- [x] Fast check passes: `pnpm --filter idlip exec vitest run test/compiler/view/codegen/nesting.test.ts test/fixtures`
 
 ## Sizing
 
@@ -64,3 +64,5 @@ One codegen module over a fixed fixture; shared files are touched in small place
 ## From nesting-format (orchestrator)
 
 `Step` gains an explicit `$step: true` discriminant (`contracts/compiled-format-nesting.change-request.md`). `nesting-compile` makes the compiler emit `$step` on every step and updates the goldens (including `effects`); `nesting-runtime` makes `resume.ts` `isStep` test `$step`. Read the change request, not only the contract, until the curator applies it.
+
+Landed as de73bca on `batch/core` after one fresh review round (goldens regenerated for write sets; `list=*` and `view` goldens now compared as text). Accepted changes outside owned paths: `segments.ts` (`$step`), `core/helpers.ts`, `server/helpers.ts`, `server/index.ts` (`slot` helper), `expr.ts`, `text.ts`.
