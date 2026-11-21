@@ -1,7 +1,7 @@
 ---
 id: markup-vscode
 title: VS Code extension and language server
-status: todo
+status: active
 priority: should
 type: feature
 story: markup-frontend

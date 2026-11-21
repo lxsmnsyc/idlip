@@ -1,7 +1,7 @@
 ---
 id: markup-compile
 title: Compile .idlip files
-status: active
+status: done
 priority: should
 type: feature
 story: markup-frontend
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 144951
 owns:
   - packages/idlip/src/compiler/markup/compile.ts
   - packages/idlip/test/compiler/markup/compile/**
@@ -47,11 +47,13 @@ Feed `.idlip` files into `compile()`, map diagnostics back to `.idlip` spans, re
 
 ## Acceptance
 
-- [ ] A `.idlip` todo compiles to the same chunks as its TSX twin.
-- [ ] A hole type error or analyzer error points at the `.idlip` line.
-- [ ] A `.idlip` file imported from another `.idlip` or `.tsx` file resolves.
-- [ ] Fast check passes: `pnpm --filter idlip exec vitest run test/compiler/markup/compile`
+- [x] A `.idlip` todo compiles to the same chunks as its TSX twin.
+- [x] A hole type error or analyzer error points at the `.idlip` line.
+- [x] A `.idlip` file imported from another `.idlip` or `.tsx` file resolves.
+- [x] Fast check passes: `pnpm --filter idlip exec vitest run test/compiler/markup/compile`
 
 ## Sizing
 
 Wiring plus span mapping over existing stages.
+
+Landed as a97403a on `feat/markup-frontend` after one fresh review round (Vite `readImport`, span fallback) and a lint fix.
