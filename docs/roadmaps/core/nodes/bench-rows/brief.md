@@ -1,7 +1,7 @@
 ---
 id: bench-rows
 title: Rendering benchmark scenarios (rows and dashboard)
-status: todo
+status: active
 priority: should
 type: feature
 story:
