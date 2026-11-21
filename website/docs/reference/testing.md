@@ -10,11 +10,12 @@ description: Mount a component in a test, click and type as a user does, and wai
 ```ts
 // @vitest-environment happy-dom
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { mount } from 'idlip/testing';
 import { expect, it } from 'vitest';
 
 // counter.idlip.tsx: `let count = 0`, `increment()` adds one, the button shows `count`.
-const source = readFileSync(new URL('./counter.idlip.tsx', import.meta.url), 'utf8');
+const source = readFileSync(join(import.meta.dirname, 'counter.idlip.tsx'), 'utf8');
 
 it('counts clicks', async () => {
   const page = await mount(source, {});

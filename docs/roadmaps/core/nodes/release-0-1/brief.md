@@ -113,6 +113,9 @@ depends_on:
   - on: fix-global-late-listener
     kind: hard
     why: 0.1.0 must not drop global listeners added by a patch
+  - on: fix-for-prop-each
+    kind: hard
+    why: 0.1.0 must update row holes in prop lists
 ---
 
 # Release 0.1.0

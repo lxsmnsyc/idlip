@@ -1,6 +1,6 @@
 ---
 title: Nesting components
-order: 20
+order: 13
 section: Guide
 description: A component renders another one. Props are data, a callback prop is a message for the parent, and each child keeps its own model.
 ---
