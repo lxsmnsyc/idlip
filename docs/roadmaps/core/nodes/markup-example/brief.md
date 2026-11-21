@@ -1,7 +1,7 @@
 ---
 id: markup-example
 title: Todo example in the DSL
-status: active
+status: done
 priority: should
 type: feature
 story: markup-frontend
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 65069
 owns:
   - examples/todo-idlip/**
 shared:
@@ -48,10 +48,12 @@ Rewrite the todo example in `.idlip` and run the existing e2e tests against it.
 
 ## Acceptance
 
-- [ ] The e2e tests pass with the same network request set as the TSX example.
-- [ ] `pnpm typecheck` checks the `.idlip` files.
-- [ ] Fast check passes: `pnpm --filter e2e test`
+- [x] The e2e tests pass with the same network request set as the TSX example.
+- [x] `pnpm typecheck` checks the `.idlip` files.
+- [x] Fast check passes: `pnpm --filter e2e test`
 
 ## Sizing
 
 A port of an existing example.
+
+Landed as 6198c80 on `feat/markup-frontend`. The orchestrator ran the full check and both e2e targets after the rebase. Accepted change outside owned paths: `e2e/playwright.config.ts` (a `todo-idlip` target). Gap: type-aware oxlint does not read `.idlip` files.
