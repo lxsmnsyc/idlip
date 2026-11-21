@@ -15,5 +15,5 @@ export default defineConfig({
   dts: true,
   sourcemap: true,
   fixedExtension: false,
-  deps: { neverBundle: ['vite', 'oxc-parser', 'seroval'] },
+  deps: { neverBundle: ['vite', 'oxc-parser', 'seroval', /^node:/] },
 });
