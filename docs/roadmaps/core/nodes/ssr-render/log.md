@@ -1,0 +1,1 @@
+- Branch feat/ssr-render reset to batch/core. Wrote helpers, render and tests. Attribute escaping keeps `<` per the contract (only `&` and `"`), so the hostile-string test checks text and script separately.
