@@ -1,7 +1,7 @@
 ---
 id: stock-sources
 title: Time, Random and the stock subscription sources
-status: active
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 90381
 owns:
   - packages/idlip/src/sources/**
   - packages/idlip/src/core/time.ts
@@ -50,13 +50,15 @@ Implement `Time` (`now`, `sleep(ms, signal)`), `Random` (`id`, `number`) and `un
 
 ## Acceptance
 
-- [ ] `sleep` and `until` reject on abort, also when the signal is already aborted.
-- [ ] The timer yields only the latest tick when pulled slowly.
-- [ ] The socket buffer holds 100 messages and drops the oldest.
-- [ ] Each source closes within one task after abort, with `return()` not awaited.
-- [ ] The media query source yields the current value first. `tsc` checks the yielded types.
-- [ ] Fast check passes: `pnpm --filter idlip exec vitest run test/sources`
+- [x] `sleep` and `until` reject on abort, also when the signal is already aborted.
+- [x] The timer yields only the latest tick when pulled slowly.
+- [x] The socket buffer holds 100 messages and drops the oldest.
+- [x] Each source closes within one task after abort, with `return()` not awaited.
+- [x] The media query source yields the current value first. `tsc` checks the yielded types.
+- [x] Fast check passes: `pnpm --filter idlip exec vitest run test/sources`
 
 ## Sizing
 
 Four small generators plus two helpers, all unit tests with fakes.
+
+Landed as 7dd92a2 on `batch/core` after self-review (two rounds).
