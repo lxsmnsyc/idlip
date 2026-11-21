@@ -2,8 +2,9 @@
 import { DEV, warnDeepQueue } from '../../core/dev.ts';
 import { getChunkId } from '../../core/format.ts';
 import { runAfter } from '../dom/run.ts';
-import { HAS_CHILDREN, HAS_REFS, HAS_TASKS } from '../features.ts';
+import { HAS_CHILDREN, HAS_REFS, HAS_SUBS, HAS_TASKS } from '../features.ts';
 import { installNesting } from '../nesting.ts';
+import { startSubs } from '../subs/index.ts';
 import { runTask } from '../tasks/run.ts';
 import type {
   After,
@@ -267,6 +268,8 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
       const result = results[index];
       if (result.status === 'rejected') {
         report(result.reason);
+        // A subscription asks for its next value only after this one, so it must not wait.
+        waiting[index].event.done?.();
         if (result.reason instanceof DropError) {
           queue.splice(queue.indexOf(waiting[index]), 1);
         } else {
@@ -349,6 +352,9 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
         continue;
       }
       touched.add(unit);
+      if (event.signal?.aborted) {
+        continue;
+      }
       try {
         await apply(unit, update!, event.message);
       } catch (error) {
@@ -377,6 +383,9 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
           runAfter(unit.page, calls);
         }
       }
+    }
+    for (const { event } of batch) {
+      event.done?.();
     }
   }
 
@@ -431,9 +440,25 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
   for (const event of early) {
     enqueue(event);
   }
+  const stopSubs = HAS_SUBS
+    ? startSubs({
+        load: async (marker, name) => {
+          const root = findRoot(marker);
+          if (root === undefined) {
+            throw new Error(`idlip: no state for the source ${name}`);
+          }
+          return root.page.load(root.page.manifest.module, `source=${name}`);
+        },
+        push: (event) => {
+          events.push(event);
+        },
+        report,
+      })
+    : undefined;
   flush().catch(report);
 
   function stop(): void {
+    stopSubs?.();
     stopped = true;
     queue.length = 0;
     Reflect.deleteProperty(events, 'push');

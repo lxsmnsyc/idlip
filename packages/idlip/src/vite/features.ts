@@ -27,6 +27,7 @@ const DETECTORS: Readonly<Record<string, Detector>> = {
   KEYED: hasKeyedPath,
   REFS: ({ manifest }) => manifest.after === true,
   CHILDREN: hasChildren,
+  SUBS: ({ manifest }) => manifest.sources !== undefined,
 };
 
 /** Returns the flags that the compiled modules turn on. */

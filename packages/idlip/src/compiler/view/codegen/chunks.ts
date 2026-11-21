@@ -3,6 +3,7 @@ import type { Component, Expr } from '../analyze/index.ts';
 import type { Module } from '../../../core/format.ts';
 import { printHelpers } from '../../../core/helpers.ts';
 import { printSlot } from './child.ts';
+import { emitSubscribeBinding } from './subscribe.ts';
 import { getMessage } from './events.ts';
 import { Emitter, createUsage, mergeUsage } from './expr.ts';
 import type { Frame, Report, ScopeName, Usage } from './expr.ts';
@@ -77,6 +78,8 @@ function emitBinding(binding: Binding, context: ChunkContext): Emitted {
         usage,
       };
     }
+    case 'subscribe':
+      return emitSubscribeBinding(binding, source.node, emitter);
     case 'event': {
       usage.helpers.add('setOn');
       const message = getMessage(context.component, source.event, emitter);

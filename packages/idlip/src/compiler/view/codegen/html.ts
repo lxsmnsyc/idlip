@@ -139,6 +139,9 @@ export class HtmlBuilder {
       case 'child':
         addChildNode(this, node, built);
         break;
+      case 'subscribe':
+        this.addSubscribe(node, built);
+        break;
       case 'global':
         addText(built, `<template i-global="${node.target}"`);
         this.addEvents(node.events, built);
@@ -149,6 +152,32 @@ export class HtmlBuilder {
         // `plan` reports the unsupported node.
         break;
     }
+  }
+
+  /**
+   * Writes the marker of a `<Subscribe>` between its own block comments, so the block hooks
+   * start and stop it. `:s` tells the loader it is not a condition.
+   */
+  addSubscribe(node: Extract<Node, { kind: 'subscribe' }>, built: Built): void {
+    const { emitter } = this;
+    const id = this.plan.subs.get(node);
+    if (node.source.kind !== 'import' && node.source.kind !== 'module') {
+      return;
+    }
+    addText(built, `<!--c${id}:s--><template i-sub="${node.source.name}"`);
+    for (const [name, hole] of [
+      ['i-input', node.input],
+      ['i-key', node.key],
+    ] as const) {
+      if (hole !== undefined) {
+        emitter.at = hole.span;
+        emitter.usage.helpers.add('attr');
+        addCode(built, `attr$(${quote(name)}, JSON.stringify(${emitter.expr(hole.expr, 0)}))`);
+      }
+    }
+    this.addEvents(node.events, built);
+    this.addAnchor(node, built);
+    addText(built, '></template><!--/c-->');
   }
 
   addEvents(events: Extract<Node, { kind: 'element' }>['events'], built: Built): void {

@@ -53,6 +53,12 @@ export interface Manifest {
   readonly tasks?: Readonly<Record<string, string>>;
   /** True when a handler returns `after` Dom calls, which the loader runs after the patch. */
   readonly after?: true;
+  /**
+   * The sources of the `<Subscribe>` blocks of the view, by the name the `i-sub` marker holds.
+   * The source of `name` is the chunk `source=<name>`, which exports `source`. Absent when the
+   * view has no `<Subscribe>`.
+   */
+  readonly sources?: readonly string[];
   /** Binding groups by key, ordered so a group comes before the groups it covers. */
   readonly groups: Readonly<Record<string, BindingGroup>>;
   /** `<For>` blocks by binding id, written as a string. */
@@ -130,6 +136,10 @@ export interface QueuedEvent {
   readonly latest: boolean;
   /** Item 3 of the message: the model path of the component that owns the handler. */
   readonly owner?: string;
+  /** Called once the batch that ran this event has patched, or when the event cannot run. */
+  readonly done?: () => void;
+  /** An event whose signal is aborted is dropped before it runs. A subscription sets it. */
+  readonly signal?: AbortSignal;
 }
 
 /** `self.$idlip`: the state records, and the queue the listener fills. */

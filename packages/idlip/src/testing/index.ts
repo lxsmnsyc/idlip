@@ -17,6 +17,7 @@ import type {
 import { patchList } from '../client/list/index.ts';
 import { renderListener } from '../client/loader/listener.ts';
 import { resume } from '../client/loader/resume.ts';
+import { restartSub } from '../client/subs/index.ts';
 import * as clientExports from '../client/patch/index.ts';
 import { render } from '../server/render.ts';
 import * as serverExports from '../server/index.ts';
@@ -158,7 +159,7 @@ async function start(
   const names: string[] = [];
   const scope: Scope = {
     server: { ...serverExports },
-    client: { ...clientExports, patchList },
+    client: { ...clientExports, patchList, restartSub },
     loaded(chunk) {
       names.push(chunk);
     },

@@ -4,12 +4,14 @@ import type { Frame, Report } from './expr.ts';
 
 type ForNode = Extract<Node, { kind: 'for' }>;
 export type ChildNode = Extract<Node, { kind: 'child' }>;
+export type SubscribeNode = Extract<Node, { kind: 'subscribe' }>;
 
 export type Source =
   | { kind: 'attr'; name: string; hole: Hole }
   | { kind: 'prop'; child: ChildNode; name: string; hole: Hole }
   | { kind: 'message'; child: ChildNode; event: Event }
   | { kind: 'event'; event: Event }
+  | { kind: 'subscribe'; node: SubscribeNode }
   | { kind: 'text'; hole: Hole }
   | { kind: 'condition'; node: Extract<Node, { kind: 'condition' }> }
   | { kind: 'list'; node: Extract<Node, { kind: 'for' }> };
@@ -82,6 +84,10 @@ export interface Plan {
   children: Map<Node, ChildInfo>;
   /** The child components the view renders, once each, in source order. */
   uses: Used[];
+  /** The id of the marker block of each `<Subscribe>`. */
+  subs: Map<Node, number>;
+  /** The sources the view subscribes to, by name, in source order. */
+  sources: Map<string, Root>;
 }
 
 /** Prints the source of a keyed segment: the model path of its value. */
@@ -153,6 +159,8 @@ class Planner {
   events = new Set<string>();
   children = new Map<Node, ChildInfo>();
   uses: Used[] = [];
+  subs = new Map<Node, number>();
+  sources = new Map<string, Root>();
   nextEvent: number;
 
   constructor(
@@ -213,7 +221,7 @@ class Planner {
   }
 
   /** Assigns ids to the events that read state at render. Returns the ids. */
-  bindEvents(events: Event[], context: WalkContext): number[] {
+  bindEvents(events: Event[], context: WalkContext, listen = true): number[] {
     const ids: number[] = [];
     for (const event of events) {
       if (event.target.kind !== 'handler' && event.target.kind !== 'prop') {
@@ -224,7 +232,10 @@ class Planner {
         );
         continue;
       }
-      this.events.add(event.name);
+      // The loader reads `on:value` of a subscription itself, so no listener is needed.
+      if (listen) {
+        this.events.add(event.name);
+      }
       const paths = this.getEventPaths(event);
       if (paths.length === 0) {
         continue;
@@ -333,6 +344,25 @@ class Planner {
         case 'child':
           this.planChild(node, context);
           break;
+        case 'subscribe': {
+          this.subs.set(node, this.nextEvent++);
+          if (node.source.kind === 'import' || node.source.kind === 'module') {
+            this.sources.set(node.source.name, node.source);
+          }
+          // The key binding restarts the run. Without a state path in the key nothing patches.
+          const ids: number[] = [];
+          if (node.key !== undefined) {
+            const id = this.bindHole(node.key, 'a', context, { kind: 'subscribe', node });
+            if (id !== undefined) {
+              ids.push(id);
+            }
+          }
+          ids.push(...this.bindEvents(node.events, context, false));
+          if (ids.length > 0) {
+            this.anchors.set(node, ids);
+          }
+          break;
+        }
         case 'global': {
           const ids = this.bindEvents(node.events, context);
           if (ids.length > 0) {
@@ -372,6 +402,8 @@ export function planBindings(component: Component, report: Report, child = false
     events: [...planner.events].sort(),
     children: planner.children,
     uses: planner.uses,
+    subs: planner.subs,
+    sources: planner.sources,
   };
 }
 

@@ -20,6 +20,7 @@ import { Emitter, createUsage, mergeUsage } from './expr.ts';
 import { HtmlBuilder, toExpression } from './html.ts';
 import { ModuleSource } from './module.ts';
 import { getTaskChunk, isBuiltinTask } from '../../update/tasks.ts';
+import { emitSourceChunk } from './subscribe.ts';
 import { getStatePaths, planBindings, planGroups } from './plan.ts';
 import type { Binding, Group, Plan } from './plan.ts';
 import { getAccessor, getKey, getLocalName, printHelperImport, quote, toLiteral } from './text.ts';
@@ -155,6 +156,7 @@ function buildManifest(
     events: plan.events,
     handlers,
     ...(Object.keys(tasks).length === 0 ? {} : { tasks }),
+    ...(plan.sources.size === 0 ? {} : { sources: [...plan.sources.keys()] }),
     groups: groupEntries,
     lists,
     ...(child ? { view: { chunk: 'view' } } : {}),
@@ -233,6 +235,10 @@ export function generate(
     const chunk = emitListChunk(info, context);
     client.push(chunk.module);
     mergeUsage(clientUsage, chunk.usage);
+  }
+
+  for (const [name, root] of plan.sources) {
+    client.push(emitSourceChunk(name, root, context));
   }
 
   if (child) {
@@ -324,6 +330,9 @@ function emitServer(
     if (!chunkNames.includes(chunk)) {
       chunkNames.push(chunk);
     }
+  }
+  for (const name of manifest.sources ?? []) {
+    chunkNames.push(`source=${name}`);
   }
   for (const group of Object.values(manifest.groups)) {
     chunkNames.push(group.chunk);
