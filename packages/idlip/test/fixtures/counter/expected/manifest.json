@@ -1,0 +1,32 @@
+{
+  "module": "/src/counter.idlip.tsx",
+  "events": [
+    "click"
+  ],
+  "handlers": {
+    "increment": {
+      "chunk": "handler=increment"
+    },
+    "add": {
+      "chunk": "handler=add"
+    },
+    "reset": {
+      "chunk": "handler=reset"
+    }
+  },
+  "groups": {
+    "count": {
+      "paths": [
+        "count"
+      ],
+      "chunk": "binding=count",
+      "bindings": [
+        "a0",
+        "t1",
+        "c2"
+      ],
+      "covers": []
+    }
+  },
+  "lists": {}
+}

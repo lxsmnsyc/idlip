@@ -1,0 +1,18 @@
+{
+  "id": "/src/todo.idlip.tsx",
+  "source": "todo.idlip.tsx",
+  "props": {
+    "initial": [
+      {
+        "id": "a1",
+        "text": "Write the format",
+        "done": true
+      },
+      {
+        "id": "a2",
+        "text": "Build <the> runtime",
+        "done": false
+      }
+    ]
+  }
+}

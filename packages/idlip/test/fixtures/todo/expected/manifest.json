@@ -1,0 +1,97 @@
+{
+  "module": "/src/todo.idlip.tsx",
+  "events": [
+    "click",
+    "input",
+    "keydown",
+    "submit"
+  ],
+  "handlers": {
+    "setDraft": {
+      "chunk": "handler=setDraft"
+    },
+    "clear": {
+      "chunk": "handler=clear"
+    },
+    "add": {
+      "chunk": "handler=add"
+    },
+    "toggle": {
+      "chunk": "handler=toggle"
+    }
+  },
+  "groups": {
+    "todos.*.done": {
+      "paths": [
+        "todos.*.done"
+      ],
+      "chunk": "binding=todos.*.done",
+      "bindings": [
+        "a4",
+        "a5"
+      ],
+      "covers": [
+        "todos"
+      ]
+    },
+    "todos.*.id": {
+      "paths": [
+        "todos.*.id"
+      ],
+      "chunk": "binding=todos.*.id",
+      "bindings": [
+        "a7"
+      ],
+      "covers": [
+        "todos"
+      ]
+    },
+    "todos.*.text": {
+      "paths": [
+        "todos.*.text"
+      ],
+      "chunk": "binding=todos.*.text",
+      "bindings": [
+        "t6"
+      ],
+      "covers": [
+        "todos"
+      ]
+    },
+    "draft": {
+      "paths": [
+        "draft"
+      ],
+      "chunk": "binding=draft",
+      "bindings": [
+        "a0",
+        "a1"
+      ],
+      "covers": []
+    },
+    "todos": {
+      "paths": [
+        "todos"
+      ],
+      "chunk": "binding=todos",
+      "bindings": [
+        "t2",
+        "l3"
+      ],
+      "covers": []
+    }
+  },
+  "lists": {
+    "3": {
+      "key": "id",
+      "path": "todos",
+      "chunk": "list=3",
+      "bindings": [
+        "a4",
+        "a5",
+        "t6",
+        "a7"
+      ]
+    }
+  }
+}
