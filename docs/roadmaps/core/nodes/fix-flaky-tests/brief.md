@@ -1,7 +1,7 @@
 ---
 id: fix-flaky-tests
 title: Find and fix the flaky unit tests
-status: todo
+status: active
 priority: should
 type: fix
 story:
