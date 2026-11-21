@@ -1,7 +1,7 @@
 ---
 id: safe-urls-2
 title: Close the remaining URL attribute gaps
-status: todo
+status: active
 priority: should
 type: fix
 story:
