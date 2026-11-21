@@ -1,7 +1,7 @@
 ---
 id: example-todo
 title: Todo example written in the DSL, passing the e2e tests
-status: active
+status: done
 priority: must
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: true
 added:
-spent:
+spent: 227462
 owns:
   - examples/todo/**
 shared:
@@ -83,3 +83,5 @@ depends_on:
 ## Notes for the worker
 
 - If the compiled output differs from the fixture, fix the compiler, not the fixture, unless the fixture is wrong. Report which.
+
+Landed on `batch/core` as 8c31c2e. First click: `toggle` 119 B + `todos.*.done` 505 B gzip. Before: page 1984 B + loader 3901 B gzip. Also fixed the loader dynamic import (resume.ts) and made the e2e target default to the example.
