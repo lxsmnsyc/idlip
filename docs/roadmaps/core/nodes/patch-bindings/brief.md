@@ -1,7 +1,7 @@
 ---
 id: patch-bindings
 title: Model path diff and binding patcher
-status: active
+status: done
 priority: must
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added:
-spent:
+spent: 292156
 owns:
   - packages/idlip/src/client/patch/**
   - packages/idlip/test/client/patch/**
@@ -58,3 +58,5 @@ Given the old model, the new model and the manifest, find the binding groups who
 ## Sizing
 
 M: path diff logic needs a property test. `fast-check` is installed by `core-api`.
+
+Landed on `batch/core` as 2099ba4. Exports the shared block and parse helpers that `patch-lists` imports. 2.2 kB gzip.
