@@ -1,7 +1,7 @@
 ---
 id: form-fields
 title: Form fields in event arrows
-status: todo
+status: active
 priority: should
 type: feature
 story:

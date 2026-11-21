@@ -1,7 +1,7 @@
 ---
 id: errors
 title: Errors: the Try block in the compiler and on the server
-status: todo
+status: active
 priority: should
 type: feature
 story:

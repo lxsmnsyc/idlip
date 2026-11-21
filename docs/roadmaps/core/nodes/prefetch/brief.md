@@ -1,7 +1,7 @@
 ---
 id: prefetch
 title: Prefetch chunks for messages present in the page
-status: todo
+status: active
 priority: should
 type: feature
 story:

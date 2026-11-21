@@ -1,7 +1,7 @@
 ---
 id: loader-trim
 title: Trim the flag-off seams out of the loader
-status: todo
+status: active
 priority: should
 type: feature
 story:
