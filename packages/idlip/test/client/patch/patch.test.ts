@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { Window } from 'happy-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { onBlock } from '../../../src/client/patch/blocks.ts';
-import { setBranch } from '../../../src/client/patch/dom.ts';
+import { setBranch$ as setBranch } from '../../../src/core/helpers.ts';
 import { findNode } from '../../../src/client/patch/nodes.ts';
 import { createPatch } from '../../../src/client/patch/patch.ts';
 import type { Manifest, Model, Page, Patch, PatchList } from '../../../src/core/format.ts';

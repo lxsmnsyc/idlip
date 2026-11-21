@@ -1,4 +1,5 @@
 // String helpers for the code generator: JS literals, HTML escaping and template literals.
+import { HELPER_NAMES } from '../../../core/helpers.ts';
 
 /** A piece of generated markup: fixed text, or JS code whose value is a string. */
 export type Part = { kind: 'text'; value: string } | { kind: 'code'; value: string };
@@ -10,6 +11,7 @@ const INTEGER = /^(?:0|[1-9]\d*)$/;
 
 /** Names a generated local never takes: JS words and the names the generated code uses. */
 const RESERVED = new Set([
+  ...HELPER_NAMES,
   'props',
   'context',
   'manifest',
@@ -20,13 +22,6 @@ const RESERVED = new Set([
   'start',
   'branch',
   'render',
-  'text$',
-  'attr$',
-  'on$',
-  'setAttr$',
-  'setText$',
-  'setOn$',
-  'setBranch$',
   'await',
   'break',
   'case',

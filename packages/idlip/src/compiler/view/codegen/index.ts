@@ -9,6 +9,7 @@ import type {
   Manifest,
   Module,
 } from '../../../core/format.ts';
+import { HELPER_NAMES } from '../../../core/helpers.ts';
 import { pickComponent } from '../../update/index.ts';
 import type { Component, ModuleIR, Span } from '../analyze/index.ts';
 import { emitBindings, emitGroupChunk, emitListChunk } from './chunks.ts';
@@ -118,6 +119,17 @@ export function generate(ir: ModuleIR, source: string, id: string): GenerateResu
     groups.set(group.key, group);
   }
   const moduleSource = new ModuleSource(ir.file, source);
+  // A module-level name that codegen also generates would be declared twice in a chunk.
+  for (const found of moduleSource.findNames(new Set(HELPER_NAMES))) {
+    report(
+      'module-reserved-name',
+      `The module-level name \`${found.name}\` is one that the compiler generates. Rename it.`,
+      { start: found.start, end: found.end },
+    );
+  }
+  if (diagnostics.length > ir.diagnostics.length) {
+    return empty();
+  }
   const byId = new Map<number, Binding>();
   for (const binding of plan.bindings) {
     byId.set(binding.id, binding);

@@ -59,13 +59,6 @@ function readManifest(name: string): unknown {
   return JSON.parse(readFixture(name, 'expected', 'manifest.json')) as unknown;
 }
 
-/** Removes the helper aliases (`setText as setText$`), which the fixtures do not use. */
-function unalias(code: string): string {
-  return code
-    .replaceAll(/\b(\w+) as \1\$/g, '$1')
-    .replaceAll(/\b(text|attr|on|set[A-Z]\w*)\$\(/g, '$1(');
-}
-
 /** Formats JS as the repo does, so only the code is compared. */
 async function normalize(code: string): Promise<string> {
   const result = await format('chunk.js', code, { singleQuote: true });
@@ -238,7 +231,7 @@ describe.each(['counter', 'todo'])('fixture %s', (name) => {
         continue;
       }
       const expected = readFixture(name, 'expected', 'client', getChunkFile(module.chunk));
-      expect(await normalize(unalias(module.code))).toBe(await normalize(expected));
+      expect(await normalize(module.code)).toBe(await normalize(expected));
     }
   });
 });
@@ -480,7 +473,8 @@ describe('server module', () => {
     expect(html).toContain('title="xx"');
     expect(html).toContain('<!--t1-->xx<!--/t-->');
     const chunk = result.client.find((module) => module.chunk === 'binding=attr');
-    expect(chunk?.code).toContain('setText as setText$');
+    expect(chunk?.code).toContain('function setText$(start, value) {');
+    expect(chunk?.code).not.toContain('idlip/client');
     expect(chunk?.code).toContain('function text(value) {');
   });
 

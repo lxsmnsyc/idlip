@@ -7,15 +7,15 @@ import { getChunkFile, getChunkId } from '../../src/core/format.ts';
 import type { Manifest, Model, RenderContext } from '../../src/core/format.ts';
 import { createContext, diffPaths, selectChunks } from './reference.ts';
 
-// Compiled modules import the render helpers from the package. The reference versions
-// stand in for them. The patch helpers are never called here.
+// Server modules import the render helpers from the package. The reference versions stand in
+// for them. Chunks copy the DOM and render helpers and import only the loader's block hooks and
+// `parseHtml`, which are never called here.
 vi.mock('idlip/server', async () => import('./reference.ts'));
-vi.mock('idlip/client', async () => ({
-  ...(await import('./reference.ts')),
-  setAttr: vi.fn(),
-  setBranch: vi.fn(),
-  setOn: vi.fn(),
-  setText: vi.fn(),
+vi.mock('idlip/client', () => ({
+  addBlock: vi.fn(),
+  findInnerBlocks: vi.fn(),
+  parseHtml: vi.fn(),
+  removeBlock: vi.fn(),
 }));
 
 const FIXTURES = ['counter', 'todo'];

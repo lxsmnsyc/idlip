@@ -148,10 +148,33 @@ export interface Todo {
  */
 export function serializeNode(node: Node): string {
   if (node instanceof Element) {
-    const attributes = [...node.attributes].toSorted((a, b) => a.name.localeCompare(b.name));
+    // The live `value`, `checked` and `selected` replace their attributes, which go stale.
+    const pairs = new Map<string, string>();
+    for (const attribute of node.attributes) {
+      pairs.set(attribute.name, attribute.value);
+    }
+    if (node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement) {
+      if (pairs.has('value') || node.value !== '') {
+        pairs.set('value', node.value);
+      }
+    }
+    if (node instanceof HTMLInputElement && (node.type === 'checkbox' || node.type === 'radio')) {
+      if (node.checked) {
+        pairs.set('checked', '');
+      } else {
+        pairs.delete('checked');
+      }
+    }
+    if (node instanceof HTMLOptionElement) {
+      if (node.selected) {
+        pairs.set('selected', '');
+      } else {
+        pairs.delete('selected');
+      }
+    }
     let text = `<${node.localName}`;
-    for (const attribute of attributes) {
-      text += ` ${attribute.name}="${attribute.value}"`;
+    for (const [name, value] of [...pairs].toSorted((a, b) => a[0].localeCompare(b[0]))) {
+      text += ` ${name}="${value}"`;
     }
     let inner = '';
     for (const child of node.childNodes) {

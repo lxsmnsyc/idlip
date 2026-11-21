@@ -1,6 +1,7 @@
 // Emits the client chunks: binding groups and list item templates.
 import type { Component } from '../analyze/index.ts';
 import type { Module } from '../../../core/format.ts';
+import { printHelpers } from '../../../core/helpers.ts';
 import { getMessage } from './events.ts';
 import { Emitter, createUsage, mergeUsage } from './expr.ts';
 import type { Frame, Report, ScopeName, Usage } from './expr.ts';
@@ -218,11 +219,15 @@ function addListExports(
   }
 }
 
-/** Joins the runtime import, the module's imports, its helpers and the code into a chunk. */
+/**
+ * Joins the loader import, the module's imports, the copied runtime helpers, the module's
+ * helpers and the code into a chunk.
+ */
 function assemble(usage: Usage, sections: string[], context: ChunkContext): string {
   const collected = context.source.collect(usage.modules, usage.imports);
   const imports: string[] = [];
-  const runtime = printHelperImport(usage.helpers, 'idlip/client');
+  const copied = printHelpers(usage.helpers);
+  const runtime = printHelperImport(copied.client, 'idlip/client');
   if (runtime !== '') {
     imports.push(runtime);
   }
@@ -231,7 +236,7 @@ function assemble(usage: Usage, sections: string[], context: ChunkContext): stri
   if (imports.length > 0) {
     blocks.push(imports.join('\n'));
   }
-  blocks.push(...collected.code, ...sections);
+  blocks.push(...copied.code, ...collected.code, ...sections);
   return `${blocks.join('\n\n')}\n`;
 }
 

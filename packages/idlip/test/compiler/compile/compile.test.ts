@@ -16,13 +16,6 @@ function readFixture(name: string, ...parts: string[]): string {
   return readFileSync(join(FIXTURES, name, ...parts), 'utf8');
 }
 
-/** Removes the helper aliases (`setText as setText$`), which the fixtures do not use. */
-function unalias(code: string): string {
-  return code
-    .replaceAll(/\b(\w+) as \1\$/g, '$1')
-    .replaceAll(/\b(text|attr|on|set[A-Z]\w*)\$\(/g, '$1(');
-}
-
 /** Formats JS as the repo does, so only the code is compared. */
 async function normalize(code: string): Promise<string> {
   const result = await format('chunk.js', code, { singleQuote: true });
@@ -141,7 +134,7 @@ describe.each(['counter', 'todo'])('compile() on the %s fixture', (name) => {
         continue;
       }
       const expected = readFixture(name, 'expected', 'client', getChunkFile(module.chunk));
-      expect(await normalize(unalias(module.code))).toBe(await normalize(expected));
+      expect(await normalize(module.code)).toBe(await normalize(expected));
     }
   });
 });

@@ -1,13 +1,42 @@
+import { onBlock } from './blocks.ts';
 import { isComment, isElement, matchMarker } from './guards.ts';
 
 type Index = Map<string, Node>;
 
 let cache: { root: ParentNode; index: Index } | undefined;
 
-/** Forgets the nodes found so far. A branch swap calls it, since it moves markers. */
-export function clearNodes(): void {
-  cache = undefined;
+/** Tells whether a node is inside a list row, whose nodes the index does not hold. */
+function isInRow(start: Node): boolean {
+  for (let node: Node | null = start; node !== null; node = node.parentNode) {
+    let depth = 0;
+    for (let item = node.previousSibling; item !== null; item = item.previousSibling) {
+      if (!isComment(item)) {
+        continue;
+      }
+      if (item.data === '/i') {
+        depth++;
+      } else if (item.data === 'i') {
+        if (depth === 0) {
+          return true;
+        }
+        depth--;
+      }
+    }
+  }
+  return false;
 }
+
+/**
+ * A branch swap moves markers, so the nodes found so far are forgotten. A copied `setBranch`
+ * calls the block hooks as it swaps. A block inside a row is not in the index.
+ */
+function forgetNodes(start: Comment): void {
+  if (!isInRow(start)) {
+    cache = undefined;
+  }
+}
+
+onBlock(forgetNodes, forgetNodes);
 
 /**
  * Walks the page once and maps binding export names to nodes: `a<id>` to an element,
@@ -38,6 +67,7 @@ function buildIndex(root: ParentNode): Index {
 }
 
 /** Returns the node of a binding outside rows. The first call walks the page. */
+// oxlint-disable-next-line import/prefer-default-export
 export function findNode(root: ParentNode, name: string): Node | undefined {
   if (cache?.root !== root) {
     cache = { root, index: buildIndex(root) };

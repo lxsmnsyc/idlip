@@ -15,6 +15,8 @@ interface ImportBinding {
   /** `default`, `*` or the imported name. */
   imported: string;
   local: string;
+  start: number;
+  end: number;
 }
 
 interface Edit {
@@ -77,6 +79,22 @@ export class ModuleSource {
     return new Set([...this.declarations.keys(), ...this.imports.keys()]);
   }
 
+  /** Finds the module-level declarations and imports whose names are in `reserved`. */
+  findNames(reserved: ReadonlySet<string>): { name: string; start: number; end: number }[] {
+    const found: { name: string; start: number; end: number }[] = [];
+    for (const [name, declaration] of this.declarations) {
+      if (reserved.has(name)) {
+        found.push({ name, start: declaration.node.start, end: declaration.node.end });
+      }
+    }
+    for (const [name, binding] of this.imports) {
+      if (reserved.has(name)) {
+        found.push({ name, start: binding.start, end: binding.end });
+      }
+    }
+    return found;
+  }
+
   read(statement: AstNode): void {
     if (statement.type === 'ImportDeclaration') {
       if (statement.importKind === 'type') {
@@ -95,12 +113,16 @@ export class ModuleSource {
             source: statement.source.value,
             imported,
             local: specifier.local.name,
+            start: specifier.start,
+            end: specifier.end,
           });
         } else {
           this.imports.set(specifier.local.name, {
             source: statement.source.value,
             imported: specifier.type === 'ImportDefaultSpecifier' ? 'default' : '*',
             local: specifier.local.name,
+            start: specifier.start,
+            end: specifier.end,
           });
         }
       }

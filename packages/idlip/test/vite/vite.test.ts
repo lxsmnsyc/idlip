@@ -7,7 +7,7 @@ import { createBuilder, createServer } from 'vite';
 import type { Plugin, ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { getChunkFile, getChunkId } from '../../src/core/format.ts';
-import type { CompileResult } from '../../src/core/format.ts';
+import type { CompileResult, Module } from '../../src/core/format.ts';
 import { listChunks, parseChunkId, replaceChunkUrls } from '../../src/vite/chunks.ts';
 import {
   compileFixture,
@@ -205,9 +205,23 @@ describe('vite build errors', () => {
   it('fails when a chunk imports a module the loader does not import', async () => {
     const root = createApp();
     try {
-      const builder = await createBuilder(createConfig(root, { client: '/src/empty-loader.js' }));
+      // The fixture chunks copy their helpers and import little. Every chunk imports the loader's
+      // `parseHtml` here, so the stub is shared and the bundler keeps it in a file of its own.
+      const checked = createCheckedCompile(root).compile;
+      function compile(source: string, id: string): CompileResult {
+        const result = checked(source, id);
+        const client: Module[] = [];
+        for (const module of result.client) {
+          const code = `import { parseHtml } from 'idlip/client';\nexport const parse = parseHtml;\n${module.code}`;
+          client.push({ ...module, code });
+        }
+        return { ...result, client };
+      }
+      const builder = await createBuilder(
+        createConfig(root, { client: '/src/empty-loader.js', compile }),
+      );
       await expect(builder.buildApp()).rejects.toThrow(
-        /todo\.binding\.todos\._\.done-[\w-]+\.js imports assets\/client-stub-[\w-]+\.js, which the loader does not import/,
+        /\.binding\.[\w.*-]+-[\w-]+\.js imports assets\/client-stub-[\w-]+\.js, which the loader does not import/,
       );
     } finally {
       rmSync(root, { recursive: true, force: true });
