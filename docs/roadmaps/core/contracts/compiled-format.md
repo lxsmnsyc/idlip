@@ -1,6 +1,6 @@
 ---
 name: compiled-format
-version: 8
+version: 9
 status: frozen
 defined_by: compiled-format
 ---
@@ -93,7 +93,7 @@ on:submit='["add",[],"prevent"]'
 on:keydown='["clear",[],"key:Escape"]'
 ```
 
-- Item 0 is the tag, the handler's name. Item 1 is the payload: the handler's arguments, then the values of the props paths the handler reads (`free` of kind `props` in the IR, in that order). The counter's `reset` reads `props.start`, so it renders as `["reset",[4]]`.
+- Item 0 is the tag, the handler's name. Item 1 is the payload: the values of the props paths the handler reads, then the handler's arguments. The props paths are the handler's own (`free` of kind `props` in the IR), then those of the handlers it calls, as `listHandlerProps(component, handler)` in `src/compiler/update/` returns them. The counter's `reset` reads `props.start`, so it renders as `["reset",[4]]`.
 - Item 2, when present, lists the modifiers, separated by spaces.
 - **Placeholders.** A top-level payload item that is an array whose first item is a string starting with `$` is a placeholder. `["$event", ...segments]` reads the segments from the event when it fires. The segment `currentTarget` is the element that carries the attribute, since the delegated listener's `currentTarget` is the document. `["$form", name]` is reserved for `form-fields`. `["$", ...items]` is a literal array whose first item starts with `$`: the compiler writes such a literal argument that way, and the listener drops the `$`. Items below the top level are never placeholders.
 - An event argument that reads the event must be a whole argument that is a path on the event, such as `e.currentTarget.value`. Any other use of the event in an argument is `event-placeholder` (view-ir change request).
@@ -270,7 +270,7 @@ export function toggle(model, [id]) {
 ```
 
 - An `Update` takes the model and the payload, and returns the next model or a `Step`. It reads the state it uses into locals, runs the body, and returns a new model with the written fields. Every `return` in the body returns that new model.
-- Props values come after the arguments in the payload, named `props$<field>` (`reset(model, [props$start])`).
+- Props values come before the arguments in the payload, named `props$<segments joined by $>` (`reset(model, [props$start])`). Props first keeps a rest parameter last: a handler that calls itself is `export function down(model, [props$k, ...$args])`.
 - A handler called by another handler runs inline in the same chunk. Module-level helpers it reaches are copied in. Imports stay imports.
 - Async handlers, implemented by `custom-effects`: a segment that ends at an `await` returns `{ model, task }`. `task.site` names the awaited call, `task.then` the continuation tag, `task.carried` the carried locals. The continuation's payload is `[outcome, ...carried]`, where `outcome` is `{ ok: true, value }` or `{ ok: false, error }`. All segments share the handler's chunk. When a segment awaits `Random` or `Time`, the loader waits for the continuation before it patches. `runTask(task, dispatch)` runs the task and dispatches the continuation.
 
@@ -370,6 +370,7 @@ The golden fixtures are the stub for both sides. Each of `test/fixtures/counter/
 
 ## Changes
 
+- v9 (2026-11-21, from the `compile-update` review): the payload puts props values before the arguments, so a rest parameter stays last, and includes the props paths of called handlers.
 - v8 (frozen by `compiled-format`): fixes the DOM encoding (binding ids, `i-a`, comment pairs, rows without keys), event JSON with placeholders and modifiers, key filters, the authoring forms for `prevent`, `stop` and key filters, the state script as a lazy seroval record, the head listener and the queue hand-off, the budgets (listener 1024 B, loader 4096 B gzip), the manifest with groups, covers and lists, chunk ids and the chunk URL map in the state record, key and index pairing in `diffPaths`, the module shapes, the render and patch helpers, the runtime seam types, the compiler API and the HTML parser rules. `patch` takes `(page, prev, next)` instead of `(root, oldModel, newModel, manifest)`, since it also needs the props and the chunk loader. Adds the counter and todo fixtures.
 - v7: block hook `onBlock`, `latest:` event attributes, `<window>` and `<document>` listeners, and the `<Subscribe>` marker with source chunk id and input. Source: `docs/roadmaps/core/debates/subscriptions/debate.md`, 2026-11-21.
 - v6: function components replace `defineModule`. Tags are handler names and payloads are argument arrays. Continuation chunks and tags for `await`. `runTask` replaces `runCmd` and `startSubs`. Subscriptions become markers in the page instead of a list in the state script. One chunk per handler, with its continuations. Source: `docs/proposals/0002-modules.md` and `docs/proposals/0004-effects-refs-errors.md`, revised 2026-11-21.
