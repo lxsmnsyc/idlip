@@ -1,7 +1,7 @@
 ---
 id: deploy-skew
 title: Recover when cached HTML meets a newer client build
-status: todo
+status: active
 priority: should
 type: feature
 story:
