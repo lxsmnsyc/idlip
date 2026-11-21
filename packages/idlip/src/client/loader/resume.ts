@@ -1,5 +1,6 @@
 // oxlint-disable import/prefer-default-export
 import { getChunkId } from '../../core/format.ts';
+import { HAS_TASKS } from '../features.ts';
 import { runTask } from '../tasks/run.ts';
 import type {
   Boot,
@@ -253,8 +254,9 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
   // other task runs on its own, and its continuation joins the queue when it settles.
   async function apply(root: Root, update: Update, message: QueuedEvent['message']): Promise<void> {
     const result = update(root.model, message.p);
-    if (!isStep(result)) {
-      root.model = result;
+    if (!HAS_TASKS || !isStep(result)) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+      root.model = result as Model;
       return;
     }
     root.model = result.model;

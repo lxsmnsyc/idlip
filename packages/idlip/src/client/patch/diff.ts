@@ -1,4 +1,5 @@
 import type { Manifest, Model } from '../../core/format.ts';
+import { HAS_KEYED } from '../features.ts';
 import { isRecord } from './guards.ts';
 
 /** Splits at the dots outside brackets, and reads `todos[id=selected]`. */
@@ -72,7 +73,7 @@ function checkChanged(
     return true;
   }
   const segment = segments[at];
-  const keyed = KEYED.exec(segment);
+  const keyed = HAS_KEYED ? KEYED.exec(segment) : null;
   if (keyed !== null) {
     // An item found on one side only is a change.
     const before = findItem(prev, roots.prev, keyed);

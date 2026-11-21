@@ -14,6 +14,7 @@ import type {
 import * as compiler from '../compiler/index.ts';
 import type { ChunkUrls, Compile, CompileDiagnostic, CompileResult } from '../core/format.ts';
 import { getChunkFile, getChunkId } from '../core/format.ts';
+import { findDroppedFeatures, getDefines, getFeatures, replaceFeatures } from './features.ts';
 import { isChunkUrls, listChunks, parseChunkId, replaceChunkUrls } from './chunks.ts';
 
 const MODULE_FILE = /\.idlip\.tsx$/;
@@ -217,7 +218,7 @@ async function servePage(
  * binding group and list, gives the server module the chunk URLs, and serves
  * server-rendered pages in `vite dev`.
  */
-export function idlip(options: IdlipOptions = {}): Plugin {
+export function idlip(options: IdlipOptions = {}): Plugin[] {
   const patterns = typeof options.modules === 'string' ? [options.modules] : options.modules;
   const entry = options.entry;
   /** `build.outDir` of the user config, which holds the client and server folders. */
@@ -233,6 +234,8 @@ export function idlip(options: IdlipOptions = {}): Plugin {
   const emitted = new Map<string, string>();
   /** The chunk URL map of the client build in this process. */
   let built: ChunkUrls | undefined;
+  /** The feature globals of the client build and their values, set once its modules compile. */
+  let defines: Map<string, string> | undefined;
 
   function getModuleId(file: string): string {
     return `/${path.relative(root, file).split(path.sep).join('/')}`;
@@ -305,7 +308,7 @@ export function idlip(options: IdlipOptions = {}): Plugin {
     return urls;
   }
 
-  return {
+  const main: Plugin = {
     name: 'idlip',
     // Compile the source before Vite's TypeScript and JSX transform.
     enforce: 'pre',
@@ -343,8 +346,10 @@ export function idlip(options: IdlipOptions = {}): Plugin {
       }
       emitted.clear();
       built = undefined;
+      const results: CompileResult[] = [];
       for (const file of findModules()) {
         const result = compileFile(this, file);
+        results.push(result);
         const name = path.basename(file, '.idlip.tsx');
         for (const chunk of listChunks(result.manifest)) {
           const reference = this.emitFile({
@@ -356,6 +361,8 @@ export function idlip(options: IdlipOptions = {}): Plugin {
           emitted.set(getChunkId(result.manifest.module, chunk), reference);
         }
       }
+      // Every module is compiled before the loader is bundled, so the loader sees the defines.
+      defines = getDefines(getFeatures(results));
     },
 
     load(id) {
@@ -384,6 +391,15 @@ export function idlip(options: IdlipOptions = {}): Plugin {
           );
         }
         const result = compileFile(this, id, code);
+        // A module outside the `modules` globs was not counted, so the client build may have
+        // dropped the loader code it needs.
+        if (defines !== undefined) {
+          for (const name of findDroppedFeatures(result, defines)) {
+            this.error(
+              `${getModuleId(id)} uses ${name}, which the client build dropped because no module of \`modules\` uses it. Add the module to \`modules\`.`,
+            );
+          }
+        }
         const urls = getChunkUrls(result);
         return {
           code: urls === undefined ? result.server : replaceChunkUrls(result.server, urls),
@@ -449,4 +465,22 @@ export function idlip(options: IdlipOptions = {}): Plugin {
       });
     },
   };
+
+  // The loader drops the code of features that no module uses.
+  const features: Plugin = {
+    name: 'idlip:features',
+    enforce: 'pre',
+    sharedDuringBuild: true,
+    transform: {
+      filter: { code: { include: '__IDLIP_HAS_' } },
+      handler(code) {
+        if (defines === undefined || this.environment.name !== 'client') {
+          return undefined;
+        }
+        return replaceFeatures(code, defines);
+      },
+    },
+  };
+
+  return [main, features];
 }
