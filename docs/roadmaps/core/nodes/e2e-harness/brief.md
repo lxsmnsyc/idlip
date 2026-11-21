@@ -1,7 +1,7 @@
 ---
 id: e2e-harness
 title: Playwright harness that counts chunks loaded on resume
-status: todo
+status: active
 priority: must
 type: feature
 story:
