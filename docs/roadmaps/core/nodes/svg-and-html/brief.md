@@ -1,7 +1,7 @@
 ---
 id: svg-and-html
 title: SVG and MathML namespaces, and trusted raw HTML
-status: active
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-20
-spent:
+spent: 244570
 owns:
   - packages/idlip/src/client/html.ts
   - packages/idlip/src/compiler/view/codegen/raw.ts
@@ -64,11 +64,11 @@ The `innerHTML` setter goes behind `HAS_HTML` (detector: a binding of kind html 
 
 ## Acceptance
 
-- [ ] A client-created row inside `<svg>` has the SVG namespace (`namespaceURI`), and in `<math>` the MathML one.
-- [ ] `html={trusted(s)}` renders on the server and patches `innerHTML`; a plain string is a type error (type test) and children are rule `html-children`.
-- [ ] The todo loader grows by at most 5 B (e2e budget test).
-- [ ] Fast check passes: `pnpm --filter idlip test`
-- [ ] Change request: `contracts/compiled-format-html.change-request.md` only if the binding kind needs a contract line.
+- [x] A client-created row inside `<svg>` has the SVG namespace (`namespaceURI`), and in `<math>` the MathML one.
+- [x] `html={trusted(s)}` renders on the server and patches `innerHTML`; a plain string is a type error (type test) and children are rule `html-children`.
+- [x] The todo loader grows by at most 5 B (e2e budget test).
+- [x] Fast check passes: `pnpm --filter idlip test`
+- [x] Change request: `contracts/compiled-format-html.change-request.md` only if the binding kind needs a contract line.
 
 ## Sizing
 
@@ -77,3 +77,5 @@ Verification of landed pieces plus one gated setter.
 ## Notes for the worker
 
 - Trusted Types: the policy is already created in `dom.ts`; reuse it, do not make a second.
+
+Landed as 4129f4c on `batch/core` after one security review round (plain `on*` attributes rejected, `trusted` checked by imported name, `html` rejected on raw-text elements, `<Try>` namespace). MathML proven only in a scratch Chromium run. `javascript:` URLs moved to `safe-urls`.
