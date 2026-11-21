@@ -1,7 +1,7 @@
 ---
 id: errors-client
 title: Errors: client swap, throwing handlers and chunk retry
-status: active
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 268605
 owns:
   - packages/idlip/src/client/errors.ts
   - packages/idlip/test/client/errors/**
@@ -61,13 +61,13 @@ All loader code goes behind `HAS_ERRORS` (recipe: `nodes/runtime-flags/outcome.m
 
 ## Acceptance
 
-- [ ] A binding that throws inside a `<Try>` swaps in the catch view; the model is unchanged (test with the real loader and patcher).
-- [ ] `reset` renders the body from the current model.
-- [ ] A throwing handler keeps the model and fires `idlip:error` once.
-- [ ] A chunk that fails once and then loads works; one that fails twice fires `idlip:error` once.
-- [ ] The todo build loader grows by at most 15 B over the `loader-trim` result (e2e budget test).
-- [ ] Fast check passes: `pnpm --filter idlip test`
-- [ ] Change request: `contracts/compiled-format-errors-client.change-request.md` (`idlip:error` shape, retry rule).
+- [x] A binding that throws inside a `<Try>` swaps in the catch view; the model is unchanged (test with the real loader and patcher).
+- [x] `reset` renders the body from the current model.
+- [x] A throwing handler keeps the model and fires `idlip:error` once.
+- [x] A chunk that fails once and then loads works; one that fails twice fires `idlip:error` once.
+- [x] The todo build loader grows by at most 15 B over the `loader-trim` result (e2e budget test).
+- [x] Fast check passes: `pnpm --filter idlip test`
+- [x] Change request: `contracts/compiled-format-errors-client.change-request.md` (`idlip:error` shape, retry rule).
 
 ## Sizing
 
@@ -77,3 +77,5 @@ Touches the hot loader file and the patcher, with a flag. Scores: coupling mediu
 
 - Use one explicit state for a region (`'body' | 'catch'`), not a flag pair. Read it from the DOM markers; do not diff inputs.
 - A source that throws inside a region is stopped through the same block hook as a removed block.
+
+Landed as 1eb9d7c on `batch/core` after one fresh review round. Flags `HAS_ERRORS` and `HAS_RETRY` (separate, `deploy-skew` reuses the retry). Flag off +0 B; both on +606 B. `idlip/testing` `settled()` rethrows caught errors unless `expectCaught: true`.
