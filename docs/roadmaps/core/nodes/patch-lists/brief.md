@@ -1,7 +1,7 @@
 ---
 id: patch-lists
 title: Keyed list patching for <For>
-status: active
+status: done
 priority: must
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added:
-spent:
+spent: 248442
 owns:
   - packages/idlip/src/client/list/**
   - packages/idlip/test/client/list/**
@@ -58,3 +58,5 @@ Patch a `<For each key>` block when its list changes: insert items (render from 
 ## Sizing
 
 M: keyed reconcile is a known algorithm, the item template chunk is new.
+
+Landed on `batch/core` as e4ebe13. Uses the shared helpers from `patch-bindings`. Adds 1446 B gzip on top of the patch module.
