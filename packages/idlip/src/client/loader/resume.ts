@@ -447,7 +447,17 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
           if (root === undefined) {
             throw new Error(`idlip: no state for the source ${name}`);
           }
-          return root.page.load(root.page.manifest.module, `source=${name}`);
+          // A marker inside a child names a source of the child's module.
+          const unit = HAS_CHILDREN
+            ? nest!.target(root, {
+                message: { t: '', p: [] },
+                target: marker,
+                type: 'value',
+                latest: false,
+              })
+            : root;
+          const { page } = unit ?? root;
+          return page.load(page.manifest.module, `source=${name}`);
         },
         push: (event) => {
           events.push(event);

@@ -12,6 +12,7 @@ import type {
   ViteDevServer,
 } from 'vite';
 import * as compiler from '../compiler/index.ts';
+import type { CompileOptions } from '../compiler/index.ts';
 import type { ChunkUrls, Compile, CompileDiagnostic, CompileResult } from '../core/format.ts';
 import { getChunkFile, getChunkId } from '../core/format.ts';
 import { findDroppedFeatures, getDefines, getFeatures, replaceFeatures } from './features.ts';
@@ -23,6 +24,10 @@ const MODULE_FILE = /\.idlip\.tsx$/;
  * folder, for a server build in another process.
  */
 const CHUNKS_FILE = '.idlip/chunks.json';
+/** The end of the id of a child's view chunk. */
+const VIEW_SUFFIX = '?idlip-view&lang.js';
+/** The id of a list chunk, whose item template renders a child with its view. */
+const LIST_CHUNK = /\?idlip-list=[^&]*&lang\.js$/;
 
 export interface IdlipOptions {
   /** Globs of the idlip modules, relative to the root. Default: `src/**\/*.idlip.tsx`. */
@@ -39,7 +44,7 @@ export interface IdlipOptions {
    */
   client?: string;
   /** The compiler. Default: `compile` from `idlip/compiler`. */
-  compile?: Compile;
+  compile?: (source: string, id: string, options?: CompileOptions) => CompileResult;
 }
 
 /** The context methods the plugin reports diagnostics with. */
@@ -56,7 +61,7 @@ function isCompile(value: unknown): value is Compile {
  * Returns `compile` from `idlip/compiler`. It throws until `compile-integration`
  * exports it.
  */
-function getDefaultCompile(): Compile {
+function getDefaultCompile(): NonNullable<IdlipOptions['compile']> {
   const value: unknown = Reflect.get(compiler, 'compile');
   if (!isCompile(value)) {
     throw new TypeError('idlip/compiler exports no compile() yet. Pass `compile` to idlip().');
@@ -163,15 +168,25 @@ function checkChunkImports(
       pending.push(...item.imports);
     }
   }
-  // Every static import of an idlip chunk must already be loaded.
+  // The files that hold a child's view. The loader never imports them.
+  const views = new Set<string>();
+  for (const item of Object.values(bundle)) {
+    if (item.type === 'chunk' && item.moduleIds.some((id) => id.endsWith(VIEW_SUFFIX))) {
+      views.add(item.fileName);
+    }
+  }
+  // Every static import of an idlip chunk must already be loaded. The one exception is a view
+  // reached from a list chunk, which loads when rows are added, or from another view file.
   const errors: string[] = [];
   for (const file of chunkFiles) {
     const item = items[file];
     if (item?.type !== 'chunk') {
       continue;
     }
+    const ids = [...item.moduleIds, item.facadeModuleId ?? ''];
+    const fromList = ids.some((id) => LIST_CHUNK.test(id) || id.endsWith(VIEW_SUFFIX));
     for (const imported of item.imports) {
-      if (!loaded.has(imported)) {
+      if (!loaded.has(imported) && !(fromList && views.has(imported))) {
         errors.push(`${file} imports ${imported}, which the loader does not import`);
       }
     }
@@ -229,7 +244,9 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
   let base = '/';
   let isServe = false;
   /** Compiled modules by file, with the source they came from. */
-  const cache = new Map<string, { source: string; result: CompileResult }>();
+  const cache = new Map<string, { source: string; child: boolean; result: CompileResult }>();
+  /** The files that another module renders as a child, found on first use. */
+  let children: Set<string> | undefined;
   /** Emitted chunk references of the client build, by chunk id. */
   const emitted = new Map<string, string>();
   /** The chunk URL map of the client build in this process. */
@@ -241,16 +258,60 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
     return `/${path.relative(root, file).split(path.sep).join('/')}`;
   }
 
+  /** Module ids of the child specifiers that the last scan resolved, by importer and specifier. */
+  const resolved = new Map<string, string>();
+
+  /** Names the module id of a specifier, as the scan of `findChildren` resolved it. */
+  function resolveModule(specifier: string, importer: string): string {
+    const known = resolved.get(`${importer}\0${specifier}`);
+    if (known !== undefined) {
+      return known;
+    }
+    if (!specifier.startsWith('.')) {
+      return specifier;
+    }
+    return getModuleId(path.resolve(path.dirname(path.join(root, importer)), specifier));
+  }
+
+  /**
+   * Finds the modules that another module renders as a child, through Vite's resolver, so an
+   * alias or a bare specifier works. The result stays until a file of the app changes.
+   */
+  async function findChildren(context: Rolldown.PluginContext): Promise<Set<string>> {
+    if (children !== undefined) {
+      return children;
+    }
+    const found = new Set<string>();
+    resolved.clear();
+    for (const file of findModules()) {
+      const importer = getModuleId(file);
+      for (const specifier of compiler.listChildren(readFileSync(file, 'utf8'), importer)) {
+        // oxlint-disable-next-line no-await-in-loop
+        const target = await context.resolve(specifier, file);
+        const id = target?.id.split('?')[0];
+        if (id === undefined || !MODULE_FILE.test(id)) {
+          continue;
+        }
+        found.add(id);
+        resolved.set(`${importer}\0${specifier}`, getModuleId(id));
+      }
+    }
+    children = found;
+    return found;
+  }
+
   function compileFile(reporter: Reporter, file: string, code?: string): CompileResult {
     const source = code ?? readFileSync(file, 'utf8');
+    // A module that is also a root takes the child output, which only adds the view chunk.
+    const child = children?.has(file) === true;
     const cached = cache.get(file);
-    if (cached?.source === source) {
+    if (cached?.source === source && cached.child === child) {
       return cached.result;
     }
     compile ??= getDefaultCompile();
-    const result = compile(source, getModuleId(file));
+    const result = compile(source, getModuleId(file), { child, resolve: resolveModule });
     reportDiagnostics(reporter, getModuleId(file), source, result.diagnostics);
-    cache.set(file, { source, result });
+    cache.set(file, { source, child, result });
     return result;
   }
 
@@ -338,7 +399,7 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       }
     },
 
-    buildStart() {
+    async buildStart() {
       // No module imports a chunk, since the loader takes chunk URLs from the
       // page. So each chunk is an entry of its own.
       if (isServe || this.environment.name !== 'client') {
@@ -346,6 +407,8 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       }
       emitted.clear();
       built = undefined;
+      children = undefined;
+      await findChildren(this);
       const results: CompileResult[] = [];
       for (const file of findModules()) {
         const result = compileFile(this, file);
@@ -365,12 +428,13 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       defines = getDefines(getFeatures(results));
     },
 
-    load(id) {
+    async load(id) {
       const parsed = parseChunkId(id);
       if (parsed === undefined) {
         return undefined;
       }
       this.addWatchFile(parsed.file);
+      await findChildren(this);
       const result = compileFile(this, parsed.file);
       for (const module of result.client) {
         if (module.chunk === parsed.chunk) {
@@ -382,7 +446,7 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
 
     transform: {
       filter: { id: MODULE_FILE },
-      handler(code, id) {
+      async handler(code, id) {
         // The client never imports a module: the loader takes chunk URLs from
         // the page. Anywhere else the module is its compiled server module.
         if (this.environment.config.consumer === 'client') {
@@ -390,6 +454,7 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
             `${getModuleId(id)} is server code. The client loads its chunks by URL.`,
           );
         }
+        await findChildren(this);
         const result = compileFile(this, id, code);
         // A module outside the `modules` globs was not counted, so the client build may have
         // dropped the loader code it needs.
@@ -431,8 +496,19 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       writeFileSync(chunksFile, JSON.stringify(built, null, 2));
     },
 
+    watchChange(file) {
+      if (MODULE_FILE.test(file)) {
+        children = undefined;
+      }
+    },
+
     hotUpdate({ file, modules, timestamp }) {
-      if (!MODULE_FILE.test(file) || this.environment.config.consumer !== 'client') {
+      if (!MODULE_FILE.test(file)) {
+        return undefined;
+      }
+      // The edit may add or drop a child import, in any environment.
+      children = undefined;
+      if (this.environment.config.consumer !== 'client') {
         return undefined;
       }
       // The page's DOM came from the old view, so a new chunk cannot patch it.
