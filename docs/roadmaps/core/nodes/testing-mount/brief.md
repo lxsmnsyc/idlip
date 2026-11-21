@@ -1,7 +1,7 @@
 ---
 id: testing-mount
 title: `idlip/testing`: render on the server and resume in happy-dom
-status: active
+status: done
 priority: must
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-20
-spent:
+spent: 245080
 owns:
   - packages/idlip/src/testing/**
   - packages/idlip/test/testing/**
@@ -63,3 +63,5 @@ After each message, `mount` can re-render the view on the server from the new mo
 - [ ] `page.loaded()` lists the chunk names loaded so far; the first checkbox click on the todo gives `handler=toggle` and `binding=todos.*.done`.
 - [ ] With `check: true` (default in tests), each settled step re-renders on the server from the new model and fails on a DOM mismatch, naming the first differing node.
 - [ ] `page.stop()` removes listeners; a click after it loads nothing.
+
+Landed on `batch/core` as abf372c. Size M against an S estimate. Deviations: server render takes a model (codegen, format.ts, golden server.js), `resume()` returns `{ stop, settled }` with an error callback.
