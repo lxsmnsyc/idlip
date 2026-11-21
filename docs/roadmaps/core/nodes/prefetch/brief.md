@@ -1,7 +1,7 @@
 ---
 id: prefetch
 title: Prefetch chunks for messages present in the page
-status: active
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-20
-spent:
+spent: 252189
 owns:
   - packages/idlip/src/server/preload.ts
   - packages/idlip/test/server/preload.test.ts
@@ -56,11 +56,11 @@ No loader code: the links are HTML. Flag-off cost 0 B, and no flag. The listener
 
 ## Acceptance
 
-- [ ] `renderPreload` output for the todo manifest names only chunks of that page.
-- [ ] The e2e request test still passes: the first click loads `toggle` and `binding=todos.*.done` and nothing else.
-- [ ] A benchmark note in `outcome.md` with numbers before and after.
-- [ ] Fast check passes: `pnpm --filter idlip test`
-- [ ] Change request: `contracts/core-api-preload.change-request.md` (the new `idlip/server` export).
+- [x] `renderPreload` output for the todo manifest names only chunks of that page.
+- [x] The e2e request test still passes: the first click loads `toggle` and `binding=todos.*.done` and nothing else.
+- [x] A benchmark note in `outcome.md` with numbers before and after.
+- [x] Fast check passes: `pnpm --filter idlip test`
+- [x] Change request: `contracts/core-api-preload.change-request.md` (the new `idlip/server` export).
 
 ## Sizing
 
@@ -73,3 +73,5 @@ Server function plus one measured run.
 ## Orchestrator decision (one-shot run)
 
 Measure first with the bench harness (cold first click at 150 ms RTT, baseline 209 ms). If prefetch does not beat the baseline beyond the noise, ship it off by default behind an option, and say so in the outcome.
+
+Landed as 64b202a on `batch/core` after one fresh review round (manifest `listens` map, no HTML parse). Opt-in: cold first click at 150 ms RTT 221 ms without, 60 ms with (0 requests at the click); the load event comes about 20 ms later. Not wired into `examples/todo`.
