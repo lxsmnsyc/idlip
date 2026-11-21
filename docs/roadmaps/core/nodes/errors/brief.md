@@ -44,4 +44,4 @@ depends_on:
 
 ## Goal
 
-When a handler throws, the model stays as it was and the client fires an `idlip:error` window event with the tag and the error. A chunk that fails to load is retried once, then fires `idlip:error`, which `deploy-skew` can handle. Error boundaries wait for their design: `docs/proposals/0004-effects-refs-errors.md`, Open questions.
+`<Try catch={(error, reset) => ...}>` boundaries from `docs/proposals/0004-effects-refs-errors.md`, Error boundaries: the server renders the `catch` view in place of a body that throws, and the client swaps a boundary's region when a binding or a subscription source inside it throws, keeping the model. `reset` renders the body again. A handler that throws keeps the model and fires `idlip:error`. A chunk that fails to load is retried once, then fires `idlip:error`.

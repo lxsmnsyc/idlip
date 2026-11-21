@@ -38,4 +38,4 @@ depends_on:
 
 ## Goal
 
-`docs/proposals/0004-effects-refs-errors.md`, Open questions, Document head. The candidate: a root component renders the whole document, `<html>` with `<head>` and `<title>`, and its holes patch like any other. `<title>` text changes as whole content. A nested component's head waits for the markup DSL. Write the full brief after the design is accepted.
+`<Head>` blocks from `docs/proposals/0004-effects-refs-errors.md`, Document head, with brumate's rules: anywhere in the markup, `<meta>` and `<link>` added and removed with their block, the last title wins and sets `document.title`, and the server writes the last title first. `<title>` outside `<Head>` is a compile error, except in `<svg>`.

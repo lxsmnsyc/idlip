@@ -28,7 +28,7 @@ To be decided by the `compiled-format` node. It must define:
 - Patcher interface called by the loader: `patch(root, oldModel, newModel, manifest): Promise<void>`. It loads chunks, so it is async. The loader awaits it before the next queued message.
 - Path diff: `diffPaths(oldModel, newModel, pathSets): Set<string>`, owned by `patch-bindings`.
 - List patcher: `patchList(block, oldList, newList, context): Promise<void>`, implemented by `patch-lists` and called from `patch()`.
-- Effects seam: `runTask(task, dispatch): Promise<void>` loads the chunk of an awaited call site, runs it, and dispatches the continuation message with the result or the error. Implemented by `custom-effects`, called by `resume-loader`. The subscription seam waits for the design in `docs/proposals/0004-effects-refs-errors.md`, Open questions.
+- Effects seam: `runTask(task, dispatch): Promise<void>` loads the chunk of an awaited call site, runs it, and dispatches the continuation message with the result or the error. Implemented by `custom-effects`, called by `resume-loader`. Subscription seam, reserved for `commands-subs`: the server renders a marker per active subscription node, and the loader starts the sources whose markers are in the page and stops them when their block goes.
 
 ## Behavior
 
@@ -37,7 +37,7 @@ To be decided by the `compiled-format` node. It must define:
 - The state script and any inline script take a CSP nonce from the render options. Marker and event attribute names are reserved, and the compiler rejects them in author markup.
 - A message in the DOM is the tuple `[tag, payload]`, where the tag is the handler's name and the payload is the array of its arguments, which `JSON.parse` reads, apart from `$event` placeholders. The loader turns it into `Message` (`{ t, p }`) after resolving the placeholders.
 - A nested component's message carries the model path of the component that handles it, for example `left`, or `counters` and `c7` for a list item with key `c7`. The encoding must keep the path apart from the tag, because a payload can be a string. The `nesting` node defines routing. Until then a message has no path.
-- Module source files are `*.idlip.tsx` that export function components (`docs/proposals/0002-modules.md`). Update handler chunks come from the function declarations in a component body. An async handler gives one chunk per segment between `await`s; continuation tags are the handler name with `$1`, `$2` and so on.
+- Module source files are `*.idlip.tsx` that export function components (`docs/proposals/0002-modules.md`). Update handler chunks come from the function declarations in a component body. All segments of an async handler share its chunk; continuation tags are the handler name with `$1`, `$2` and so on. When a segment awaits `Random` or `Time`, the loader waits for the continuation before it patches.
 - Path sets use `*` for list items, for example `todos.*.done`.
 - Reserved path syntax for keyed segments: `name[key=source]`, where `source` is `$p`, `$p.<field>` or a model path, for example `todos[id=$p].done`. The parser must reject it until `keyed-paths` lands, so no fixture uses it by accident.
 - Reserved placeholder `["$form", name]`, read from the `FormData` of the event target's form. Implemented by `form-fields`.
@@ -45,7 +45,8 @@ To be decided by the `compiled-format` node. It must define:
 - Reserved: a ref marker attribute on elements with `ref`, scoped by component path. Implemented by `dom-refs`.
 - Reserved: a raw HTML binding that sets `innerHTML` from a `TrustedHtml` value. Implemented by `svg-and-html`.
 - Reserved manifest field `tasks`: awaited call site id to chunk. Implemented by `custom-effects`.
-- Reserved: boundary markers around a component's region and a `fallback` manifest field, kept for the error boundary design that is still open in `docs/proposals/0004-effects-refs-errors.md`. Implemented by `errors`.
+- Reserved: boundary markers around each `<Try>` region and a `fallback` manifest field (chunk of its `catch` template). Implemented by `errors`.
+- Reserved: head block markers and the title rule (last title wins). Implemented by `document-head`.
 
 ## Stub
 
@@ -57,7 +58,7 @@ The golden fixtures are the stub for both sides.
 
 ## Changes
 
-- v6: function components replace `defineModule`. Tags are handler names and payloads are argument arrays. Continuation chunks and tags for `await`. `runTask` replaces `runCmd` and `startSubs`. The subscription list leaves the state script until subscriptions are designed. Source: `docs/proposals/0002-modules.md` and `docs/proposals/0004-effects-refs-errors.md`, revised 2026-11-21.
+- v6: function components replace `defineModule`. Tags are handler names and payloads are argument arrays. Continuation chunks and tags for `await`. `runTask` replaces `runCmd` and `startSubs`. Subscriptions become markers in the page instead of a list in the state script. One chunk per handler, with its continuations. Source: `docs/proposals/0002-modules.md` and `docs/proposals/0004-effects-refs-errors.md`, revised 2026-11-21.
 - v5: SVG and MathML namespaces, and reserved ref markers, raw HTML bindings, effect and fallback manifest fields and boundary markers. Source: `docs/proposals/0004-effects-refs-errors.md`.
 - v4: adds the state encoding budget, early events, event modifiers, HTML parser rules, placeholder timing and CSP nonces. Source: runtime gap review against brumate, 2026-11-20.
 - v3: reserves the manifest fields `writes`, `bindings` and `ops`, keyed path segments and the `$form` placeholder. Source: `docs/proposals/0003-update-analysis.md`.

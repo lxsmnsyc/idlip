@@ -1,15 +1,17 @@
 # 0002: Components
 
-Status: accepted. Revised 2026-11-21: function components are the only way to write a module. `defineModule`, `state()`, `task()` and the other compile-time APIs are removed. This replaces the 2026-11-20 revision (a declared `Msg` interface and `defineModule<Model, Msg>()`), which replaced the first version.
+Status: accepted. Revised 2026-11-21: function components are the only way to write a module. `defineModule`, `state()`, `task()` and the other compile-time APIs are removed. Same day: block components for the proof of concept, impure values through `await`, and the decisions on concurrency and slot names. This replaces the 2026-11-20 revision (a declared `Msg` interface and `defineModule<Model, Msg>()`), which replaced the first version.
 
 This proposal replaces the Messages, Update and Nesting sections of [0001](0001-dsl.md). The rest of 0001 still holds.
 
 ## Decisions
 
 - **A module is a function component.** A `*.idlip.tsx` file exports components as function declarations. The compiler reads the body and emits the view IR, the server render function and one chunk per handler. The body never runs.
-- **No compile-time APIs.** Nothing is imported from `idlip` only so that the compiler can find it. The syntax carries the meaning: `let` is state, `const` is a derived value, a function declaration is a handler, and `return` is the view. A marker for state would need a marker for derived values too, and would leave unmarked `let` and `const` with unclear meaning. `<For>` is the one exception until the markup DSL (`markup-frontend`) replaces it with a block.
+- **No compile-time APIs.** Nothing is imported from `idlip` only so that the compiler can find it. The syntax carries the meaning: `let` is state, `const` is a derived value, a function declaration is a handler, and `return` is the view. A marker for state would need a marker for derived values too, and would leave unmarked `let` and `const` with unclear meaning. The exceptions are the block components below, until the markup DSL (`markup-frontend`) replaces them with blocks.
 - **A handler is a message.** Each function declared in the body is a message tag and a chunk. There is no `Msg` interface: `tsc` checks each call to a handler against its parameters.
 - **Effects are `await` in a handler.** The compiler splits an async handler at each `await` into a task and a continuation. This replaces `task()`, `Result<T>` and commands that take constructors. Errors go to `try` and `catch`.
+- **Block components for the proof of concept.** `<For>`, `<Try>`, `<Head>` and `<Subscribe>`, and the `<window>` and `<document>` elements, stand in for brumate's `#for`, `#try`, `#head` and `<window>`. Each maps to the view IR node the DSL block will produce, so the DSL changes only the front end. Chosen over moving to the DSL now, because the proof of concept tests resumption, not syntax, and the DSL's parser and tooling would join the critical path of the first milestone. See [0004](0004-effects-refs-errors.md).
+- **Impure values come through `await`,** as in Elm's `Random.generate` and `Time.now`: `const id = await Random.id()`. The result is in the continuation's payload, so the message log replays exactly.
 - **Components nest as JSX.** `<Counter start={0} />` gives the child a slot in the parent's model. A component with no state and no handlers is inlined, as partials were.
 - **MVU stays after compilation.** All state is one serializable model value, every change is a named message, and the compiled update functions are pure functions of the model and the message.
 - **File suffix `.idlip.tsx`.** Unchanged.
@@ -18,7 +20,7 @@ This proposal replaces the Messages, Update and Nesting sections of [0001](0001-
 
 ```tsx
 // todo.idlip.tsx
-import { For } from 'idlip';
+import { For, Random } from 'idlip';
 import { saveTodos } from './api';
 
 interface Todo {
@@ -46,13 +48,14 @@ export default function TodoApp(props: { initial: Todo[] }) {
   function setDraft(text: string) {
     draft = text;
   }
-  function add() {
-    if (draft === '') return;
-    todos = [...todos, { id: crypto.randomUUID(), text: draft, done: false }];
-    draft = '';
-  }
   function toggle(id: string) {
     todos = todos.map((t) => (t.id === id ? { ...t, done: !t.done } : t));
+  }
+  async function add() {
+    if (draft === '') return;
+    const id = await Random.id();
+    todos = [...todos, { id, text: draft, done: false }];
+    draft = '';
   }
   async function persist() {
     save = { state: 'saving' };
@@ -116,7 +119,10 @@ Each rule is a compile error with a rule id unless it says otherwise.
 - **Handlers are function declarations,** so every message has a name in the log. A handler body is ordinary TypeScript and runs only on the client. It changes state only by assigning to state variables. Changing a state value in place (`todos.push(x)`) is an error in the first version. A handler may call another handler, and the call runs as part of the same message.
 - **Event attributes** take a handler, or an arrow whose body is one call to a handler. The call's arguments are in the closed grammar over state, derived values, props, loop variables and property paths on the event parameter. Event paths are read when the event fires. Any other closure is an error.
 - **Handler free variables** are state, derived values, props, other handlers, imports and module-level declarations. Anything else is an error.
-- **`await`** may appear in top-level statements of a handler and inside `try` blocks. An `await` in a loop or a condition is an error in the first version. The awaited callee is an import or a module-level function. Locals that live across an `await` become payload fields of the continuation, so they must serialize. After an `await`, a read of state reads the model at that moment, as a closure would in plain TypeScript. Two clicks start two independent runs.
+- **`await`** may appear in top-level statements of a handler and inside `try` blocks. An `await` in a loop or a condition is an error in the first version. The awaited callee is an import or a module-level function. Locals that live across an `await` become payload fields of the continuation, so they must serialize. After an `await`, a read of state reads the model at that moment, as a closure would in plain TypeScript.
+- **One chunk per handler.** All segments of an async handler share its chunk. `Random` and `Time` run in the runtime core, so `await Random.id()` loads nothing, and the loader waits for a built-in before it patches, so `add` patches once.
+- **Concurrency follows plain TypeScript.** Two clicks start two independent runs, and every run continues. A continuation that must not write a stale result checks the state first: `if (user.state === 'loading' && user.id === id)`. There is no hidden latest-wins rule.
+- **Handlers are deterministic.** A sync call to `Math.random`, `Date.now`, `performance.now`, `crypto.randomUUID`, `crypto.getRandomValues` or `new Date()` with no arguments in a handler is an error that points to the `await` form: `await Random.id()`, `await Random.number()`, `await Time.now()`. A helper can still hide one. Devtools replay compares each step with its recorded model and reports the first divergence.
 - **State serializes** with seroval. A function assigned to state is a compile error. Class instances other than Date, Map, Set and the web types seroval supports are rejected at server render, with the model path. `File` and `Blob` may be held in state on the client only: see [0004](0004-effects-refs-errors.md), Files.
 
 ## Messages
@@ -127,7 +133,7 @@ A message is `{ t, p }`: the handler's name and its arguments as an array. The m
 
 - A component takes one parameter, `props`, or an object pattern of it.
 - The root component's props come from the server: `render(TodoApp, { initial })`. They serialize into the state script.
-- A child component used in a parent's JSX gets a slot in the parent's model, named by an explicit `key` or by position. Inside `<For>`, the slot is keyed by the loop key.
+- A child component used in a parent's JSX gets a slot in the parent's model, named by its position in the source, or by an optional `key`. Inside `<For>`, the slot is keyed by the loop key. This is the scheme of brumate's `$id()` (scope ID plus call position) and React's `useId`. Old HTML loads the chunks of its own build (`deploy-skew`), so slots never change under a cached page. HMR warns when slots move.
 - A child's messages carry the model path of the child, kept separate from the tag.
 - A callback prop such as `onRemove={() => remove(c.id)}` follows the event attribute rule and compiles to a message prop. The child calls `props.onRemove()` in a handler or passes it to an event attribute. It is dispatched with the parent's path.
 - A component with no `let` and no handlers is inlined into its caller's view, so path analysis reads through it. It has no chunk of its own.
@@ -143,10 +149,7 @@ The `todo-resumes` milestone ships static paths only, and a `dynamic` hole is a 
 
 ## Open questions
 
-- **Subscriptions.** There is no `subscriptions` function. One option: a handler starts a subscription with a runtime call that returns a plain handle, keeps it in an explicit union in state, and stops it in another handler. The runtime restarts the handles in the state script on resume. See [0004](0004-effects-refs-errors.md).
-- **Concurrency of async handlers.** Every run continues today. Whether a newer run can cancel an older one, and how that is written without an API, is open.
-- **Purity of handlers.** The example calls `crypto.randomUUID()` in a handler. This affects devtools replay and deterministic tests.
-- **Positional slot names** break when the JSX is reordered between deploys while old HTML is cached. Decide whether `key` is required on stateful children.
+- **Cancelling a run.** A newer run cannot abort an older one's request. The guard above keeps the model right, but the request still finishes.
 - **Large props** copied into event payloads grow the HTML. Decide whether they warn.
 
 ## Prior art

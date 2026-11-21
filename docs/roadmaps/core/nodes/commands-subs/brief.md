@@ -1,6 +1,6 @@
 ---
 id: commands-subs
-title: Subscriptions and global events
+title: Subscriptions in the view, and the Random and Time functions
 status: todo
 priority: should
 type: feature
@@ -40,8 +40,8 @@ depends_on:
     via: compiled-format
 ---
 
-# Subscriptions and global events
+# Subscriptions in the view, and the Random and Time functions
 
 ## Goal
 
-Timers, sockets and `window` or `document` listeners that live across messages, once their design is decided: `docs/proposals/0004-effects-refs-errors.md`, Open questions, Subscriptions and global events. The candidate is a runtime call in a handler that starts the subscription and returns a plain handle kept in an explicit union in state, a `stop(handle)` call, and a restart of every handle in the state script on resume. No subscription is inferred from the model. Write the full brief after the design is accepted.
+Subscriptions in the view, from `docs/proposals/0004-effects-refs-errors.md`, Subscriptions: `<window>` and `<document>` listeners, and `<Subscribe to={source} input={...} on:value={handler}>` for module-level async generators. A subscription starts and stops with the block it sits in. The server renders a marker per active subscription and the loader starts them on resume. A changed `input` restarts the run. `Random` and `Time` (`contracts/core-api.md`) land here too.

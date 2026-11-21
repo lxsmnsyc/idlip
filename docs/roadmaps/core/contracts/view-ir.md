@@ -24,6 +24,7 @@ Fixed now:
 - Derived values are inlined into the holes that read them.
 - Holes, attribute values and event payloads use a closed grammar: state, derived value, prop and loop-variable paths, literals, comparison and boolean operators, ternary, template strings and helper calls. No closures, assignments or statements. Source: `debate/debate.md`.
 - A helper is an import or a module-level function, and every argument is in the closed grammar. A hole's paths are the union of its argument paths. A closure argument or a whole-model argument is an error. A helper whose body is one return expression in the closed grammar is inlined. Each helper call records `helper: 'args' | 'inlined'`.
+- `<Try>` is a boundary block with a body and a `catch` template. `<Head>` is a head block whose children go in `<head>`. `<Subscribe>`, `<window>` and `<document>` are subscription nodes: they record the source, the input hole and the event props, and start and stop with the block they sit in. Source: `docs/proposals/0004-effects-refs-errors.md`.
 - A ternary or `&&` whose branches are JSX is a condition block. Its condition is a hole with its own path set. `<Show>`, `<Switch>` and `<Match>` do not exist.
 - Each diagnostic carries a rule id.
 - Imported values and module-level `const` bindings are allowed in holes. Their path set is empty, so the hole is static.
@@ -50,7 +51,7 @@ Hand-written IR for the counter and todo views, in this file, once the spike fre
 
 ## Changes
 
-- v6: reads function components instead of `defineModule`: state fields, derived values, handlers and the view. Event props are handler references or arrows with one handler call. Stateless components are inlined. The `catch` view is removed. Source: `docs/proposals/0002-modules.md`, revised 2026-11-21.
+- v6: reads function components instead of `defineModule`: state fields, derived values, handlers and the view. Event props are handler references or arrows with one handler call. Stateless components are inlined. The `catch` view is replaced by `<Try>` boundary blocks. Adds head blocks and subscription nodes. Source: `docs/proposals/0002-modules.md`, revised 2026-11-21.
 - v5: constants in holes, refs, raw HTML holes, namespaces, `catch` view. Source: `docs/proposals/0004-effects-refs-errors.md`.
 - v4: closed hole grammar, helper rule, JSX branches as condition blocks instead of `<Show>`, rule ids on diagnostics. Source: `debate/debate.md`, 2026-11-20.
 - v3: path type reserves keyed segments. Source: `docs/proposals/0003-update-analysis.md`.
