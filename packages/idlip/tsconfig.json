@@ -14,6 +14,12 @@
     "isolatedDeclarations": true,
     "declaration": true,
     "skipLibCheck": true,
+    "jsx": "preserve",
+    "jsxImportSource": "idlip",
+    "paths": {
+      "idlip": ["./src/index.ts"],
+      "idlip/*": ["./src/*/index.ts"]
+    },
     "noEmit": true
   },
   "include": ["src", "test"]

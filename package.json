@@ -3,15 +3,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "pnpm -r --filter=./packages/* build",
-    "test": "pnpm -r --filter=./packages/* test",
+    "build": "pnpm -r --filter=./packages/* --filter=./examples/* build",
+    "test": "pnpm -r --filter=./packages/* --filter=./examples/* test",
     "typecheck": "pnpm -r typecheck",
     "lint": "oxlint --type-aware",
     "lint:fix": "oxlint --type-aware --fix",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "changeset": "changeset",
-    "version": "changeset version"
+    "version": "changeset version",
+    "e2e": "pnpm --filter e2e test"
   },
   "devDependencies": {
     "@changesets/cli": "^3.0.3",
