@@ -208,7 +208,7 @@ The server writes one state script per rendered root, after its markup, on one l
 
 Group A covers group B when every path of A has a prefix in B's paths, or equals one. Updates are immutable, so every change under A also changes B. A's chunk then holds B's bindings too, and loading it patches both.
 
-- In `groups`, a group comes before every group it covers. The compiler orders groups topologically by the covers relation, ties by key. Sorting by longest path alone is not enough: `[a.b]` covers `[a.b, c.d.e]` but has the shorter longest path.
+- In `groups`, a group comes before every group it covers. The compiler orders groups topologically by the covers relation; ties go by longest path, most segments first, then by key. Sorting by longest path alone is not enough: `[a.b]` covers `[a.b, c.d.e]` but has the shorter longest path.
 - The patcher walks `groups` in order. For each changed group not yet handled, it loads the group's chunk and marks the group and the groups it covers as handled.
 - Why: toggling a todo changes `todos.*.done` and `todos`, and `{left}` reads `todos`. With covers, the first click loads `handler=toggle` and `binding=todos.*.done` and nothing else, which is the GOAL's count. A covered binding is copied into each covering chunk, as helpers are (`spike-chunk-split` outcome, Gotchas).
 
