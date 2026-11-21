@@ -75,7 +75,7 @@ Options weighed: (A) TS subset with restricted JSX in `*.idlip.tsx`, (B) an own 
 
 ## Overruled
 
-- P3: the judge rejected a markup frontend after 0.1. The user upholds it: they want real control-flow blocks, because JSX needs fake control-flow components. It comes after the TSX proof of concept.
+- P3: the judge rejected a markup frontend after 0.1. The user upholds it: they want real control-flow blocks, because JSX needs fake control-flow components. It comes after the TSX proof of concept. Source: the user, 2026-11-20, objecting to repeated pushback for plain TS: "we never had this kind of pushback with brumate". They accept the brumate-style tooling (Volar language core, tsc wrapper, editor extension). Settled: do not reopen TS versus DSL unless the user asks.
 - O11: the judge set a trigger of 10 block-removable diagnostics. The user rejects the trigger: the debate weighed syntax only by node count, not by authoring value.
 
 ## Cost of this debate
