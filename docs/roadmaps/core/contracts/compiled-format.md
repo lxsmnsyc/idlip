@@ -1,6 +1,6 @@
 ---
 name: compiled-format
-version: 11
+version: 12
 status: frozen
 defined_by: compiled-format
 ---
@@ -150,10 +150,11 @@ The server writes one state script per rendered root, after its markup, on one l
 - The pushed value is a `StateRecord`: the event types, separated by spaces, and a function that returns the `PageState`. The function body is seroval's `serialize()` output for `{ manifest, chunks, model, props }`. The record relies on that output being a parenthesized expression, `({…})` or `(h=>…)()`, so it serves as the arrow body as it is. A seroval upgrade that changes this breaks the format.
 - The client never imports seroval. Running the function decodes the state, as brumate's code records do (`../brumate/docs/compiler.md`: that change took its core from 14,971 B to about 4.8 kB gzip). The loader calls the function on the first event only, so a page that never gets an event never decodes its state.
 - seroval writes `<` in a string as `\x3C` and escapes U+2028 and U+2029, so a value cannot end the script.
-- `chunks` is the chunk URL map (see Chunk URLs) for the modules rendered on the page, and only those.
+- `chunks` is the chunk URL map (see Chunk URLs) for the modules rendered on the page, and only those. The `view` chunk of a module in `modules` is left out, since a template chunk imports it by id.
 - `model` is the component's state fields. `props` holds only the props fields that some binding reads. Handlers get the props they read through the payload. Both fixtures have `props: {}`.
 - With a `nonce` render option, the script is `<script i-state nonce="…">`.
-- `PageState` also holds `slots` and `modules` (Nested components) and `dynamic` (Dynamic holes). Each is absent when the page has none, so a page without children or dynamic holes does not change.
+- `PageState` also holds `slots`, `dynamic` (Dynamic holes) and `modules` (Nested components). Each is absent when the page has none, so a page without children or dynamic holes does not change. The key order is `manifest, chunks, model, props, slots, dynamic, modules`.
+- The server serializes the parts that do not change between requests (the root manifest, `chunks` and `modules` of the root's `uses` closure) once per root module and reuses them; each render serializes only `model`, `props`, `slots` and `dynamic`. When seroval would write function form, it falls back to one call for the whole state. A child rendered outside the root's `uses` closure is serialized for that render only.
 - `i-build="<id>"` on the state script is the build id (Build id). It is not part of the state value.
 
 ### Listener and early events
@@ -371,7 +372,7 @@ These checks apply across block boundaries: a `<For>` inside `<tbody>` whose row
 
 A stateful child has a boundary, a slot in the state script and a `view` chunk. The golden fixtures `test/fixtures/nested/board/` and `nested/counter/` show every part.
 
-- **Types.** `Slot { module, model, props }`; `PageState.slots` (rendered children by path) and `PageState.modules` (manifests of the child modules and of what they can render, the `uses` closure, including a child whose list is empty at render); `Manifest.view?: { chunk: 'view' }`, present when a project module renders the module as a child (`compile` option `{ child: true }`); `Scope.path` (absent is the root); `PropBinding`; `ViewChunk { init(props): Model; render(scope): string }`; `QueuedEvent.owner`; `Page.path` and `Page.start`.
+- **Types.** `Slot { module, model, props }`; `PageState.slots` (rendered children by path) and `PageState.modules: Record<string, ChildManifest>` (manifests of the child modules and of what they can render, the `uses` closure, including a child whose list is empty at render; a `ChildManifest` is a `Manifest` without `events`, `listens`, `view` and the `writes` of each handler, and the loader fills `events: []` where it needs a `Manifest`); `Manifest.view?: { chunk: 'view' }`, present when a project module renders the module as a child (`compile` option `{ child: true }`); `Scope.path` (absent is the root); `PropBinding`; `ViewChunk { init(props): Model; render(scope): string }`; `QueuedEvent.owner`; `Page.path` and `Page.start`.
 - **Boundary.** `<!--n:<path>-->…<!--/n-->`. The root has no boundary and the path `''`. `path = slot ('/' slot)*`, one slot per component level, outermost first. `slot = <site>[':' <key>]*`. `site` is the index of the child among the `child` nodes of the component's view, in source order, from 0, unaffected by conditions and loops. A `key` part is `String(value)` through `encodeURIComponent` with `-` written `%2D`, so a path never holds `/`, `:`, `-` or `>`. The keys are an explicit `key` prop, then the loop key of every enclosing `<For>`, outermost first (always present inside a `<For>`). Examples: `0`, `1:a1`, `1:a1/0`. `slot(path, site, ...keys)` from `idlip/server` builds it. A row holds the boundary: `<!--i--><!--n:1:a1-->…<!--/n--><!--/i-->`. The boundary is a block for `onBlock`, children removed before parents.
 - **Lookups stay in one component.** Binding ids restart in each module. A component's bindings are found between its own boundary comments, and the search never enters a nested boundary.
 - **Ids.** A prop value is a hole and takes a hole id in view order. A message prop whose arguments read model paths takes the next event id. A prop hole or message prop with an empty path set exports nothing.

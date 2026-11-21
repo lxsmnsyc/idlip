@@ -1,7 +1,7 @@
 ---
 id: perf-ssr-state
 title: Smaller state script and faster server render
-status: active
+status: done
 priority: should
 type: refactor
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 460000
 owns:
   - packages/idlip/src/server/**
   - packages/idlip/src/client/nesting.ts

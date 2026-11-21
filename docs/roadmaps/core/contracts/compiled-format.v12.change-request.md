@@ -1,7 +1,7 @@
 # Change request: compiled-format v11 to v12
 
 - From node: perf-ssr-state
-- Status: open
+- Status: applied
 
 ## Problem
 
@@ -26,3 +26,5 @@ The state script carries what the loader never reads. In the dashboard (50 child
 `src/server/render.ts` writes the new shape. `test/fixtures/reference.ts` (`toClientManifest`), `nested/board/expected/page.html` and `fixtures.test.ts` follow it.
 
 ## Decision
+
+Accepted by the orchestrator on 2026-11-21 after the fresh review of `perf-ssr-state`. Applied as `compiled-format` v12. The chunk map re-keying is not part of it.
