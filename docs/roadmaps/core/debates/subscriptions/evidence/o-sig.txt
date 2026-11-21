@@ -1,0 +1,6 @@
+docs/roadmaps/core/debates/subscriptions/evidence/o-sig.tsx(6,15): error TS2322: Type '(url: string, protocols?: string[] | undefined) => AsyncGenerator<string, void, unknown>' is not assignable to type '(input: string, signal: AbortSignal) => AsyncIterable<string>'.
+  Types of parameters 'protocols' and 'signal' are incompatible.
+    Type 'AbortSignal' is missing the following properties from type 'string[]': length, pop, push, concat, and 29 more.
+docs/roadmaps/core/debates/subscriptions/evidence/o-sig.tsx(7,15): error TS2322: Type '(a: string, b: number) => AsyncGenerator<string, void, unknown>' is not assignable to type '(input: string, signal: AbortSignal) => AsyncIterable<string>'.
+  Types of parameters 'b' and 'signal' are incompatible.
+    Type 'AbortSignal' is not assignable to type 'number'.

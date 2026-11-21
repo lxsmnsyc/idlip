@@ -1,0 +1,885 @@
+{
+  "goal": "Decide how idlip components declare subscriptions (timers, sockets, custom async sources, window and document events) under the no-compile-time-API and no-implicit-state-machine rules",
+  "research": false,
+  "max_rounds": 3,
+  "supersedes": null,
+  "extra_axes": [
+    {
+      "name": "explicitness",
+      "by": "proponent",
+      "why": "The user's rules decide this design: the lifecycle must be readable as one explicit union plus a visible condition, with no behavior from diffing inputs or hidden handles. Score each option by how many lifecycle decisions the runtime makes that the source does not show.",
+      "status": "accepted",
+      "ruling_why": "The user's rules on explicit lifecycles and no compile-time APIs decide between the options more than device, time or tokens do."
+    }
+  ],
+  "claims": [
+    {
+      "id": "J1",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "device",
+      "text": "8 cores, 8 GB RAM, 3.3 GB free, 7.1 GB free disk, load 3.9. Design debate; no build runs.",
+      "evidence": {
+        "type": "measured",
+        "source": "pr-author capacity.py --json",
+        "detail": ""
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "J2",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "time",
+      "text": "Nothing is built yet: wave 1 (core-api, spike-chunk-split, spike-view-analysis) has not started. Subscriptions are node commands-subs (should, outline, milestone apps), not on the must path.",
+      "evidence": {
+        "type": "measured",
+        "source": "plan.py docs/roadmaps/core status; nodes/commands-subs/brief.md",
+        "detail": ""
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "J3",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "time",
+      "text": "Rule: no compile-time APIs. Nothing is imported from idlip only so the compiler can find it; block components For, Try, Head (and currently Subscribe) are tolerated for the TSX proof of concept until the markup DSL replaces them with blocks.",
+      "evidence": {
+        "type": "inferred",
+        "source": "docs/proposals/0002-modules.md, Decisions; user, 2026-11-21",
+        "detail": "A body-level marker call such as every(1000, tick, {when}) is a compile-time API, because the component body never runs."
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "J4",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "time",
+      "text": "Rule: no implicit state machines. Each lifecycle is one explicit union in state with named transitions; no boolean flag combinations and no runtime behavior driven by comparing inputs.",
+      "evidence": {
+        "type": "inferred",
+        "source": "user memory no-implicit-state-machines (2026-11-20); docs/proposals/0004-effects-refs-errors.md",
+        "detail": "The user rejected a requests(m) table that started and aborted requests by diffing inputs, called the handle-in-state option 'a bit too manual', and asked how implicit Elm's diffed subscriptions are."
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "J5",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "time",
+      "text": "Resumability: nothing the client resumes is a closure. Model, messages and continuations are plain data; async handlers compile to a task plus a continuation message with serializable locals.",
+      "evidence": {
+        "type": "source",
+        "source": "docs/roadmaps/core/GOAL.md, Constraints; docs/proposals/0002-modules.md, Rules (await)",
+        "detail": ""
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "J6",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "time",
+      "text": "Current draft (option A): <Subscribe to={source} input={v} on:value={h}> in the view, started and stopped by its block; <window>/<document> intrinsic elements. tsc 7.0.2: a single input prop infers source input and yielded value types and catches both mismatches; a variadic args tuple did not infer.",
+      "evidence": {
+        "type": "measured",
+        "source": "node_modules/.bin/tsc on evidence/subscribe-types.tsx",
+        "detail": "evidence/subscribe-types.tsx"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "J7",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "time",
+      "text": "brumate puts <window> and <document> listeners in markup, stopped while their body is hidden. Long-lived effects are $effect with cleanup bound to scope lifecycle and re-run from signal reads; $effect never runs on page load, $client runs code once without a change. Loader triggers load, idle and visible exist in runtime/boot.ts.",
+      "evidence": {
+        "type": "prior-art",
+        "source": "../brumate/docs/decisions.md lines 7-12, 98, 131; ../brumate/packages/brumate/src/runtime/boot.ts:441",
+        "detail": "brumate's subscription lifecycle is implicit (reactive reads) and uses compile-time markers, both excluded in idlip."
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "J8",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "time",
+      "text": "Elm, Iced and Hyperapp v2 compute subscriptions from the model after each update and diff them by identity and arguments; new ones start, missing ones stop.",
+      "evidence": {
+        "type": "prior-art",
+        "source": "Elm Browser.element subscriptions; iced Application::subscription; hyperapp v2 subscriptions docs",
+        "detail": "Widely adopted; the start/stop transitions are not named in user code."
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "J9",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "time",
+      "text": "Generator-loop prior art: redux-saga runs long-lived processes as while(true) loops with take/race and stops them with cancel(task) or a race; Crank.js components are async generators that loop with for await over props.",
+      "evidence": {
+        "type": "prior-art",
+        "source": "redux-saga docs (Advanced: Task cancellation, Non-blocking calls); crank.js docs (Async generator components)",
+        "detail": "Cancellation in redux-saga needs a task handle or a race against a stop action."
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "J10",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "time",
+      "text": "Option B as sketched: start = handler call (event, on:load, on:visible); stop = state change then break on the next value, so a quiet source (a socket with no traffic) stays open until its next value; the runtime ends a component's loops when the instance is removed; v1 forbids await inside loops, so for await needs a rule change.",
+      "evidence": {
+        "type": "source",
+        "source": "conversation 2026-11-21; docs/proposals/0002-modules.md, Rules (await)",
+        "detail": ""
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "P1",
+      "round": 1,
+      "by": "proponent",
+      "kind": "proposal",
+      "text": "Keep option A as the one general form: <Subscribe to={source} input={v} on:value={h}> rendered under a condition on an explicit state union (clock.state === 'running'). Start and stop are the block's mount and unmount, so the lifecycle is a visible expression and no handle is stored.",
+      "evidence": {
+        "type": "source",
+        "source": "docs/proposals/0004-effects-refs-errors.md lines 76-109",
+        "detail": "Draft already types input and yield with tsc 7.0.2 (J6). Same mechanism as For and Try, which are already tolerated blocks (J3), and it becomes a block in the DSL."
+      },
+      "axis": "time",
+      "estimate": {
+        "value": 1,
+        "unit": "new block component, 0 new compile-time imports"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "P2",
+      "round": 1,
+      "by": "proponent",
+      "kind": "proposal",
+      "text": "Change one rule in A: input is read once at start, and a new run needs a new key (<Subscribe key={clock.ms} ...>) or a remount through the condition. The runtime never compares old and new input. This removes the only implicit diff in the draft ('when input changes, the runtime stops the old run'), which J4 forbids.",
+      "evidence": {
+        "type": "inferred",
+        "source": "user memory no-implicit-state-machines; 0004 line 106",
+        "detail": "React's key and the existing list-key rule give the same identity-by-key behavior with no new concept; slots are already keyed by position or key (0002 line 136)."
+      },
+      "axis": "time",
+      "estimate": {
+        "value": 0,
+        "unit": "runtime input comparisons"
+      },
+      "ruling": "upheld",
+      "ruling_why": "Upheld with O3's diagnostic: a key is an identity comparison like the <For> key, written in the source, unlike comparing inputs."
+    },
+    {
+      "id": "P3",
+      "round": 1,
+      "by": "proponent",
+      "kind": "proposal",
+      "text": "Ship order: (1) <window> and <document> intrinsics, delegated by the loader, with no source and no marker; (2) Subscribe with server-rendered markers and loader start and stop; (3) stock sources as plain module-level async generators (Time.every, WebSocket, EventSource, media query). Step 1 covers keydown, resize, online and visibilitychange, which are the most common cases, and does not wait for step 2.",
+      "evidence": {
+        "type": "prior-art",
+        "source": "../brumate/docs/decisions.md lines 7-12; docs/roadmaps/core/contracts/compiled-format.md line 31",
+        "detail": "brumate ships window and document listeners in markup; the compiled-format already reserves the subscription marker seam for commands-subs."
+      },
+      "axis": "time",
+      "estimate": {
+        "value": 3,
+        "unit": "steps, step 1 about a third of the work"
+      },
+      "ruling": "upheld",
+      "ruling_why": "Step 3 is amended by O2: stock sources with several parameters take one input object."
+    },
+    {
+      "id": "P4",
+      "round": 1,
+      "by": "proponent",
+      "kind": "proposal",
+      "text": "Each value a source yields is dispatched as an ordinary message on:value with the value as its serialized payload, so the message log records it and devtools replay never re-runs the source. Values must be plain data (the same rule as continuation locals); a source that yields a non-serializable value is a compile or dev-time error at the Subscribe call.",
+      "evidence": {
+        "type": "source",
+        "source": "docs/proposals/0002-modules.md line 130 and Rules (await); GOAL.md Constraints (J5)",
+        "detail": "Messages are { t, p } with array payloads; a yielded value is the argument array of the handler."
+      },
+      "axis": "time",
+      "estimate": {
+        "value": 0,
+        "unit": "new message kinds"
+      },
+      "ruling": "upheld",
+      "ruling_why": "Upheld with O1: the serializability check runs at dispatch in dev builds, as for continuation locals, not at compile time."
+    },
+    {
+      "id": "P5",
+      "round": 1,
+      "by": "proponent",
+      "kind": "proposal",
+      "text": "Resume cost stays at zero for pages without subscriptions: the server renders one marker per active Subscribe (source chunk id plus serialized input), and the loader loads the source chunk only when the marker is in the page. Closing the page state (condition false) leaves no marker, so a resumed page never restarts a stopped source.",
+      "evidence": {
+        "type": "source",
+        "source": "docs/roadmaps/core/contracts/compiled-format.md line 31 and v6 changelog line 61",
+        "detail": "Markers replace the state-script subscription list; brumate loader triggers (boot.ts:441) show the same lazy start."
+      },
+      "axis": "device",
+      "estimate": {
+        "value": 0,
+        "unit": "bytes of JS on pages with no subscription"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "A1",
+      "round": 1,
+      "by": "proponent",
+      "kind": "alternative",
+      "text": "Cheaper in scope than A for timers: no new construct. A self-scheduling handler, async function tick() { if (clock.state !== 'running') return; await Time.sleep(1000); tick(); }, reuses await and the explicit union; the pending sleep cannot be cancelled but only wakes a handler that exits. It covers timers only; sockets, EventSource and custom sources still need P1, and window and document events still need P3 step 1. Option B (for await in a handler) is dearer than this because it reverses the 'no await in loops' rule, leaves a quiet socket open after the stop state, and needs a task handle for abort.",
+      "evidence": {
+        "type": "source",
+        "source": "docs/proposals/0002-modules.md line 122 (await rules), line 14; J9 redux-saga cancellation needs a handle or race",
+        "detail": "Whether 'tick()' as the last statement after await may call the handler by name needs a check of the closed handler-call grammar (line 120)."
+      },
+      "axis": "time",
+      "estimate": {
+        "value": 0,
+        "unit": "new compiler rules for timers"
+      },
+      "ruling": "rejected",
+      "ruling_why": "O6: a page resumed in the running state has no pending sleep, so the timer never restarts; and it covers timers only."
+    },
+    {
+      "id": "O1",
+      "round": 1,
+      "by": "opponent",
+      "kind": "risk",
+      "axis": "time",
+      "severity": "high",
+      "answers": [
+        "P4"
+      ],
+      "text": "P4 promises a compile or dev-time error when a source yields non-serializable data, but tsc gives none: a source yielding MessageEvent type-checked against a handler taking MessageEvent with no error. The check needs a new analysis pass over arbitrary imported generators (their yield type must be a seroval-safe type), which the draft does not cost. Without it, a socket source fails only at dispatch time, in the browser.",
+      "estimate": {
+        "value": 1,
+        "unit": "new type-level serializability check, uncosted"
+      },
+      "evidence": {
+        "type": "measured",
+        "source": "tsc 7.0.2 --strict on evidence/o-sig.tsx (line 8, no error)",
+        "detail": "evidence/o-sig.txt"
+      },
+      "ruling": "upheld",
+      "ruling_why": "Measured: tsc does not reject a non-serializable yield. This moves the check to dispatch time; it does not change the structure."
+    },
+    {
+      "id": "O2",
+      "round": 1,
+      "by": "opponent",
+      "kind": "cost",
+      "axis": "time",
+      "severity": "medium",
+      "answers": [
+        "P1"
+      ],
+      "text": "The single-input form (J6) makes every stock source need a wrapper: a WebSocket source (url, protocols?) or any (a, b) generator is rejected by tsc because its second parameter collides with the reserved signal slot. Authors must pack arguments into one object and unpack them, so the 'stock sources as plain generators' of P3 step 3 are not plain.",
+      "evidence": {
+        "type": "measured",
+        "source": "tsc 7.0.2 on evidence/o-sig.tsx (lines 6 and 7 error TS2322)",
+        "detail": "evidence/o-sig.txt"
+      },
+      "ruling": "upheld",
+      "ruling_why": "Measured TS2322; a real but small authoring cost, solved by one input object per source."
+    },
+    {
+      "id": "O3",
+      "round": 1,
+      "by": "opponent",
+      "kind": "risk",
+      "axis": "time",
+      "severity": "high",
+      "answers": [
+        "P2"
+      ],
+      "text": "P2 makes input read-once, but the markup still reads as reactive: input={interval} compiles, type-checks and silently keeps the old value after interval changes. That is a stale-value trap with no diagnostic; the fix is a key the author must remember. The runtime also still compares the key between renders to decide remount, so it is an identity diff, only a smaller one. Cheaper: make the compiler reject an input expression that reads state unless a key reads the same state.",
+      "estimate": {
+        "value": 0,
+        "unit": "diagnostics in P2 as written"
+      },
+      "evidence": {
+        "type": "source",
+        "source": "docs/proposals/0004-effects-refs-errors.md line 106; docs/proposals/0002-modules.md line 136",
+        "detail": "slots already compare keys; P2 keeps that diff and adds a silent-stale case"
+      },
+      "ruling": "upheld",
+      "ruling_why": "The stale input trap is real, and the diagnostic is cheap to add to compile-view-analyze."
+    },
+    {
+      "id": "O4",
+      "round": 1,
+      "by": "opponent",
+      "kind": "cost",
+      "axis": "time",
+      "severity": "high",
+      "answers": [
+        "P1",
+        "P5"
+      ],
+      "text": "Start and stop 'when the block goes' must be wired into every patch path that creates or removes a block: conditional blocks, For rows (added from the item template chunk on the client, not only server markers), Try replacement, whole-component removal and HMR. Those paths are owned by wave-1 and later patch nodes, but commands-subs owns only src/effects/** and depends on resume-loader and compiled-format as contracts. The compiled-format seam is one sentence (line 31); it has no block-lifecycle hook, no marker format for client-created subscriptions and no nested-removal order. Expect cross-node contract work before commands-subs can start.",
+      "estimate": {
+        "value": 4,
+        "unit": "patch paths needing a lifecycle hook (conditional, For row, Try, HMR)"
+      },
+      "evidence": {
+        "type": "source",
+        "source": "docs/roadmaps/core/nodes/commands-subs/brief.md owns/depends_on; docs/roadmaps/core/contracts/compiled-format.md lines 28 and 31",
+        "detail": "owns packages/idlip/src/effects/** only; patch(), patchList() are other nodes"
+      },
+      "ruling": "upheld",
+      "ruling_why": "The hook is cross-node contract work, but J11 shows Head and Try need the same hook, so it is shared, not a cost of subscriptions alone."
+    },
+    {
+      "id": "O5",
+      "round": 1,
+      "by": "opponent",
+      "kind": "risk",
+      "axis": "device",
+      "severity": "medium",
+      "answers": [
+        "P4"
+      ],
+      "text": "Every yielded value is one message through a loader that awaits patch() before the next queued message, and each lands in the message log. A resize, pointermove, socket burst or 16 ms timer enqueues unbounded messages with no coalescing rule in the contract, so a fast source can backlog the queue and grow the log in RAM. No proposal states a rate policy or log cap.",
+      "estimate": {
+        "value": 60,
+        "unit": "messages per second from one 60 Hz source, uncapped"
+      },
+      "evidence": {
+        "type": "source",
+        "source": "docs/roadmaps/core/contracts/compiled-format.md line 28; docs/proposals/0002-modules.md line 130",
+        "detail": "no queue, coalesce or throttle text anywhere in docs (grep)"
+      },
+      "ruling": "upheld",
+      "ruling_why": "Led to P7; the Subscribe flood part is answered (O12), the window/document part continues as O8 and the log part as O9."
+    },
+    {
+      "id": "O6",
+      "round": 1,
+      "by": "opponent",
+      "kind": "risk",
+      "axis": "time",
+      "severity": "medium",
+      "answers": [
+        "A1"
+      ],
+      "text": "A1 is not resume-safe: a page rendered or restored with clock.state === 'running' (initial state, bfcache, HMR model transfer) has no pending sleep, so the timer never starts, while P5's marker restarts a Subscribe. Also tick() called after await reruns as part of the continuation message, so the log shows one growing chain. Do not adopt A1 as the timer form.",
+      "evidence": {
+        "type": "source",
+        "source": "docs/proposals/0002-modules.md lines 119-122; 0004 line 74 (HMR sends model)",
+        "detail": "pending task is not state; handlers never run on the server, nothing re-arms the sleep"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "A2",
+      "round": 1,
+      "by": "opponent",
+      "kind": "alternative",
+      "axis": "time",
+      "answers": [
+        "P1",
+        "P3"
+      ],
+      "text": "Cut v1 to what has no open contract: window and document intrinsics (P3 step 1) plus Subscribe limited to stock sources that live in the runtime core like Time and Random (timer, WebSocket, EventSource, media query), each with a fixed typed signature. That needs no source chunk id, no marker for user generators, no serializability analysis (O1) and no wrapper typing (O2). User-defined async generators then join as a later step once the block lifecycle hook (O4) is settled. Same explicit-union lifecycle, same rule set; delivers the listed use cases except custom sources.",
+      "estimate": {
+        "value": 2,
+        "unit": "steps instead of 3 for first ship"
+      },
+      "evidence": {
+        "type": "inferred",
+        "source": "docs/roadmaps/core/GOAL.md; nodes/commands-subs/brief.md (priority should, milestone apps)",
+        "detail": "commands-subs is not on the must path (J2), so staging custom sources costs no must-path time"
+      },
+      "ruling": "rejected",
+      "ruling_why": "Stock-source Subscribe still starts and stops with blocks, so it still needs O4's hook (J11); it drops custom sources, which the goal names, to save O1 and O2, which are small after their rulings."
+    },
+    {
+      "id": "J11",
+      "round": 1,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "time",
+      "text": "A block add/remove hook in the patch paths is needed regardless of subscriptions: <Head> meta and link elements are added and removed with their block, and <Try> swaps its region on error.",
+      "evidence": {
+        "type": "source",
+        "source": "docs/proposals/0004-effects-refs-errors.md, Document head and Error boundaries"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "P6",
+      "round": 2,
+      "by": "proponent",
+      "kind": "concession",
+      "text": "Amend P2, P3, P4 to the upheld costs: (a) the compiler rejects a Subscribe `input` that reads state unless `key` reads the same state (O3); (b) stock sources with several parameters take one input object, e.g. socket({url, protocols}) (O2); (c) the serializability check runs at dispatch in dev builds, not at compile time (O1).",
+      "answers": [
+        "P2",
+        "P3",
+        "P4"
+      ],
+      "why": "O1 and O2 are measured with tsc 7.0.2 (TS2322, no error on a MessageEvent yield) and O3 shows input read-once is a silent stale-value trap.",
+      "ruling": "upheld"
+    },
+    {
+      "id": "P7",
+      "round": 2,
+      "by": "proponent",
+      "kind": "proposal",
+      "text": "Answer O5 with pull-based delivery, no new policy object: the loader calls next() on a source only after the handler's message has patched, so one value per subscription is in flight and a source cannot flood the queue; the source decides what to drop. Stock Time.every yields the latest tick and skips missed ones; the socket source holds a bounded buffer (default 100) and drops oldest. For push events on <window>/<document> (resize, pointermove, scroll), the loader keeps one pending message per element and event name and replaces it with the newest until dispatch (latest-wins). The dev message log is a ring of 1000 entries.",
+      "evidence": {
+        "type": "source",
+        "source": "docs/roadmaps/core/contracts/compiled-format.md line 28 (loader awaits patch before next message); ECMAScript async iterator protocol (next() is pull-based)",
+        "detail": "Pull-based generators give backpressure for free. The latest-wins rule for push events is the one added behavior and is stated per event, not inferred from input diffs. Numbers (100, 1000) are defaults to be set by commands-subs."
+      },
+      "axis": "device",
+      "estimate": {
+        "value": 1,
+        "unit": "in-flight message per subscription"
+      },
+      "answers": [
+        "O5"
+      ],
+      "ruling": "upheld",
+      "ruling_why": "Pull-based delivery for Subscribe stands. Its latest-wins rule for window and document events is beaten by O8, and its log ring is amended by O9 and J13."
+    },
+    {
+      "id": "P8",
+      "round": 2,
+      "by": "proponent",
+      "kind": "concession",
+      "text": "Concede option B (for await in an async handler). It cannot beat P1 on explicitness: the async iterator is a local that lives across awaits, and 0002 requires such locals to serialize, so the runtime must keep a hidden iterator handle outside the model. That is the state the user rejected as 'a bit too manual' or implicit. Stop is also late (the loop breaks only on the next value, so a quiet socket stays open), and the 'no await in loops' rule would have to be reversed. A resumed page with the union in 'running' has no loop unless an on:load handler restarts it by checking the union, a second, hand-written start path.",
+      "answers": [
+        "A1"
+      ],
+      "why": "J5 and 0002 line 122 make a loop iterator across awaits unserializable; the only escape is a hidden runtime handle, which breaks J4. A variant that starts from on:load/on:visible still needs that handle.",
+      "evidence": {
+        "type": "source",
+        "source": "docs/proposals/0002-modules.md lines 120-122; docs/roadmaps/core/GOAL.md Constraints",
+        "detail": "No evidence exists that an iterator survives resume; Crank.js and redux-saga (J9) keep it in live runtime state, which idlip's resumption forbids."
+      },
+      "ruling": "upheld",
+      "ruling_why": "Concession counts on the late stop, the second start path and the await-in-loop rule; its hidden-handle reason is beaten by O10."
+    },
+    {
+      "id": "P9",
+      "round": 2,
+      "by": "proponent",
+      "kind": "rebuttal",
+      "text": "Option C (body-level every(1000, tick, { when })) is not a competitor to P1: J3 makes it a compile-time API, because the component body never runs on the client, and no variant avoids that. Its useful part, the `when` condition, is exactly P1's visible conditional on the union. No claim is made for C.",
+      "answers": [
+        "P1"
+      ],
+      "evidence": {
+        "type": "source",
+        "source": "docs/proposals/0002-modules.md Decisions",
+        "detail": "Component body does not run on the client."
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "P10",
+      "round": 2,
+      "by": "proponent",
+      "kind": "proposal",
+      "text": "Sequence around O4: P3 step 1 (<window>/<document> intrinsics) ships first in commands-subs with no block hook. Subscribe (P3 step 2) is marked dependent on the block add/remove hook that <Head> and <Try> already need (J11), and the hook contract (start on add, stop on remove, children before parents, For rows from the item template, HMR remove) is added to compiled-format once by the Head/Try node, not by commands-subs. If that hook is late, commands-subs delivers step 1 and the stock-source part of step 3 as a runtime-only Subscribe on top-level blocks, and defers nested and For cases.",
+      "evidence": {
+        "type": "source",
+        "source": "docs/roadmaps/core/nodes/commands-subs/brief.md; contracts/compiled-format.md lines 28, 31; J11",
+        "detail": "commands-subs is priority should, so the delay costs a milestone app, not the must path (J2)."
+      },
+      "axis": "time",
+      "estimate": {
+        "value": 2,
+        "unit": "steps shipped before the hook"
+      },
+      "answers": [
+        "O4"
+      ],
+      "ruling": "upheld",
+      "ruling_why": "Upheld for the order and the shared hook, with O11: the stale errors edge goes (J12), and the top-level-only fallback is dropped."
+    },
+    {
+      "id": "O7",
+      "round": 2,
+      "by": "opponent",
+      "kind": "risk",
+      "axis": "explicitness",
+      "severity": "high",
+      "answers": [
+        "P1",
+        "P7"
+      ],
+      "text": "P1 says the runtime stops a source by aborting the signal and calling return(). On an async generator suspended in an await, return() is queued behind that await: a quiet-socket style source never cleans up. Measured on node: return() still pending after 500 ms and the finally block not run, while a source that rejects its await on the signal returned and cleaned. So stop works only if every source races its awaits against the signal, a rule the source author must follow and tsc cannot check. P7's pull model does not help, because the generator is mid-await, not at a yield.",
+      "evidence": {
+        "type": "measured",
+        "source": "node scratch g.mjs (quiet vs signal-aware generator)",
+        "detail": "evidence/o-return.txt"
+      },
+      "ruling": "upheld",
+      "ruling_why": "Measured: return() on a generator suspended in an await does not run finally. Prompt stop needs sources that observe the signal; the proponent must answer in round 3."
+    },
+    {
+      "id": "O8",
+      "round": 2,
+      "by": "opponent",
+      "kind": "risk",
+      "axis": "time",
+      "severity": "high",
+      "answers": [
+        "P7"
+      ],
+      "text": "P7's latest-wins per element and event name drops events that must all arrive. compiled-format says queued input events keep the value each one had, and P3 names keydown as the headline window case: two Escape or Enter presses during the first chunk load or a slow patch collapse into one, and typed keys are lost. Latest-wins is right for resize, scroll and pointermove only. The loader needs a per-event-name policy table (coalesce vs queue), which is a new hidden runtime decision unless the source markup states it.",
+      "evidence": {
+        "type": "source",
+        "source": "docs/roadmaps/core/contracts/compiled-format.md line 36; P3 step 1 text",
+        "detail": "the loader already guarantees per-event values for queued input events; P7 contradicts it for window and document events"
+      },
+      "ruling": "upheld",
+      "ruling_why": "Contradicts compiled-format line 36, which keeps every queued input value."
+    },
+    {
+      "id": "O9",
+      "round": 2,
+      "by": "opponent",
+      "kind": "risk",
+      "axis": "tokens",
+      "severity": "medium",
+      "answers": [
+        "P7"
+      ],
+      "text": "A dev message log capped at 1000 entries breaks replay. Devtools replay compares each step with its recorded model and reports the first divergence, which needs the log from the first message or periodic model snapshots. One 60 Hz source fills the ring in about 17 s, after which replay from the start is impossible. P7 states neither a snapshot rule nor that replay covers only the window; the devtools node is affected.",
+      "evidence": {
+        "type": "source",
+        "source": "docs/proposals/0002-modules.md line 119 (replay compares each step with its recorded model); P7 ring of 1000",
+        "detail": "1000 / 60 per second = 16.7 s"
+      },
+      "ruling": "upheld",
+      "ruling_why": "Real, but J13 lowers it: a ring keeps a snapshot per entry, so replay starts from the oldest kept entry."
+    },
+    {
+      "id": "O10",
+      "round": 2,
+      "by": "opponent",
+      "kind": "rebuttal",
+      "axis": "explicitness",
+      "severity": "low",
+      "answers": [
+        "P8"
+      ],
+      "text": "P8's main reason against B, that it needs a hidden iterator handle outside the model, does not separate B from P1: P1 also keeps a live generator and AbortController in the loader, keyed by marker. The conclusion against B still holds on the other reasons (late stop of a quiet source, a second hand-written start path on resume, reversing the no-await-in-loops rule), and O7 shows P1's stop is only as prompt as the source's signal handling. P8 also lists A1 under answers, but it concerns B, so A1's resume flaw (O6) stands separately.",
+      "evidence": {
+        "type": "source",
+        "source": "docs/proposals/0004-effects-refs-errors.md Subscriptions (runtime aborts signal and calls return()); P5 markers",
+        "detail": "handle location is the loader in both; the difference is who controls start and stop"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "O11",
+      "round": 2,
+      "by": "opponent",
+      "kind": "risk",
+      "axis": "time",
+      "severity": "high",
+      "answers": [
+        "P10"
+      ],
+      "text": "P10 puts the add/remove hook in the Head/Try node, but errors depends on commands-subs (it routes source errors to Try), so Subscribe depending on the errors node makes a cycle. document-head depends only on ssr-render and patch-bindings and can own the hook without a cycle, but then Try's region swap is not covered. Also the fallback 'runtime-only Subscribe on top-level blocks' cannot be conditional, and an always-on Subscribe cannot stop, so it gives no explicit-union lifecycle; it equals a window listener. State that the hook belongs to document-head or patch-bindings, not to errors, and drop the fallback.",
+      "evidence": {
+        "type": "source",
+        "source": "docs/roadmaps/core/nodes/errors/brief.md depends_on (resume-loader, commands-subs, ssr-render, patch-bindings); nodes/document-head/brief.md depends_on; commands-subs/brief.md",
+        "detail": "dependency lists as read from the briefs"
+      },
+      "ruling": "upheld",
+      "ruling_why": "The cycle is real and comes from a stale edge (J12). The top-level-only fallback cannot stop, so it gives no lifecycle."
+    },
+    {
+      "id": "O12",
+      "round": 2,
+      "by": "opponent",
+      "kind": "concession",
+      "answers": [
+        "O5"
+      ],
+      "why": "P7 answers O5 for pull-based sources: next() after patch gives one value in flight, so the flood risk for Subscribe sources is withdrawn. The risk remains for window and document events, now covered by O8, and for the log, now O9.",
+      "text": "Withdraw the flood part of O5 for Subscribe sources; keep the window and document part under O8 and the log part under O9.",
+      "ruling": "upheld"
+    },
+    {
+      "id": "J12",
+      "round": 2,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "time",
+      "text": "The errors node's edge to commands-subs is stale: its why is 'failed commands report through the same path', but the 2026-11-21 revision removed commands. Removing that edge removes O11's cycle.",
+      "evidence": {
+        "type": "source",
+        "source": "docs/roadmaps/core/nodes/errors/brief.md depends_on; docs/proposals/0004-effects-refs-errors.md Decisions"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "J13",
+      "round": 2,
+      "by": "judge",
+      "kind": "fact",
+      "axis": "tokens",
+      "text": "Devtools already keeps a recorded model per message: 0002 says replay compares each step with its recorded model. A log ring can replay from its oldest kept snapshot.",
+      "evidence": {
+        "type": "source",
+        "source": "docs/proposals/0002-modules.md, Rules (handlers are deterministic)"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "P11",
+      "round": 3,
+      "by": "proponent",
+      "kind": "proposal",
+      "text": "Answer O7: delivery stops at once, cleanup is bounded by the source. On block removal the runtime aborts the signal, calls return() without awaiting it, and discards any value the generator yields afterwards, so no handler runs after the block is gone. A finally block runs promptly only if the source ends its awaits on the signal. Stock sources (Time.every, socket, EventSource, media query) do, by construction. For custom sources the author writes `await until(signal, promise)` or `Time.sleep(ms, signal)`, both plain runtime imports that reject on abort. In dev builds the runtime warns, naming the source, if return() has not settled 1000 ms after abort. There is no static check, and the proposal does not claim one.",
+      "evidence": {
+        "type": "measured",
+        "source": "O7: node scratch g.mjs (quiet generator return() pending after 500 ms, finally not run; signal-aware generator cleaned)",
+        "detail": "The ledger's O7 result shows the failure; the fix moves cleanup onto the source's signal handling and removes the runtime's dependence on return()."
+      },
+      "axis": "explicitness",
+      "estimate": {
+        "value": 0,
+        "unit": "handlers run after block removal"
+      },
+      "answers": [
+        "P1"
+      ],
+      "ruling": "upheld",
+      "ruling_why": "Upheld with O13 as an accepted risk: prompt cleanup holds for stock sources and for custom sources that use until or Time.sleep with the signal."
+    },
+    {
+      "id": "P12",
+      "round": 3,
+      "by": "proponent",
+      "kind": "proposal",
+      "text": "Answer O8: on <window>, <document> and any element, delivery queues every event by default and keeps each event's value, as compiled-format line 36 requires. Latest-wins is opt-in in the source through the `latest:` attribute namespace, as in <window latest:pointermove={move} on:keydown={key} />. The author sees the policy next to the handler, and the loader has no per-event table. This replaces P7's hidden latest-wins rule for push events. P7's pull-based rule for Subscribe sources stays.",
+      "evidence": {
+        "type": "source",
+        "source": "docs/roadmaps/core/contracts/compiled-format.md line 36; docs/proposals/0004-effects-refs-errors.md line 97 (event props on <window>)",
+        "detail": "JSX allows namespaced attribute names such as on:keydown; the compiler can reserve latest: next to on:. Needs the marker for latest: added to compiled-format."
+      },
+      "axis": "explicitness",
+      "estimate": {
+        "value": 0,
+        "unit": "hidden per-event policies"
+      },
+      "answers": [
+        "O8",
+        "P7"
+      ],
+      "ruling": "upheld",
+      "ruling_why": "Upheld with O14 (list the jsx-types, compiled-format and loader changes, and make on:x plus latest:x on one element a compile error) and O15 (dev warning on queue depth)."
+    },
+    {
+      "id": "P13",
+      "round": 3,
+      "by": "proponent",
+      "kind": "proposal",
+      "text": "Answer O9: the dev log is a ring of 1000 messages, each with its recorded model (already kept per J13). Replay starts from the oldest kept snapshot and reports 'replay window: last N messages'; it does not promise replay from page load. A fast source can shrink the window to seconds, so a source meant for replay should yield at a lower rate or the author uses latest: for push events. Production keeps no log.",
+      "evidence": {
+        "type": "source",
+        "source": "docs/proposals/0002-modules.md Rules (handlers are deterministic); J13",
+        "detail": "Devtools node must show the window; no extra snapshot machinery."
+      },
+      "axis": "device",
+      "estimate": {
+        "value": 1000,
+        "unit": "messages kept in dev"
+      },
+      "answers": [
+        "O9",
+        "P7"
+      ],
+      "ruling": "upheld"
+    },
+    {
+      "id": "P14",
+      "round": 3,
+      "by": "proponent",
+      "kind": "proposal",
+      "text": "Answer O11: the block add/remove hook is owned by patch-bindings (it owns packages/idlip/src/client/patch/** and patches condition blocks), declared once in compiled-format. patch-lists calls it for For rows through the existing patchList interface, document-head and errors call it for head blocks and the Try region swap, and commands-subs only registers start and stop on it. This needs the errors -> commands-subs edge removed (J12), which removes the cycle. I drop P10's fallback of a runtime-only Subscribe on top-level blocks, since it cannot stop.",
+      "evidence": {
+        "type": "source",
+        "source": "nodes/patch-bindings/brief.md owns and Goal; nodes/patch-lists/brief.md depends_on; nodes/document-head/brief.md depends_on; J12",
+        "detail": "document-head owns nothing and depends on patch-bindings already, so the hook sits upstream of every node that uses it."
+      },
+      "axis": "time",
+      "estimate": {
+        "value": 1,
+        "unit": "contract section in compiled-format"
+      },
+      "answers": [
+        "O11",
+        "P10"
+      ],
+      "ruling": "upheld",
+      "ruling_why": "Upheld with O16: starting a source is not awaited by patch(), and compiled-format moves to v7."
+    },
+    {
+      "id": "P15",
+      "round": 3,
+      "by": "proponent",
+      "kind": "concession",
+      "text": "Amend P8: its hidden-handle reason does not separate B from P1, since P1 also keeps a live generator and AbortController in the loader (O10). The record is derived from the page's markers and not from the model. The conclusion against B rests on the remaining reasons: late stop of a quiet source, a second start path on resume, and the reversed await-in-loop rule. P8's answer to A1 is dropped; A1 stands rejected on O6.",
+      "answers": [
+        "P8",
+        "A1"
+      ],
+      "why": "O10 shows P1 keeps the same kind of runtime handle, so the argument would also reject P1.",
+      "evidence": {
+        "type": "source",
+        "source": "docs/proposals/0004-effects-refs-errors.md Subscriptions; ledger O10",
+        "detail": ""
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "O13",
+      "round": 3,
+      "by": "opponent",
+      "kind": "risk",
+      "axis": "device",
+      "severity": "medium",
+      "answers": [
+        "P11"
+      ],
+      "text": "P11 fixes delivery (no handler runs after removal) but not cleanup: return() is not awaited, so a custom source that forgets until(signal, ...) keeps its WebSocket or listener open for as long as its await stays pending, for example an idle socket for the life of the tab. The only guard is a dev warning after 1000 ms, and production has none. The leak is a resource on the user's machine, hidden from the author because the UI looks stopped. Likelihood is moderate for custom sources, nil for stock ones.",
+      "evidence": {
+        "type": "measured",
+        "source": "node scratch g.mjs, quiet generator",
+        "detail": "evidence/o-return.txt: finally block not run while the await stays pending"
+      },
+      "ruling": "upheld",
+      "ruling_why": "Accepted risk: no static check can see whether a custom source observes its signal; dev warning only."
+    },
+    {
+      "id": "O14",
+      "round": 3,
+      "by": "opponent",
+      "kind": "risk",
+      "axis": "time",
+      "severity": "medium",
+      "answers": [
+        "P12"
+      ],
+      "text": "latest: is not a compile-time API in the J3 sense, because it is attribute syntax next to on:, nothing is imported for the compiler. But it widens three contracts that the draft does not list: jsx-types (every event prop needs a latest: twin typed with the same EventProp), compiled-format (a marker, and the rule that marker names are reserved) and the loader queue (replace by element and event name, which is the diffing of pending messages the user rejected for inputs, now keyed by name). The draft also does not say what happens when on:x and latest:x are both present on one element, which needs a compile error.",
+      "evidence": {
+        "type": "source",
+        "source": "docs/roadmaps/core/nodes/jsx-types/brief.md (on:* props only); docs/roadmaps/core/contracts/compiled-format.md lines 18 and 37",
+        "detail": "no latest: in any contract; contracts at v6"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "O15",
+      "round": 3,
+      "by": "opponent",
+      "kind": "risk",
+      "axis": "device",
+      "severity": "medium",
+      "answers": [
+        "P12"
+      ],
+      "text": "Opt-in latest: makes the unsafe case the default: <window on:resize={r}> or on:pointermove on any element queues every event while each patch awaits chunk loads. At 60 Hz over the first 500 ms of a cold chunk fetch that is about 30 queued messages, each with its own recorded model in dev. A diagnostic that warns in dev when one event name has more than N pending messages would cost one counter and keep the default explicit.",
+      "evidence": {
+        "type": "estimate",
+        "source": "60 events/s x 0.5 s cold chunk load, P7 default queue",
+        "detail": "basis: compiled-format line 28, the loader awaits patch before the next message"
+      },
+      "ruling": "upheld",
+      "ruling_why": "Low: answered by a dev warning on pending queue depth, keeping queue-by-default as compiled-format line 36 requires."
+    },
+    {
+      "id": "O16",
+      "round": 3,
+      "by": "opponent",
+      "kind": "cost",
+      "axis": "time",
+      "severity": "medium",
+      "answers": [
+        "P14"
+      ],
+      "text": "P14 moves the hook into patch-bindings, a must-path node of size M, and adds children-before-parents order, For rows, Try swap and HMR removal to it. The hook's start must not be awaited by patch(), because starting a subscription loads a source chunk, and patch() is awaited before the next message: an awaited start would stall every patch behind a network fetch. P14 does not state this. Delivery of the must path now carries a contract it did not own, so compiled-format needs a version bump (v6 to v7) and a size review of patch-bindings.",
+      "evidence": {
+        "type": "source",
+        "source": "docs/roadmaps/core/nodes/patch-bindings/brief.md (priority must, size M); contracts/compiled-format.md line 28 patch() is async and awaited",
+        "detail": "commands-subs stays should; the hook lands on must"
+      },
+      "ruling": "upheld"
+    },
+    {
+      "id": "O17",
+      "round": 3,
+      "by": "opponent",
+      "kind": "concession",
+      "answers": [
+        "O8",
+        "O9",
+        "O11"
+      ],
+      "why": "P12 removes the loader's per-event table (policy is in markup, default queues every event, so compiled-format line 36 holds). J13 and P13 show replay needs only a window of recorded models. J12 and P14 remove the errors-to-commands-subs edge; I rebuilt the dependency graph from the briefs without it and patch-bindings does not reach commands-subs, so there is no cycle.",
+      "text": "Withdraw O8's hidden-table concern, O9 and O11.",
+      "ruling": "upheld"
+    },
+    {
+      "id": "O18",
+      "round": 3,
+      "by": "opponent",
+      "kind": "concession",
+      "answers": [
+        "O7"
+      ],
+      "why": "P11 stops handler delivery at block removal and drops later yields, so the stale-message risk is gone. The cleanup part stays as O13.",
+      "text": "Withdraw the delivery part of O7.",
+      "ruling": "upheld"
+    }
+  ],
+  "questions": [],
+  "proofs": [],
+  "hypothesis": null,
+  "spend": [
+    {
+      "round": 1,
+      "tokens": 103473
+    },
+    {
+      "round": 2,
+      "tokens": 120540
+    },
+    {
+      "round": 3,
+      "tokens": 127000
+    }
+  ]
+}

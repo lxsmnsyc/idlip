@@ -24,7 +24,9 @@ function Subscribe<I, V>(props: { to: (input: I, signal: AbortSignal) => AsyncIt
 
 // Impure values, awaited in handlers so the log records them. Run in the runtime core.
 const Random: { id(): Promise<string>; number(): Promise<number> };
-const Time: { now(): Promise<number>; sleep(ms: number): Promise<void> };
+const Time: { now(): Promise<number>; sleep(ms: number, signal?: AbortSignal): Promise<void> };
+// Rejects when signal aborts, so a subscription source ends its await on stop.
+function until<T>(signal: AbortSignal, promise: Promise<T>): Promise<T>;
 
 // Raw HTML. A runtime brand, so a plain string is a type error.
 type TrustedHtml = string & { readonly __trusted: unique symbol };
@@ -45,7 +47,8 @@ const Dom: {
 type EventFor<El extends Element, E extends Event> = E & { readonly currentTarget: El };
 type EventProp<El extends Element, E extends Event> = (event: EventFor<El, E>) => unknown;
 // Intrinsic elements: attributes, `class` as a string or a record of booleans, `ref`, `html`, `key`, on:* props.
-// Also `<window>` and `<document>`, which take only on:* props.
+// Also `<window>` and `<document>`, which take only on:* and latest:* props.
+// latest:* props take the same functions as on:* and opt into latest-wins delivery.
 
 // idlip/server, owned by `ssr-render`.
 function render<Props>(component: (props: Props) => JSX.Element, props: Props, options?: { nonce?: string }): Promise<string>;
@@ -82,6 +85,7 @@ Subpaths: `idlip`, `idlip/server`, `idlip/client`, `idlip/compiler`, `idlip/vite
 
 ## Changes
 
+- v6 (amended 2026-11-21 by the subscriptions debate): `until`, `Time.sleep` with a signal, `latest:` props.
 - v6: function components replace `defineModule`. Block components `Try`, `Head` and `Subscribe`, the `<window>` and `<document>` elements, and `Random` and `Time`. Removes `defineModule`, the `Msg` types, `Handlers`, `ModelOf`, `MsgOf`, `Cmd`, `cmd`, `Sub`, `Result`, `task`, `defineSub`, `ref()` and the `event` placeholder. Event props take functions of the element's event. Adds `render` as a reserved signature. Source: `docs/proposals/0002-modules.md` and `docs/proposals/0004-effects-refs-errors.md`, revised 2026-11-21.
 - v5: messages declared first as `Msg`; commands take constructors by value; `Result<T>`; `task` returns a function. Source: 0002 and 0004, 2026-11-20.
 - v4: reserves `task`, `defineSub`, `ref`, `trusted`, and the `catch` and `head` module properties. Source: `docs/proposals/0004-effects-refs-errors.md`.

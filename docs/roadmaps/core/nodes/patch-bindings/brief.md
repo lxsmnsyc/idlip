@@ -48,6 +48,7 @@ Given the old model, the new model and the manifest, find the binding groups who
 
 - [ ] Changing `draft` in the todo fixture loads only the binding group that reads `draft`.
 - [ ] A property test (fast-check) shows the changed-path set is exactly the set of paths whose values differ, for random model pairs.
+- [ ] The block hook `onBlock(add, remove)` from `contracts/compiled-format.md` (v7) fires when a condition block is added or removed, children before parents, and `patch()` does not await what is registered on it (`debates/subscriptions/debate.md`).
 - [ ] Fast check passes: `pnpm --filter idlip test`
 
 ## Notes for the worker

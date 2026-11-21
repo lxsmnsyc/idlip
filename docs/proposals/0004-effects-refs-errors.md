@@ -7,7 +7,7 @@ This proposal fills gaps found by a feature review of the core roadmap on 2026-1
 ## Decisions
 
 - **Effects are `await` in a handler.** An async handler awaits an imported or module-level async function. The compiler runs the call as a task on the client and dispatches the rest of the handler as a continuation message. Impure values such as random IDs and the time come the same way (0002, Rules).
-- **Subscriptions are in the view.** `<window>`, `<document>` and `<Subscribe>` start when the block they sit in renders and stop when it goes, like brumate's `<window>` and `<document>` elements. A custom source is an async generator.
+- **Subscriptions are in the view.** `<window>`, `<document>` and `<Subscribe>` start when the block they sit in is added and stop when it is removed, like brumate's `<window>` and `<document>` elements. A source is a module-level async generator. Settled by `docs/roadmaps/core/debates/subscriptions/debate.md`.
 - **Error boundaries are `<Try>`,** placed anywhere in the markup, like brumate's `#try … #catch`.
 - **The head is `<Head>`,** placed anywhere in the markup, like brumate's `#head`.
 - **Files** may be held in state on the client. They leave the client only as form data parts, as in brumate.
@@ -75,12 +75,18 @@ Prior art: brumate runs an async handler whole in the browser as a closure, and 
 
 ## Subscriptions
 
-A subscription is a node in the view. It starts when the block it sits in renders and stops when the block goes, as an element is added and removed. Its lifecycle is the view's: the state that turns it on is an explicit union in the model, and no handle is kept by hand.
+Settled by the debate in `docs/roadmaps/core/debates/subscriptions/debate.md`, approved 2026-11-21.
+
+A subscription is a node in the view. It starts when the block it sits in is added and stops when the block is removed. The state that turns it on is an explicit union in the model, and no handle is kept by hand.
 
 ```tsx
-async function* every(ms: number) {
+import { Subscribe, Time } from 'idlip';
+
+type ClockState = { state: 'stopped' } | { state: 'running'; ticks: number };
+
+async function* every(ms: number, signal: AbortSignal) {
   while (true) {
-    await Time.sleep(ms);
+    await Time.sleep(ms, signal);
     yield await Time.now();
   }
 }
@@ -91,10 +97,11 @@ export default function Clock() {
   function stop() { clock = { state: 'stopped' }; }
   function tick(now: number) { if (clock.state === 'running') clock = { ...clock, ticks: clock.ticks + 1 }; }
   function key(name: string) { if (name === 'Escape') stop(); }
+  function move(x: number) { ... }
 
   return (
     <main>
-      <window on:keydown={(e) => key(e.key)} />
+      <window on:keydown={(e) => key(e.key)} latest:pointermove={(e) => move(e.clientX)} />
       {clock.state === 'running' && <Subscribe to={every} input={1000} on:value={tick} />}
       <button on:click={start}>Start</button>
     </main>
@@ -102,11 +109,37 @@ export default function Clock() {
 }
 ```
 
-- `<window>` and `<document>` take event props like any element. Their listeners are delegated by the loader.
-- `<Subscribe to={source} input={value} on:value={handler}>` runs `source(input, signal)`, an async generator declared at module level or imported. `tsc` checks `input` against the source's first parameter and the yielded type against the handler's parameter (checked with `tsc` 7.0.2; a variadic `args` tuple did not infer, so the input is one value). Each value it yields dispatches `on:value`. When the block goes, the runtime aborts `signal` and calls the generator's `return()`. When `input` changes, the runtime stops the old run and starts a new one, as a changed attribute is patched.
-- The server renders a marker for each active subscription. On resume, the loader starts the subscriptions whose markers are in the page and loads their source chunks. A page with none loads nothing for them.
+### Window and document events
+
+- `<window>` and `<document>` take event props like any element. The loader delegates their listeners. They need no source chunk and no marker, and ship before `<Subscribe>`.
+- Every event queues by default and keeps its own value, as `compiled-format` requires for queued `input` events.
+- `latest:name={...}` opts into latest-wins: while the handler's chunk loads or a patch runs, a new event replaces the pending one for the same element and event name. Use it for `pointermove`, `scroll` and `resize`. `on:x` and `latest:x` on one element is a compile error. `latest:` works on any element.
+- Dev builds warn when an element's pending queue grows deep, naming the event.
+
+### `<Subscribe>`
+
+- `<Subscribe to={source} input={value} on:value={handler}>` runs `source(input, signal)`, an async generator declared at module level or imported. A source with several parameters takes one input object. `tsc` checks `input` against the source and the yielded type against the handler.
+- **Input is read once at start.** A new run needs a new `key` or a remount through the condition. The runtime never compares inputs. The compiler rejects an `input` that reads state unless `key` reads the same state, so a stale input cannot go unnoticed.
+- **Delivery is pull-based.** The loader asks the source for its next value only after the previous message has patched, so each subscription has one value in flight and the source decides what to drop. Stock sources: the timer yields the latest tick, and the socket source keeps a buffer of 100 and drops the oldest.
+- **Each value is an ordinary message** with the value as its payload, so it is in the message log and replay never runs the source again. Dev builds check at dispatch that the payload serializes.
+- **Stop.** When the block is removed, the runtime aborts the signal, calls `return()` without awaiting it, and drops any later yield, so no handler runs after the block is gone. Cleanup is prompt only for sources that end their awaits on the signal. Stock sources do. Custom sources use `until(signal, promise)` or `Time.sleep(ms, signal)`, which reject on abort. Dev builds warn when `return()` has not settled 1000 ms after the abort.
+- **Resume.** The server renders a marker for each active `<Subscribe>`, with the source chunk id and the serialized input. The loader starts the sources whose markers are in the page. A page without subscriptions loads nothing for them, and a stopped source leaves no marker.
 - An error thrown by a source goes to the nearest `<Try>`.
-- Prior art: brumate's `<window>` and `<document>` elements, Svelte's `<svelte:window>`, Elm's `subscriptions` (computed from the model, compared after each message).
+- Stock sources: timer, WebSocket, EventSource and media query, shipped as plain async generators.
+
+### Block hook and log
+
+- Start and stop run on one block add/remove hook, owned by `patch-bindings` and shared with `<For>` rows, `<Head>` and `<Try>`. Starting a source is not awaited by `patch()`.
+- The dev message log is a ring of 1000 messages, each with its recorded model. Replay starts from the oldest kept entry. Production keeps no log.
+
+### Accepted risks
+
+- A custom source that does not observe its signal keeps its socket or listener open after stop. No static check can see it; dev builds warn.
+- A fast event without `latest:` queues every event, about 30 during a 500 ms cold chunk load at 60 Hz. Dev builds warn on queue depth.
+
+Rejected, with reasons in the debate: a `for await` loop in a handler, a declaration in the component body, a self-scheduling timer, restarting when the input changes, and latest-wins by default.
+
+Prior art: brumate's `<window>` and `<document>` elements, Svelte's `<svelte:window>`, Elm's `subscriptions`.
 
 ## Error boundaries
 

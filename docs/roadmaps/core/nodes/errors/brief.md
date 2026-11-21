@@ -29,9 +29,6 @@ depends_on:
   - on: resume-loader
     kind: hard
     why: wraps handler dispatch
-  - on: commands-subs
-    kind: hard
-    why: failed commands report through the same path
   - on: ssr-render
     kind: hard
     why: server fallbacks render inside the server renderer

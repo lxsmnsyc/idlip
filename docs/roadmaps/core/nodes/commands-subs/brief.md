@@ -44,4 +44,4 @@ depends_on:
 
 ## Goal
 
-Subscriptions in the view, from `docs/proposals/0004-effects-refs-errors.md`, Subscriptions: `<window>` and `<document>` listeners, and `<Subscribe to={source} input={...} on:value={handler}>` for module-level async generators. A subscription starts and stops with the block it sits in. The server renders a marker per active subscription and the loader starts them on resume. A changed `input` restarts the run. `Random` and `Time` (`contracts/core-api.md`) land here too.
+Subscriptions as settled in `debates/subscriptions/debate.md` and `docs/proposals/0004-effects-refs-errors.md`, Subscriptions. First `<window>` and `<document>` listeners with `latest:` (no block hook needed). Then `<Subscribe to={source} input={...} on:value={handler}>`: start and stop on the block hook from `patch-bindings`, pull-based delivery, abort plus unawaited `return()` on stop, dropped late yields, the dev warning after 1000 ms, server markers and start on resume. Stock sources (timer, WebSocket, EventSource, media query) as async generators, plus `until`, `Random` and `Time`.

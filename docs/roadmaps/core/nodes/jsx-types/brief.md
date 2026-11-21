@@ -38,7 +38,7 @@ depends_on:
 
 ## Goal
 
-`idlip/jsx-runtime` types: intrinsic elements whose `on:*` props take a function of the element's event (`EventProp` from `contracts/core-api.md`), so `e.currentTarget` has the element's type. Attributes `ref`, `html` (`TrustedHtml` only) and `key`. Conditions are plain JSX ternaries and `&&`, so there is no `Show`, `Switch` or `Match`. The compiler, not the types, restricts event props to handler calls.
+`idlip/jsx-runtime` types: intrinsic elements whose `on:*` props take a function of the element's event (`EventProp` from `contracts/core-api.md`), so `e.currentTarget` has the element's type. Attributes `ref`, `html` (`TrustedHtml` only) and `key`. `latest:*` props with the same types as `on:*`. `<window>` and `<document>` intrinsic elements with only `on:*` and `latest:*` props (`debates/subscriptions/debate.md`). Conditions are plain JSX ternaries and `&&`, so there is no `Show`, `Switch` or `Match`. The compiler, not the types, restricts event props to handler calls.
 
 ## Context
 

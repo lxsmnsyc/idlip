@@ -1,6 +1,6 @@
 ---
 name: compiled-format
-version: 6
+version: 7
 status: draft
 defined_by: compiled-format
 ---
@@ -28,7 +28,8 @@ To be decided by the `compiled-format` node. It must define:
 - Patcher interface called by the loader: `patch(root, oldModel, newModel, manifest): Promise<void>`. It loads chunks, so it is async. The loader awaits it before the next queued message.
 - Path diff: `diffPaths(oldModel, newModel, pathSets): Set<string>`, owned by `patch-bindings`.
 - List patcher: `patchList(block, oldList, newList, context): Promise<void>`, implemented by `patch-lists` and called from `patch()`.
-- Effects seam: `runTask(task, dispatch): Promise<void>` loads the chunk of an awaited call site, runs it, and dispatches the continuation message with the result or the error. Implemented by `custom-effects`, called by `resume-loader`. Subscription seam, reserved for `commands-subs`: the server renders a marker per active subscription node, and the loader starts the sources whose markers are in the page and stops them when their block goes.
+- Effects seam: `runTask(task, dispatch): Promise<void>` loads the chunk of an awaited call site, runs it, and dispatches the continuation message with the result or the error. Implemented by `custom-effects`, called by `resume-loader`. Subscription seam, reserved for `commands-subs`: the server renders a marker per active `<Subscribe>` with the source chunk id and the serialized input, and the loader starts the sources whose markers are in the page.
+- Block hook: `onBlock(add, remove)`, owned by `patch-bindings`. `patch()` calls it when it adds or removes a condition block, `patchList` for `<For>` rows, `document-head` for head blocks and `errors` for a `<Try>` region swap. Children are removed before parents. A registered start is not awaited by `patch()`. `commands-subs` registers subscription start and stop on it. Source: `docs/roadmaps/core/debates/subscriptions/debate.md`.
 
 ## Behavior
 
@@ -40,6 +41,7 @@ To be decided by the `compiled-format` node. It must define:
 - Module source files are `*.idlip.tsx` that export function components (`docs/proposals/0002-modules.md`). Update handler chunks come from the function declarations in a component body. All segments of an async handler share its chunk; continuation tags are the handler name with `$1`, `$2` and so on. When a segment awaits `Random` or `Time`, the loader waits for the continuation before it patches.
 - Path sets use `*` for list items, for example `todos.*.done`.
 - Reserved path syntax for keyed segments: `name[key=source]`, where `source` is `$p`, `$p.<field>` or a model path, for example `todos[id=$p].done`. The parser must reject it until `keyed-paths` lands, so no fixture uses it by accident.
+- `latest:name` event attributes are encoded in the DOM like `on:name` with a latest-wins flag. While the handler's chunk loads or a patch runs, a new event replaces the pending one for the same element and event name. Other events queue with their own values. `on:x` and `latest:x` on one element is a compile error. `<window>` and `<document>` listeners are encoded on a reserved marker and delegated by the loader.
 - Reserved placeholder `["$form", name]`, read from the `FormData` of the event target's form. Implemented by `form-fields`.
 - Templates inside `<svg>` and `<math>` keep their namespace, including item templates and condition block templates created on the client. The encoding records the namespace of each template.
 - Reserved: a ref marker attribute on elements with `ref`, scoped by component path. Implemented by `dom-refs`.
@@ -58,6 +60,7 @@ The golden fixtures are the stub for both sides.
 
 ## Changes
 
+- v7: block hook `onBlock`, `latest:` event attributes, `<window>` and `<document>` listeners, and the `<Subscribe>` marker with source chunk id and input. Source: `docs/roadmaps/core/debates/subscriptions/debate.md`, 2026-11-21.
 - v6: function components replace `defineModule`. Tags are handler names and payloads are argument arrays. Continuation chunks and tags for `await`. `runTask` replaces `runCmd` and `startSubs`. Subscriptions become markers in the page instead of a list in the state script. One chunk per handler, with its continuations. Source: `docs/proposals/0002-modules.md` and `docs/proposals/0004-effects-refs-errors.md`, revised 2026-11-21.
 - v5: SVG and MathML namespaces, and reserved ref markers, raw HTML bindings, effect and fallback manifest fields and boundary markers. Source: `docs/proposals/0004-effects-refs-errors.md`.
 - v4: adds the state encoding budget, early events, event modifiers, HTML parser rules, placeholder timing and CSP nonces. Source: runtime gap review against brumate, 2026-11-20.
