@@ -1,7 +1,7 @@
 ---
 id: row-list-exports
 title: Compiler: export list bindings from row group chunks
-status: active
+status: done
 priority: must
 type: fix
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 112157
 owns:
   - packages/idlip/src/compiler/view/codegen/**
   - packages/idlip/test/compiler/view/codegen/**
@@ -47,3 +47,5 @@ depends_on:
 - [ ] A test that fails on the current batch: a view with `<For each={todos} key="id">` and `class={selected === t.id}` compiles to a row group chunk that exports both the row binding and the list's `l`.
 - [ ] Nested lists export every enclosing `l`.
 - [ ] The golden fixtures are unchanged, or the change is explained.
+
+Landed on `batch/core` as 91b1639.
