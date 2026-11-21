@@ -34,6 +34,8 @@ export interface Harness {
   send: (tag: string, payload: unknown[]) => void;
   readonly boot: Boot;
   readonly errors: unknown[];
+  /** Resolves when no chunk is loading and no batch runs. */
+  settled: () => Promise<void>;
   cleanup: () => void;
 }
 
@@ -100,7 +102,7 @@ export function setup(): Harness {
   new Function(full)();
   const errors: unknown[] = [];
   vi.spyOn(console, 'error').mockImplementation(() => {});
-  const { stop } = resume(listener.boot, createPatch(patchList), (error) => {
+  const { stop, settled } = resume(listener.boot, createPatch(patchList), (error) => {
     errors.push(error);
   });
   return {
@@ -114,18 +116,11 @@ export function setup(): Harness {
     },
     boot: listener.boot,
     errors,
+    settled,
     cleanup() {
       stop();
       listener.cleanup();
       rmSync(dir, { recursive: true, force: true });
     },
   };
-}
-
-export async function settle(): Promise<void> {
-  for (let tick = 0; tick < 10; tick++) {
-    await new Promise((resolve) => {
-      setTimeout(resolve, 10);
-    });
-  }
 }

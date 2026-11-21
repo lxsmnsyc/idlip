@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { mount } from '../../../src/testing/index.ts';
 import type { MountedPage } from '../../../src/testing/index.ts';
-import { getLoaded, settle, setup } from '../loader/helpers.ts';
+import { getLoaded, setup } from '../loader/helpers.ts';
 import type { Harness } from '../loader/helpers.ts';
 
 let page: MountedPage | undefined;
@@ -252,7 +252,7 @@ describe('a chunk that fails to load', () => {
     breakChunk('handler=increment', 1);
     harness.start();
     document.querySelectorAll('button')[0].click();
-    await settle();
+    await harness.settled();
     expect(getLoaded()).toEqual(['handler=increment']);
     expect(harness.patch).toHaveBeenCalledTimes(1);
     expect(events).toHaveLength(0);
@@ -263,7 +263,7 @@ describe('a chunk that fails to load', () => {
     breakChunk('handler=increment', 2);
     harness.start();
     document.querySelectorAll('button')[0].click();
-    await settle();
+    await harness.settled();
     expect(harness.patch).not.toHaveBeenCalled();
     expect(events).toHaveLength(1);
     expect((events[0].detail.error as Error).message).toBe('chunk failed');

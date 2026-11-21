@@ -5,6 +5,7 @@ import { vi } from 'vitest';
 import { renderListener } from '../../../src/client/loader/listener.ts';
 import { resume } from '../../../src/client/loader/resume.ts';
 import { getChunkFile } from '../../../src/core/format.ts';
+import type { Resumed } from '../../../src/client/loader/resume.ts';
 import type { Boot, Patch } from '../../../src/core/format.ts';
 
 const FIXTURES = join(import.meta.dirname, '../../fixtures');
@@ -37,6 +38,8 @@ export interface Harness {
   readonly boot: Boot;
   /** Starts the loader, which takes over what the listener queued. */
   start: () => void;
+  /** Resolves when no chunk is loading and no batch runs. A gated chunk holds it. */
+  settled: () => Promise<void>;
   /** Stops a chunk from failing. */
   restore: (chunk: string) => void;
   cleanup: () => void;
@@ -130,11 +133,15 @@ export function setup(fixture: string, options: Options = {}): Harness {
 
   const patch = vi.fn<Patch>(async () => {});
   const boot = listener.boot;
+  let resumed: Resumed | undefined;
   return {
     patch,
     boot,
     start() {
-      resume(boot, patch);
+      resumed = resume(boot, patch);
+    },
+    async settled() {
+      await resumed!.settled();
     },
     restore(chunk) {
       const broken = scope.idlipBroken!;
@@ -151,11 +158,16 @@ export function release(chunk: string): void {
   scope.idlipGates![chunk]();
 }
 
-/** Lets pending promises and imports settle. */
-export async function settle(): Promise<void> {
-  for (let tick = 0; tick < 10; tick++) {
+/** Waits for the state an assertion needs, since a chunk import takes as long as the machine allows. */
+export async function until(done: () => boolean): Promise<void> {
+  while (!done()) {
     await new Promise((resolve) => {
-      setTimeout(resolve, 10);
+      setTimeout(resolve, 2);
     });
   }
+}
+
+/** Waits until the evaluation of a gated chunk has started and waits for `release`. */
+export async function reached(chunk: string): Promise<void> {
+  await until(() => scope.idlipGates?.[chunk] !== undefined);
 }

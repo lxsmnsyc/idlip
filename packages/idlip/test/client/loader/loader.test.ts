@@ -2,7 +2,7 @@
 // oxlint-disable typescript/no-unsafe-type-assertion
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resume } from '../../../src/client/loader/resume.ts';
-import { getLoaded, release, settle, setup } from './helpers.ts';
+import { getLoaded, reached, release, setup } from './helpers.ts';
 import type { Harness } from './helpers.ts';
 
 let harness: Harness | undefined;
@@ -26,7 +26,7 @@ describe('counter', () => {
     harness = setup('counter');
     harness.start();
     buttons()[0].click();
-    await settle();
+    await harness.settled();
     expect(getLoaded()).toEqual(['handler=increment']);
     expect(harness.patch).toHaveBeenCalledTimes(1);
     const [page, prev, next] = harness.patch.mock.calls[0];
@@ -39,7 +39,7 @@ describe('counter', () => {
   it('does not decode the state before the first event', async () => {
     harness = setup('counter');
     harness.start();
-    await settle();
+    await harness.settled();
     expect(harness.patch).not.toHaveBeenCalled();
     expect(getLoaded()).toEqual([]);
   });
@@ -49,10 +49,10 @@ describe('counter', () => {
     harness.start();
     buttons()[1].click();
     buttons()[1].click();
-    await settle();
+    await reached('handler=add');
     expect(harness.patch).not.toHaveBeenCalled();
     release('handler=add');
-    await settle();
+    await harness.settled();
     expect(harness.patch).toHaveBeenCalledTimes(1);
     expect(harness.patch.mock.calls[0][1]).toEqual({ count: 4 });
     expect(harness.patch.mock.calls[0][2]).toEqual({ count: 24 });
@@ -64,9 +64,9 @@ describe('counter', () => {
     buttons()[1].click();
     buttons()[0].click();
     buttons()[1].click();
-    await settle();
+    await reached('handler=add');
     release('handler=add');
-    await settle();
+    await harness.settled();
     expect(harness.patch).toHaveBeenCalledTimes(1);
     expect(harness.patch.mock.calls[0][2]).toEqual({ count: 25 });
   });
@@ -75,9 +75,9 @@ describe('counter', () => {
     harness = setup('counter');
     harness.start();
     buttons()[0].click();
-    await settle();
+    await harness.settled();
     buttons()[0].click();
-    await settle();
+    await harness.settled();
     expect(harness.patch).toHaveBeenCalledTimes(2);
     expect(harness.patch.mock.calls[1][1]).toEqual({ count: 5 });
     expect(harness.patch.mock.calls[1][2]).toEqual({ count: 6 });
@@ -90,7 +90,7 @@ describe('counter', () => {
     buttons()[0].click();
     expect(harness.boot.q).toHaveLength(2);
     harness.start();
-    await settle();
+    await harness.settled();
     expect(harness.boot.q).toHaveLength(0);
     expect(harness.patch.mock.calls[0][2]).toEqual({ count: 6 });
   });
@@ -100,12 +100,12 @@ describe('counter', () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
     harness.start();
     buttons()[0].click();
-    await settle();
+    await harness.settled();
     expect(errors).toHaveBeenCalled();
     expect(harness.patch).not.toHaveBeenCalled();
     harness.restore('handler=increment');
     buttons()[0].click();
-    await settle();
+    await harness.settled();
     expect(harness.patch).toHaveBeenCalledTimes(1);
     expect(harness.patch.mock.calls[0][2]).toEqual({ count: 6 });
   });
@@ -122,7 +122,7 @@ describe('bad events', () => {
     stray.click();
     buttons()[0].click();
     buttons()[0].click();
-    await settle();
+    await harness.settled();
     expect(errors).toHaveBeenCalled();
     expect(harness.patch).toHaveBeenCalledTimes(1);
     expect(harness.patch.mock.calls[0][2]).toEqual({ count: 6 });
@@ -135,11 +135,11 @@ describe('bad events', () => {
     buttons()[1].click();
     buttons()[0].click();
     buttons()[1].click();
-    await settle();
+    await harness.settled();
     expect(harness.patch).not.toHaveBeenCalled();
     harness.restore('handler=add');
     buttons()[1].click();
-    await settle();
+    await harness.settled();
     // add(10), increment, add(10), add(10): in click order, not increment first.
     expect(harness.patch).toHaveBeenCalledTimes(1);
     expect(harness.patch.mock.calls[0][2]).toEqual({ count: 35 });
@@ -151,9 +151,9 @@ describe('bad events', () => {
     harness.patch.mockRejectedValueOnce(new Error('patch failed'));
     harness.start();
     buttons()[0].click();
-    await settle();
+    await harness.settled();
     buttons()[0].click();
-    await settle();
+    await harness.settled();
     expect(harness.patch.mock.calls[1][1]).toEqual({ count: 4 });
     expect(harness.patch.mock.calls[1][2]).toEqual({ count: 6 });
   });
@@ -174,7 +174,7 @@ describe('todo', () => {
     harness = setup('todo');
     harness.start();
     input(field(), 'milk');
-    await settle();
+    await harness.settled();
     // The binding chunk of the write set starts with the handler chunk.
     expect(getLoaded().toSorted()).toEqual(['binding=draft', 'handler=setDraft']);
     expect(harness.patch.mock.calls[0][2]).toMatchObject({ draft: 'milk' });
@@ -194,14 +194,14 @@ describe('todo', () => {
     input(field(), 'a');
     input(field(), 'ab');
     input(field(), 'abc');
-    await settle();
+    await reached('handler=setDraft');
     expect(messages).toEqual([
       { t: 'setDraft', p: ['a'] },
       { t: 'setDraft', p: ['ab'] },
       { t: 'setDraft', p: ['abc'] },
     ]);
     release('handler=setDraft');
-    await settle();
+    await harness.settled();
     expect(harness.patch).toHaveBeenCalledTimes(1);
     expect(harness.patch.mock.calls[0][2]).toMatchObject({ draft: 'abc' });
   });
@@ -218,12 +218,12 @@ describe('todo', () => {
     harness = setup('todo');
     harness.start();
     input(field(), 'x');
-    await settle();
+    await harness.settled();
     field().dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'a' }));
-    await settle();
+    await harness.settled();
     expect(harness.patch).toHaveBeenCalledTimes(1);
     field().dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
-    await settle();
+    await harness.settled();
     expect(harness.patch).toHaveBeenCalledTimes(2);
     expect(harness.patch.mock.calls[1][1]).toMatchObject({ draft: 'x' });
     expect(harness.patch.mock.calls[1][2]).toMatchObject({ draft: '' });
@@ -233,7 +233,7 @@ describe('todo', () => {
     harness = setup('todo');
     harness.start();
     document.querySelector<HTMLInputElement>('input[type=checkbox]')!.click();
-    await settle();
+    await harness.settled();
     expect(getLoaded().toSorted()).toEqual(['binding=todos.*.done', 'handler=toggle']);
     const [, prev, next] = harness.patch.mock.calls[0];
     expect((prev.todos as { done: boolean }[])[0].done).toBe(true);

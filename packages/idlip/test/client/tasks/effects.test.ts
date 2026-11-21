@@ -25,10 +25,11 @@ afterEach(() => {
   cleanup = undefined;
 });
 
-async function settle(): Promise<void> {
-  for (let tick = 0; tick < 8; tick++) {
+// Waits for the state itself, since a chunk import takes as long as the machine allows.
+async function until(done: () => boolean): Promise<void> {
+  while (!done()) {
     await new Promise((resolve) => {
-      setTimeout(resolve, 10);
+      setTimeout(resolve, 2);
     });
   }
 }
@@ -78,8 +79,12 @@ it('runs the compiled effects chunks: props reach a continuation and awaits chai
   const [, save, rename] = [...document.querySelectorAll('button')];
 
   // `persist` carries `props$step` (1) into its continuation: saved goes from 0 to 1.
+  function lastLabel(): unknown {
+    return (patch.mock.calls.at(-1)?.[2] as { label?: unknown } | undefined)?.label;
+  }
   save.click();
-  await settle();
+  await until(() => lastLabel() === 'done' || errors.length > 0);
+  await resumed.settled();
   expect(errors).toEqual([]);
   expect(scope.idlipSaved).toEqual([[]]);
   expect(patch.mock.calls.at(-1)![2]).toMatchObject({ saved: 1, label: 'done' });
@@ -87,7 +92,8 @@ it('runs the compiled effects chunks: props reach a continuation and awaits chai
 
   // `rename` awaits twice and carries a local between the awaits.
   rename.click();
-  await settle();
+  await until(() => lastLabel() === 'todo/0:todo/0/0:0' || errors.length > 0);
+  await resumed.settled();
   expect(patch.mock.calls.at(-1)![2]).toMatchObject({ label: 'todo/0:todo/0/0:0' });
   expect(errors).toEqual([]);
 });

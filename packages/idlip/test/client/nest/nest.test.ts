@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { isComment } from '../../../src/client/patch/guards.ts';
-import { getLoaded, settle, setup } from './harness.ts';
+import { getLoaded, setup } from './harness.ts';
 import type { Harness } from './harness.ts';
 
 let harness: Harness | undefined;
@@ -23,7 +23,7 @@ describe('nested board', () => {
   it('runs a child click on its own slot and loads only the child chunks', async () => {
     harness = setup();
     getButtons('+')[1].click();
-    await settle();
+    await harness.settled();
     expect(getCounts()).toEqual(['0', '1', '0']);
     expect(getLoaded().toSorted()).toEqual(['counter:binding=count', 'counter:handler=increment']);
     expect(harness.errors).toEqual([]);
@@ -34,16 +34,16 @@ describe('nested board', () => {
     getButtons('+')[0].click();
     getButtons('+')[0].click();
     getButtons('+')[2].click();
-    await settle();
+    await harness.settled();
     expect(getCounts()).toEqual(['2', '0', '1']);
   });
 
   it('runs the parent remove for a message prop and drops the slot', async () => {
     harness = setup();
     getButtons('+')[1].click();
-    await settle();
+    await harness.settled();
     getButtons('Remove')[1].click();
-    await settle();
+    await harness.settled();
     expect(getCounts()).toEqual(['0', '0']);
     expect(document.querySelector('p')?.textContent).toBe('1 counters');
     expect(harness.errors).toEqual([]);
@@ -53,11 +53,11 @@ describe('nested board', () => {
     harness = setup();
     const gone = getButtons('+')[1];
     getButtons('Remove')[1].click();
-    await settle();
+    await harness.settled();
     expect(harness.errors).toEqual([]);
     expect(getCounts()).toEqual(['0', '0']);
     gone.click();
-    await settle();
+    await harness.settled();
     expect(getCounts()).toEqual(['0', '0']);
     expect(harness.errors).toEqual([]);
   });
@@ -65,7 +65,7 @@ describe('nested board', () => {
   it('runs a message prop that has no paths on the parent', async () => {
     harness = setup();
     getButtons('Remove')[0].click();
-    await settle();
+    await harness.settled();
     expect(getCounts()).toEqual(['0']);
     expect(harness.errors).toEqual([]);
   });
@@ -73,10 +73,10 @@ describe('nested board', () => {
   it('patches the props binding of a child when the parent passes a new prop', async () => {
     harness = setup();
     getButtons('+')[2].click();
-    await settle();
+    await harness.settled();
     getLoaded().length = 0;
     harness.send('relabel', ['a2', 'Renamed']);
-    await settle();
+    await harness.settled();
     const labels = [...document.querySelectorAll('span')].map((s) => s.textContent);
     expect(labels).toEqual(['Spare', 'First', 'Renamed']);
     // The child's own state stays.
@@ -89,14 +89,14 @@ describe('nested board', () => {
   it('runs the child init for a client-added row and then its handlers', async () => {
     harness = setup();
     harness.send('add', ['a3', 'Third']);
-    await settle();
+    await harness.settled();
     expect(getCounts()).toEqual(['0', '0', '0', '0']);
     expect(getLoaded()).toContain('counter:view');
     getButtons('+')[3].click();
-    await settle();
+    await harness.settled();
     expect(getCounts()).toEqual(['0', '0', '0', '1']);
     getButtons('Remove')[3].click();
-    await settle();
+    await harness.settled();
     expect(getCounts()).toEqual(['0', '0', '0']);
     expect(harness.errors).toEqual([]);
   });
@@ -104,14 +104,14 @@ describe('nested board', () => {
   it('keeps the slots when rows move', async () => {
     harness = setup();
     getButtons('+')[2].click();
-    await settle();
+    await harness.settled();
     harness.send('reverse', []);
-    await settle();
+    await harness.settled();
     const labels = [...document.querySelectorAll('span')].map((s) => s.textContent);
     expect(labels).toEqual(['Spare', 'Second', 'First']);
     expect(getCounts()).toEqual(['0', '1', '0']);
     getButtons('+')[1].click();
-    await settle();
+    await harness.settled();
     expect(getCounts()).toEqual(['0', '2', '0']);
     expect(harness.errors).toEqual([]);
   });
@@ -119,11 +119,11 @@ describe('nested board', () => {
   it('starts a row that returns under the same key from its props', async () => {
     harness = setup();
     getButtons('+')[2].click();
-    await settle();
+    await harness.settled();
     getButtons('Remove')[2].click();
-    await settle();
+    await harness.settled();
     harness.send('add', ['a2', 'Again']);
-    await settle();
+    await harness.settled();
     expect(getCounts()).toEqual(['0', '0', '0']);
     expect([...document.querySelectorAll('span')].map((s) => s.textContent)).toEqual([
       'Spare',
@@ -149,7 +149,7 @@ describe('nested board', () => {
       }
     }
     harness.send('relabel', ['a2', 'Renamed']);
-    await settle();
+    await harness.settled();
     // The child's `t0` is not applied to the `t0` of the root.
     expect(document.querySelector('p')?.textContent).toBe('2 counters');
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('1:a2'));
