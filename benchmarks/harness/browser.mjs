@@ -1,10 +1,24 @@
 import { gzipSync } from 'node:zlib';
+import { COUNT_ARG } from './count.mjs';
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 function isScript(entry) {
   return entry.type === 'script' || /\.m?js(\?|$)/.test(entry.url);
+}
+
+// These two run in the page. They rebuild the count reader from its source, because a function
+// sent to the page cannot use imports. The tests run them against a DOM.
+export function prepareLeft({ source }) {
+  window.__left = new Function(`return (${source})`)()(document);
+}
+
+export function toggleDone({ source }) {
+  const left = new Function(`return (${source})`)()(document);
+  return (
+    left === window.__left - 1 && document.querySelectorAll('ul li')[1].className.includes('done')
+  );
 }
 
 // The interactions. Each one has an action and a check that runs in the page.
@@ -17,9 +31,8 @@ const INTERACTIONS = {
   },
   toggle: {
     run: (page) => page.locator('ul li button').nth(1).click(),
-    done: () =>
-      /(\d+) left/.exec(document.body.textContent)?.[1] === String(window.__left - 1) &&
-      document.querySelectorAll('ul li')[1].className.includes('done'),
+    arg: COUNT_ARG,
+    done: toggleDone,
   },
   add: {
     run: async (page) => {
@@ -50,7 +63,7 @@ function total(entries) {
 // Loads the page, waits while idle, then runs the steps in order. Records every request with
 // the phase in which it started. Each step has a `name`, a `run(page)` and a `done(arg)` that
 // runs in the page.
-async function run(browser, base, pageUrl, steps, { idleMs, prepare }) {
+async function run(browser, base, pageUrl, steps, { idleMs, prepare, prepareArg }) {
   const context = await browser.newContext();
   const page = await context.newPage();
   const log = [];
@@ -85,7 +98,7 @@ async function run(browser, base, pageUrl, steps, { idleMs, prepare }) {
   await page.waitForLoadState('networkidle');
   await sleep(idleMs);
   if (prepare) {
-    await page.evaluate(prepare);
+    await page.evaluate(prepare, prepareArg);
   }
 
   const checks = {};
@@ -128,9 +141,8 @@ function session(browser, base, order, { idleMs, n }) {
   }
   return run(browser, base, `${base}/?n=${n}`, steps, {
     idleMs,
-    prepare: () => {
-      window.__left = Number(/(\d+) left/.exec(document.body.textContent)[1]);
-    },
+    prepareArg: COUNT_ARG,
+    prepare: prepareLeft,
   });
 }
 

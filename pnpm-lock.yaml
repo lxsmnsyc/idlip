@@ -194,6 +194,16 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
+  benchmarks/brumate:
+    dependencies:
+      brumate:
+        specifier: npm:brumate@0.8.1
+        version: 0.8.1(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(yaml@2.9.1))
+    devDependencies:
+      vite:
+        specifier: 8.3.4
+        version: 8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(yaml@2.9.1)
+
   benchmarks/brumate-0.3:
     dependencies:
       brumate:
@@ -206,6 +216,9 @@ importers:
 
   benchmarks/harness:
     devDependencies:
+      happy-dom:
+        specifier: 21.0.4
+        version: 21.0.4
       playwright-core:
         specifier: 1.64.1
         version: 1.64.1
@@ -1993,6 +2006,12 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@seroval/transport@0.1.3':
+    resolution: {integrity: sha512-XNfwv2j05RZfZB4FBRSQPOGb/KIZVMuPn3ZpnP0dslqb8ou2a4Qif2R/cJPL9mK+ebDyJuiIDQ8oM72g03LFGg==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      seroval: ^1.8.0
+
   '@twinkleplop/bash@0.1.7':
     resolution: {integrity: sha512-/cBFzqKcfffT6aaWlSeUhjoXJS3VhG4Tz1sg1oJILooVlbD3WX2Ke+zRWFLS+GmoXrl8hlQF/ZsMNmila41/Jw==}
 
@@ -2244,6 +2263,25 @@ packages:
       sass: '>=1.70'
       vite: ^8.0.0
     peerDependenciesMeta:
+      less:
+        optional: true
+      sass:
+        optional: true
+      vite:
+        optional: true
+
+  brumate@0.8.1:
+    resolution: {integrity: sha512-6XWYlzijmJ007s8CJwrOxe+k/fj5azg9Pj4oec3UCUff5QlJ32gU6hzWBqQlOnfOhdEEFY6CZ1jX0IVmkJWPRQ==}
+    engines: {node: '>=22'}
+    hasBin: true
+    peerDependencies:
+      axe-core: '>=4.8'
+      less: '>=4'
+      sass: '>=1.70'
+      vite: ^8.0.0
+    peerDependenciesMeta:
+      axe-core:
+        optional: true
       less:
         optional: true
       sass:
@@ -4091,6 +4129,10 @@ snapshots:
   '@rollup/rollup-win32-x64-msvc@4.68.7':
     optional: true
 
+  '@seroval/transport@0.1.3(seroval@1.8.2)':
+    dependencies:
+      seroval: 1.8.2
+
   '@twinkleplop/bash@0.1.7':
     dependencies:
       '@twinkleplop/core': 0.3.1
@@ -4277,6 +4319,21 @@ snapshots:
 
   brumate@0.3.0(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(yaml@2.9.1)):
     dependencies:
+      '@twinkleplop/core': 0.3.1
+      '@twinkleplop/css': 0.1.7
+      '@twinkleplop/theme-github': 0.2.4
+      '@twinkleplop/tsx': 0.1.7
+      oxc-parser: 0.154.0
+      postcss: 8.5.33
+      postcss-selector-parser: 7.2.1
+      seroval: 1.8.2
+      seroval-plugins: 1.8.0(seroval@1.8.2)
+    optionalDependencies:
+      vite: 8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(yaml@2.9.1)
+
+  brumate@0.8.1(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.2)(yaml@2.9.1)):
+    dependencies:
+      '@seroval/transport': 0.1.3(seroval@1.8.2)
       '@twinkleplop/core': 0.3.1
       '@twinkleplop/css': 0.1.7
       '@twinkleplop/theme-github': 0.2.4
