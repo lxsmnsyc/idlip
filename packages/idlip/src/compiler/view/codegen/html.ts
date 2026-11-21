@@ -91,10 +91,10 @@ export class HtmlBuilder {
   }
 
   pickAccumulator(): string {
-    // The `$` keeps the name apart from `rows` in the scope and from the author's names.
-    let name = 'rows$';
+    // A leading `$` without a trailing one is a form `getLocalName` never returns.
+    let name = '$rows';
     for (let count = 2; this.accumulators.has(name); count++) {
-      name = `rows$${count}`;
+      name = `$rows${count}`;
     }
     this.accumulators.add(name);
     return name;
