@@ -1,7 +1,7 @@
 ---
 id: dynamic-paths
 title: Runtime path tracking for dynamic holes
-status: active
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-20
-spent:
+spent: 363165
 owns:
   - packages/idlip/src/client/dynamic.ts
   - packages/idlip/src/server/dynamic.ts
@@ -68,11 +68,11 @@ Behind `HAS_DYNAMIC` (detector: a manifest or state record names a dynamic hole)
 
 ## Acceptance
 
-- [ ] A fixture with a dynamic hole renders on the server with `dynamic` paths in the state script.
-- [ ] After a handler changes a path the hole read, only that hole patches; after the hole's reads change, the next patch uses the new paths.
-- [ ] A module with no dynamic hole compiles to identical output (todo goldens unchanged) and the todo loader grows by at most 20 B.
-- [ ] Fast check passes: `pnpm --filter idlip test`
-- [ ] Change request: `contracts/compiled-format-dynamic.change-request.md` and `contracts/view-ir-dynamic.change-request.md`.
+- [x] A fixture with a dynamic hole renders on the server with `dynamic` paths in the state script.
+- [x] After a handler changes a path the hole read, only that hole patches; after the hole's reads change, the next patch uses the new paths.
+- [x] A module with no dynamic hole compiles to identical output (todo goldens unchanged) and the todo loader grows by at most 20 B.
+- [x] Fast check passes: `pnpm --filter idlip test`
+- [x] Change request: `contracts/compiled-format-dynamic.change-request.md` and `contracts/view-ir-dynamic.change-request.md`.
 
 ## Sizing
 
@@ -86,3 +86,5 @@ Compiler, server and client; sized M by splitting the grammar choice to the smal
 ## Orchestrator decision (one-shot run)
 
 Use the two proposed sources of `dynamic` holes: whole-model helper calls and aliases of the model. The user can revisit.
+
+Landed as 439a849 on `batch/core` after one fresh review round (static fallback inside rows, blocks and children; `$dynamic` preloaded with handlers; `has`/`ownKeys` traps). Flag off +0 B, on +117 B. Limit: object-keyed records grow `PageState.dynamic` with key count.
