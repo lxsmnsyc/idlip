@@ -1,7 +1,7 @@
 ---
 id: spike-chunk-merge
 title: Spike: does merging chunks speed up the first click
-status: todo
+status: active
 priority: should
 type: spike
 story:
