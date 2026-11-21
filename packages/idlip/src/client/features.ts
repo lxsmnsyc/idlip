@@ -13,6 +13,7 @@ declare const __IDLIP_HAS_KEYED__: boolean | undefined;
 declare const __IDLIP_HAS_REFS__: boolean | undefined;
 declare const __IDLIP_HAS_CHILDREN__: boolean | undefined;
 declare const __IDLIP_HAS_SUBS__: boolean | undefined;
+declare const __IDLIP_HAS_HEAD__: boolean | undefined;
 
 /** Handlers that `await`, which the task runner serves. */
 export const HAS_TASKS: boolean = typeof __IDLIP_HAS_TASKS__ === 'undefined' || __IDLIP_HAS_TASKS__;
@@ -27,3 +28,5 @@ export const HAS_CHILDREN: boolean =
   typeof __IDLIP_HAS_CHILDREN__ === 'undefined' || __IDLIP_HAS_CHILDREN__;
 /** `<Subscribe>` blocks, which the loader starts and stops with their markers. */
 export const HAS_SUBS: boolean = typeof __IDLIP_HAS_SUBS__ === 'undefined' || __IDLIP_HAS_SUBS__;
+/** `<Head>` blocks, which the loader adds to and removes from `<head>` with their markers. */
+export const HAS_HEAD: boolean = typeof __IDLIP_HAS_HEAD__ === 'undefined' || __IDLIP_HAS_HEAD__;

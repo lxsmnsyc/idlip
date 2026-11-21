@@ -69,6 +69,8 @@ export interface Manifest {
    * `<Try>`.
    */
   readonly fallback?: Readonly<Record<string, string>>;
+  /** True when the view has a `<Head>`, which the loader serves. Absent otherwise. */
+  readonly head?: true;
   /** Binding groups by key, ordered so a group comes before the groups it covers. */
   readonly groups: Readonly<Record<string, BindingGroup>>;
   /** `<For>` blocks by binding id, written as a string. */
@@ -161,6 +163,17 @@ export interface Boot extends Array<StateRecord> {
 export interface RenderContext {
   /** Records the state of the root component. */
   state(state: PageState): void;
+  /** Reserves the id of one `<Head>` block. Ids count up in render order, from 0. A host context without head output may leave these out. */
+  headId?(): number;
+  /**
+   * Records what a `<Head>` block writes in `<head>`: `markup` for its elements except the
+   * title, and `title` for its `<title>` element. Every element carries `i-head="<id>.<index>"`.
+   */
+  head?(id: number, markup: string, title?: string): void;
+  /** Returns a checkpoint of the head output, so a `<Try>` body that throws can drop its own. */
+  headMark?(): number;
+  /** Drops the head output recorded after a checkpoint. */
+  headRollback?(mark: number): void;
 }
 
 /** The default export of a compiled server module. */

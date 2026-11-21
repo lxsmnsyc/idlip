@@ -3,6 +3,7 @@ import type { Component, Expr } from '../analyze/index.ts';
 import type { Module } from '../../../core/format.ts';
 import { printHelpers } from '../../../core/helpers.ts';
 import { printSlot } from './child.ts';
+import { emitHeadBody } from './head.ts';
 import { printHtmlBody } from './raw.ts';
 import { emitSubscribeBinding } from './subscribe.ts';
 import { getMessage } from './events.ts';
@@ -81,6 +82,14 @@ function emitBinding(binding: Binding, context: ChunkContext): Emitted {
     }
     case 'html': {
       const body = printHtmlBody(source, emitter);
+      return {
+        code: `export function ${binding.name}(${printParams('el', usage)}) {\n${body}\n}`,
+        usage,
+      };
+    }
+    case 'head-attr':
+    case 'head-title': {
+      const body = emitHeadBody(source, emitter);
       return {
         code: `export function ${binding.name}(${printParams('el', usage)}) {\n${body}\n}`,
         usage,

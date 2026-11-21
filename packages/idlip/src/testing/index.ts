@@ -19,7 +19,7 @@ import { renderListener } from '../client/loader/listener.ts';
 import { resume } from '../client/loader/resume.ts';
 import { restartSub } from '../client/subs/index.ts';
 import * as clientExports from '../client/patch/index.ts';
-import { render } from '../server/render.ts';
+import { renderPage } from '../server/render.ts';
 import * as serverExports from '../server/index.ts';
 import { compareTrees } from './compare.ts';
 import { bindImports, toDataUrl } from './modules.ts';
@@ -171,7 +171,13 @@ async function start(
   const server = (await importCode(bindImports(compiled.server, key))) as ServerModule;
   // `render` passes the context itself.
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-  const html = await render(server.default as (props: Props) => unknown, props, { nonce });
+  const rendered = await renderPage(server.default as (props: Props) => unknown, props, { nonce });
+  const { body: html } = rendered;
+  // The elements of a `<Head>` go in the document head, which `stop` clears again.
+  const headRoot = document.createElement('div');
+  headRoot.innerHTML = rendered.head;
+  const headElements = [...headRoot.children];
+  document.head.append(...headElements);
   const markup = html.replace(STATE_SCRIPT, '');
   const stateScript = STATE_BODY.exec(html.slice(markup.length))?.[1] ?? '';
 
@@ -238,7 +244,7 @@ async function start(
     checked = true;
     // The server module renders from the model it is given instead of from props.
     const fresh = document.createElement('div');
-    const context: RenderContext = { state() {} };
+    const context: RenderContext = { state() {}, headId: () => 0, head() {} };
     fresh.innerHTML = server.default(props, context, patched);
     const difference = compareTrees(root, fresh, (node) => node instanceof HTMLScriptElement);
     if (difference !== undefined) {
@@ -277,6 +283,9 @@ async function start(
         loader.stop();
         listeners.stop();
         root.remove();
+        for (const element of document.head.querySelectorAll('[i-head]')) {
+          element.remove();
+        }
         Reflect.deleteProperty(globalThis, key);
         Reflect.deleteProperty(globalThis, '$idlip');
         live = false;

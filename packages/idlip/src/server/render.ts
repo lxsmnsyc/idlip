@@ -1,5 +1,6 @@
 import { Feature, serialize } from 'seroval';
 import type { ChunkUrls, Manifest, Model, PageState, Props } from '../core/format.ts';
+import { DEV } from '../core/dev.ts';
 import { attr } from './helpers.ts';
 
 export interface RenderOptions {
@@ -50,6 +51,17 @@ interface ComponentState extends PageState {
 /** `RenderContext` with the nesting additions of compiled-format v10. */
 interface NestedContext {
   state(state: ComponentState, path?: string): void;
+  headId(): number;
+  head(id: number, markup: string, title?: string): void;
+  headMark(): number;
+  headRollback(mark: number): void;
+}
+
+/** What `renderPage` returns: the markup for `<head>`, and the body markup with the state script. */
+export interface RenderResult {
+  /** The elements of every `<Head>`. The title of the last block is first. */
+  head: string;
+  body: string;
 }
 
 /** What the state script holds: the root's state, the child manifests and the slots. */
@@ -174,10 +186,28 @@ function mergeState(root: ComponentState, children: Map<string, ComponentState>)
   };
 }
 
-function renderSync(component: (props: never) => unknown, props: unknown, nonce?: string): string {
+function renderSync(
+  component: (props: never) => unknown,
+  props: unknown,
+  nonce?: string,
+): RenderResult {
   let root: ComponentState | undefined;
+  let heads = 0;
+  const entries: { id: number; markup: string; title: string | undefined }[] = [];
   const children = new Map<string, ComponentState>();
   const context: NestedContext = {
+    headId() {
+      return heads++;
+    },
+    head(id, markup, title) {
+      entries.push({ id, markup, title });
+    },
+    headMark() {
+      return entries.length;
+    },
+    headRollback(mark) {
+      entries.length = mark;
+    },
     state(state, path) {
       // The root has no path, or the empty one.
       if (path === undefined || path === '') {
@@ -205,11 +235,25 @@ function renderSync(component: (props: never) => unknown, props: unknown, nonce?
       'The component recorded no state. Pass the default export of a compiled module',
     );
   }
-  return markup + writeState(mergeState(root, children), nonce);
+  // The last title goes first, since a reader without scripts takes the first one.
+  const titles: string[] = [];
+  const head: string[] = [];
+  // Ids follow the order of the markup, which a `<Try>` body breaks for the calls.
+  entries.sort((a, b) => a.id - b.id);
+  for (const entry of entries) {
+    head.push(entry.markup);
+    if (entry.title !== undefined) {
+      titles.push(entry.title);
+    }
+  }
+  // The last title is the one that wins, so it goes first. The others follow, for the client.
+  head.unshift(...titles.slice(-1), ...titles.slice(0, -1));
+  return { head: head.join(''), body: markup + writeState(mergeState(root, children), nonce) };
 }
 
 /**
- * Renders a compiled component to HTML: its markup, then its state script.
+ * Renders a compiled component to HTML: its markup, then its state script. The elements of a
+ * `<Head>` are not in the result: use `renderPage` to get them.
  */
 // A promise executor turns a thrown error into a rejection without an `await`.
 // oxlint-disable-next-line typescript/promise-function-async
@@ -218,6 +262,26 @@ export function render<P>(
   props: P,
   options: RenderOptions = {},
 ): Promise<string> {
+  return new Promise((resolve) => {
+    const { head, body } = renderSync(component, props, options.nonce);
+    if (DEV && head !== '') {
+      // oxlint-disable-next-line no-console
+      console.warn('idlip: render() drops the <Head> output of the page. Use renderPage().');
+    }
+    resolve(body);
+  });
+}
+
+/**
+ * Renders a compiled component and returns the markup for `<head>` next to the body markup.
+ * The host writes `head` inside `<head>` and `body` in `<body>`.
+ */
+// oxlint-disable-next-line typescript/promise-function-async
+export function renderPage<P>(
+  component: (props: P) => unknown,
+  props: P,
+  options: RenderOptions = {},
+): Promise<RenderResult> {
   return new Promise((resolve) => {
     resolve(renderSync(component, props, options.nonce));
   });

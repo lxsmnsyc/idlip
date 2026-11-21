@@ -20,6 +20,8 @@ function readLiveProperties(element: Element, attributes: Map<string, string>): 
   for (const name of LIVE_PROPERTIES) {
     attributes.delete(name);
   }
+  // A head block that a patch adds takes a number after every block on the page.
+  attributes.delete('i-head');
   if (element instanceof HTMLInputElement) {
     attributes.set('value', element.value);
     attributes.set('checked', String(element.checked));

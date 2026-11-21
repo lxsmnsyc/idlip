@@ -6,6 +6,8 @@ type ForNode = Extract<Node, { kind: 'for' }>;
 export type ChildNode = Extract<Node, { kind: 'child' }>;
 export type SubscribeNode = Extract<Node, { kind: 'subscribe' }>;
 export type TryNode = Extract<Node, { kind: 'try' }>;
+export type HeadNode = Extract<Node, { kind: 'head' }>;
+type ElementNode = Extract<Node, { kind: 'element' }>;
 
 export type Source =
   | { kind: 'attr'; name: string; hole: Hole }
@@ -14,6 +16,8 @@ export type Source =
   | { kind: 'message'; child: ChildNode; event: Event }
   | { kind: 'event'; event: Event }
   | { kind: 'subscribe'; node: SubscribeNode }
+  | { kind: 'head-attr'; index: number; name: string; hole: Hole }
+  | { kind: 'head-title'; index: number; children: Node[] }
   | { kind: 'text'; hole: Hole }
   | { kind: 'condition'; node: Extract<Node, { kind: 'condition' }> }
   | { kind: 'list'; node: Extract<Node, { kind: 'for' }> };
@@ -104,6 +108,8 @@ export interface Plan {
   tries: TryInfo[];
   /** The region id of each `<Try>` node. */
   tryIds: Map<Node, number>;
+  /** The id of the marker block of each `<Head>`. */
+  heads: Map<Node, number>;
 }
 
 /** Prints the source of a keyed segment: the model path of its value. */
@@ -180,6 +186,7 @@ class Planner {
   sources = new Map<string, Root>();
   tries: TryInfo[] = [];
   tryIds = new Map<Node, number>();
+  heads = new Map<Node, number>();
   nextEvent: number;
 
   constructor(
@@ -343,6 +350,58 @@ class Planner {
     }
   }
 
+  /** Plans the bindings of one element of a `<Head>`. Returns the ids. */
+  planHeadElement(element: ElementNode, index: number, context: WalkContext): number[] {
+    const ids: number[] = [];
+    for (const attr of element.attrs) {
+      if (attr.value.kind === 'hole') {
+        const id = this.bindHole(attr.value.hole, 'a', context, {
+          kind: 'head-attr',
+          index,
+          name: attr.name,
+          hole: attr.value.hole,
+        });
+        if (id !== undefined) {
+          ids.push(id);
+        }
+      }
+    }
+    if (element.events.length > 0 || element.ref !== undefined || element.html !== undefined) {
+      this.report(
+        'codegen-unsupported',
+        'A head element takes no events, ref or html',
+        element.span,
+      );
+    }
+    if (element.tag === 'title') {
+      // The holes of a title are not patched one by one: one binding sets the whole text.
+      const paths = new Set<string>();
+      let first: Hole | undefined;
+      for (const child of element.children) {
+        if (child.kind === 'text-hole') {
+          first ??= child.hole;
+          for (const path of getStatePaths(
+            child.hole.paths,
+            this.report,
+            child.hole.span,
+            this.child,
+          )) {
+            paths.add(path);
+          }
+        }
+      }
+      if (first !== undefined && paths.size > 0) {
+        this.addBinding('a', first.id, [...paths].sort(), context, {
+          kind: 'head-title',
+          index,
+          children: element.children,
+        });
+        ids.push(first.id);
+      }
+    }
+    return ids;
+  }
+
   walk(nodes: Node[], context: WalkContext): void {
     for (const node of nodes) {
       switch (node.kind) {
@@ -434,6 +493,32 @@ class Planner {
           this.scanCatch(node.catch);
           break;
         }
+        case 'head': {
+          this.heads.set(node, this.nextEvent++);
+          const ids: number[] = [];
+          let index = 0;
+          let titles = 0;
+          for (const child of node.children) {
+            if (child.kind !== 'element') {
+              this.report('codegen-unsupported', 'A <Head> holds elements only', {
+                start: 0,
+                end: 0,
+              });
+              continue;
+            }
+            titles += child.tag === 'title' ? 1 : 0;
+            if (titles > 1) {
+              this.report('head-title-twice', 'A <Head> holds one <title>', child.span);
+              continue;
+            }
+            ids.push(...this.planHeadElement(child, index, context));
+            index++;
+          }
+          if (ids.length > 0) {
+            this.anchors.set(node, ids);
+          }
+          break;
+        }
         case 'global': {
           const ids = this.bindEvents(node.events, context);
           if (ids.length > 0) {
@@ -442,7 +527,7 @@ class Planner {
           break;
         }
         default:
-          this.report('codegen-unsupported', `A ${node.kind} block is not generated yet`, {
+          this.report('codegen-unsupported', 'A block is not generated yet', {
             start: 0,
             end: 0,
           });
@@ -478,6 +563,7 @@ export function planBindings(component: Component, report: Report, child = false
     sources: planner.sources,
     tries: planner.tries,
     tryIds: planner.tryIds,
+    heads: planner.heads,
   };
 }
 

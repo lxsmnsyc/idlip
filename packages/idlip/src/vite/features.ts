@@ -28,6 +28,7 @@ const DETECTORS: Readonly<Record<string, Detector>> = {
   REFS: ({ manifest }) => manifest.after === true,
   CHILDREN: hasChildren,
   SUBS: ({ manifest }) => manifest.sources !== undefined,
+  HEAD: ({ manifest }) => manifest.head === true,
 };
 
 /** Returns the flags that the compiled modules turn on. */

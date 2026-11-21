@@ -169,6 +169,7 @@ function buildManifest(
     ...(Object.keys(tasks).length === 0 ? {} : { tasks }),
     ...(plan.sources.size === 0 ? {} : { sources: [...plan.sources.keys()] }),
     ...(plan.tries.length === 0 ? {} : { fallback }),
+    ...(plan.heads.size === 0 ? {} : { head: true as const }),
     groups: groupEntries,
     lists,
     ...(child ? { view: { chunk: 'view' } } : {}),

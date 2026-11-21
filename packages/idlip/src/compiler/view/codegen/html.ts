@@ -3,7 +3,7 @@ import type { Component, Node } from '../analyze/index.ts';
 import { addChildNode } from './child.ts';
 import { getMessage, printModifiers } from './events.ts';
 import type { Emitter } from './expr.ts';
-import type { Plan } from './plan.ts';
+import type { HeadNode, Plan } from './plan.ts';
 import { addRawHtml } from './raw.ts';
 import {
   escapeAttribute,
@@ -65,6 +65,9 @@ function addCode(built: Built, value: string): void {
 }
 
 export class HtmlBuilder {
+  /** Set while a server render writes a head element: the variable of its block and its index. */
+  headMark: { variable: string; index: number } | undefined;
+
   /** Variable names in use for list rows. */
   accumulators: Set<string> = new Set();
 
@@ -149,6 +152,9 @@ export class HtmlBuilder {
       case 'try':
         this.addTry(node, built);
         break;
+      case 'head':
+        this.addHead(node, built);
+        break;
       case 'global':
         addText(built, `<template i-global="${node.target}"`);
         this.addEvents(node.events, built);
@@ -207,12 +213,17 @@ export class HtmlBuilder {
         ...parts,
         { kind: 'text', value: '<!--/e-->' },
       ]);
+    // A body that throws after a `<Head>` or a child wrote its head output drops that output.
+    const marked =
+      this.target === 'server' && (this.plan.heads.size > 0 || this.plan.uses.length > 0);
     built.pre.push(
       `let ${variable};`,
+      ...(marked ? [`const $mark${id} = context.headMark?.() ?? 0;`] : []),
       'try {',
       ...body.pre,
       `${variable} = ${wrap(0, body.parts)};`,
       '} catch ($e) {',
+      ...(marked ? [`context.headRollback?.($mark${id});`] : []),
       `const ${error} = $e instanceof Error ? $e.name + ': ' + $e.message : String($e);`,
       ...catchBuilt.pre,
       `${variable} = ${wrap(1, catchBuilt.parts)};`,
@@ -227,6 +238,48 @@ export class HtmlBuilder {
     const built = this.build(node.catch);
     this.catching.pop();
     return built;
+  }
+
+  /**
+   * Writes the marker block of a `<Head>`. A client template holds the elements in the marker,
+   * and the loader moves them to `<head>`. The server writes the elements through `context`
+   * instead, each with `i-head="<id>.<index>"`, and the marker stays empty.
+   */
+  addHead(node: HeadNode, built: Built): void {
+    const id = this.plan.heads.get(node);
+    const elements: Extract<Node, { kind: 'element' }>[] = [];
+    for (const child of node.children) {
+      if (child.kind === 'element') {
+        elements.push(child);
+      }
+    }
+    if (this.target === 'client') {
+      addText(built, `<!--c${id}:h--><template i-head=""`);
+      this.addAnchor(node, built);
+      addText(built, '>');
+      for (const element of elements) {
+        this.addElement(element, built);
+      }
+      addText(built, '</template><!--/c-->');
+      return;
+    }
+    const variable = `$head${id}`;
+    built.pre.push(`const ${variable} = context.headId?.() ?? 0;`);
+    const rest = createBuilt();
+    const title = createBuilt();
+    for (const [index, element] of elements.entries()) {
+      this.headMark = { variable, index };
+      this.addElement(element, element.tag === 'title' ? title : rest);
+    }
+    this.headMark = undefined;
+    built.pre.push(...rest.pre, ...title.pre);
+    const titleArgument = title.parts.length === 0 ? '' : `, ${joinParts(title.parts)}`;
+    addText(built, `<!--c${id}:h--><template i-head="`);
+    addCode(built, variable);
+    addText(built, '"');
+    this.addAnchor(node, built);
+    addText(built, '></template><!--/c-->');
+    addCode(built, `(context.head?.(${variable}, ${joinParts(rest.parts)}${titleArgument}), '')`);
   }
 
   addEvents(events: Extract<Node, { kind: 'element' }>['events'], built: Built): void {
@@ -296,7 +349,13 @@ export class HtmlBuilder {
     }
     this.addEvents(node.events, built);
     this.addRef(node, built);
-    this.addAnchor(node, built);
+    if (this.headMark === undefined) {
+      this.addAnchor(node, built);
+    } else {
+      addText(built, ' i-head="');
+      addCode(built, this.headMark.variable);
+      addText(built, `.${this.headMark.index}"`);
+    }
     addText(built, '>');
     if (VOID_TAGS.has(node.tag)) {
       return;

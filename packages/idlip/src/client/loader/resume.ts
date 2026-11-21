@@ -2,7 +2,8 @@
 import { DEV, warnDeepQueue } from '../../core/dev.ts';
 import { getChunkId } from '../../core/format.ts';
 import { runAfter } from '../dom/run.ts';
-import { HAS_CHILDREN, HAS_REFS, HAS_SUBS, HAS_TASKS } from '../features.ts';
+import { HAS_CHILDREN, HAS_HEAD, HAS_REFS, HAS_SUBS, HAS_TASKS } from '../features.ts';
+import { startHead } from '../head.ts';
 import { connectHot } from '../hot.ts';
 import type { Hot } from '../hot.ts';
 import { getChildren, installNesting } from '../nesting.ts';
@@ -512,10 +513,12 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
     report,
   };
   const stopSubs = HAS_SUBS ? startSubs(subsHost) : undefined;
+  const stopHead = HAS_HEAD ? startHead() : undefined;
   flush().catch(report);
 
   function stop(): void {
     stopSubs?.();
+    stopHead?.();
     if (import.meta.hot) {
       stopHotSubs?.();
     }
