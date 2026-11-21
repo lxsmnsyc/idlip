@@ -1,0 +1,33 @@
+import type { JSX } from 'idlip/jsx-runtime';
+
+type Load = { state: 'idle' } | { state: 'loading' } | { state: 'failed'; error: string };
+
+export default function Panel(props: { title: string }): JSX.Element {
+  let load = { state: 'idle' } satisfies Load as Load;
+  let open = false;
+
+  function toggle() {
+    open = !open;
+  }
+  function reload() {
+    load = { state: 'loading' };
+  }
+
+  return (
+    <section>
+      <h1>{props.title}</h1>
+      <button on:click={toggle}>Toggle</button>
+      #if (open) {
+        <p>Open</p>
+      }
+      #if (load.state === 'loading') {
+        <p>Loading</p>
+      } #else if (load.state === 'failed') {
+        <p class="error">{load.error}</p>
+        <button on:click={reload}>Retry</button>
+      } #else {
+        <button on:click={reload}>Load</button>
+      }
+    </section>
+  );
+}

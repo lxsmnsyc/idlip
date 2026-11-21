@@ -1,0 +1,14 @@
+{
+  "name": "bench-idlip",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "idlip": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^8.3.8"
+  }
+}

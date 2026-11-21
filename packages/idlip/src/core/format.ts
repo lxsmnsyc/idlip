@@ -19,7 +19,8 @@ export interface Message<Tag extends string = string, Payload = unknown> {
  */
 export type DomMessage =
   | readonly [tag: string, payload: readonly unknown[]]
-  | readonly [tag: string, payload: readonly unknown[], modifiers: string];
+  | readonly [tag: string, payload: readonly unknown[], modifiers: string]
+  | readonly [tag: string, payload: readonly unknown[], modifiers: string, owner: string];
 
 /**
  * A payload item that the listener replaces when the event fires.
@@ -27,7 +28,6 @@ export type DomMessage =
  */
 export type Placeholder =
   | readonly ['$event', ...segments: string[]]
-  | readonly ['$form', name: string]
   | readonly ['$', ...items: unknown[]];
 
 /** The state fields of a component, by name. */
@@ -42,19 +42,48 @@ export interface Manifest {
   readonly module: string;
   /** Event types the view listens to, sorted. */
   readonly events: readonly string[];
+  /**
+   * Event type to the names of the handlers that the view dispatches on it, sorted. The server
+   * reads it to preload chunks without the markup. Absent when no element dispatches a handler.
+   */
+  readonly listens?: Readonly<Record<string, readonly string[]>>;
   /** Message tag to its update chunk. Continuation tags have entries too. */
   readonly handlers: Readonly<Record<string, HandlerEntry>>;
+  /**
+   * Continuation tag to the chunk that runs its awaited call: `task=<tag>`, or the handler's
+   * own chunk for a built-in such as `Random.id`, which exports `task$<tag>`. Absent when no
+   * handler awaits.
+   */
+  readonly tasks?: Readonly<Record<string, string>>;
+  /** True when a handler returns `after` Dom calls, which the loader runs after the patch. */
+  readonly after?: true;
+  /**
+   * The sources of the `<Subscribe>` blocks of the view, by the name the `i-sub` marker holds.
+   * The source of `name` is the chunk `source=<name>`, which exports `source`. Absent when the
+   * view has no `<Subscribe>`.
+   */
+  readonly sources?: readonly string[];
+  /**
+   * The `<Try>` regions of the view: the region id, as a string, to the chunk `try=<id>`. The
+   * chunk exports `render(error, scope)`, the catch view as HTML. Absent when the view has no
+   * `<Try>`.
+   */
+  readonly fallback?: Readonly<Record<string, string>>;
+  /** True when the view has a `<Head>`, which the loader serves. Absent otherwise. */
+  readonly head?: true;
   /** Binding groups by key, ordered so a group comes before the groups it covers. */
   readonly groups: Readonly<Record<string, BindingGroup>>;
   /** `<For>` blocks by binding id, written as a string. */
   readonly lists: Readonly<Record<string, ListEntry>>;
+  /** Present when a project module renders this module as a child. */
+  readonly view?: { readonly chunk: string };
 }
 
 export interface HandlerEntry {
   readonly chunk: string;
-  /** Reserved for `write-sets`: the state paths the handler writes. */
+  /** The model paths the handler can change, such as `todos.*.done`. Absent: diff every path. */
   readonly writes?: readonly string[];
-  /** Reserved for `write-sets`: the groups whose paths meet `writes`. */
+  /** The group keys the loader starts with the chunk: groups that meet `writes`, minus covered ones. */
   readonly bindings?: readonly string[];
 }
 
@@ -91,6 +120,23 @@ export interface PageState {
   readonly chunks: ChunkUrls;
   readonly model: Model;
   readonly props: Props;
+  /** Manifests of the child modules on the page and of what they can render, by module. */
+  readonly modules?: Readonly<Record<string, Manifest>>;
+  /** Rendered children by model path. */
+  readonly slots?: Readonly<Record<string, Slot>>;
+  /**
+   * The model paths each dynamic hole read when it last ran, by binding name. The client keeps
+   * the record and replaces an entry each time the hole runs again. Absent when the module has
+   * no dynamic hole.
+   */
+  readonly dynamic?: Record<string, string[]>;
+}
+
+/** A rendered child: its module, its model and the props the client reads. */
+export interface Slot {
+  readonly module: string;
+  readonly model: Model;
+  readonly props: Props;
 }
 
 /** Chunk id (`getChunkId`) to the URL the loader imports. */
@@ -106,6 +152,12 @@ export interface QueuedEvent {
   readonly target: Element;
   readonly type: string;
   readonly latest: boolean;
+  /** Item 3 of the message: the model path of the component that owns the handler. */
+  readonly owner?: string;
+  /** Called once the batch that ran this event has patched, or when the event cannot run. */
+  readonly done?: () => void;
+  /** An event whose signal is aborted is dropped before it runs. A subscription sets it. */
+  readonly signal?: AbortSignal;
 }
 
 /** `self.$idlip`: the state records, and the queue the listener fills. */
@@ -117,6 +169,17 @@ export interface Boot extends Array<StateRecord> {
 export interface RenderContext {
   /** Records the state of the root component. */
   state(state: PageState): void;
+  /** Reserves the id of one `<Head>` block. Ids count up in render order, from 0. A host context without head output may leave these out. */
+  headId?(): number;
+  /**
+   * Records what a `<Head>` block writes in `<head>`: `markup` for its elements except the
+   * title, and `title` for its `<title>` element. Every element carries `i-head="<id>.<index>"`.
+   */
+  head?(id: number, markup: string, title?: string): void;
+  /** Returns a checkpoint of the head output, so a `<Try>` body that throws can drop its own. */
+  headMark?(): number;
+  /** Drops the head output recorded after a checkpoint. */
+  headRollback?(mark: number): void;
 }
 
 /** The default export of a compiled server module. */
@@ -140,6 +203,10 @@ export interface Scope {
   readonly model: Model;
   readonly props: Props;
   readonly rows: readonly Row[];
+  /** The model path of the component the binding belongs to. Absent means the root. */
+  readonly path?: string;
+  /** The paths dynamic holes read, by binding name. Only the root has them. */
+  readonly dynamic?: Record<string, string[]>;
 }
 
 /** An `a<id>`, `t<id>` or `c<id>` export: patches the node it is given. */
@@ -148,24 +215,46 @@ export type NodeBinding = (node: Node, scope: Scope) => void;
 /** An `l<id>` export: returns the list of a `<For>` block. */
 export type ListBinding = (scope: Scope) => readonly unknown[];
 
-export type Binding = NodeBinding | ListBinding;
+/** A `p<id>` export: has no node. It passes a prop to a slot by path. */
+export type PropBinding = (scope: Scope) => void;
+
+export type Binding = NodeBinding | ListBinding | PropBinding;
+
+/** The `view` chunk of a child module. */
+export interface ViewChunk {
+  /** The initial model from the state initializers and the props. */
+  readonly init: (props: Props) => Model;
+  /** The whole view, without the boundary markers. */
+  readonly render: (scope: Scope) => string;
+}
 
 /** A handler export: the next model, or the next model and a task. */
 export type Update = (model: Model, payload: readonly unknown[]) => Model | Step;
 
 export interface Step {
+  /** Marks a step, since a model may have a field named `model` or `task`. */
+  readonly $step?: true;
   readonly model: Model;
-  readonly task: Task;
+  readonly task?: Task;
+  /** Dom calls that run once after the batch's patch. */
+  readonly after?: readonly After[];
 }
 
-/** Reserved for `custom-effects`: an awaited call, run by `runTask`. */
+/** A `Dom.focus`, `Dom.scrollIntoView` or `Dom.reset` call of a handler, run after the patch. */
+export interface After {
+  readonly call: 'focus' | 'scrollIntoView' | 'reset';
+  /** The ref name: a string, or `[name, key]` for a row. */
+  readonly args: readonly [string | readonly [string, string | number]];
+}
+
+/** An awaited call, run by `runTask`. */
 export interface Task {
-  /** The awaited call site, such as `Random.id` or `persist:0`. */
+  /** The awaited call site: the continuation tag, such as `persist$1`. A key of `manifest.tasks`. */
   readonly site: string;
   readonly args: readonly unknown[];
   /** The continuation tag, such as `persist$1`. */
   readonly then: string;
-  /** Locals read after the `await`, in the order of `segments[n].carried`. */
+  /** Locals read after the `await` in the order of `segments[n].carried`, then props values. */
   readonly carried: readonly unknown[];
 }
 
@@ -194,6 +283,12 @@ export interface Page {
   readonly manifest: Manifest;
   readonly props: Props;
   readonly load: LoadChunk;
+  /** The model path of a child. Absent for the root. */
+  readonly path?: string;
+  /** The boundary start of a child: its bindings are looked up between it and its end. */
+  readonly start?: Comment;
+  /** The state record's `dynamic`. Only the root has it. */
+  readonly dynamic?: Record<string, string[]>;
 }
 
 /** Owned by `patch-bindings`. The loader awaits it before the next queued message. */
@@ -236,9 +331,6 @@ export type PatchList = (
 /** Owned by `patch-bindings`: registers code that runs when a block is added or removed. */
 export type OnBlock = (add: (start: Comment) => void, remove: (start: Comment) => void) => void;
 
-/** Implemented by `custom-effects`, called by the loader. */
-export type RunTask = (task: Task, dispatch: (message: Message) => void) => Promise<void>;
-
 /** A client module the compiler emits. */
 export interface Module {
   /** The chunk name, such as `handler=toggle` or `binding=todos.*.done`. */
@@ -265,11 +357,17 @@ export interface CompileResult {
 export type Compile = (source: string, id: string) => CompileResult;
 
 /**
- * Returns the file name of a chunk: `binding=todos.*.done` is `binding.todos._.done.js`.
- * The fixtures use it, and so does the Vite plugin for the `name` of an emitted chunk.
+ * Returns the file name of a chunk: `binding=todos.*.done` is `binding.todos._.done.js`. The
+ * first `=` separates the kind. A keyed segment keeps URL-safe characters: `[` is `(`, `]` is `)`
+ * and the `=` inside is `~`, so `binding=todos[id=selected].text` is
+ * `binding.todos(id~selected).text.js`. The fixtures use it, and so does the Vite plugin for the
+ * `name` of an emitted chunk.
  */
 export function getChunkFile(chunk: string): string {
-  return `${chunk.replaceAll('=', '.').replaceAll('*', '_').replaceAll(',', '+')}.js`;
+  const at = chunk.indexOf('=');
+  const kind = at === -1 ? chunk : `${chunk.slice(0, at)}.${chunk.slice(at + 1)}`;
+  const text = kind.replaceAll('=', '~').replaceAll('[', '(').replaceAll(']', ')');
+  return `${text.replaceAll('*', '_').replaceAll(',', '+')}.js`;
 }
 
 /**

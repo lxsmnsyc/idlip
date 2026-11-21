@@ -41,7 +41,7 @@ A todo app written in the idlip DSL renders on the server and resumes in the bro
 - Nothing the client resumes is a closure. Models, messages, commands and subscriptions are plain data.
 - Serialization uses seroval.
 - Build integration is a Vite plugin (`idlip/vite`). The compiler uses `oxc-parser`.
-- One published package, `idlip`, with subpaths: `idlip`, `idlip/server`, `idlip/client`, `idlip/compiler`, `idlip/vite`, `idlip/jsx-runtime`.
+- One published runtime and compiler package, `idlip`, with subpaths (editor tooling for the markup DSL ships separately as `@idlip/language-core` and `@idlip/tsc`, decided at the `markup-syntax` gate): `idlip`, `idlip/server`, `idlip/client`, `idlip/compiler`, `idlip/vite`, `idlip/jsx-runtime`.
 - Code follows the ts-style skill. Prose follows the plain-writing skill.
 
 ## Non-goals
@@ -75,3 +75,7 @@ A todo app written in the idlip DSL renders on the server and resumes in the bro
 
 - After the contract wave (`core-api`, `compiled-format`, `spike-view-analysis`): the user reviews the frozen contracts.
 - After `example-todo`: the user reviews the milestone.
+
+## One-shot run (2026-11-21)
+
+The user asked to run the roadmap in one go. The orchestrator decides gates other than releases (`markup-syntax`, `nesting-format`) and records each decision in the node's outcome, for the user to revisit. Release nodes still stop for the user.

@@ -67,7 +67,10 @@ function toItem(expr: Expr, emitter: Emitter): Item {
       const segments: string[] = [];
       for (const segment of expr.segments) {
         if (typeof segment !== 'string') {
-          emitter.fail('event-placeholder', 'An event argument reads fields by name only');
+          emitter.fail(
+            'event-computed-key',
+            'An event argument reads fields by a fixed name, such as elements.draft.value',
+          );
           break;
         }
         segments.push(segment);
@@ -112,9 +115,28 @@ export function printModifiers(event: Event): string {
   return names.join(' ');
 }
 
-/** Builds the message of an event: the handler tag, the props values, then the arguments. */
-export function getMessage(component: Component, event: Event, emitter: Emitter): Message {
+/**
+ * Builds the message of an event: the handler tag, the props values, then the arguments. An
+ * event on a prop forwards the message that the parent passed. With `owner`, the message is
+ * a message prop: its fourth item is the code of the model path of the component that owns the
+ * handler.
+ */
+export function getMessage(
+  component: Component,
+  event: Event,
+  emitter: Emitter,
+  owner?: string,
+): Message {
   emitter.at = event.span;
+  if (event.target.kind === 'prop') {
+    const path: Expr = {
+      kind: 'path',
+      root: { kind: 'props' },
+      segments: [event.target.name],
+      optional: false,
+    };
+    return { json: undefined, code: emitter.expr(path, 0) };
+  }
   const tag = event.target.kind === 'handler' ? event.target.name : '';
   // Props values come first, then the arguments. `compile-update` owns the list.
   const items: Item[] = [];
@@ -155,12 +177,14 @@ export function getMessage(component: Component, event: Event, emitter: Emitter)
   items.push(...args);
   const modifiers = printModifiers(event);
   let json: string | undefined;
-  if (isFixed(items)) {
+  if (owner === undefined && isFixed(items)) {
     const payload = getValues(items);
     json = JSON.stringify(modifiers === '' ? [tag, payload] : [tag, payload, modifiers]);
   }
   const parts = [toLiteral(tag), printItems(items)];
-  if (modifiers !== '') {
+  if (owner !== undefined) {
+    parts.push(toLiteral(modifiers), owner);
+  } else if (modifiers !== '') {
     parts.push(toLiteral(modifiers));
   }
   return { json, code: `[${parts.join(', ')}]` };

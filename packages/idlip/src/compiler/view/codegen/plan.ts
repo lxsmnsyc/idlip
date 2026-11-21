@@ -1,18 +1,32 @@
 // Plans the bindings of a component: which holes and events patch, their ids, groups and lists.
-import type { Component, Event, Hole, Node, Path, Span } from '../analyze/index.ts';
+import type { Component, Event, Expr, Hole, Node, Path, Root, Span } from '../analyze/index.ts';
+import type { UrlKind } from '../../../core/url.ts';
 import type { Frame, Report } from './expr.ts';
 
+type ForNode = Extract<Node, { kind: 'for' }>;
+export type ChildNode = Extract<Node, { kind: 'child' }>;
+export type SubscribeNode = Extract<Node, { kind: 'subscribe' }>;
+export type TryNode = Extract<Node, { kind: 'try' }>;
+export type HeadNode = Extract<Node, { kind: 'head' }>;
+type ElementNode = Extract<Node, { kind: 'element' }>;
+
 export type Source =
-  | { kind: 'attr'; name: string; hole: Hole }
+  | { kind: 'attr'; name: string; hole: Hole; url?: UrlKind }
+  | { kind: 'html'; node: Extract<Node, { kind: 'element' }>; hole: Hole }
+  | { kind: 'prop'; child: ChildNode; name: string; hole: Hole }
+  | { kind: 'message'; child: ChildNode; event: Event }
   | { kind: 'event'; event: Event }
+  | { kind: 'subscribe'; node: SubscribeNode }
+  | { kind: 'head-attr'; index: number; name: string; hole: Hole }
+  | { kind: 'head-title'; index: number; children: Node[] }
   | { kind: 'text'; hole: Hole }
   | { kind: 'condition'; node: Extract<Node, { kind: 'condition' }> }
   | { kind: 'list'; node: Extract<Node, { kind: 'for' }> };
 
 export interface Binding {
   id: number;
-  /** `a` for an element, `t` for text, `c` for a condition, `l` for a list. */
-  kind: 'a' | 't' | 'c' | 'l';
+  /** `a` for an element, `t` for text, `c` for a condition, `l` for a list, `p` for a prop. */
+  kind: 'a' | 't' | 'c' | 'l' | 'p';
   /** The export name, such as `a4`. */
   name: string;
   /** The state paths the binding reads, sorted. Never empty. */
@@ -22,6 +36,8 @@ export interface Binding {
   /** The id of the list whose rows hold the binding. */
   list: number | undefined;
   source: Source;
+  /** A dynamic hole: its paths are not known at build time, so `paths` is empty. */
+  dynamic?: true;
 }
 
 export interface ListInfo {
@@ -31,6 +47,34 @@ export interface ListInfo {
   parent: number | undefined;
   /** The rows around the list block. */
   frames: Frame[];
+}
+
+/** A `<Try>` region. Its id is the number of the region marker `<!--e<id>:<state>-->`. */
+export interface TryInfo {
+  id: number;
+  node: TryNode;
+  /** The rows around the region, outermost first. */
+  frames: Frame[];
+}
+
+/** Where a child component sits in its parent. */
+export interface ChildInfo {
+  /** The index of the child among all child nodes of the view, in source order. */
+  site: number;
+  /** The `<For>` blocks around the child, outermost first. */
+  loops: ForNode[];
+}
+
+/** A stateful component that the view renders. */
+export interface Used {
+  /** The local name of the import, such as `Counter`. */
+  name: string;
+  /** The specifier of the import, as the source writes it. */
+  source: string;
+  /** The id of the child's module, which `generate` resolves from the specifier. */
+  module: string;
+  /** The id of the child's `view` chunk. */
+  view: string;
 }
 
 export interface Group {
@@ -47,12 +91,44 @@ export interface Plan {
   bindings: Binding[];
   /** Hole ids that have a binding. */
   bound: Set<number>;
+  /** Hole ids of the dynamic holes. */
+  dynamic: Set<number>;
   eventIds: Map<Event, number>;
   /** Element and global nodes to the binding ids on them. */
   anchors: Map<Node, number[]>;
   lists: ListInfo[];
   /** Event types the view listens to, sorted. */
   events: string[];
+  /** Event type to the names of the handlers that elements of the view dispatch on it. */
+  listens: Map<string, string[]>;
+  /** The place of every child node. */
+  children: Map<Node, ChildInfo>;
+  /** The child components the view renders, once each, in source order. */
+  uses: Used[];
+  /** The id of the marker block of each `<Subscribe>`. */
+  subs: Map<Node, number>;
+  /** The sources the view subscribes to, by name, in source order. */
+  sources: Map<string, Root>;
+  /** The `<Try>` regions of the view, in view order. */
+  tries: TryInfo[];
+  /** The region id of each `<Try>` node. */
+  tryIds: Map<Node, number>;
+  /** The id of the marker block of each `<Head>`. */
+  heads: Map<Node, number>;
+}
+
+/** Prints the source of a keyed segment: the model path of its value. */
+function printPathSource(expr: Expr): string {
+  const parts: string[] = [];
+  if (expr.kind === 'path' && expr.root.kind === 'state') {
+    parts.push(expr.root.name);
+    for (const segment of expr.segments) {
+      if (typeof segment === 'string') {
+        parts.push(segment);
+      }
+    }
+  }
+  return parts.join('.');
 }
 
 /** Prints a path as the manifest writes it: `todos.*.done`. */
@@ -63,6 +139,10 @@ export function printPathKey(path: Path, report: Report, span: Span): string {
       parts.push(segment);
     } else if (segment.kind === 'item') {
       parts.push('*');
+    } else if (segment.kind === 'keyed') {
+      // The analysis keeps a keyed segment only when its value is a state path.
+      const last = parts.length - 1;
+      parts[last] = `${parts[last]}[${segment.field}=${printPathSource(segment.value)}]`;
     } else {
       report('codegen-unsupported', `A ${segment.kind} path segment is not generated yet`, span);
     }
@@ -71,15 +151,20 @@ export function printPathKey(path: Path, report: Report, span: Span): string {
 }
 
 /** Returns the sorted state paths of a hole or event, or an empty list when nothing patches. */
-export function getStatePaths(paths: Path[] | 'dynamic', report: Report, span: Span): string[] {
+export function getStatePaths(
+  paths: Path[] | 'dynamic',
+  report: Report,
+  span: Span,
+  child = false,
+): string[] {
   if (paths === 'dynamic') {
     report('hole-dynamic', 'A dynamic path set cannot be generated', span);
     return [];
   }
   const keys = new Set<string>();
   for (const path of paths) {
-    // Root props never change, so only state paths patch.
-    if (path.root === 'state') {
+    // Root props never change, so only state paths patch. A child's props change with the parent.
+    if (path.root === 'state' || child) {
       keys.add(printPathKey(path, report, span));
     }
   }
@@ -89,20 +174,33 @@ export function getStatePaths(paths: Path[] | 'dynamic', report: Report, span: S
 interface WalkContext {
   frames: Frame[];
   list: number | undefined;
+  loops: ForNode[];
+  /** The condition and `<Try>` blocks around the node. */
+  blocks: number;
 }
 
 class Planner {
   bindings = new Map<number, Binding>();
   bound = new Set<number>();
+  dynamic = new Set<number>();
   eventIds = new Map<Event, number>();
   anchors = new Map<Node, number[]>();
   lists: ListInfo[] = [];
   events = new Set<string>();
+  listens = new Map<string, Set<string>>();
+  children = new Map<Node, ChildInfo>();
+  uses: Used[] = [];
+  subs = new Map<Node, number>();
+  sources = new Map<string, Root>();
+  tries: TryInfo[] = [];
+  tryIds = new Map<Node, number>();
+  heads = new Map<Node, number>();
   nextEvent: number;
 
   constructor(
     component: Component,
     readonly report: Report,
+    readonly child: boolean,
   ) {
     let max = -1;
     for (const hole of component.holes) {
@@ -136,7 +234,22 @@ class Planner {
     context: WalkContext,
     source: Source,
   ): number | undefined {
-    const paths = getStatePaths(hole.paths, this.report, hole.span);
+    const tracked =
+      hole.paths === 'dynamic' &&
+      context.frames.length === 0 &&
+      context.blocks === 0 &&
+      !this.child;
+    if (tracked) {
+      return this.bindDynamic(hole, kind, context, source);
+    }
+    // Rows, blocks and children render from templates that record no reads, so a dynamic hole
+    // there keeps the static paths of the analysis.
+    const paths = getStatePaths(
+      hole.paths === 'dynamic' ? (hole.fallback ?? []) : hole.paths,
+      this.report,
+      hole.span,
+      this.child,
+    );
     if (paths.length === 0) {
       return undefined;
     }
@@ -145,11 +258,39 @@ class Planner {
     return hole.id;
   }
 
+  /** Binds a dynamic hole at the top level of a root component, where reads are recorded. */
+  bindDynamic(
+    hole: Hole,
+    kind: Binding['kind'],
+    context: WalkContext,
+    source: Source,
+  ): number | undefined {
+    this.bound.add(hole.id);
+    this.dynamic.add(hole.id);
+    this.addBinding(kind, hole.id, [], context, source);
+    const binding = this.bindings.get(hole.id);
+    if (binding !== undefined) {
+      binding.dynamic = true;
+    }
+    return hole.id;
+  }
+
+  /** The model paths an event reads at render: its arguments, and the prop it forwards. */
+  getEventPaths(event: Event): string[] {
+    const paths = getStatePaths(event.paths, this.report, event.span, this.child);
+    // A message prop is read from the props. It changes only when the parent passes a new one.
+    if (event.target.kind === 'prop' && this.child) {
+      paths.push(`props.${event.target.name}`);
+      paths.sort();
+    }
+    return paths;
+  }
+
   /** Assigns ids to the events that read state at render. Returns the ids. */
-  bindEvents(events: Event[], context: WalkContext): number[] {
+  bindEvents(events: Event[], context: WalkContext, listen = true): number[] {
     const ids: number[] = [];
     for (const event of events) {
-      if (event.target.kind !== 'handler') {
+      if (event.target.kind !== 'handler' && event.target.kind !== 'prop') {
         this.report(
           'codegen-unsupported',
           `An event that targets a ${event.target.kind} is not generated yet`,
@@ -157,8 +298,16 @@ class Planner {
         );
         continue;
       }
-      this.events.add(event.name);
-      const paths = getStatePaths(event.paths, this.report, event.span);
+      // The loader reads `on:value` of a subscription itself, so no listener is needed.
+      if (listen) {
+        this.events.add(event.name);
+        if (event.target.kind === 'handler') {
+          const names = this.listens.get(event.name) ?? new Set<string>();
+          names.add(event.target.name);
+          this.listens.set(event.name, names);
+        }
+      }
+      const paths = this.getEventPaths(event);
       if (paths.length === 0) {
         continue;
       }
@@ -166,6 +315,129 @@ class Planner {
       this.eventIds.set(event, id);
       this.addBinding('a', id, paths, context, { kind: 'event', event });
       ids.push(id);
+    }
+    return ids;
+  }
+
+  /** Plans a stateful child: its site, the bindings of its props and its message props. */
+  planChild(node: ChildNode, context: WalkContext): void {
+    this.children.set(node, { site: this.children.size, loops: context.loops });
+    const root: Root = node.component;
+    if (root.kind !== 'import' || root.name.includes('.')) {
+      this.report(
+        'codegen-unsupported',
+        'A stateful child must be a component imported by its default name',
+        { start: 0, end: 0 },
+      );
+    } else if (!this.uses.some((used) => used.name === root.name)) {
+      this.uses.push({ name: root.name, source: root.source, module: '', view: '' });
+    }
+    for (const prop of node.props) {
+      this.bindHole(prop.value, 'p', context, {
+        kind: 'prop',
+        child: node,
+        name: prop.name,
+        hole: prop.value,
+      });
+    }
+    for (const event of node.messages) {
+      if (event.target.kind !== 'handler' && event.target.kind !== 'prop') {
+        this.report(
+          'codegen-unsupported',
+          `A message prop that targets a ${event.target.kind} is not generated yet`,
+          event.span,
+        );
+        continue;
+      }
+      const paths = this.getEventPaths(event);
+      if (paths.length === 0) {
+        continue;
+      }
+      const id = this.nextEvent++;
+      this.eventIds.set(event, id);
+      this.addBinding('p', id, paths, context, { kind: 'message', child: node, event });
+    }
+  }
+
+  /**
+   * Checks the catch view. It is rendered once, from the state at the time of the failure, so
+   * nothing in it patches: it gets no bindings. It listens to the events it names, and it may
+   * hold elements, text, holes and conditions.
+   */
+  scanCatch(nodes: Node[]): void {
+    for (const node of nodes) {
+      switch (node.kind) {
+        case 'text':
+        case 'text-hole':
+          break;
+        case 'element':
+          for (const event of node.events) {
+            this.events.add(event.name);
+          }
+          this.scanCatch(node.children);
+          break;
+        case 'condition':
+          this.scanCatch(node.then);
+          this.scanCatch(node.else);
+          break;
+        default:
+          this.report(
+            'try-catch-node',
+            `A ${node.kind} block in the catch view of <Try> is not supported`,
+            { start: 0, end: 0 },
+          );
+      }
+    }
+  }
+
+  /** Plans the bindings of one element of a `<Head>`. Returns the ids. */
+  planHeadElement(element: ElementNode, index: number, context: WalkContext): number[] {
+    const ids: number[] = [];
+    for (const attr of element.attrs) {
+      if (attr.value.kind === 'hole') {
+        const id = this.bindHole(attr.value.hole, 'a', context, {
+          kind: 'head-attr',
+          index,
+          name: attr.name,
+          hole: attr.value.hole,
+        });
+        if (id !== undefined) {
+          ids.push(id);
+        }
+      }
+    }
+    if (element.events.length > 0 || element.ref !== undefined || element.html !== undefined) {
+      this.report(
+        'codegen-unsupported',
+        'A head element takes no events, ref or html',
+        element.span,
+      );
+    }
+    if (element.tag === 'title') {
+      // The holes of a title are not patched one by one: one binding sets the whole text.
+      const paths = new Set<string>();
+      let first: Hole | undefined;
+      for (const child of element.children) {
+        if (child.kind === 'text-hole') {
+          first ??= child.hole;
+          for (const path of getStatePaths(
+            child.hole.paths,
+            this.report,
+            child.hole.span,
+            this.child,
+          )) {
+            paths.add(path);
+          }
+        }
+      }
+      if (first !== undefined && paths.size > 0) {
+        this.addBinding('a', first.id, [...paths].sort(), context, {
+          kind: 'head-title',
+          index,
+          children: element.children,
+        });
+        ids.push(first.id);
+      }
     }
     return ids;
   }
@@ -186,6 +458,7 @@ class Planner {
                 kind: 'attr',
                 name: attr.name,
                 hole: attr.value.hole,
+                url: attr.url,
               });
               if (id !== undefined) {
                 ids.push(id);
@@ -193,11 +466,15 @@ class Planner {
             }
           }
           ids.push(...this.bindEvents(node.events, context));
-          if (node.ref !== undefined) {
-            this.report('codegen-unsupported', 'ref is not generated yet', node.span);
-          }
           if (node.html !== undefined) {
-            this.report('codegen-unsupported', 'html is not generated yet', node.span);
+            const id = this.bindHole(node.html, 'a', context, {
+              kind: 'html',
+              node,
+              hole: node.html,
+            });
+            if (id !== undefined) {
+              ids.push(id);
+            }
           }
           if (ids.length > 0) {
             this.anchors.set(node, ids);
@@ -214,14 +491,76 @@ class Planner {
             row: context.frames.length,
           };
           this.lists.push({ id, node, parent: context.list, frames: context.frames });
-          this.walk(node.body, { frames: [...context.frames, frame], list: id });
+          this.walk(node.body, {
+            frames: [...context.frames, frame],
+            list: id,
+            loops: [...context.loops, node],
+            blocks: context.blocks,
+          });
           break;
         }
         case 'condition':
           this.bindHole(node.test, 'c', context, { kind: 'condition', node });
-          this.walk(node.then, context);
-          this.walk(node.else, context);
+          this.walk(node.then, { ...context, blocks: context.blocks + 1 });
+          this.walk(node.else, { ...context, blocks: context.blocks + 1 });
           break;
+        case 'child':
+          this.planChild(node, context);
+          break;
+        case 'subscribe': {
+          this.subs.set(node, this.nextEvent++);
+          if (node.source.kind === 'import' || node.source.kind === 'module') {
+            this.sources.set(node.source.name, node.source);
+          }
+          // The key binding restarts the run. Without a state path in the key nothing patches.
+          const ids: number[] = [];
+          if (node.key !== undefined) {
+            const id = this.bindHole(node.key, 'a', context, { kind: 'subscribe', node });
+            if (id !== undefined) {
+              ids.push(id);
+            }
+          }
+          ids.push(...this.bindEvents(node.events, context, false));
+          if (ids.length > 0) {
+            this.anchors.set(node, ids);
+          }
+          break;
+        }
+        case 'try': {
+          // Regions count on their own, so a `<Try>` never renames the ids that follow it.
+          const id = this.tries.length;
+          this.tryIds.set(node, id);
+          this.tries.push({ id, node, frames: context.frames });
+          this.walk(node.body, { ...context, blocks: context.blocks + 1 });
+          this.scanCatch(node.catch);
+          break;
+        }
+        case 'head': {
+          this.heads.set(node, this.nextEvent++);
+          const ids: number[] = [];
+          let index = 0;
+          let titles = 0;
+          for (const child of node.children) {
+            if (child.kind !== 'element') {
+              this.report('codegen-unsupported', 'A <Head> holds elements only', {
+                start: 0,
+                end: 0,
+              });
+              continue;
+            }
+            titles += child.tag === 'title' ? 1 : 0;
+            if (titles > 1) {
+              this.report('head-title-twice', 'A <Head> holds one <title>', child.span);
+              continue;
+            }
+            ids.push(...this.planHeadElement(child, index, context));
+            index++;
+          }
+          if (ids.length > 0) {
+            this.anchors.set(node, ids);
+          }
+          break;
+        }
         case 'global': {
           const ids = this.bindEvents(node.events, context);
           if (ids.length > 0) {
@@ -230,7 +569,7 @@ class Planner {
           break;
         }
         default:
-          this.report('codegen-unsupported', `A ${node.kind} block is not generated yet`, {
+          this.report('codegen-unsupported', 'A block is not generated yet', {
             start: 0,
             end: 0,
           });
@@ -240,9 +579,9 @@ class Planner {
 }
 
 /** Plans the bindings of a component's view. */
-export function planBindings(component: Component, report: Report): Plan {
-  const planner = new Planner(component, report);
-  planner.walk(component.view, { frames: [], list: undefined });
+export function planBindings(component: Component, report: Report, child = false): Plan {
+  const planner = new Planner(component, report, child);
+  planner.walk(component.view, { frames: [], list: undefined, loops: [], blocks: 0 });
   // Order by id: holes in view order, then events.
   const ids = [...planner.bindings.keys()].sort((a, b) => a - b);
   const bindings: Binding[] = [];
@@ -255,11 +594,29 @@ export function planBindings(component: Component, report: Report): Plan {
   return {
     bindings,
     bound: planner.bound,
+    dynamic: planner.dynamic,
     eventIds: planner.eventIds,
     anchors: planner.anchors,
     lists: planner.lists,
     events: [...planner.events].sort(),
+    listens: sortListens(planner.listens),
+    children: planner.children,
+    uses: planner.uses,
+    subs: planner.subs,
+    sources: planner.sources,
+    tries: planner.tries,
+    tryIds: planner.tryIds,
+    heads: planner.heads,
   };
+}
+
+/** Sorts the event types and the handler names of each. */
+function sortListens(listens: ReadonlyMap<string, ReadonlySet<string>>): Map<string, string[]> {
+  const sorted = new Map<string, string[]>();
+  for (const type of [...listens.keys()].sort()) {
+    sorted.set(type, [...(listens.get(type) ?? [])].sort());
+  }
+  return sorted;
 }
 
 function countSegments(key: string): number {

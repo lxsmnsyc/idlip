@@ -24,6 +24,8 @@ export interface EmitOptions {
   locals?: readonly string[];
   /** Called with the offset of a `return` inside a `try` block that has a `finally`. */
   onFinallyReturn?: (start: number) => void;
+  /** Nodes written as the given text instead, such as an `await` that became `$outcome.value`. */
+  replacements?: ReadonlyMap<AstNode, string>;
 }
 
 /** Returns the payload variable of a props path: `props.user.name` is `props$user$name`. */
@@ -122,6 +124,11 @@ function isShadowed(scopes: readonly Set<string>[], name: string): boolean {
 
 /** Collects the edits for one node and everything under it. */
 function collectEdits(node: AstNode, walk: Walk, nested: boolean): void {
+  const replacement = walk.options.replacements?.get(node);
+  if (replacement !== undefined) {
+    walk.edits.push({ start: node.start, end: node.end, text: replacement });
+    return;
+  }
   const names = declareScope(node);
   if (names !== undefined) {
     walk.scopes.push(names);

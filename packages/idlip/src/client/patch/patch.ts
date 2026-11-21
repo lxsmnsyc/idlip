@@ -1,19 +1,25 @@
 import type {
   Binding,
+  ListBinding,
   ListContext,
   Manifest,
   Model,
+  NodeBinding,
   Page,
   Patch,
   PatchList,
+  PropBinding,
   Scope,
 } from '../../core/format.ts';
+import { failRegion } from '../errors.ts';
+import { DYNAMIC_GROUP, getDynamic, isIdle } from '../dynamic.ts';
+import { HAS_CHILDREN, HAS_DYNAMIC, HAS_ERRORS } from '../features.ts';
 import { diffPaths, getListKeys } from './diff.ts';
 import { isBinding, isComment, isRecord } from './guards.ts';
 import { findNode } from './nodes.ts';
 
 interface Plan {
-  /** The paths of every group, without root props, which never change. */
+  /** The paths of every group. */
   readonly paths: readonly string[];
   readonly keys: Readonly<Record<string, string>>;
   /** The export names of bindings inside rows. */
@@ -28,9 +34,7 @@ function getPlan(manifest: Manifest): Plan {
     const paths: string[] = [];
     for (const group of Object.values(manifest.groups)) {
       for (const path of group.paths) {
-        if (path !== 'props' && !path.startsWith('props.')) {
-          paths.push(path);
-        }
+        paths.push(path);
       }
     }
     const rowNames = new Set<string>();
@@ -107,8 +111,19 @@ function compareNames(a: string, b: string): number {
   return Number(a.slice(1)) - Number(b.slice(1));
 }
 
+function createScope(page: Page, model: Model): Scope {
+  return {
+    model,
+    props: page.props,
+    rows: [],
+    ...(HAS_CHILDREN && { path: page.path }),
+    ...(HAS_DYNAMIC && { dynamic: page.dynamic }),
+  };
+}
+
 function readList(binding: Binding, scope: Scope): readonly unknown[] {
-  const list: unknown = Reflect.apply(binding, undefined, [scope]);
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+  const list: unknown = (binding as ListBinding)(scope);
   return Array.isArray(list) ? list : [];
 }
 
@@ -123,28 +138,51 @@ export function createPatch(patchList: PatchList): Patch {
     const { manifest } = page;
     const plan = getPlan(manifest);
     const selected = selectGroups(manifest, plan, prev, next);
+    const changed = HAS_DYNAMIC ? getDynamic(page, prev, next, plan.keys) : [];
+    if (HAS_DYNAMIC && changed.length > 0) {
+      selected.push(DYNAMIC_GROUP);
+    }
     if (selected.length === 0) {
       return;
     }
     const bindings = await loadBindings(page, selected);
     const names: string[] = [];
     for (const name of bindings.keys()) {
-      if (!plan.rowNames.has(name)) {
+      if (!plan.rowNames.has(name) && !(HAS_DYNAMIC && isIdle(manifest, changed, name))) {
         names.push(name);
       }
     }
     // Ids follow view order, so a block runs before the bindings inside it.
     names.sort(compareNames);
-    const prevScope: Scope = { model: prev, props: page.props, rows: [] };
-    const nextScope: Scope = { model: next, props: page.props, rows: [] };
+    const prevScope = createScope(page, prev);
+    const nextScope = createScope(page, next);
     for (const name of names) {
-      const start = findNode(page.root, name);
+      if (HAS_CHILDREN && name[0] === 'p') {
+        // A props binding has no node.
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+        (bindings.get(name) as PropBinding)(nextScope);
+        continue;
+      }
+      const start = findNode(page.root, name, page.start);
       const binding = bindings.get(name);
       if (start === undefined || binding === undefined) {
         continue;
       }
       if (name[0] !== 'l') {
-        Reflect.apply(binding, undefined, [start, nextScope]);
+        if (HAS_ERRORS) {
+          try {
+            // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+            (binding as NodeBinding)(start, nextScope);
+          } catch (error) {
+            // A throw inside a `<Try>` swaps its region. Anywhere else it goes on to the loader.
+            if (!(await failRegion(page, start, error, nextScope))) {
+              throw error;
+            }
+          }
+        } else {
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+          (binding as NodeBinding)(start, nextScope);
+        }
         continue;
       }
       const id = name.slice(1);

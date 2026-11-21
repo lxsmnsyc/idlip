@@ -4,7 +4,8 @@
 export type TrustedHtml = string & { readonly __trusted: unique symbol };
 
 /**
- * Marks a string as safe to write as HTML, for `html={trusted(value)}`.
+ * Marks a string as safe to write as HTML, for `html={trusted(value)}`. It does not sanitize
+ * or escape anything: a call is the trust boundary, so pass only markup you wrote or cleaned.
  */
 export function trusted(html: string): TrustedHtml {
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion

@@ -2,7 +2,7 @@ import { parseSync } from 'oxc-parser';
 import type { ChunkUrls, Manifest } from '../core/format.ts';
 
 /** `<file>?idlip-<kind>=<name>&lang.js`. Group 1 is the chunk name, such as `handler=toggle`. */
-const CHUNK_QUERY = /\?idlip-((?:handler|binding|list)=[^&]*)&lang\.js$/;
+const CHUNK_QUERY = /\?idlip-((?:(?:handler|binding|list|task|source|try)=[^&]*|view))&lang\.js$/;
 
 /**
  * Splits a chunk id into the source file and the chunk name. Returns undefined
@@ -32,7 +32,8 @@ export function isChunkUrls(value: unknown): value is ChunkUrls {
 }
 
 /**
- * Returns every chunk name of a manifest: handlers, binding groups and lists,
+ * Returns every chunk name of a manifest: handlers, tasks, sources, binding groups, lists, `<Try>`
+ * fallbacks and the view of a child,
  * each once.
  */
 export function listChunks(manifest: Manifest): string[] {
@@ -40,11 +41,23 @@ export function listChunks(manifest: Manifest): string[] {
   for (const entry of Object.values(manifest.handlers)) {
     chunks.add(entry.chunk);
   }
+  for (const chunk of Object.values(manifest.tasks ?? {})) {
+    chunks.add(chunk);
+  }
+  for (const name of manifest.sources ?? []) {
+    chunks.add(`source=${name}`);
+  }
   for (const group of Object.values(manifest.groups)) {
     chunks.add(group.chunk);
   }
   for (const list of Object.values(manifest.lists)) {
     chunks.add(list.chunk);
+  }
+  for (const chunk of Object.values(manifest.fallback ?? {})) {
+    chunks.add(chunk);
+  }
+  if (manifest.view !== undefined) {
+    chunks.add(manifest.view.chunk);
   }
   return [...chunks];
 }

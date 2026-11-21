@@ -1,5 +1,7 @@
 // The view IR, as frozen in docs/roadmaps/core/contracts/view-ir.md (v8).
 
+import type { UrlKind } from '../../../core/url.ts';
+
 /** A source range: byte offsets into the file. */
 export interface Span {
   start: number;
@@ -10,7 +12,9 @@ export interface Span {
  * One segment of a path. A string is a field name. `item` is any element of a list or any
  * value of a record, printed `*`; it appears in path sets only. `index` is a computed access
  * (`labels[filter]`) in an expression; in the path set it becomes `*` plus the key's paths.
- * `keyed` is reserved for `keyed-paths` and never emitted yet.
+ * `keyed` is `list.find((t) => t.field === value)`: the item whose `field` equals `value`.
+ * A path set keeps it only for a list whose `<For>` has that `key` and a state path as value.
+ * Otherwise it becomes `*`, plus a path to the field.
  */
 export type Segment =
   | string
@@ -21,8 +25,7 @@ export type Segment =
 /**
  * Where a path starts. `state` and `props` are model paths: they are what bindings subscribe
  * to. `loop`, `event` and `local` paths are resolved against a loop row, a DOM event or a
- * `<Try>` catch parameter and never appear in a path set. `form` is reserved for the
- * `["$form", name]` placeholder of `form-fields` and never emitted yet. `global` is a pure
+ * `<Try>` catch parameter and never appear in a path set. `global` is a pure
  * global from the allow-list (`String`, `Math.max`).
  */
 export type Root =
@@ -30,7 +33,6 @@ export type Root =
   | { kind: 'props' }
   | { kind: 'loop'; name: string; index: boolean }
   | { kind: 'event' }
-  | { kind: 'form'; name: string }
   | { kind: 'local'; name: string }
   | { kind: 'global'; name: string }
   | { kind: 'import'; name: string; source: string }
@@ -100,6 +102,11 @@ export interface Hole {
   id: number;
   expr: Expr;
   paths: Path[] | 'dynamic';
+  /**
+   * The static paths of a `dynamic` hole, the coarse set the analysis can name. Code generation
+   * binds the hole with them where it cannot track reads: in rows, blocks and children.
+   */
+  fallback?: Path[];
   span: Span;
 }
 
@@ -136,6 +143,8 @@ export type AttrValue = { kind: 'static'; value: string | true } | { kind: 'hole
 export interface Attr {
   name: string;
   value: AttrValue;
+  /** How a bound value is checked as a URL, from `getUrlKind`. */
+  url?: UrlKind;
 }
 
 export type Namespace = 'html' | 'svg' | 'mathml';
@@ -171,7 +180,14 @@ export type Node =
       body: Node[];
     }
   | { kind: 'condition'; test: Hole; then: Node[]; else: Node[]; namespace: Namespace }
-  | { kind: 'try'; body: Node[]; error: string; reset: string | undefined; catch: Node[] }
+  | {
+      kind: 'try';
+      body: Node[];
+      error: string;
+      reset: string | undefined;
+      catch: Node[];
+      namespace: Namespace;
+    }
   | { kind: 'head'; children: Node[] }
   | {
       kind: 'subscribe';

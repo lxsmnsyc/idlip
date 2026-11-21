@@ -38,7 +38,8 @@ describe('mount', () => {
     page = await mount(TODO, { initial: INITIAL });
     page.click('li:nth-child(2) input');
     await page.settled();
-    expect(page.loaded()).toEqual(['handler=toggle', 'binding=todos.*.done']);
+    // The binding chunk starts with the handler chunk, so the arrival order is not fixed.
+    expect(page.loaded().toSorted()).toEqual(['binding=todos.*.done', 'handler=toggle']);
     expect(page.text('p')).toBe('0 left');
     expect(page.get('li:nth-child(2)').className).toBe('done');
   });
@@ -47,7 +48,7 @@ describe('mount', () => {
     page = await mount(TODO, { initial: INITIAL });
     page.input('form input', 'Ship it');
     await page.settled();
-    expect(page.loaded()).toEqual(['handler=setDraft', 'binding=draft']);
+    expect(page.loaded().toSorted()).toEqual(['binding=draft', 'handler=setDraft']);
     expect(page.get('button').hasAttribute('disabled')).toBe(false);
     page.get('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     await page.settled();

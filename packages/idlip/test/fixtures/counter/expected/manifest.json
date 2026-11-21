@@ -3,15 +3,40 @@
   "events": [
     "click"
   ],
+  "listens": {
+    "click": [
+      "add",
+      "increment",
+      "reset"
+    ]
+  },
   "handlers": {
     "increment": {
-      "chunk": "handler=increment"
+      "chunk": "handler=increment",
+      "writes": [
+        "count"
+      ],
+      "bindings": [
+        "count"
+      ]
     },
     "add": {
-      "chunk": "handler=add"
+      "chunk": "handler=add",
+      "writes": [
+        "count"
+      ],
+      "bindings": [
+        "count"
+      ]
     },
     "reset": {
-      "chunk": "handler=reset"
+      "chunk": "handler=reset",
+      "writes": [
+        "count"
+      ],
+      "bindings": [
+        "count"
+      ]
     }
   },
   "groups": {

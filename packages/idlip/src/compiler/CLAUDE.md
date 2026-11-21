@@ -1,0 +1,8 @@
+# compiler
+
+- A bound value of a URL attribute is wrapped in `safeUrl$` (`core/helpers.ts`), decided by `getUrlKind(tag, name, target)` in `core/url.ts`. A new URL attribute goes in `URL_ATTRS`, a new element-specific case (a frame, an animation target) in `getUrlKind`. Why: the compiler wraps only the listed names, and a value a browser runs as a script or a document must not come from data. A literal in source is not wrapped, since the author wrote it.
+- Raw HTML reaches the page only through `trusted(...)` imported from `idlip`: `html=` and a bound `srcdoc`. Anything else is `html-trusted` or `srcdoc-trusted`. Why: `trusted` is the one place the author vouches for markup.
+- A helper copied into a chunk (`core/helpers.ts`, `core/dynamic.ts`) holds no comment in its body and no name from outside its own text. Why: the compiler copies its `toString()`.
+- A helper copied into a chunk ends in `$` (`setAttr$`, `safeUrl$`, `track$`, `getRows$`) and is listed in `HELPER_NAMES`. A module-level author name equal to one is `module-reserved-name`. A local that generated code declares starts with `$` (`$after`, `$e`, `dynamic$` and `lists$` are the module-level exceptions that end in `$`). Why: a generated name must not collide with the author's.
+- Region, block and boundary ids count on their own counter (`e` regions from 0), so adding a `<Try>` does not move the ids of lists, conditions or events after it. Why: golden fixtures and chunk names depend on ids.
+- A change to a chunk's exports rewrites the goldens (`UPDATE_TRY=1 pnpm vitest run test/try`, and the fixture tests). Why: goldens compare the whole chunk.

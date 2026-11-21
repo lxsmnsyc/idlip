@@ -5,10 +5,13 @@ import type {
   ListContext,
   NodeBinding,
   PatchList,
+  PropBinding,
   Scope,
 } from '../../core/format.ts';
-import { isComment } from '../patch/guards.ts';
-import { addBlock, findInnerBlocks, parseHtml, removeBlock } from '../patch/index.ts';
+import { failRegion } from '../errors.ts';
+import { HAS_CHILDREN, HAS_ERRORS } from '../features.ts';
+import { isComment, isElement } from '../patch/guards.ts';
+import { addBlock, findInnerBlocks, parseHtml, readField, removeBlock } from '../patch/index.ts';
 
 interface Range {
   readonly start: Comment;
@@ -19,22 +22,32 @@ function getData(node: Node | null): string | undefined {
   return isComment(node) ? node.data : undefined;
 }
 
-function isElement(node: Node): node is Element {
-  return node.nodeType === 1;
-}
-
-function walk(node: Node, nodes: Node[]): void {
+function walk(node: Node, nodes: Node[]): Node {
   nodes.push(node);
-  for (let child = node.firstChild; child !== null; child = child.nextSibling) {
-    walk(child, nodes);
+  if (HAS_CHILDREN && getData(node)?.startsWith('n:')) {
+    // A nested child has its own binding ids, so its markup is skipped whole.
+    let level = 0;
+    for (let next: Node | null = node; next !== null; next = next.nextSibling) {
+      const data = getData(next) ?? '';
+      level += data.startsWith('n:') ? 1 : 0;
+      level -= data === '/n' ? 1 : 0;
+      if (level === 0) {
+        return next;
+      }
+    }
+    return node;
   }
+  for (let child: Node | null = node.firstChild; child !== null; child = child.nextSibling) {
+    child = walk(child, nodes);
+  }
+  return node;
 }
 
 // The nodes of a row in document order, nested ones included.
 function getNodes(range: Range): Node[] {
   const nodes: Node[] = [];
   for (let node: Node | null = range.start; node !== null; node = node.nextSibling) {
-    walk(node, nodes);
+    node = walk(node, nodes);
     if (node === range.end) {
       break;
     }
@@ -129,10 +142,6 @@ function getStayers(olds: readonly number[]): Set<number> {
   return stay;
 }
 
-function getKey(item: unknown, key: string): unknown {
-  return typeof item === 'object' && item !== null ? Reflect.get(item, key) : undefined;
-}
-
 function getRowScope(scope: Scope, item: unknown, index: number): Scope {
   return { ...scope, rows: [...scope.rows, { item, index }] };
 }
@@ -168,6 +177,12 @@ async function patchRow(
     if (binding === undefined) {
       continue;
     }
+    if (HAS_CHILDREN && name[0] === 'p') {
+      // A props binding has no node.
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+      (binding as PropBinding)(next);
+      continue;
+    }
     nodes ??= findNodes(range);
     const node = nodes.get(name);
     // A binding earlier in the row may have swapped out the branch that holds this node.
@@ -175,8 +190,21 @@ async function patchRow(
       continue;
     }
     if (name[0] !== 'l') {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-      (binding as NodeBinding)(node, next);
+      if (HAS_ERRORS) {
+        try {
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+          (binding as NodeBinding)(node, next);
+        } catch (error) {
+          if (!(await failRegion(context.page, node, error, next))) {
+            throw error;
+          }
+          // The swap replaced the nodes of the row, so they are looked up again.
+          nodes = undefined;
+        }
+      } else {
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+        (binding as NodeBinding)(node, next);
+      }
       continue;
     }
     // A nested list: patch its rows with the scopes of this row. All chosen bindings go through,
@@ -201,12 +229,12 @@ export async function patchList(...args: Parameters<PatchList>): Promise<void> {
   // A key that is new or repeated counts as an insert.
   const oldIndexes = new Map<unknown, number>();
   for (let i = 0; i < prev.length; i++) {
-    oldIndexes.set(getKey(prev[i], list.key), i);
+    oldIndexes.set(readField(prev[i], list.key), i);
   }
   const olds: number[] = [];
   const used = new Set<number>();
   for (const item of next) {
-    const old = oldIndexes.get(getKey(item, list.key));
+    const old = oldIndexes.get(readField(item, list.key));
     if (old === undefined || used.has(old)) {
       olds.push(-1);
     } else {

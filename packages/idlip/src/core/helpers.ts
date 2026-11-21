@@ -9,11 +9,14 @@
 // - A loader export is called as `name$`, through the forwarding function below. In a chunk the
 //   name is the import alias, `parseHtml as parseHtml$`. A bundler or a test runner renames
 //   imported bindings in the text of a function, but not a function declared in the module.
-// oxlint-disable typescript/no-base-to-string
+// oxlint-disable typescript/no-base-to-string, no-control-regex
 import { addBlock, findInnerBlocks, removeBlock } from '../client/patch/blocks.ts';
 import { parseHtml } from '../client/patch/dom.ts';
+import { track$ } from './dynamic.ts';
 import type { Namespace } from '../client/patch/dom.ts';
 import type { DomMessage } from './format.ts';
+
+export { track$ };
 
 function addBlock$(start: Comment): void {
   addBlock(start);
@@ -56,6 +59,10 @@ function joinClass$(value: object): string {
   return names.join(' ');
 }
 
+function encode$(part: string): string {
+  return encodeURIComponent(part).replaceAll('-', '%2D');
+}
+
 function findEnd$(start: Comment): Node | null {
   let depth = 0;
   for (let node = start.nextSibling; node !== null; node = node.nextSibling) {
@@ -75,10 +82,59 @@ function findEnd$(start: Comment): Node | null {
 }
 
 /**
+ * Returns the model path of a child: the parent's path, then the site of the child and one
+ * escaped key for each enclosing loop and an explicit `key`. A key part never holds `/`, `:`,
+ * `-` or `>`, so a path splits cleanly and cannot end a comment.
+ */
+export function slot$(path: string, site: number, ...keys: unknown[]): string {
+  let id = String(site);
+  for (const key of keys) {
+    id += `:${encode$(String(key))}`;
+  }
+  return path === '' ? id : `${path}/${id}`;
+}
+
+/**
  * Returns a hole's value as escaped text.
  */
 export function text$(value: unknown): string {
   return escapeText$(getText$(value));
+}
+
+/**
+ * Returns a URL attribute's value, or `undefined` for a `javascript:` or `vbscript:` URL, so the
+ * attribute is left out. An object or function is dropped too, since `attr$` would join its keys.
+ * A browser ignores control characters and spaces in a scheme, so they are removed before the
+ * test. With `embed`, a `data:` URL is dropped too, unless it is a raster image. The `values` of
+ * an animation is a `;` list, so each part is tested. Wraps every bound value of a URL attribute,
+ * on the server and in a chunk.
+ */
+export function safeUrl$(value: unknown, name: string, embed?: boolean): unknown {
+  if (value === null || value === undefined || typeof value === 'boolean') {
+    return value;
+  }
+  let unsafe = typeof value === 'object' || typeof value === 'function';
+  if (!unsafe) {
+    for (const part of name === 'values' ? String(value).split(';') : [String(value)]) {
+      const url = part.replace(/[\u0000- ]/g, '');
+      if (
+        /^(?:javascript|vbscript):/i.test(url) ||
+        (embed === true &&
+          /^data:/i.test(url) &&
+          !/^data:image\/(?:png|gif|jpe?g|webp|avif|bmp)[;,]/i.test(url))
+      ) {
+        unsafe = true;
+      }
+    }
+  }
+  if (unsafe) {
+    if (process.env.NODE_ENV !== 'production') {
+      // oxlint-disable-next-line no-console
+      console.warn(`idlip: dropped an unsafe URL from ${name}.`);
+    }
+    return undefined;
+  }
+  return value;
 }
 
 /**
@@ -192,6 +248,50 @@ export function setBranch$(
   addBlock$(start);
 }
 
+/** Reads the rows around a region from the DOM: `reset` has no binding scope. `paths` maps a list id to its `each` path. */
+function getRows$(
+  start: Node,
+  model: unknown,
+  paths: Record<string, string>,
+): { item: unknown; index: number }[] {
+  const levels: { id: string; index: number }[] = [];
+  let node: Node | null = start;
+  while (node !== null) {
+    let depth = 0;
+    let row = false;
+    let index = 0;
+    let list: Node | undefined;
+    for (
+      let item = node.previousSibling;
+      item !== null && list === undefined;
+      item = item.previousSibling
+    ) {
+      const data = item.nodeType === 8 ? (item.nodeValue ?? '') : '';
+      if (data === '/i') {
+        index += row && depth === 0 ? 1 : 0;
+        depth++;
+      } else if (data === 'i') {
+        row ||= depth === 0;
+        depth -= depth === 0 ? 0 : 1;
+      } else if (row && depth === 0 && /^l\d/.test(data)) {
+        levels.push({ id: data.slice(1), index });
+        list = item;
+      }
+    }
+    node = list ?? node.parentNode;
+  }
+  const rows: { item: unknown; index: number }[] = [];
+  for (const { id, index } of levels.toReversed()) {
+    let value: unknown = model;
+    let star = 0;
+    for (const key of paths[id].split('.')) {
+      value = Reflect.get(Object(value), key === '*' ? rows[star++].index : key);
+    }
+    rows.push({ item: Reflect.get(Object(value), index), index });
+  }
+  return rows;
+}
+
 type Source = (...args: never[]) => unknown;
 
 interface Helper {
@@ -208,13 +308,18 @@ const HELPERS: Record<string, Helper | undefined> = {
   escapeText$: { source: escapeText$, uses: [], client: [] },
   escapeAttr$: { source: escapeAttr$, uses: [], client: [] },
   joinClass$: { source: joinClass$, uses: [], client: [] },
+  encode$: { source: encode$, uses: [], client: [] },
   findEnd$: { source: findEnd$, uses: [], client: [] },
+  getRows$: { source: getRows$, uses: [], client: [] },
   text$: { source: text$, uses: ['getText$', 'escapeText$'], client: [] },
+  safeUrl$: { source: safeUrl$, uses: [], client: [] },
   attr$: { source: attr$, uses: ['getText$', 'escapeAttr$', 'joinClass$'], client: [] },
   on$: { source: on$, uses: [], client: [] },
+  slot$: { source: slot$, uses: ['encode$'], client: [] },
   setText$: { source: setText$, uses: ['getText$'], client: [] },
   setAttr$: { source: setAttr$, uses: ['getText$', 'joinClass$'], client: [] },
   setOn$: { source: setOn$, uses: [], client: [] },
+  track$: { source: track$, uses: [], client: [] },
   setBranch$: {
     source: setBranch$,
     uses: ['findEnd$'],

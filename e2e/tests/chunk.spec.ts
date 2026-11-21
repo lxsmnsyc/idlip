@@ -13,6 +13,11 @@ test('getChunkName reads dev ids and built file names', () => {
   );
   expect(getChunkName('/assets/todo.list.3.Dl2IjM7-.js')).toBe('list=3');
   expect(getChunkName('/assets/todo.handler.set-Draft.-abc_123.js')).toBe('handler=set-Draft');
+  expect(getChunkName('/assets/counter.source.idle.Afm-GCnA.js')).toBe('source=idle');
+  expect(getChunkName('/assets/todo.task.save.Afm-GCnA.js')).toBe('task=save');
+  expect(getChunkName('/assets/counter.view.CXUOfqUo.js')).toBe('view');
+  expect(getChunkName('/assets/counter.idlip.tsx_idlip-view_lang.DncCKmVA.js')).toBe('view');
+  expect(getChunkName('/src/counter.idlip.tsx?idlip-view&lang.js')).toBe('view');
   expect(getChunkName('/assets/loader.CinWKtZa.js')).toBeUndefined();
   expect(getChunkName('/')).toBeUndefined();
 });

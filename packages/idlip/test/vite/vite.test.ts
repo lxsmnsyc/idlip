@@ -8,6 +8,7 @@ import type { Plugin, ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { getChunkFile, getChunkId } from '../../src/core/format.ts';
 import type { CompileResult, Module } from '../../src/core/format.ts';
+import { listChildren } from '../../src/compiler/index.ts';
 import { listChunks, parseChunkId, replaceChunkUrls } from '../../src/vite/chunks.ts';
 import {
   compileFixture,
@@ -70,6 +71,24 @@ describe('chunk ids', () => {
     ]);
   });
 
+  it('names the view chunk of a child', () => {
+    const id = '/src/counter.idlip.tsx?idlip-view&lang.js';
+    expect(parseChunkId(id)).toEqual({ file: '/src/counter.idlip.tsx', chunk: 'view' });
+    const { manifest } = compileFixture('', '/src/counter.idlip.tsx');
+    expect(listChunks({ ...manifest, view: { chunk: 'view' } })).toContain('view');
+  });
+
+  it('lists the children a module renders', () => {
+    const source = `import Counter from './counter.idlip.tsx';
+export default function Board() {
+  return <main><Counter label="a" /></main>;
+}`;
+    expect(listChildren(source, '/src/board.idlip.tsx')).toEqual(['./counter.idlip.tsx']);
+    expect(
+      listChildren('export default function A() { return <p />; }', '/src/a.idlip.tsx'),
+    ).toEqual([]);
+  });
+
   it('replaces the chunk URLs of a server module', async () => {
     const { server } = compileFixture('', '/src/counter.idlip.tsx');
     const urls = { '/src/counter.idlip.tsx?idlip-handler=add&lang.js': '/assets/add.js' };
@@ -129,7 +148,8 @@ describe('vite build', () => {
         expect(listExports(readFileSync(file, 'utf8')), id).toEqual(listExports(source));
       }
     }
-    expect(Object.keys(urls).toSorted()).toEqual(expected.toSorted());
+    // The build id (`skew`) is the one key that is not a chunk.
+    expect(Object.keys(urls).toSorted()).toEqual([...expected, 'build'].toSorted());
     // Besides the chunks, only the loader (`idlip/client`) and the files it imports statically, which
     // the page loads at boot.
     const assets = path.join(client, 'assets');
@@ -147,7 +167,8 @@ describe('vite build', () => {
         pending.push(...listImports(readFileSync(path.join(assets, file), 'utf8')));
       }
     }
-    const chunkUrls = new Set(Object.values(urls));
+    // `build.js` is the module the loader imports to read the server's build.
+    const chunkUrls = new Set([...Object.values(urls), '/assets/build.js']);
     for (const file of readdirSync(assets)) {
       expect(chunkUrls.has(`/assets/${file}`) || loaded.has(file), file).toBe(true);
     }
@@ -311,7 +332,7 @@ describe('vite dev', () => {
     expect(missing.ok).toBe(false);
   });
 
-  it('reloads the page when a module changes', async () => {
+  it('keeps the page when a module changes without a change of output', async () => {
     if (server === undefined) {
       throw new Error('The dev server did not start');
     }
@@ -346,7 +367,7 @@ describe('vite dev', () => {
       ],
     );
     expect(result).toEqual([]);
-    expect(send).toHaveBeenCalledWith({ type: 'full-reload' });
+    expect(send).not.toHaveBeenCalled();
     send.mockRestore();
   });
 });

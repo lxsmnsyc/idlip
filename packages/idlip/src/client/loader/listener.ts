@@ -26,7 +26,7 @@ if(o.includes('capture'))r.unshift([x,m,o]);else u.push([x,m,o])
 r.concat(u).some(([x,m,o])=>{
 if(o.includes('prevent')&&!o.includes('passive'))e.preventDefault();
 if(o.includes('once'))x.removeAttribute(a);
-q.push({message:{t:m[0],p:m[1].map(v=>Array.isArray(v)&&typeof v[0]=='string'&&v[0][0]=='$'?v[0]=='$'?v.slice(1):v[0]=='$event'?v.slice(1).reduce((n,k)=>n==null?n:n==e&&k=='currentTarget'?c||x:n[k],e):v:v)},target:x,type:t,latest:o.includes('latest')});
+q.push({message:{t:m[0],p:m[1].map(v=>Array.isArray(v)&&typeof v[0]=='string'&&v[0][0]=='$'?v[0]=='$'?v.slice(1):v[0]=='$event'?v.slice(1).reduce((n,k)=>n==null?n:n==e&&k=='currentTarget'?c||x:n[k],e):v:v)},target:x,type:t,latest:o.includes('latest'),owner:m[3]});
 if(o.includes('stop')){e.stopImmediatePropagation();return 1}
 })
 },

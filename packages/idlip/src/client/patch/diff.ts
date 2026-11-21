@@ -1,10 +1,33 @@
 import type { Manifest, Model } from '../../core/format.ts';
+import { HAS_KEYED } from '../features.ts';
 import { isRecord } from './guards.ts';
+
+/** Splits at the dots outside brackets, and reads `todos[id=selected]`. */
+const SPLIT = /\.(?![^[]*\])/;
+const KEYED = /^(\w+)\[(\w+)=([^\]]*)\]$/;
 
 type Keys = Readonly<Record<string, string>>;
 
-function readField(value: unknown, field: string): unknown {
+/** The models being compared, for the sources of keyed segments. */
+interface Roots {
+  readonly prev: unknown;
+  readonly next: unknown;
+}
+
+export function readField(value: unknown, field: string): unknown {
   return isRecord(value) ? value[field] : undefined;
+}
+
+/** Finds the item of `name[field=source]` in a model, or undefined without a key value. */
+function findItem(model: unknown, root: unknown, [, name, field, source]: string[]): unknown {
+  let id = root;
+  for (const part of source.split('.')) {
+    id = readField(id, part);
+  }
+  const list = readField(model, name);
+  return id === undefined || !Array.isArray(list)
+    ? undefined
+    : list.find((item) => readField(item, field) === id);
 }
 
 function checkKeyed(
@@ -15,6 +38,7 @@ function checkKeyed(
   at: number,
   itemPath: string,
   keys: Keys,
+  roots: Roots,
 ): boolean {
   if (!Array.isArray(prev) || !Array.isArray(next)) {
     return false;
@@ -25,7 +49,7 @@ function checkKeyed(
   }
   for (const item of next) {
     const id = readField(item, key);
-    if (before.has(id) && checkChanged(before.get(id), item, segments, at, itemPath, keys)) {
+    if (before.has(id) && checkChanged(before.get(id), item, segments, at, itemPath, keys, roots)) {
       return true;
     }
   }
@@ -39,6 +63,7 @@ function checkChanged(
   at: number,
   prefix: string,
   keys: Keys,
+  roots: Roots,
 ): boolean {
   // Updates are immutable, so the same reference means nothing below it changed.
   if (prev === next) {
@@ -48,6 +73,15 @@ function checkChanged(
     return true;
   }
   const segment = segments[at];
+  const keyed = HAS_KEYED ? KEYED.exec(segment) : null;
+  if (keyed !== null) {
+    // An item found on one side only is a change.
+    const before = findItem(prev, roots.prev, keyed);
+    const after = findItem(next, roots.next, keyed);
+    return before === undefined || after === undefined
+      ? before !== after
+      : checkChanged(before, after, segments, at + 1, `${prefix}.${segment}`, keys, roots);
+  }
   if (segment !== '*') {
     const path = prefix === '' ? segment : `${prefix}.${segment}`;
     return checkChanged(
@@ -57,6 +91,7 @@ function checkChanged(
       at + 1,
       path,
       keys,
+      roots,
     );
   }
   const itemPath = prefix === '' ? '*' : `${prefix}.*`;
@@ -64,7 +99,7 @@ function checkChanged(
   // row bindings after a reorder. By index covers holes such as `todos[selected].done`.
   if (
     Object.hasOwn(keys, prefix) &&
-    checkKeyed(prev, next, keys[prefix], segments, at + 1, itemPath, keys)
+    checkKeyed(prev, next, keys[prefix], segments, at + 1, itemPath, keys, roots)
   ) {
     return true;
   }
@@ -74,7 +109,7 @@ function checkChanged(
   for (const field of Object.keys(before)) {
     if (
       !Object.hasOwn(after, field) ||
-      checkChanged(before[field], after[field], segments, at + 1, itemPath, keys)
+      checkChanged(before[field], after[field], segments, at + 1, itemPath, keys, roots)
     ) {
       return true;
     }
@@ -100,7 +135,8 @@ export function getListKeys(manifest: Manifest): Record<string, string> {
 
 /**
  * Returns the paths whose values differ by reference. A `*` pairs items by index, and under
- * a keyed list also by key.
+ * a keyed list also by key. A keyed segment such as `todos[id=selected]` compares the item
+ * found by key on each side.
  */
 export function diffPaths(
   prev: Model,
@@ -110,7 +146,7 @@ export function diffPaths(
 ): Set<string> {
   const changed = new Set<string>();
   for (const path of paths) {
-    if (checkChanged(prev, next, path.split('.'), 0, '', keys)) {
+    if (checkChanged(prev, next, path.split(SPLIT), 0, '', keys, { prev, next })) {
       changed.add(path);
     }
   }

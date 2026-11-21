@@ -2,5 +2,11 @@ packages:
   - packages/*
   - examples/*
   - e2e
+  # Benchmark apps. The root build, test and typecheck scripts leave them out.
+  - benchmarks/*
 linkWorkspacePackages: true
 preferWorkspacePackages: true
+
+allowBuilds:
+  # Vite 7 in benchmarks/qwik1 brings esbuild. Its platform binary comes as an optional dependency.
+  esbuild: false

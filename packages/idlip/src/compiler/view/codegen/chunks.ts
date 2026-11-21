@@ -1,14 +1,19 @@
 // Emits the client chunks: binding groups and list item templates.
-import type { Component } from '../analyze/index.ts';
+import type { Component, Expr } from '../analyze/index.ts';
 import type { Module } from '../../../core/format.ts';
 import { printHelpers } from '../../../core/helpers.ts';
+import { printSlot } from './child.ts';
+import { emitHeadBody } from './head.ts';
+import { printHtmlBody } from './raw.ts';
+import { emitSubscribeBinding } from './subscribe.ts';
 import { getMessage } from './events.ts';
+import { printTracked } from './dynamic.ts';
 import { Emitter, createUsage, mergeUsage } from './expr.ts';
 import type { Frame, Report, ScopeName, Usage } from './expr.ts';
 import { HtmlBuilder, toExpression } from './html.ts';
 import type { ModuleSource } from './module.ts';
-import type { Binding, Group, ListInfo, Plan } from './plan.ts';
-import { getLocalName, printHelperImport, quote } from './text.ts';
+import type { Binding, Group, ListInfo, Plan, TryInfo } from './plan.ts';
+import { getKey, getLocalName, quote } from './text.ts';
 
 export interface ChunkContext {
   component: Component;
@@ -19,20 +24,27 @@ export interface ChunkContext {
   report: Report;
 }
 
-interface Emitted {
+export interface Emitted {
   code: string;
   usage: Usage;
 }
 
-const SCOPE_ORDER: ScopeName[] = ['model', 'props', 'rows'];
+const SCOPE_ORDER: ScopeName[] = ['model', 'props', 'rows', 'dynamic'];
 
-/** Prints the destructured scope parameter, such as `{ model, rows }`, or an empty string. */
-function printScope(usage: Usage): string {
+/**
+ * Prints the scope as the destructured parameter, such as `{ model, rows }`, or an empty string.
+ * `definition` is for a parameter, where the path defaults to the root's `''`. Without it the
+ * text is an object literal that passes the scope on.
+ */
+function printScope(usage: Usage, definition = false): string {
   const names: string[] = [];
   for (const name of SCOPE_ORDER) {
     if (usage.scope.has(name)) {
       names.push(name);
     }
+  }
+  if (usage.path) {
+    names.push(definition ? "path = ''" : 'path');
   }
   return names.length === 0 ? '' : `{ ${names.join(', ')} }`;
 }
@@ -42,7 +54,7 @@ function printParams(first: string | undefined, usage: Usage): string {
   if (first !== undefined) {
     params.push(first);
   }
-  const scope = printScope(usage);
+  const scope = printScope(usage, true);
   if (scope !== '') {
     params.push(scope);
   }
@@ -56,16 +68,42 @@ function emitBinding(binding: Binding, context: ChunkContext): Emitted {
   emitter.frames = binding.frames;
   const source = binding.source;
   switch (source.kind) {
+    case 'prop':
+    case 'message':
+      return emitPropBinding(binding, context);
     case 'attr': {
       emitter.at = source.hole.span;
       usage.helpers.add('setAttr');
-      const value = emitter.expr(source.hole.expr, 1);
+      let value = binding.dynamic
+        ? printTracked(emitter, context.component, source.hole, binding.name)
+        : emitter.expr(source.hole.expr, 1);
+      if (source.url !== undefined) {
+        usage.helpers.add('safeUrl');
+        value = `safeUrl$(${value}, ${quote(source.name)}${source.url === 'embed' ? ', true' : ''})`;
+      }
       const body = `setAttr$(el, ${quote(source.name)}, ${value});`;
       return {
         code: `export function ${binding.name}(${printParams('el', usage)}) {\n${body}\n}`,
         usage,
       };
     }
+    case 'html': {
+      const body = printHtmlBody(source, emitter);
+      return {
+        code: `export function ${binding.name}(${printParams('el', usage)}) {\n${body}\n}`,
+        usage,
+      };
+    }
+    case 'head-attr':
+    case 'head-title': {
+      const body = emitHeadBody(source, emitter);
+      return {
+        code: `export function ${binding.name}(${printParams('el', usage)}) {\n${body}\n}`,
+        usage,
+      };
+    }
+    case 'subscribe':
+      return emitSubscribeBinding(binding, source.node, emitter);
     case 'event': {
       usage.helpers.add('setOn');
       const message = getMessage(context.component, source.event, emitter);
@@ -78,7 +116,10 @@ function emitBinding(binding: Binding, context: ChunkContext): Emitted {
     case 'text': {
       emitter.at = source.hole.span;
       usage.helpers.add('setText');
-      const body = `setText$(start, ${emitter.expr(source.hole.expr, 1)});`;
+      const value = binding.dynamic
+        ? printTracked(emitter, context.component, source.hole, binding.name)
+        : emitter.expr(source.hole.expr, 1);
+      const body = `setText$(start, ${value});`;
       return {
         code: `export function ${binding.name}(${printParams('start', usage)}) {\n${body}\n}`,
         usage,
@@ -116,6 +157,7 @@ function emitCondition(
   const elseBuilt = builder.build(node.else);
   const render = `renderC${node.test.id}`;
   const scope = printScope(branchUsage);
+  const parameter = printScope(branchUsage, true);
   let body: string;
   if (thenBuilt.pre.length === 0 && elseBuilt.pre.length === 0) {
     body = `return branch === 0 ? ${toExpression(thenBuilt)} : ${toExpression(elseBuilt)};`;
@@ -129,7 +171,7 @@ function emitCondition(
       `return ${toExpression({ pre: [], parts: elseBuilt.parts })};`,
     ].join('\n');
   }
-  const renderFunction = `function ${render}(${scope === '' ? 'branch' : `branch, ${scope}`}) {\n${body}\n}`;
+  const renderFunction = `function ${render}(${parameter === '' ? 'branch' : `branch, ${parameter}`}) {\n${body}\n}`;
   mergeUsage(usage, branchUsage);
   // Only the scope the branches read goes to the render function.
   const reference = scope === '' ? render : `(branch) => ${render}(branch, ${scope})`;
@@ -227,9 +269,17 @@ function assemble(usage: Usage, sections: string[], context: ChunkContext): stri
   const collected = context.source.collect(usage.modules, usage.imports);
   const imports: string[] = [];
   const copied = printHelpers(usage.helpers);
-  const runtime = printHelperImport(copied.client, 'idlip/client');
-  if (runtime !== '') {
-    imports.push(runtime);
+  // The loader's own exports come as they are, and the copies call it through forwarders.
+  const specifiers: string[] = [];
+  for (const name of [...copied.client].sort()) {
+    specifiers.push(`${name} as ${name}$`);
+  }
+  specifiers.push(...[...usage.loader].sort());
+  if (specifiers.length > 0) {
+    imports.push(`import { ${specifiers.join(', ')} } from 'idlip/client';`);
+  }
+  for (const [name, id] of usage.views) {
+    imports.push(`import * as ${name} from ${quote(id)};`);
   }
   imports.push(...collected.imports);
   const blocks: string[] = [];
@@ -258,18 +308,45 @@ export function emitListChunk(info: ListInfo, context: ChunkContext): GroupChunk
   emitter.frames = [...info.frames, frame];
   const builder = new HtmlBuilder(context.component, context.plan, emitter);
   const built = builder.build(info.node.body);
-  // The row's own item and index are read from the new row.
+  // The row's own item and index are read from the new row. A template that adds children
+  // also reads the path of the scope, so it takes the whole scope.
+  const scoped = usage.path;
+  const rows = scoped ? 'scope.rows' : 'rows';
   const lines: string[] = [];
   if (usage.vars.has(info.node.item)) {
-    lines.push(`const ${getLocalName(info.node.item)} = rows[${depth}].item;`);
-    usage.scope.add('rows');
+    lines.push(`const ${getLocalName(info.node.item)} = ${rows}[${depth}].item;`);
+    if (!scoped) {
+      usage.scope.add('rows');
+    }
   }
   if (info.node.index !== undefined && usage.vars.has(info.node.index)) {
-    lines.push(`const ${getLocalName(info.node.index)} = rows[${depth}].index;`);
-    usage.scope.add('rows');
+    lines.push(`const ${getLocalName(info.node.index)} = ${rows}[${depth}].index;`);
+    if (!scoped) {
+      usage.scope.add('rows');
+    }
+  }
+  let parameter: string;
+  if (scoped) {
+    parameter = 'scope';
+    // The own row is read from `scope.rows`. The rows around the list are destructured.
+    const names: string[] = [];
+    for (const name of SCOPE_ORDER) {
+      if (usage.scope.has(name)) {
+        names.push(name);
+      }
+    }
+    if (names.length > 0) {
+      lines.unshift(`const { ${names.join(', ')} } = scope;`);
+    }
+    lines.push("const path = scope.path ?? '';");
+  } else {
+    parameter = printScope(usage);
   }
   lines.push(...built.pre, `return ${toExpression({ pre: [], parts: built.parts })};`);
-  const sections = [`export function render(${printScope(usage)}) {\n${lines.join('\n')}\n}`];
+  const comment = scoped
+    ? "// `addChild` makes the child's model from `init`, records the slot and returns the child's\n// markup between its boundary comments.\n"
+    : '';
+  const sections = [`${comment}export function render(${parameter}) {\n${lines.join('\n')}\n}`];
   if (info.node.namespace !== 'html') {
     sections.push(`export const namespace = ${quote(info.node.namespace)};`);
   }
@@ -277,4 +354,217 @@ export function emitListChunk(info: ListInfo, context: ChunkContext): GroupChunk
     module: { chunk: `list=${info.id}`, code: assemble(usage, sections, context) },
     usage,
   };
+}
+
+/**
+ * Emits the chunk of a `<Try>` region. `render(error, scope)` returns the catch view, with
+ * `error` the message of what was thrown, a string. A catch view with `reset` also gets
+ * `region(scope, start)`: the whole region with its markers, built the way the server builds
+ * it, for the reset. A region inside a `<For>` reads its rows from the DOM around `start`, with
+ * `listPaths`, the `each` path of each list.
+ */
+export function emitTryChunk(
+  info: TryInfo,
+  context: ChunkContext,
+  listPaths: Readonly<Record<string, string>>,
+): GroupChunk {
+  const usage = createUsage();
+  const emitter = new Emitter('client', usage, context.report);
+  emitter.frames = info.frames;
+  const builder = new HtmlBuilder(context.component, context.plan, emitter);
+  const built = builder.buildCatch(info.node, info.id);
+  const body = [...built.pre, `return ${toExpression({ pre: [], parts: built.parts })};`];
+  const error = getLocalName(info.node.error);
+  const sections = [
+    `export function render(${printParams(error, usage)}) {\n${body.join('\n')}\n}`,
+  ];
+  if (info.node.reset !== undefined) {
+    const whole = builder.build([info.node]);
+    const lines = [...whole.pre, `return ${toExpression({ pre: [], parts: whole.parts })};`];
+    const inRow = info.frames.length > 0;
+    if (inRow) {
+      // The rows are read at the reset, not passed in.
+      usage.helpers.add('getRows');
+      usage.scope.delete('rows');
+      usage.scope.add('model');
+      lines.unshift('const rows = getRows$(start, model, lists$);');
+      sections.push(`const lists$ = ${JSON.stringify(listPaths)};`);
+    }
+    const params = printParams(undefined, usage);
+    sections.push(
+      `export function region(${params}${inRow ? `${params === '' ? '' : ', '}start` : ''}) {\n${lines.join('\n')}\n}`,
+    );
+  }
+  if (info.node.namespace !== 'html') {
+    sections.push(`export const namespace = ${quote(info.node.namespace)};`);
+  }
+  return {
+    module: { chunk: `try=${info.id}`, code: assemble(usage, sections, context) },
+    usage,
+  };
+}
+
+/** The first comment of a props binding that sets a prop. */
+const PROP_COMMENT =
+  '// A props binding: it has no node. It tells the loader the new value of one prop of a slot.';
+
+/** Emits `p<id>`: it tells the loader the new value of one prop of one child slot. */
+function emitPropBinding(binding: Binding, context: ChunkContext): Emitted {
+  const usage = createUsage();
+  const emitter = new Emitter('client', usage, context.report);
+  // The rows are read into variables, so the code reads the same as in a template.
+  const rows: { name: string; read: string }[] = [];
+  for (const [depth, frame] of binding.frames.entries()) {
+    emitter.frames.push({ item: frame.item, index: frame.index, row: undefined });
+    rows.push({ name: frame.item, read: `scope.rows[${depth}].item` });
+    if (frame.index !== undefined) {
+      rows.push({ name: frame.index, read: `scope.rows[${depth}].index` });
+    }
+  }
+  const { source } = binding;
+  let comment: string;
+  let call: string;
+  let path = "scope.path ?? ''";
+  let hoisted = false;
+  if (source.kind === 'prop') {
+    comment = PROP_COMMENT;
+    const slot = printSlot(emitter, context.plan, source.child, path);
+    emitter.at = source.hole.span;
+    call = `setProp(${slot}, ${quote(source.name)}, ${emitter.expr(source.hole.expr, 1)});`;
+  } else if (source.kind === 'message') {
+    path = 'path';
+    hoisted = true;
+    const { event } = source;
+    const slot = printSlot(emitter, context.plan, source.child, path);
+    const message = getMessage(context.component, event, emitter, path).code;
+    comment =
+      event.target.kind === 'handler'
+        ? `// The message prop carries the path of this component as its owner, so the child's click\n// reaches \`${event.target.name}\` here and not a handler of the child.`
+        : '// A message prop that the component forwards keeps the owner that its parent gave it.';
+    call = `setProp(${slot}, ${quote(event.name)}, ${message});`;
+  } else {
+    throw new Error(`${binding.name} is not a props binding`);
+  }
+  usage.loader.add('setProp');
+  const lines: string[] = [];
+  const names: string[] = [];
+  for (const name of ['model', 'props'] as const) {
+    if (usage.scope.has(name)) {
+      names.push(name);
+    }
+  }
+  if (names.length > 0) {
+    lines.push(`const { ${names.join(', ')} } = scope;`);
+  }
+  for (const row of rows) {
+    if (usage.vars.has(row.name)) {
+      lines.push(`const ${getLocalName(row.name)} = ${row.read};`);
+    }
+  }
+  if (hoisted) {
+    lines.push("const path = scope.path ?? '';");
+  }
+  lines.push(call);
+  return {
+    code: `${comment}\nexport function ${binding.name}(scope) {\n${lines.join('\n')}\n}`,
+    usage,
+  };
+}
+
+/** Whether an expression reads a state field, which a later initializer then reads as a local. */
+function readsState(expr: Expr): boolean {
+  switch (expr.kind) {
+    case 'literal':
+      return false;
+    case 'path': {
+      if (expr.root.kind === 'state') {
+        return true;
+      }
+      for (const segment of expr.segments) {
+        if (typeof segment !== 'string' && segment.kind === 'index' && readsState(segment.value)) {
+          return true;
+        }
+      }
+      return false;
+    }
+    case 'unary':
+      return readsState(expr.arg);
+    case 'binary':
+    case 'logical':
+      return readsState(expr.left) || readsState(expr.right);
+    case 'conditional':
+      return readsState(expr.test) || readsState(expr.then) || readsState(expr.else);
+    case 'template':
+      return expr.exprs.some(readsState);
+    case 'object':
+      return expr.entries.some((entry) => readsState(entry.value));
+    case 'array':
+      return expr.items.some(readsState);
+    case 'call':
+      return expr.helper === 'inlined' ? readsState(expr.body) : expr.args.some(readsState);
+    case 'method':
+      return readsState(expr.receiver) || expr.args.some(readsState);
+    default:
+      return readsState(expr.receiver);
+  }
+}
+
+/** Emits the `view` chunk of a module that a parent renders: `init` and `render`. */
+export function emitViewChunk(context: ChunkContext): GroupChunk {
+  const { component } = context;
+  const usage = createUsage();
+
+  // The initial model, from the state initializers and the props.
+  const initUsage = createUsage();
+  const initEmitter = new Emitter('server', initUsage, context.report);
+  let sequential = false;
+  for (const field of component.state) {
+    sequential = sequential || readsState(field.init);
+  }
+  // An initializer that reads an earlier field needs the fields as locals.
+  const fields: string[] = [];
+  const locals: string[] = [];
+  for (const field of component.state) {
+    const local = getLocalName(field.name);
+    const value = initEmitter.expr(field.init, 1);
+    locals.push(`const ${local} = ${value};`);
+    if (sequential) {
+      fields.push(local === field.name ? local : `${getKey(field.name)}: ${local}`);
+    } else {
+      fields.push(`${getKey(field.name)}: ${value}`);
+    }
+  }
+  const initBody = sequential
+    ? `${locals.join('\n')}\nreturn { ${fields.join(', ')} };`
+    : `return ${fields.length === 0 ? '{}' : `{ ${fields.join(', ')} }`};`;
+  for (const name of initUsage.modules) {
+    usage.modules.add(name);
+  }
+  for (const name of initUsage.imports) {
+    usage.imports.add(name);
+  }
+  for (const name of initUsage.helpers) {
+    usage.helpers.add(name);
+  }
+  const init = `// The initial model, from the state initializers and the props.\nexport function init(${initUsage.scope.has('props') ? 'props' : ''}) {\n${initBody}\n}`;
+
+  // The whole view, with the server's names. A child it renders is added, as in a template.
+  const emitter = new Emitter('server', usage, context.report);
+  const builder = new HtmlBuilder(context.component, context.plan, emitter);
+  builder.target = 'client';
+  const built = builder.build(component.view);
+  const lines: string[] = [];
+  if (component.state.length > 0) {
+    usage.scope.add('model');
+    const names: string[] = [];
+    for (const field of component.state) {
+      const local = getLocalName(field.name);
+      names.push(local === field.name ? local : `${getKey(field.name)}: ${local}`);
+    }
+    lines.push(`const { ${names.join(', ')} } = model;`);
+  }
+  lines.push(...built.pre, `return ${toExpression({ pre: [], parts: built.parts })};`);
+  const render = `// The whole view without the boundary markers, which the parent's template writes.\nexport function render(${printScope(usage, true)}) {\n${lines.join('\n')}\n}`;
+  const chunk: Module = { chunk: 'view', code: assemble(usage, [init, render], context) };
+  return { module: chunk, usage };
 }

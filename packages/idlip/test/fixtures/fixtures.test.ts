@@ -1,24 +1,45 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { runInNewContext } from 'node:vm';
 import { Window } from 'happy-dom';
 import { parseSync } from 'oxc-parser';
 import { describe, expect, it, vi } from 'vitest';
 import { getChunkFile, getChunkId } from '../../src/core/format.ts';
-import type { Manifest, Model, RenderContext } from '../../src/core/format.ts';
-import { createContext, diffPaths, selectChunks } from './reference.ts';
+import type { Manifest, Model } from '../../src/core/format.ts';
+import { createContext, diffPaths, selectChunks, slot } from './reference.ts';
+import type { NestedContext } from './reference.ts';
 
 // Server modules import the render helpers from the package. The reference versions stand in
 // for them. Chunks copy the DOM and render helpers and import only the loader's block hooks and
-// `parseHtml`, which are never called here.
+// `parseHtml`, which are never called here. The nested fixtures also import `addChild` and
+// `setProp`, which only the parent's template renders call, so `addChild` is the reference one.
 vi.mock('idlip/server', async () => import('./reference.ts'));
-vi.mock('idlip/client', () => ({
-  addBlock: vi.fn(),
-  findInnerBlocks: vi.fn(),
-  parseHtml: vi.fn(),
-  removeBlock: vi.fn(),
-}));
+vi.mock('idlip/client', async () => {
+  const reference = await import('./reference.ts');
+  return {
+    addBlock: vi.fn(),
+    addChild: reference.addChild,
+    findInnerBlocks: vi.fn(),
+    parseHtml: vi.fn(),
+    removeBlock: vi.fn(),
+    setProp: vi.fn(),
+  };
+});
+// A parent imports its child's server module by the source's specifier. The compiler's output
+// resolves it to the child's server module, which here is the expected file. The parent's
+// template chunk imports the child's view chunk by id.
+vi.mock('./nested/counter/counter.idlip.tsx', async () => {
+  const server = await vi.importActual<Record<string, unknown>>(
+    './nested/counter/expected/server.js',
+  );
+  // A module with no children has no `uses` export, and a mock throws on a missing export.
+  return { uses: [], ...server };
+});
+vi.mock('/src/counter.idlip.tsx?idlip-view&lang.js', async () =>
+  vi.importActual<Record<string, unknown>>('./nested/counter/expected/client/view.js'),
+);
 
-const FIXTURES = ['counter', 'todo'];
+const FIXTURES = ['counter', 'todo', 'effects', 'nested/counter', 'nested/board', 'try'];
 
 type Exports = Record<string, unknown>;
 
@@ -138,11 +159,22 @@ function listChunks(manifest: Manifest): string[] {
   for (const entry of Object.values(manifest.handlers)) {
     chunks.add(entry.chunk);
   }
+  for (const chunk of Object.values(manifest.tasks ?? {})) {
+    chunks.add(chunk);
+  }
   for (const group of Object.values(manifest.groups)) {
     chunks.add(group.chunk);
   }
   for (const list of Object.values(manifest.lists)) {
     chunks.add(list.chunk);
+  }
+  for (const chunk of Object.values(manifest.fallback ?? {})) {
+    chunks.add(chunk);
+  }
+  // A module that a parent renders as a child has a view chunk (`nesting-format`).
+  const view: unknown = Reflect.get(manifest, 'view');
+  if (isRecord(view) && typeof view.chunk === 'string') {
+    chunks.add(view.chunk);
   }
   return [...chunks];
 }
@@ -172,10 +204,12 @@ async function renderServer(name: string): Promise<{ html: string; model: Model 
   const server = await importModule(name, 'expected', 'server.js');
   const { context, writeState } = createContext();
   let model: Model = {};
-  const recorder: RenderContext = {
-    state(state) {
-      model = state.model;
-      context.state(state);
+  const recorder: NestedContext = {
+    state(state, path) {
+      if (path === undefined || path === '') {
+        model = state.model;
+      }
+      context.state(state, path);
     },
   };
   const markup = callExport(server, 'default', readInput(name).props, recorder);
@@ -320,6 +354,10 @@ describe.each(FIXTURES)('fixture %s', (name) => {
       for (const binding of group.bindings) {
         const kind = binding[0];
         const id = binding.slice(1);
+        if (kind === 'p') {
+          // A props binding has no node: it names a slot by path (`nesting-format`).
+          continue;
+        }
         if (kind === 'a') {
           expect(window.document.querySelector(`[i-a~="${id}"]`), binding).not.toBeNull();
         } else if (kind === 'c') {
@@ -415,5 +453,151 @@ describe('handler chunks', () => {
       todos: [{ ...todo, done: true }],
     });
     expect(callExport(clear, 'clear', model, [])).toEqual({ ...model, draft: '' });
+  });
+});
+
+interface RecordedState {
+  events: string;
+  state: Record<string, unknown>;
+}
+
+/**
+ * Runs the state script of a page, as the loader does on the first event.
+ */
+function readState(page: string): RecordedState {
+  const match = /<script i-state>(.*)<\/script>/s.exec(page);
+  if (match === null) {
+    throw new Error('The page has no state script');
+  }
+  const boot: { $idlip?: unknown[] } = {};
+  runInNewContext(match[1], { self: boot });
+  const record: unknown = boot.$idlip?.[0];
+  if (!Array.isArray(record)) {
+    throw new Error('The state script pushed no record');
+  }
+  const items: readonly unknown[] = record;
+  const events = items[0];
+  const load = items[1];
+  if (typeof events !== 'string' || typeof load !== 'function') {
+    throw new Error('The state record has the wrong shape');
+  }
+  const state: unknown = Reflect.apply(load, undefined, []);
+  if (!isRecord(state)) {
+    throw new Error('The state record returned no state');
+  }
+  return { events, state };
+}
+
+describe('nested components', () => {
+  const page = readText('nested/board', 'expected', 'page.html').trimEnd();
+  const boardManifest = readManifest('nested/board');
+
+  it('pairs each boundary marker with a slot in the state script', async () => {
+    const { comments, window } = listComments(page);
+    const opened: string[] = [];
+    let depth = 0;
+    for (const comment of comments) {
+      if (comment.startsWith('n:')) {
+        opened.push(comment.slice(2));
+        depth++;
+      } else if (comment === '/n') {
+        depth--;
+        expect(depth).toBeGreaterThanOrEqual(0);
+      }
+    }
+    expect(depth).toBe(0);
+    const { state } = readState(page);
+    const slots = state.slots;
+    if (!isRecord(slots)) {
+      throw new Error('The state has no slots');
+    }
+    expect(Object.keys(slots).toSorted()).toEqual(opened.toSorted());
+    expect(opened).toEqual(['0', '1:a1', '1:a2']);
+    for (const entry of Object.values(slots)) {
+      expect(entry).toMatchObject({ module: '/src/counter.idlip.tsx' });
+    }
+    await window.happyDOM.close();
+  });
+
+  it('writes the child manifests and the union of the event types', () => {
+    const { events, state } = readState(page);
+    expect(events).toBe('click');
+    expect(boardManifest.events).toEqual([]);
+    expect(state.modules).toEqual({
+      '/src/counter.idlip.tsx': readManifest('nested/counter'),
+    });
+  });
+
+  it('gives a child its own handlers without a path and a message prop its owner', () => {
+    // `increment` is the child's: the loader reads its path from the boundary around the target.
+    expect(page).toContain(`on:click='["increment",[]]'`);
+    // `remove` and `clearAll` belong to the board, the root, so the owner is the empty path.
+    expect(page).toContain(`on:click='["remove",["a1"],"",""]'`);
+    expect(page).toContain(`on:click='["clearAll",[],"",""]'`);
+  });
+
+  it('builds slot paths from the site and the loop keys', () => {
+    expect(slot('', 0)).toBe('0');
+    expect(slot('', 1, 'a1')).toBe('1:a1');
+    expect(slot('1:a1', 0)).toBe('1:a1/0');
+    expect(slot('', 2, 'x', 'y')).toBe('2:x:y');
+    // `/`, `:` and `-` never appear in a key part, so a path splits and a comment stays valid.
+    expect(slot('', 1, 'a/b:c--d>')).toBe('1:a%2Fb%3Ac%2D%2Dd%3E');
+  });
+
+  it('sets the props of a slot from the parent bindings', async () => {
+    const client = await import('idlip/client');
+    const setProp: unknown = Reflect.get(client, 'setProp');
+    if (!vi.isMockFunction(setProp)) {
+      throw new Error('setProp is not the mock');
+    }
+    setProp.mockClear();
+    const label = await importChunk('nested/board', 'binding=items.*.label');
+    const id = await importChunk('nested/board', 'binding=items.*.id');
+    const row = { item: { id: 'a1', label: 'Uno' }, index: 0 };
+    callExport(label, 'p3', { model: {}, props: {}, rows: [row] });
+    callExport(id, 'p4', { model: {}, props: {}, rows: [row], path: '3' });
+    expect(setProp.mock.calls).toEqual([
+      ['1:a1', 'label', 'Uno'],
+      ['3/1:a1', 'onRemove', ['remove', ['a1'], '', '3']],
+    ]);
+  });
+
+  it('keeps every slot path when the rows are reordered', async () => {
+    const client = await import('idlip/client');
+    const setProp: unknown = Reflect.get(client, 'setProp');
+    if (!vi.isMockFunction(setProp)) {
+      throw new Error('setProp is not the mock');
+    }
+    setProp.mockClear();
+    const first = { id: 'a1', label: 'First' };
+    const second = { id: 'a2', label: 'Second' };
+    const prev = { items: [first, second] };
+    const next = { items: [second, first] };
+    // By index both row groups changed, so their chunks load and the bindings run on each row.
+    expect(selectChunks(boardManifest, prev, next)).toEqual([
+      'binding=items.*.id',
+      'binding=items.*.label',
+    ]);
+    const label = await importChunk('nested/board', 'binding=items.*.label');
+    for (const [index, item] of next.items.entries()) {
+      callExport(label, 'p3', { model: next, props: {}, rows: [{ item, index }] });
+    }
+    // The paths hold keys, and each label goes to the slot of its own key. Nothing is removed.
+    expect(setProp.mock.calls).toEqual([
+      ['1:a2', 'label', 'Second'],
+      ['1:a1', 'label', 'First'],
+    ]);
+    expect(slot('', 1, 'a1')).toBe('1:a1');
+  });
+
+  it('loads only the label chunk when a label changes, and updates the list on remove', async () => {
+    const first = { id: 'a1', label: 'First' };
+    const second = { id: 'a2', label: 'Second' };
+    const model = { items: [first, second] };
+    const relabeled = { items: [{ ...first, label: 'Uno' }, second] };
+    expect(selectChunks(boardManifest, model, relabeled)).toEqual(['binding=items.*.label']);
+    const remove = await importChunk('nested/board', 'handler=remove');
+    expect(callExport(remove, 'remove', model, ['a1'])).toEqual({ items: [second] });
   });
 });

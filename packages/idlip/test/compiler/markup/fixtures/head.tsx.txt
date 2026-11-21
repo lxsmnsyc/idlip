@@ -1,0 +1,22 @@
+import type { JSX } from 'idlip/jsx-runtime';
+
+export default function Page(props: { count: number }): JSX.Element {
+  let count = props.count;
+
+  const title = `${count} left`;
+
+  function inc() {
+    count = count + 1;
+  }
+
+  return (
+    <main>
+      <Head>
+        <title>{title}</title>
+        <meta name="description" content={`${count} items`} />
+      </Head>
+      <button on:click={inc}>Add</button>
+    </main>
+  );
+}
+import { Head } from 'idlip';

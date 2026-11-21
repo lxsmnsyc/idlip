@@ -57,9 +57,12 @@ export interface AnchorAttributes {
   target?: '_self' | '_blank' | '_parent' | '_top' | (string & {});
   rel?: string;
   download?: string | boolean;
+  /** On an SVG `<a>`. */
+  'xlink:href'?: string;
 }
 
 export interface ButtonAttributes {
+  formaction?: string;
   type?: 'button' | 'submit' | 'reset';
   disabled?: boolean;
   name?: string;
@@ -152,7 +155,26 @@ export interface LinkAttributes {
 /**
  * Attributes that are specific to a tag. Tags that are not listed take only the common ones.
  */
+export interface FrameAttributes {
+  src?: string;
+  /** A bound document must be `trusted(...)`. */
+  srcdoc?: string | TrustedHtml;
+}
+
+export interface ObjectAttributes {
+  data?: string;
+  type?: string;
+}
+
+export interface EmbedAttributes {
+  src?: string;
+  type?: string;
+}
+
 export interface SpecificAttributes {
+  iframe: FrameAttributes;
+  object: ObjectAttributes;
+  embed: EmbedAttributes;
   a: AnchorAttributes;
   button: ButtonAttributes;
   input: InputAttributes;
@@ -166,9 +188,33 @@ export interface SpecificAttributes {
   link: LinkAttributes;
 }
 
+/** What an event arrow reads from a named field of a form, such as `e.currentTarget.elements.draft.value`. */
+export interface FormField {
+  readonly value: string;
+  readonly checked: boolean;
+  readonly valueAsNumber: number;
+}
+
+/** A form whose `elements` has a named field for each name an arrow reads. */
+export type FormElement = EventTarget &
+  Pick<
+    HTMLFormElement,
+    'action' | 'checkValidity' | 'id' | 'method' | 'name' | 'reportValidity' | 'reset'
+  > & {
+    readonly elements: Readonly<Record<string, FormField>>;
+  };
+
+interface TargetOverrides {
+  form: FormElement;
+}
+
+type TargetOf<Tag extends keyof HTMLElementTagNameMap> = Tag extends keyof TargetOverrides
+  ? TargetOverrides[Tag]
+  : HTMLElementTagNameMap[Tag];
+
 type ElementProps<Tag extends keyof HTMLElementTagNameMap> = CommonAttributes &
   (Tag extends keyof SpecificAttributes ? SpecificAttributes[Tag] : unknown) &
-  EventProps<HTMLElementTagNameMap[Tag], HTMLElementEventMap>;
+  (TargetOf<Tag> extends infer T extends EventTarget ? EventProps<T, HTMLElementEventMap> : never);
 
 /**
  * Every HTML element. Its `on:*` and `latest:*` props take a function of an event whose
@@ -190,3 +236,57 @@ export interface GlobalElements {
   window: WindowProps;
   document: DocumentProps;
 }
+
+type Letter =
+  | 'a'
+  | 'b'
+  | 'c'
+  | 'd'
+  | 'e'
+  | 'f'
+  | 'g'
+  | 'h'
+  | 'i'
+  | 'j'
+  | 'k'
+  | 'l'
+  | 'm'
+  | 'n'
+  | 'o'
+  | 'p'
+  | 'q'
+  | 'r'
+  | 's'
+  | 't'
+  | 'u'
+  | 'v'
+  | 'w'
+  | 'x'
+  | 'y'
+  | 'z';
+
+/** The plain `onload` style names. They would set an event handler attribute, so they are errors. */
+type PlainHandlers = { [Name in `on${Letter}${string}`]?: never };
+
+type NamespacedProps<El extends EventTarget, Map> = CommonAttributes &
+  EventProps<El, Map> &
+  PlainHandlers & { [attribute: string]: unknown };
+
+/**
+ * The SVG elements that are not HTML elements. They take any attribute, since the SVG
+ * attributes are many, and `html` stays `TrustedHtml`.
+ */
+export type SvgElements = {
+  [Tag in Exclude<keyof SVGElementTagNameMap, keyof HTMLElementTagNameMap>]: NamespacedProps<
+    SVGElementTagNameMap[Tag],
+    SVGElementEventMap
+  >;
+};
+
+/** The MathML elements, typed like the SVG ones. */
+export type MathElements = {
+  [Tag in Exclude<keyof MathMLElementTagNameMap, keyof HTMLElementTagNameMap>]: NamespacedProps<
+    MathMLElementTagNameMap[Tag],
+    MathMLElementEventMap
+  >;
+};

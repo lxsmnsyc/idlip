@@ -69,9 +69,9 @@ component Whole (stateless)
     <i>
       {#0}
   holes:
-    #0 format(props)
-        expr  format(props)
-        paths props
+    #0 props[props.x]
+        expr  props[props.x]
+        paths props.x, props.*
 
 component Broken (stateful, exported)
   props: {  }
@@ -268,8 +268,8 @@ component Broken (stateful, exported)
     #14 first
         expr  undefined
         paths (static)
-    #15 format(props)
-        expr  format(undefined)
+    #15 props[props.x]
+        expr  undefined
         paths (static)
     #16 setDraft
         expr  undefined
@@ -393,7 +393,7 @@ diagnostics: 104
   159:7 error global-children: <window> takes no children
   161:7 error subscribe-children: <Subscribe> takes no children
   163:8 error component-import: Widget comes from ./widget, which is not an .idlip.tsx component
-  59:21 error props-whole: A stateless component must read props by name, not pass the props object along
+  59:14 error props-whole: A stateless component must read props by name, not pass the props object along
   36:7 error component-recursive: <Loop> renders itself
   169:11 error hole-handler: The handler setDraft is allowed only in an event prop
   171:12 error hole-statement: Assignments are not allowed in a hole

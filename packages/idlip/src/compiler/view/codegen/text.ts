@@ -1,5 +1,4 @@
 // String helpers for the code generator: JS literals, HTML escaping and template literals.
-import { HELPER_NAMES } from '../../../core/helpers.ts';
 
 /** A piece of generated markup: fixed text, or JS code whose value is a string. */
 export type Part = { kind: 'text'; value: string } | { kind: 'code'; value: string };
@@ -11,8 +10,8 @@ const INTEGER = /^(?:0|[1-9]\d*)$/;
 
 /** Names a generated local never takes: JS words and the names the generated code uses. */
 const RESERVED = new Set([
-  ...HELPER_NAMES,
   'props',
+  'path',
   'context',
   'manifest',
   'chunks',
@@ -65,9 +64,13 @@ const RESERVED = new Set([
   'undefined',
 ]);
 
-/** Returns a JS identifier for a source name, adding `$` when the name is taken. */
+/**
+ * Returns a JS identifier for a source name. One rule keeps source names apart from generated
+ * locals: a name that is reserved or holds a `$` gets a trailing `$`, and generated locals are
+ * never of that form. Helpers are `name$` and accumulators start with `$` and do not end in it.
+ */
 export function getLocalName(name: string): string {
-  return RESERVED.has(name) ? `${name}$` : name;
+  return RESERVED.has(name) || name.includes('$') ? `${name}$` : name;
 }
 
 /** Returns a single-quoted JS string literal. */

@@ -48,6 +48,7 @@ import type {
   Target,
   UnaryOp,
 } from './ir.ts';
+import { getUrlKind } from '../../../core/url.ts';
 import { findImpliedWrapper, findNestingProblem } from './nesting.ts';
 import { locate, printPath } from './print.ts';
 
@@ -174,6 +175,9 @@ function isMethod(name: string): name is Method {
 // ---------------------------------------------------------------------------------------------
 // Scopes
 
+/** Elements whose content the parser reads as text, so `html` would change what runs or shows. */
+const RAW_HTML_FORBIDDEN = new Set(['script', 'style', 'textarea', 'title', 'noscript']);
+
 interface ModuleScope {
   /** `imported` is the exported name, `default` for a default import, `*` for a namespace. */
   imports: Map<string, { source: string; imported: string; typeOnly: boolean }>;
@@ -282,6 +286,10 @@ class Analyzer {
   /** Diagnostics go here while trying to inline a helper. */
   sink: Diagnostic[] | undefined;
   holes: Hole[] = [];
+  /** The `key` of each `<For>`, by its printed list path. Filled by the first pass. */
+  listKeys = new Map<string, string>();
+  /** Set when a `find` was lowered, so a second pass can use the keys. */
+  hasFind = false;
   childPosition = 0;
   inlineStack: string[] = [];
 
@@ -557,6 +565,15 @@ class Analyzer {
         );
       case 'props-subst': {
         const [first, ...rest] = segments;
+        if (segments.length === 0) {
+          // The whole props object, as one object of the caller's values. A helper that takes
+          // it reads fields the analysis cannot see, so the hole is dynamic (`createHole`).
+          const entries: { key: string; value: Expr }[] = [];
+          for (const [key, value] of binding.values) {
+            entries.push({ key, value });
+          }
+          return { kind: 'object', entries };
+        }
         if (typeof first !== 'string') {
           return this.reportError(
             'props-whole',
@@ -812,6 +829,12 @@ class Analyzer {
           );
         }
       }
+      if (root === undefined && callee.property.name === 'find') {
+        const found = this.lowerFind(node, callee.object, scope);
+        if (found !== undefined) {
+          return found;
+        }
+      }
       if (root === undefined && isMethod(callee.property.name)) {
         return {
           kind: 'method',
@@ -839,6 +862,56 @@ class Analyzer {
       }
     }
     return { kind: 'call', callee: root, args, helper: 'args' };
+  }
+
+  /**
+   * Lowers `list.find((t) => t.field === value)` to the path `list[field=value]`. The value
+   * must be a path to a state field, so the manifest can name it. Anything else is not in the
+   * closed grammar.
+   */
+  lowerFind(node: CallExpression, listNode: AstNode, scope: Scope): Expr | undefined {
+    const [arrow] = node.arguments;
+    const body = arrow.type === 'ArrowFunctionExpression' ? arrow.body : undefined;
+    if (
+      node.arguments.length !== 1 ||
+      arrow.type !== 'ArrowFunctionExpression' ||
+      arrow.params.length !== 1 ||
+      arrow.params[0].type !== 'Identifier' ||
+      body?.type !== 'BinaryExpression' ||
+      body.operator !== '==='
+    ) {
+      return undefined;
+    }
+    const param = arrow.params[0].name;
+    const sides = [body.left, body.right];
+    for (const [index, side] of sides.entries()) {
+      // One side reads a field of the item, the other does not read the item.
+      if (
+        side.type !== 'MemberExpression' ||
+        side.computed ||
+        side.object.type !== 'Identifier' ||
+        side.object.name !== param
+      ) {
+        continue;
+      }
+      const other = sides[1 - index];
+      if (other.type === 'Identifier' && other.name === param) {
+        return undefined;
+      }
+      const list = this.lower(listNode, scope);
+      if (list.kind !== 'path' || (list.root.kind !== 'state' && list.root.kind !== 'props')) {
+        return undefined;
+      }
+      this.hasFind = true;
+      const value = this.lower(other, scope);
+      return {
+        kind: 'path',
+        root: list.root,
+        segments: [...list.segments, { kind: 'keyed', field: side.property.name, value }],
+        optional: list.optional,
+      };
+    }
+    return undefined;
   }
 
   lowerArgs(node: CallExpression, scope: Scope): Expr[] {
@@ -905,21 +978,63 @@ class Analyzer {
     return minimizePaths(found);
   }
 
+  /** Tells whether a keyed segment can stay keyed: the list has a `<For>` with that key. */
+  isKeyedList(root: Root, before: Segment[], segment: { field: string; value: Expr }): boolean {
+    if (root.kind !== 'state' && root.kind !== 'props') {
+      return false;
+    }
+    for (const item of before) {
+      if (typeof item !== 'string') {
+        return false;
+      }
+    }
+    // The manifest names the key's source as a model path.
+    const value = segment.value;
+    if (value.kind !== 'path' || value.root.kind !== 'state') {
+      return false;
+    }
+    for (const item of value.segments) {
+      if (typeof item !== 'string') {
+        return false;
+      }
+    }
+    const list = printPath({
+      root: root.kind,
+      segments: root.kind === 'state' ? [root.name, ...before] : [...before],
+    });
+    return this.listKeys.get(list) === segment.field;
+  }
+
   collectPaths(expr: Expr, out: Path[]): void {
     switch (expr.kind) {
       case 'literal':
         return;
       case 'path': {
         const segments: Segment[] = [];
+        const root = expr.root;
         for (const segment of expr.segments) {
           if (typeof segment === 'object' && segment.kind === 'index') {
             this.collectPaths(segment.value, out);
+            segments.push({ kind: 'item' });
+          } else if (typeof segment === 'object' && segment.kind === 'keyed') {
+            this.collectPaths(segment.value, out);
+            if (this.isKeyedList(root, segments, segment)) {
+              segments.push(segment);
+              continue;
+            }
+            // Without a `<For>` key, the item is any item and the test reads its field.
+            if (root.kind === 'state' || root.kind === 'props') {
+              const base = root.kind === 'state' ? [root.name, ...segments] : [...segments];
+              out.push({
+                root: root.kind,
+                segments: [...base, { kind: 'item' }, segment.field],
+              });
+            }
             segments.push({ kind: 'item' });
           } else {
             segments.push(segment);
           }
         }
-        const root = expr.root;
         if (root.kind === 'state') {
           out.push({ root: 'state', segments: [root.name, ...segments] });
         } else if (root.kind === 'props') {
@@ -984,19 +1099,23 @@ class Analyzer {
     }
   }
 
-  createHole(node: AstNode, scope: Scope): Hole {
+  /**
+   * Creates a hole. A text or attribute hole (`dynamic`) whose path set the analysis cannot
+   * trust gets `paths: 'dynamic'`: the server and the client record what it reads.
+   */
+  createHole(node: AstNode, scope: Scope, dynamic = false): Hole {
     const expr = this.lower(node, scope);
+    const found = this.findPaths(expr);
     const hole: Hole = {
       id: this.holes.length,
       expr,
-      paths: this.findPaths(expr),
+      paths: dynamic && found.length > 0 && isTracked(expr) ? 'dynamic' : found,
       span: this.readSpan(node),
     };
-    // The analysis never produces `dynamic` for the closed grammar. Until `dynamic-paths`
-    // lands, one would be an error.
     if (hole.paths === 'dynamic') {
-      this.report('hole-dynamic', 'error', 'This hole needs runtime path tracking', node);
-    } else if (hole.paths.length > 0 && hasImpureCall(expr)) {
+      hole.fallback = found;
+    }
+    if (hole.paths !== 'dynamic' && hole.paths.length > 0 && hasImpureCall(expr)) {
       // An impure value recomputes only when the hole's paths change.
       const names: string[] = [];
       for (const path of hole.paths) {
@@ -1369,7 +1488,7 @@ class Analyzer {
       return [];
     }
     this.checkTableText(context, node);
-    return [{ kind: 'text-hole', hole: this.createHole(node, scope) }];
+    return [{ kind: 'text-hole', hole: this.createHole(node, scope, true) }];
   }
 
   resolveChildren(node: Expression, scope: Scope): Node[] | undefined {
@@ -1583,12 +1702,24 @@ class Analyzer {
             );
           }
         }
+        // A submit never navigates: the arrow's handler gets the fields at dispatch instead.
+        if (event.name === 'submit') {
+          addPrevent(event);
+        }
         events.push(event);
         continue;
       }
       const attrName =
         name.type === 'JSXNamespacedName' ? `${name.namespace.name}:${name.name.name}` : name.name;
       const value = attribute.value;
+      if (/^on[a-z]/i.test(attrName)) {
+        this.reportError(
+          'attr-event',
+          `${attrName} would set an event handler attribute. Use on:${attrName.slice(2).toLowerCase()}`,
+          attribute,
+        );
+        continue;
+      }
       if (attrName.startsWith('i-')) {
         this.reportError(
           'attr-reserved',
@@ -1602,6 +1733,10 @@ class Analyzer {
         continue;
       }
       if (attrName === 'html') {
+        if (namespace === 'html' && RAW_HTML_FORBIDDEN.has(tag)) {
+          this.reportError('html-element', `html is not allowed on <${tag}>`, attribute);
+          continue;
+        }
         html = this.lowerHtml(value, scope, attribute);
         continue;
       }
@@ -1614,16 +1749,29 @@ class Analyzer {
       } else if (value.type === 'JSXExpressionContainer') {
         if (value.expression.type === 'Literal' && typeof value.expression.value === 'string') {
           attrs.push({ name: attrName, value: { kind: 'static', value: value.expression.value } });
+        } else if (namespace === 'html' && attrName === 'srcdoc') {
+          // A document written into a frame runs scripts, so a bound one must be trusted(...).
+          const hole = this.lowerTrusted(value.expression, scope);
+          if (hole === undefined) {
+            this.reportError(
+              'srcdoc-trusted',
+              'srcdoc takes a literal or trusted(value) from idlip',
+              attribute,
+            );
+          } else {
+            attrs.push({ name: attrName, value: { kind: 'hole', hole } });
+          }
         } else {
           attrs.push({
             name: attrName,
-            value: { kind: 'hole', hole: this.createHole(value.expression, scope) },
+            value: { kind: 'hole', hole: this.createHole(value.expression, scope, true) },
           });
         }
       } else {
         this.reportError('attr-jsx', 'An attribute value cannot be JSX', value);
       }
     }
+    markUrls(tag, attrs);
     const inner: ViewContext = {
       ...context,
       namespace: tag === 'foreignObject' ? 'html' : namespace,
@@ -1697,7 +1845,23 @@ class Analyzer {
       ) {
         const key = this.lower(second, scope);
         if (key.kind === 'path' && key.root.kind === 'loop') {
-          return { kind: 'tuple', name: first.value, key };
+          const row = context.rowKey;
+          if (
+            row !== undefined &&
+            !key.root.index &&
+            key.root.name === row.item &&
+            key.segments.length === 1 &&
+            key.segments[0] === row.key
+          ) {
+            return { kind: 'tuple', name: first.value, key };
+          }
+          this.report(
+            'ref-key',
+            'error',
+            `The key of a ref must be the key of the enclosing <For>, the field ${row?.key ?? ''} of its item`,
+            attribute,
+          );
+          return undefined;
         }
       }
     }
@@ -1710,20 +1874,34 @@ class Analyzer {
     return undefined;
   }
 
+  /** Whether a local name is the `trusted` export of `idlip`, under any local name. */
+  isTrusted(local: string): boolean {
+    const found = this.module.imports.get(local);
+    return found?.source === 'idlip' && found.imported === 'trusted';
+  }
+
+  /** The hole of `trusted(value)` from idlip, or undefined for any other expression. */
+  lowerTrusted(expression: JSXExpression, scope: Scope): Hole | undefined {
+    if (
+      expression.type === 'CallExpression' &&
+      expression.callee.type === 'Identifier' &&
+      this.isTrusted(expression.callee.name) &&
+      expression.arguments.length === 1
+    ) {
+      return this.createHole(expression.arguments[0], scope);
+    }
+    return undefined;
+  }
+
   lowerHtml(
     value: JSXAttributeValue | null,
     scope: Scope,
     attribute: JSXAttribute,
   ): Hole | undefined {
     const expression = value?.type === 'JSXExpressionContainer' ? value.expression : undefined;
-    if (
-      expression?.type === 'CallExpression' &&
-      expression.callee.type === 'Identifier' &&
-      expression.callee.name === 'trusted' &&
-      this.module.imports.get('trusted')?.source === 'idlip' &&
-      expression.arguments.length === 1
-    ) {
-      return this.createHole(expression.arguments[0], scope);
+    const hole = expression === undefined ? undefined : this.lowerTrusted(expression, scope);
+    if (hole !== undefined) {
+      return hole;
     }
     this.report('html-trusted', 'error', 'html takes trusted(value) from idlip', attribute);
     return undefined;
@@ -1829,7 +2007,14 @@ class Analyzer {
         }
         const catchView = this.lowerBranch(handler.body, inner, context);
         return [
-          { kind: 'try', body, error: errorParam.name, reset: resetParam?.name, catch: catchView },
+          {
+            kind: 'try',
+            body,
+            error: errorParam.name,
+            reset: resetParam?.name,
+            catch: catchView,
+            namespace: context.namespace,
+          },
         ];
       }
       case 'Head':
@@ -1936,6 +2121,9 @@ class Analyzer {
         base = own[0];
       }
     }
+    if (base !== undefined && keyNode?.type === 'Literal' && typeof keyNode.value === 'string') {
+      this.listKeys.set(printPath({ root: base.root, segments: base.segments }), keyNode.value);
+    }
     const inner = createScope(scope);
     const itemParam = render.params[0];
     const indexParam = render.params.at(1);
@@ -1990,6 +2178,10 @@ class Analyzer {
     const body = this.lowerBranch(render.body, inner, {
       ...context,
       loopDepth: context.loopDepth + 1,
+      rowKey: {
+        item: itemName,
+        key: keyNode?.type === 'Literal' && typeof keyNode.value === 'string' ? keyNode.value : '',
+      },
     });
     return [
       {
@@ -2991,6 +3183,8 @@ interface ViewContext {
   namespace: Namespace;
   inHead: boolean;
   loopDepth: number;
+  /** The innermost `<For>`: its item name and `key` field. */
+  rowKey?: { item: string; key: string };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -3128,6 +3322,16 @@ function readEventMember(node: AstNode, param: string): string | undefined {
     return node.property.name;
   }
   return undefined;
+}
+
+/** Adds `prevent` to an event that does not have it. */
+function addPrevent(event: Event): void {
+  for (const modifier of event.modifiers) {
+    if (modifier.kind === 'prevent') {
+      return;
+    }
+  }
+  event.modifiers = [...event.modifiers, { kind: 'prevent' }];
 }
 
 /** True when the argument reads the event other than as a whole member path. */
@@ -3536,6 +3740,93 @@ function hasImpureCallIn(exprs: Expr[]): boolean {
   return false;
 }
 
+interface TrackScan {
+  /** A helper call takes an object of model fields. */
+  bundle: boolean;
+  /** The expression reads a loop variable, the event or a catch error, or is impure. */
+  blocked: boolean;
+}
+
+function scanTracked(expr: Expr, scan: TrackScan): void {
+  switch (expr.kind) {
+    case 'literal':
+      return;
+    case 'path':
+      if (expr.root.kind === 'loop' || expr.root.kind === 'local' || expr.root.kind === 'event') {
+        scan.blocked = true;
+      }
+      for (const segment of expr.segments) {
+        if (typeof segment === 'object' && segment.kind !== 'item') {
+          scanTracked(segment.value, scan);
+        }
+      }
+      return;
+    case 'unary':
+      scanTracked(expr.arg, scan);
+      return;
+    case 'binary':
+    case 'logical':
+      scanTracked(expr.left, scan);
+      scanTracked(expr.right, scan);
+      return;
+    case 'conditional':
+      scanTracked(expr.test, scan);
+      scanTracked(expr.then, scan);
+      scanTracked(expr.else, scan);
+      return;
+    case 'template':
+      for (const item of expr.exprs) {
+        scanTracked(item, scan);
+      }
+      return;
+    case 'object':
+      for (const entry of expr.entries) {
+        scanTracked(entry.value, scan);
+      }
+      return;
+    case 'array':
+      for (const item of expr.items) {
+        scanTracked(item, scan);
+      }
+      return;
+    case 'property':
+      scanTracked(expr.receiver, scan);
+      return;
+    case 'method':
+      scanTracked(expr.receiver, scan);
+      for (const item of expr.args) {
+        scanTracked(item, scan);
+      }
+      return;
+    default:
+      if (expr.helper === 'inlined') {
+        scanTracked(expr.body, scan);
+        return;
+      }
+      if (expr.impure === true) {
+        scan.blocked = true;
+      }
+      for (const arg of expr.args) {
+        if (arg.kind === 'object' && expr.callee.kind !== 'global') {
+          scan.bundle = true;
+        }
+        scanTracked(arg, scan);
+      }
+  }
+}
+
+/**
+ * Tells whether a hole is dynamic: a helper that is not inlined takes an object of model
+ * fields, such as the whole props of a stateless component or an alias `const view = { todos }`,
+ * so the fields it reads are known only when it runs. A hole that reads a loop variable, the
+ * event or a catch error stays static, since the runtime tracks model reads only.
+ */
+function isTracked(expr: Expr): boolean {
+  const scan: TrackScan = { bundle: false, blocked: false };
+  scanTracked(expr, scan);
+  return scan.bundle && !scan.blocked;
+}
+
 /** Drops paths that have a prefix in the set: a reference check on the prefix covers them. */
 function minimizePaths(paths: Path[]): Path[] {
   const printed: string[] = [];
@@ -3551,7 +3842,7 @@ function minimizePaths(paths: Path[]): Path[] {
     }
     let covered = false;
     for (const other of printed) {
-      if (other !== text && text.startsWith(`${other}.`)) {
+      if (other !== text && (text.startsWith(`${other}.`) || text.startsWith(`${other}[`))) {
         covered = true;
       }
     }
@@ -3564,20 +3855,10 @@ function minimizePaths(paths: Path[]): Path[] {
   return out;
 }
 
-/** Reads one `*.idlip.tsx` file into the view IR. */
-export function analyze(file: string, source: string, options: AnalyzeOptions = {}): ModuleIR {
-  const parsed = parseSync(file, source, { lang: 'tsx' });
-  const analyzer = new Analyzer(file, source, parsed.program, options);
-  for (const error of parsed.errors) {
-    analyzer.diagnostics.push({
-      rule: 'parse',
-      severity: 'error',
-      message: error.message,
-      span: { start: error.labels[0]?.start ?? 0, end: error.labels[0]?.end ?? 0 },
-    });
-  }
+/** Reads the components of a parsed file into the IR. */
+function readComponents(analyzer: Analyzer, program: Program): Component[] {
   const components: Component[] = [];
-  for (const statement of parsed.program.body) {
+  for (const statement of program.body) {
     const exported =
       statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration';
     const declaration = exported ? statement.declaration : statement;
@@ -3589,5 +3870,47 @@ export function analyze(file: string, source: string, options: AnalyzeOptions = 
       components.push(analyzer.analyzeComponent(declaration.id.name, declaration, exported));
     }
   }
+  return components;
+}
+
+/** Reads one `*.idlip.tsx` file into the view IR. */
+export function analyze(file: string, source: string, options: AnalyzeOptions = {}): ModuleIR {
+  const parsed = parseSync(file, source, { lang: 'tsx' });
+  let analyzer = new Analyzer(file, source, parsed.program, options);
+  let components = readComponents(analyzer, parsed.program);
+  // A `find` may come before the `<For>` that keys its list, so the first pass collects the
+  // keys and a second pass uses them.
+  if (analyzer.hasFind && analyzer.listKeys.size > 0) {
+    const second = new Analyzer(file, source, parsed.program, options);
+    second.listKeys = analyzer.listKeys;
+    analyzer = second;
+    components = readComponents(analyzer, parsed.program);
+  }
+  const parseDiagnostics: Diagnostic[] = [];
+  for (const error of parsed.errors) {
+    parseDiagnostics.push({
+      rule: 'parse',
+      severity: 'error',
+      message: error.message,
+      span: { start: error.labels[0]?.start ?? 0, end: error.labels[0]?.end ?? 0 },
+    });
+  }
+  analyzer.diagnostics.unshift(...parseDiagnostics);
   return { file, components, diagnostics: analyzer.diagnostics };
+}
+
+/** Sets `url` on each bound attribute that holds a URL. */
+function markUrls(tag: string, attrs: Attr[]): void {
+  // The attribute an `<animate>` or `<set>` changes: its text, null when bound.
+  let target: string | null | undefined;
+  for (const attr of attrs) {
+    if (attr.name === 'attributeName') {
+      target = attr.value.kind === 'static' && attr.value.value !== true ? attr.value.value : null;
+    }
+  }
+  for (const attr of attrs) {
+    if (attr.value.kind === 'hole') {
+      attr.url = getUrlKind(tag, attr.name, target);
+    }
+  }
 }

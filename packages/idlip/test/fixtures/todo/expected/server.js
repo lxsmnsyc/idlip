@@ -10,41 +10,7 @@ function countLeft(todos) {
   return left;
 }
 
-export const manifest = {
-  module: '/src/todo.idlip.tsx',
-  events: ['click', 'input', 'keydown', 'submit'],
-  handlers: {
-    setDraft: { chunk: 'handler=setDraft' },
-    clear: { chunk: 'handler=clear' },
-    add: { chunk: 'handler=add' },
-    toggle: { chunk: 'handler=toggle' },
-  },
-  groups: {
-    'todos.*.done': {
-      paths: ['todos.*.done'],
-      chunk: 'binding=todos.*.done',
-      bindings: ['a4', 'a5'],
-      covers: ['todos'],
-    },
-    'todos.*.id': {
-      paths: ['todos.*.id'],
-      chunk: 'binding=todos.*.id',
-      bindings: ['a7'],
-      covers: ['todos'],
-    },
-    'todos.*.text': {
-      paths: ['todos.*.text'],
-      chunk: 'binding=todos.*.text',
-      bindings: ['t6'],
-      covers: ['todos'],
-    },
-    draft: { paths: ['draft'], chunk: 'binding=draft', bindings: ['a0', 'a1'], covers: [] },
-    todos: { paths: ['todos'], chunk: 'binding=todos', bindings: ['t2', 'l3'], covers: [] },
-  },
-  lists: {
-    3: { key: 'id', path: 'todos', chunk: 'list=3', bindings: ['a4', 'a5', 't6', 'a7'] },
-  },
-};
+export const manifest = { module: '/src/todo.idlip.tsx', events: ['click', 'input', 'keydown', 'submit'], listens: {click: ['toggle'], input: ['setDraft'], keydown: ['clear'], submit: ['add']}, handlers: { setDraft: { chunk: 'handler=setDraft', writes: ['draft'], bindings: ['draft'] }, clear: { chunk: 'handler=clear', writes: ['draft'], bindings: ['draft'] }, add: { chunk: 'handler=add', writes: ['todos', 'next', 'draft'], bindings: ['todos.*.done', 'todos.*.id', 'todos.*.text', 'draft'] }, toggle: { chunk: 'handler=toggle', writes: ['todos.*.done'], bindings: ['todos.*.done'] } }, groups: { 'todos.*.done': { paths: ['todos.*.done'], chunk: 'binding=todos.*.done', bindings: ['a4', 'a5'], covers: ['todos'] }, 'todos.*.id': { paths: ['todos.*.id'], chunk: 'binding=todos.*.id', bindings: ['a7'], covers: ['todos'] }, 'todos.*.text': { paths: ['todos.*.text'], chunk: 'binding=todos.*.text', bindings: ['t6'], covers: ['todos'] }, draft: { paths: ['draft'], chunk: 'binding=draft', bindings: ['a0', 'a1'], covers: [] }, todos: { paths: ['todos'], chunk: 'binding=todos', bindings: ['t2', 'l3'], covers: [] } }, lists: { 3: { key: 'id', path: 'todos', chunk: 'list=3', bindings: ['a4', 'a5', 't6', 'a7'] } } };
 
 // `vite-plugin` replaces the URLs in a build.
 export const chunks = {

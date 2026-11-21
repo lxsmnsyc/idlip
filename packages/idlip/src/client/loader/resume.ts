@@ -1,30 +1,88 @@
 // oxlint-disable import/prefer-default-export
+import { DEV, warnDeepQueue } from '../../core/dev.ts';
 import { getChunkId } from '../../core/format.ts';
+import { runAfter } from '../dom/run.ts';
+import { RESET, fireError, keepModel, resetRegion } from '../errors.ts';
+import {
+  HAS_CHILDREN,
+  HAS_DYNAMIC,
+  HAS_ERRORS,
+  HAS_HEAD,
+  HAS_REFS,
+  HAS_RETRY,
+  HAS_SKEW,
+  HAS_SUBS,
+  HAS_TASKS,
+} from '../features.ts';
+import { checkSkew } from '../skew.ts';
+import { startHead } from '../head.ts';
+import { connectHot } from '../hot.ts';
+import type { Hot } from '../hot.ts';
+import { getChildren, installNesting } from '../nesting.ts';
+import { startSubs } from '../subs/index.ts';
+import type { SubsHost } from '../subs/index.ts';
+import { runTask } from '../tasks/run.ts';
 import type {
+  After,
   Boot,
   HandlerChunk,
   Model,
   Page,
   PageState,
   Patch,
+  Props,
   QueuedEvent,
   Step,
   Update,
 } from '../../core/format.ts';
 
-interface Root {
+interface Component {
   readonly script: Element;
-  readonly page: Page;
+  /** A child replaces it when its props or its boundary change. */
+  page: Page;
   readonly state: PageState;
   /** The model after the last update. */
   model: Model;
   /** The model the DOM shows. It changes only after a patch succeeds. */
   rendered: Model;
+  /** Dom calls to run after the patch of the batch. */
+  after?: After[];
+}
+
+/** The component of a state script. */
+export interface Root extends Component {
+  readonly kind: 'root';
+}
+
+/** A stateful child that the page renders, found by its model path. */
+export interface Child extends Component {
+  readonly kind: 'live';
+  /** The model path of the child. */
+  readonly path: string;
+  /** Counts the times the path was added, so late work for an old slot is told apart. */
+  readonly gen: number;
+  readonly top: Root;
+  /** The props the DOM shows. */
+  shown: Props;
+}
+
+/** What a message runs on, and what a patch updates. */
+export type Unit = Root | Child;
+
+/** What the loader asks of nesting. */
+export interface Nesting {
+  /** The component an event addresses. `undefined` drops the event. */
+  target: (root: Root, event: QueuedEvent) => Unit | undefined;
+  /** Tells whether a component still takes messages. */
+  live: (unit: Unit) => boolean;
+  /** Patches the DOM of a component whose model or props changed. */
+  patch: (unit: Unit) => Promise<void>;
 }
 
 interface Pending {
   readonly event: QueuedEvent;
   readonly root: Root;
+  readonly unit: Unit;
   update: Update | undefined;
   /** The chunk failed to load. The item waits for the next event with its tag. */
   failed: boolean;
@@ -46,7 +104,7 @@ function importChunk(url: string): Promise<unknown> {
 }
 
 function isStep(result: Model | Step): result is Step {
-  return 'task' in result && 'model' in result;
+  return '$step' in result;
 }
 
 export interface Resumed {
@@ -71,6 +129,12 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
     onError?.(error);
   }
 
+  const nest = HAS_CHILDREN ? installNesting(patch) : undefined;
+
+  // Set below, since the loader functions that read it come first.
+  // oxlint-disable-next-line prefer-const
+  let hot: Hot | undefined;
+  let stopHotSubs: (() => void) | undefined;
   const queue: Pending[] = [];
   const roots = new Map<number, Root>();
   const loads = new Map<string, Promise<unknown>>();
@@ -86,16 +150,28 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
   }
 
   async function load(url: string): Promise<unknown> {
+    if (import.meta.hot) {
+      // Dev only: a chunk that an edit changed loads from a new URL.
+      url = hot!.rewrite(url);
+    }
     let promise = loads.get(url);
     if (promise === undefined) {
       // A browser may keep a failed import, so a retry asks for the URL with a fragment.
       const retry = failures.get(url);
-      promise = importChunk(retry === undefined ? url : `${url}#${retry}`);
+      const target = retry === undefined ? url : `${url}#${retry}`;
+      // A chunk that fails is asked for once more at once, under another URL.
+      promise = HAS_RETRY
+        ? importChunk(target).catch(async () => importChunk(`${url}#r${retry ?? 0}`))
+        : importChunk(target);
       loads.set(url, promise);
       // A failed load is forgotten, so the next event tries again.
       promise.catch(() => {
         loads.delete(url);
         failures.set(url, (retry ?? 0) + 1);
+        // A chunk that is gone may mean a newer build.
+        if (HAS_SKEW) {
+          checkSkew();
+        }
       });
     }
     return promise;
@@ -106,7 +182,8 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
     return (
       parent !== null &&
       parent.contains(target) &&
-      (script.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_PRECEDING) !== 0
+      (script === target ||
+        (script.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_PRECEDING) !== 0)
     );
   }
 
@@ -116,15 +193,50 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
       script,
       model: state.model,
       rendered: state.model,
+      kind: 'root',
       state,
       page: {
         root: script.parentNode ?? document,
         manifest: state.manifest,
         props: state.props,
         load: async (module, chunk) => load(state.chunks[getChunkId(module, chunk)]),
+        ...(HAS_DYNAMIC && { dynamic: state.dynamic }),
       },
     };
   }
+
+  // Dev only. `import.meta.hot` is undefined in a build, so this and its import are dropped.
+  hot = import.meta.hot
+    ? connectHot(import.meta.hot, {
+        boot,
+        roots,
+        createRoot,
+        patch: async (root) => {
+          if (HAS_CHILDREN) {
+            await nest!.patch(root);
+          } else {
+            await patch(root.page, root.rendered, root.model);
+            root.rendered = root.model;
+          }
+        },
+        children: HAS_CHILDREN ? getChildren : undefined,
+        subs: HAS_SUBS
+          ? {
+              stop: () => {
+                // oxlint-disable-next-line no-use-before-define
+                stopSubs?.();
+                stopHotSubs?.();
+              },
+              start: () => {
+                // oxlint-disable-next-line no-use-before-define
+                stopHotSubs = startSubs(subsHost);
+              },
+            }
+          : undefined,
+        settled: async () => settled(),
+        report,
+      })
+    : undefined;
 
   function findRoot(target: Element): Root | undefined {
     for (const root of roots.values()) {
@@ -162,7 +274,11 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
         other.failed = false;
       }
     }
-    const item: Pending = { event, root, update: undefined, failed: false };
+    const unit = HAS_CHILDREN ? nest!.target(root, event) : root;
+    if (HAS_CHILDREN && unit === undefined) {
+      return;
+    }
+    const item: Pending = { event, root, unit: unit!, update: undefined, failed: false };
     if (event.latest) {
       // Latest wins: the pending event of this element and type is replaced.
       for (let index = 0; index < queue.length; index++) {
@@ -173,23 +289,37 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
         }
       }
     }
+    if (DEV) {
+      warnDeepQueue(queue, event);
+    }
     queue.push(item);
   }
 
-  async function loadUpdate(item: Pending): Promise<void> {
-    const tag = item.event.message.t;
-    const { manifest, chunks } = item.root.state;
+  async function getUpdate(root: Unit, tag: string): Promise<Update> {
+    const { manifest, chunks } = root.state;
     const entry = Object.hasOwn(manifest.handlers, tag) ? manifest.handlers[tag] : undefined;
     const url = entry === undefined ? undefined : chunks[getChunkId(manifest.module, entry.chunk)];
     if (url === undefined) {
       throw new DropError(`idlip: no chunk for ${tag}`);
+    }
+    // The binding chunks start with the handler chunk, not after it. A failure surfaces in the patch.
+    for (const key of entry?.bindings ?? []) {
+      load(chunks[getChunkId(manifest.module, manifest.groups[key].chunk)]).catch(() => {});
     }
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion
     const module = (await load(url)) as HandlerChunk;
     if (!Object.hasOwn(module, tag) || typeof module[tag] !== 'function') {
       throw new DropError(`idlip: no export ${tag}`);
     }
-    item.update = module[tag];
+    return module[tag];
+  }
+
+  async function loadUpdate(item: Pending): Promise<void> {
+    // A reset has no handler chunk: it keeps the model and renders a region in `runBatch`.
+    item.update =
+      HAS_ERRORS && item.event.message.t === RESET
+        ? keepModel
+        : await getUpdate(item.unit, item.event.message.t);
   }
 
   // Loads the chunks of the waiting events. An event that cannot run is dropped, and an event
@@ -208,6 +338,13 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
       const result = results[index];
       if (result.status === 'rejected') {
         report(result.reason);
+        if (HAS_ERRORS) {
+          fireError(result.reason, waiting[index].unit.page.path);
+        }
+        // A subscription asks for its next value only after this one, so it must not wait.
+        if (HAS_SUBS) {
+          waiting[index].event.done?.();
+        }
         if (result.reason instanceof DropError) {
           queue.splice(queue.indexOf(waiting[index]), 1);
         } else {
@@ -244,34 +381,97 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
     return false;
   }
 
+  // Runs one message. A built-in task settles here, so its continuation joins the batch. Any
+  // other task runs on its own, and its continuation joins the queue when it settles.
+  async function apply(root: Unit, update: Update, message: QueuedEvent['message']): Promise<void> {
+    const result = update(root.model, message.p);
+    if (!((HAS_TASKS || HAS_REFS) && isStep(result))) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+      root.model = result as Model;
+      return;
+    }
+    root.model = result.model;
+    if (HAS_REFS && result.after !== undefined) {
+      (root.after ??= []).push(...result.after);
+    }
+    if (!HAS_TASKS || result.task === undefined) {
+      return;
+    }
+    await runTask(
+      {
+        page: root.page,
+        apply: async (next, sent) => apply(root, next, sent),
+        // The state script stands for the target, since a continuation has no element.
+        push: (sent) => {
+          if (!HAS_CHILDREN || nest!.live(root)) {
+            boot.q!.push({
+              message: sent,
+              target: root.script,
+              type: '',
+              latest: false,
+              ...(HAS_CHILDREN && root.kind === 'live' && { owner: root.path }),
+            });
+          }
+        },
+        report,
+      },
+      result.task,
+    );
+  }
+
   async function runBatch(batch: readonly Pending[]): Promise<void> {
-    const touched = new Set<Root>();
-    for (const { event, root, update } of batch) {
-      touched.add(root);
+    const touched = new Set<Unit>();
+    for (const { event, unit, update } of batch) {
+      if (HAS_CHILDREN && !nest!.live(unit)) {
+        // The component left the page while the chunk loaded.
+        continue;
+      }
+      touched.add(unit);
+      if (HAS_SUBS && event.signal?.aborted) {
+        continue;
+      }
       try {
-        const result: Model | Step | undefined = update?.(root.model, event.message.p);
-        if (result === undefined) {
-          throw new Error(`idlip: ${event.message.t} returned nothing`);
+        if (HAS_ERRORS && event.message.t === RESET) {
+          await resetRegion(unit.page, unit.model, event.target, event.message.p[0]);
+        } else {
+          await apply(unit, update!, event.message);
         }
-        if (isStep(result)) {
-          throw new Error('idlip: tasks are not supported');
-        }
-        root.model = result;
       } catch (error) {
         report(error);
+        if (HAS_ERRORS) {
+          fireError(error, unit.page.path);
+        }
       }
     }
-    for (const root of touched) {
+    for (const unit of touched) {
       if (stopped) {
         return;
       }
-      if (root.model !== root.rendered) {
-        try {
-          await patch(root.page, root.rendered, root.model);
-          root.rendered = root.model;
-        } catch (error) {
-          report(error);
+      let patched = true;
+      try {
+        if (HAS_CHILDREN) {
+          await nest!.patch(unit);
+        } else if (unit.model !== unit.rendered) {
+          await patch(unit.page, unit.rendered, unit.model);
+          unit.rendered = unit.model;
         }
+      } catch (error) {
+        patched = false;
+        report(error);
+        if (HAS_ERRORS) {
+          fireError(error, unit.page.path);
+        }
+      }
+      if (HAS_REFS) {
+        const calls = unit.after?.splice(0);
+        if (patched && calls !== undefined) {
+          runAfter(unit.page, calls);
+        }
+      }
+    }
+    if (HAS_SUBS) {
+      for (const { event } of batch) {
+        event.done?.();
       }
     }
   }
@@ -327,9 +527,39 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
   for (const event of early) {
     enqueue(event);
   }
+  const subsHost: SubsHost = {
+    load: async (marker, name) => {
+      const root = findRoot(marker);
+      if (root === undefined) {
+        throw new Error(`idlip: no state for the source ${name}`);
+      }
+      // A marker inside a child names a source of the child's module.
+      const unit = HAS_CHILDREN
+        ? nest!.target(root, {
+            message: { t: '', p: [] },
+            target: marker,
+            type: 'value',
+            latest: false,
+          })
+        : root;
+      const { page } = unit ?? root;
+      return page.load(page.manifest.module, `source=${name}`);
+    },
+    push: (event) => {
+      events.push(event);
+    },
+    report,
+  };
+  const stopSubs = HAS_SUBS ? startSubs(subsHost) : undefined;
+  const stopHead = HAS_HEAD ? startHead() : undefined;
   flush().catch(report);
 
   function stop(): void {
+    stopSubs?.();
+    stopHead?.();
+    if (import.meta.hot) {
+      stopHotSubs?.();
+    }
     stopped = true;
     queue.length = 0;
     Reflect.deleteProperty(events, 'push');

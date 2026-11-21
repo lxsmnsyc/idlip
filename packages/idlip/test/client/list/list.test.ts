@@ -90,7 +90,11 @@ function mount(html: string, tag = 'ul'): { root: Element; start: Comment } {
 }
 
 function setRange(start: Comment, value: string): void {
-  while (start.nextSibling !== null && (start.nextSibling as Comment).data !== '/t') {
+  // The end is the comment `/t`. A text node that reads `/t` is the todo's own text.
+  while (
+    start.nextSibling !== null &&
+    !(start.nextSibling.nodeType === 8 && (start.nextSibling as Comment).data === '/t')
+  ) {
     start.nextSibling.remove();
   }
   start.after(document.createTextNode(value));
@@ -275,7 +279,18 @@ describe('patchList model test', () => {
         }
         return true;
       }),
-      { numRuns: 200 },
+      {
+        numRuns: 200,
+        // A todo whose text is `/t` once ended a range early in the test's own setRange.
+        examples: [
+          [
+            [
+              { kind: 'add', text: '/t', at: 0 },
+              { kind: 'toggle', at: 0 },
+            ],
+          ],
+        ],
+      },
     );
   });
 });

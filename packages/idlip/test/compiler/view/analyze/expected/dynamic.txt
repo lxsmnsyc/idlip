@@ -1,0 +1,78 @@
+file dynamic.idlip.tsx
+
+component Badge (stateless)
+  props: props
+  view:
+    <i title={#0}>
+      {#1}
+  holes:
+    #0 summarize(props)
+        expr  summarize(props)
+        paths props
+    #1 summarize(props)
+        expr  summarize(props)
+        paths props
+
+component Board (stateful, exported)
+  props: props
+  state:
+    todos = props.initial
+    filter = "all"
+    note = ""
+  derived:
+    stats = { todos: todos, filter: filter }
+  handlers:
+    toggle(id)
+      free: todos:state
+      writes: todos
+    rename(id, text)
+      free: todos:state
+      writes: todos
+    setFilter(value)
+      free: -
+      writes: filter
+    setNote(text)
+      free: -
+      writes: note
+  view:
+    <main>
+      <p>
+        {#0}
+      <i title={#1}>
+        {#2}
+      <p class="note">
+        {#3}
+      <button [on:click -> setFilter("open")]>
+        "Open"
+      <button [on:click -> setNote("hi")]>
+        "Note"
+      <ul>
+        for #4 key=id item=t
+          <li>
+            <input type="checkbox" checked={#5} [on:click -> toggle(t.id)  render reads todos.*.id]>
+            <b [on:click -> rename(t.id, `${t.text}!`)  render reads todos.*.id, todos.*.text]>
+              {#6}
+  holes:
+    #0 summarize(stats)
+        expr  summarize({ todos: todos, filter: filter })
+        paths dynamic
+    #1 summarize(props)
+        expr  summarize({ todos: todos, filter: filter })
+        paths dynamic
+    #2 summarize(props)
+        expr  summarize({ todos: todos, filter: filter })
+        paths dynamic
+    #3 note
+        expr  note
+        paths note
+    #4 todos
+        expr  todos
+        paths todos
+    #5 t.done
+        expr  t.done
+        paths todos.*.done
+    #6 t.text
+        expr  t.text
+        paths todos.*.text
+
+diagnostics: 0

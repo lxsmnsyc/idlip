@@ -1,5 +1,6 @@
 // Emits the server render module, the binding and list chunks and the manifest from the view IR,
 // as `contracts/compiled-format.md` fixes them. Handler chunks come from `compile-update`.
+import { posix } from 'node:path';
 import { getChunkId } from '../../../core/format.ts';
 import type {
   BindingGroup,
@@ -11,14 +12,24 @@ import type {
 } from '../../../core/format.ts';
 import { HELPER_NAMES } from '../../../core/helpers.ts';
 import { pickComponent } from '../../update/index.ts';
+import { listWrites, meetsPath } from '../../update/writes.ts';
 import type { Component, ModuleIR, Span } from '../analyze/index.ts';
-import { emitBindings, emitGroupChunk, emitListChunk } from './chunks.ts';
+import {
+  emitBindings,
+  emitGroupChunk,
+  emitListChunk,
+  emitTryChunk,
+  emitViewChunk,
+} from './chunks.ts';
 import type { ChunkContext } from './chunks.ts';
+import { DYNAMIC_GROUP, DYNAMIC_STORE } from './dynamic.ts';
 import { Emitter, createUsage, mergeUsage } from './expr.ts';
 import { HtmlBuilder, toExpression } from './html.ts';
 import { ModuleSource } from './module.ts';
+import { getTaskChunk, isBuiltinTask } from '../../update/tasks.ts';
+import { emitSourceChunk } from './subscribe.ts';
 import { getStatePaths, planBindings, planGroups } from './plan.ts';
-import type { Binding, Group, Plan } from './plan.ts';
+import type { Binding, Group, ListInfo, Plan } from './plan.ts';
 import { getAccessor, getKey, getLocalName, printHelperImport, quote, toLiteral } from './text.ts';
 
 export interface GenerateResult {
@@ -30,15 +41,89 @@ export interface GenerateResult {
   diagnostics: CompileDiagnostic[];
 }
 
+export interface GenerateOptions {
+  /** True when a project module renders this module as a child: it gets a `view` chunk. */
+  child?: boolean;
+  /**
+   * Returns the id of the module that an import specifier names. Vite resolves it. Without it,
+   * a relative specifier is resolved against the id of the importer.
+   */
+  resolve?: (specifier: string, importer: string) => string;
+}
+
+function resolveSpecifier(specifier: string, importer: string): string {
+  return specifier.startsWith('.') ? posix.join(posix.dirname(importer), specifier) : specifier;
+}
+
+/** The manifest of a module that a parent renders: `view` is in compiled-format v10. */
+type ChildManifest = Manifest & { view?: { chunk: string } };
+
 function createEmptyManifest(id: string): Manifest {
   return { module: id, events: [], handlers: {}, groups: {}, lists: {} };
 }
 
-function buildManifest(id: string, component: Component, plan: Plan, groups: Group[]): Manifest {
+/** Tells whether a path of the group meets a write. */
+function meetsWrites(group: Group, writes: readonly string[]): boolean {
+  for (const path of group.paths) {
+    for (const write of writes) {
+      if (meetsPath(path, write)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/** Lists the groups to load with a handler: those that meet a write, minus covered ones. */
+function listBindings(groups: readonly Group[], writes: readonly string[]): string[] {
+  const met: Group[] = [];
+  const covered = new Set<string>();
+  for (const group of groups) {
+    if (meetsWrites(group, writes)) {
+      met.push(group);
+      for (const key of group.covers) {
+        covered.add(key);
+      }
+    }
+  }
+  const keys: string[] = [];
+  for (const group of met) {
+    if (!covered.has(group.key)) {
+      keys.push(group.key);
+    }
+  }
+  // The paths of the dynamic holes are unknown until they run, so any handler may change one.
+  for (const group of groups) {
+    if (group.key === DYNAMIC_GROUP) {
+      keys.push(group.key);
+    }
+  }
+  return keys;
+}
+
+function buildManifest(
+  id: string,
+  component: Component,
+  plan: Plan,
+  groups: Group[],
+  writes: ReadonlyMap<string, readonly string[] | undefined>,
+  child: boolean,
+): ChildManifest {
   const handlers: Record<string, HandlerEntry> = {};
+  const tasks: Record<string, string> = {};
   for (const handler of component.handlers) {
+    const own = writes.get(handler.name);
     for (const segment of handler.segments) {
-      handlers[segment.tag] = { chunk: `handler=${segment.tag}` };
+      // A continuation lives in the chunk of its handler, and has its write set.
+      handlers[segment.tag] =
+        own === undefined
+          ? { chunk: `handler=${handler.name}` }
+          : { chunk: `handler=${handler.name}`, writes: own, bindings: listBindings(groups, own) };
+      const root = segment.awaits;
+      if (root !== undefined) {
+        const builtin = root.kind === 'import' && isBuiltinTask(root.name, root.source);
+        tasks[segment.tag] = getTaskChunk(handler.name, segment.tag, builtin);
+      }
     }
   }
   const groupEntries: Record<string, BindingGroup> = {};
@@ -62,15 +147,7 @@ function buildManifest(id: string, component: Component, plan: Plan, groups: Gro
         bindings.push(binding.name);
       }
     }
-    // The path is known when `each` is a plain path that reads one state path.
-    const each = info.node.each;
-    let path: string | undefined;
-    if (each.expr.kind === 'path' && each.paths !== 'dynamic') {
-      const paths = getStatePaths(each.paths, () => {}, each.span);
-      if (paths.length === 1) {
-        path = paths[0];
-      }
-    }
+    const path = getListPath(info, child);
     lists[String(info.id)] = {
       key: info.node.key,
       ...(path === undefined ? {} : { path }),
@@ -79,17 +156,46 @@ function buildManifest(id: string, component: Component, plan: Plan, groups: Gro
       ...(info.parent === undefined ? {} : { parent: String(info.parent) }),
     };
   }
+  const fallback: Record<string, string> = {};
+  for (const info of plan.tries) {
+    fallback[String(info.id)] = `try=${info.id}`;
+  }
   return {
     module: id,
     events: plan.events,
+    ...(plan.listens.size === 0 ? {} : { listens: Object.fromEntries(plan.listens) }),
     handlers,
+    ...(Object.keys(tasks).length === 0 ? {} : { tasks }),
+    ...(plan.sources.size === 0 ? {} : { sources: [...plan.sources.keys()] }),
+    ...(plan.tries.length === 0 ? {} : { fallback }),
+    ...(plan.heads.size === 0 ? {} : { head: true as const }),
     groups: groupEntries,
     lists,
+    ...(child ? { view: { chunk: 'view' } } : {}),
   };
 }
 
+/** The path of `each` when it is a plain path that reads one state path. */
+function getListPath(info: ListInfo, child: boolean): string | undefined {
+  const each = info.node.each;
+  if (each.expr.kind === 'path' && each.paths !== 'dynamic') {
+    const paths = getStatePaths(each.paths, () => {}, each.span, child);
+    if (paths.length === 1) {
+      return paths[0];
+    }
+  }
+  return undefined;
+}
+
 /** Generates the server module, the client chunks and the manifest of one `*.idlip.tsx` file. */
-export function generate(ir: ModuleIR, source: string, id: string): GenerateResult {
+export function generate(
+  ir: ModuleIR,
+  source: string,
+  id: string,
+  options: GenerateOptions = {},
+): GenerateResult {
+  const child = options.child === true;
+  const resolve = options.resolve ?? resolveSpecifier;
   const diagnostics: CompileDiagnostic[] = [...ir.diagnostics];
   const report = (rule: string, message: string, span: Span): void => {
     diagnostics.push({ rule, severity: 'error', message, span });
@@ -112,8 +218,21 @@ export function generate(ir: ModuleIR, source: string, id: string): GenerateResu
   }
 
   // Plan which holes and events patch, then group them by path set.
-  const plan = planBindings(component, report);
-  const groupList = planGroups(plan.bindings);
+  const plan = planBindings(component, report, child);
+  for (const used of plan.uses) {
+    used.module = resolve(used.source, id);
+    used.view = getChunkId(used.module, 'view');
+  }
+  // The dynamic holes share one group at the end, whose paths the page state records.
+  const staticBindings: Binding[] = [];
+  const dynamicBindings: Binding[] = [];
+  for (const binding of plan.bindings) {
+    (binding.dynamic === true ? dynamicBindings : staticBindings).push(binding);
+  }
+  const groupList = planGroups(staticBindings);
+  if (dynamicBindings.length > 0) {
+    groupList.push({ key: DYNAMIC_GROUP, paths: [], bindings: dynamicBindings, covers: [] });
+  }
   const groups = new Map<string, Group>();
   for (const group of groupList) {
     groups.set(group.key, group);
@@ -151,8 +270,47 @@ export function generate(ir: ModuleIR, source: string, id: string): GenerateResu
     mergeUsage(clientUsage, chunk.usage);
   }
 
-  const manifest = buildManifest(id, component, plan, groupList);
-  const server = emitServer(id, component, plan, manifest, clientUsage.props, moduleSource, report);
+  const listPaths: Record<string, string> = {};
+  for (const info of plan.lists) {
+    const path = getListPath(info, child);
+    if (path !== undefined) {
+      listPaths[String(info.id)] = path;
+    }
+  }
+  for (const info of plan.tries) {
+    const chunk = emitTryChunk(info, context, listPaths);
+    client.push(chunk.module);
+    mergeUsage(clientUsage, chunk.usage);
+  }
+
+  for (const [name, root] of plan.sources) {
+    client.push(emitSourceChunk(name, root, context));
+  }
+
+  if (child) {
+    const chunk = emitViewChunk(context);
+    client.push(chunk.module);
+    mergeUsage(clientUsage, chunk.usage);
+  }
+
+  const manifest = buildManifest(
+    id,
+    component,
+    plan,
+    groupList,
+    listWrites(ir.file, source, component),
+    child,
+  );
+  const server = emitServer(
+    id,
+    component,
+    plan,
+    manifest,
+    clientUsage.props,
+    moduleSource,
+    report,
+    child,
+  );
   for (const diagnostic of diagnostics) {
     if (diagnostic.severity === 'error') {
       return { ...empty(), manifest };
@@ -166,10 +324,11 @@ function emitServer(
   id: string,
   component: Component,
   plan: Plan,
-  manifest: Manifest,
+  manifest: ChildManifest,
   clientProps: Set<string>,
   moduleSource: ModuleSource,
   report: ChunkContext['report'],
+  child: boolean,
 ): string {
   const usage = createUsage();
   const emitter = new Emitter('server', usage, report);
@@ -189,9 +348,21 @@ function emitServer(
   for (const field of clientProps) {
     props.push(`${getKey(field)}: props${getAccessor(field, false)}`);
   }
-  lines.push(
-    `context.state({ manifest, chunks, model: { ${model.join(', ')} }, props: ${props.length === 0 ? '{}' : `{ ${props.join(', ')} }`} });`,
-  );
+  // The root's path is `''`. A child gets its path from its parent.
+  const parent = plan.uses.length > 0;
+  const state = [
+    'manifest',
+    'chunks',
+    ...(parent ? ['uses'] : []),
+    `model: { ${model.join(', ')} }`,
+    `props: ${props.length === 0 ? '{}' : `{ ${props.join(', ')} }`}`,
+    ...(plan.dynamic.size === 0 ? [] : [`dynamic: ${DYNAMIC_STORE}`]),
+  ];
+  // Each dynamic hole stores the paths it read as the markup is built.
+  if (plan.dynamic.size > 0) {
+    lines.push(`const ${DYNAMIC_STORE} = {};`);
+  }
+  lines.push(`context.state({ ${state.join(', ')} }${parent || child ? ', path' : ''});`);
 
   // The markup.
   const builder = new HtmlBuilder(component, plan, emitter);
@@ -201,16 +372,30 @@ function emitServer(
   // The chunk map writes each id as its own URL.
   const urls: string[] = [];
   const chunkNames: string[] = [];
-  for (const handler of component.handlers) {
-    for (const segment of handler.segments) {
-      chunkNames.push(`handler=${segment.tag}`);
+  for (const entry of Object.values(manifest.handlers)) {
+    if (!chunkNames.includes(entry.chunk)) {
+      chunkNames.push(entry.chunk);
     }
+  }
+  for (const chunk of Object.values(manifest.tasks ?? {})) {
+    if (!chunkNames.includes(chunk)) {
+      chunkNames.push(chunk);
+    }
+  }
+  for (const name of manifest.sources ?? []) {
+    chunkNames.push(`source=${name}`);
   }
   for (const group of Object.values(manifest.groups)) {
     chunkNames.push(group.chunk);
   }
   for (const list of Object.values(manifest.lists)) {
     chunkNames.push(list.chunk);
+  }
+  for (const chunk of Object.values(manifest.fallback ?? {})) {
+    chunkNames.push(chunk);
+  }
+  if (manifest.view !== undefined) {
+    chunkNames.push(manifest.view.chunk);
   }
   for (const chunk of chunkNames) {
     const chunkId = quote(getChunkId(id, chunk));
@@ -223,6 +408,10 @@ function emitServer(
   if (usage.helpers.size > 0) {
     imports.push(printHelperImport(usage.helpers, 'idlip/server'));
   }
+  // A child module is imported by the specifier of the source. Vite resolves it.
+  for (const used of plan.uses) {
+    imports.push(`import * as ${used.name} from ${quote(used.source)};`);
+  }
   imports.push(...collected.imports);
   const blocks: string[] = [];
   if (imports.length > 0) {
@@ -232,7 +421,22 @@ function emitServer(
     ...collected.code,
     `export const manifest = ${toLiteral(manifest)};`,
     `// \`vite-plugin\` replaces the URLs in a build.\nexport const chunks = {\n${urls.join('\n')}\n};`,
-    `export default function ${component.name}(props, context, model) {\n${lines.join('\n')}\n}`,
+  );
+  if (parent) {
+    const names = plan.uses.map((used) => used.name).join(', ');
+    blocks.push(
+      `// The server modules of the stateful children, so \`render()\` can write their manifests and\n// chunk URLs, also for children that no row renders yet.\nexport const uses = [${names}];`,
+    );
+  }
+  // `path` is the model path of this component: the empty string for the root.
+  let pathParameter = '';
+  if (parent) {
+    pathParameter = ", path = ''";
+  } else if (child) {
+    pathParameter = ', path';
+  }
+  blocks.push(
+    `export default function ${component.name}(props, context, model${pathParameter}) {\n${lines.join('\n')}\n}`,
   );
   return `${blocks.join('\n\n')}\n`;
 }

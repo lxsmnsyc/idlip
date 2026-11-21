@@ -13,7 +13,7 @@ export interface Frame {
   row: number | undefined;
 }
 
-export type ScopeName = 'model' | 'props' | 'rows';
+export type ScopeName = 'model' | 'props' | 'rows' | 'dynamic';
 
 /** What the printed code reads, so a chunk imports and destructures only that. */
 export interface Usage {
@@ -28,6 +28,12 @@ export interface Usage {
   vars: Set<string>;
   /** Runtime helpers: `text`, `attr`, `on`, `setAttr` and so on. */
   helpers: Set<string>;
+  /** Loader exports that a chunk imports as they are: `addChild` and `setProp`. */
+  loader: Set<string>;
+  /** Child view chunks a chunk imports: the local name to the chunk id. */
+  views: Map<string, string>;
+  /** Whether the code reads the model path of the component it renders. */
+  path: boolean;
 }
 
 export function createUsage(): Usage {
@@ -38,6 +44,9 @@ export function createUsage(): Usage {
     props: new Set(),
     vars: new Set(),
     helpers: new Set(),
+    loader: new Set(),
+    views: new Map(),
+    path: false,
   };
 }
 
@@ -60,6 +69,13 @@ export function mergeUsage(into: Usage, from: Usage): void {
   for (const name of from.helpers) {
     into.helpers.add(name);
   }
+  for (const name of from.loader) {
+    into.loader.add(name);
+  }
+  for (const [name, id] of from.views) {
+    into.views.set(name, id);
+  }
+  into.path = into.path || from.path;
 }
 
 export type Report = (rule: string, message: string, span: Span) => void;
@@ -108,6 +124,9 @@ export class Emitter {
 
   /** The span reported with a diagnostic. Callers set it to the hole or event they print. */
   at: Span = { start: 0, end: 0 };
+
+  /** Prints state as `model.name` on the server too: a dynamic hole reads a proxy of the model. */
+  tracked = false;
 
   constructor(
     readonly mode: 'server' | 'client',
@@ -163,7 +182,12 @@ export class Emitter {
       case 'object': {
         const entries: string[] = [];
         for (const entry of expr.entries) {
-          entries.push(`${getKey(entry.key)}: ${this.expr(entry.value, 1)}`);
+          // A tracked object reads its fields when the helper does, not when it is built.
+          entries.push(
+            this.tracked
+              ? `get ${getKey(entry.key)}() { return ${this.expr(entry.value, 0)}; }`
+              : `${getKey(entry.key)}: ${this.expr(entry.value, 1)}`,
+          );
         }
         return entries.length === 0 ? '{}' : `{ ${entries.join(', ')} }`;
       }
@@ -221,15 +245,14 @@ export class Emitter {
   printRoot(root: Extract<Expr, { kind: 'path' }>['root']): string {
     switch (root.kind) {
       case 'state':
-        if (this.mode === 'server') {
+        if (this.mode === 'server' && !this.tracked) {
           return getLocalName(root.name);
         }
         this.usage.scope.add('model');
         return `model${getAccessor(root.name, false)}`;
       case 'props':
-        if (this.mode === 'client') {
-          this.usage.scope.add('props');
-        }
+        // A view chunk prints with the server's names and still reads `props` from its scope.
+        this.usage.scope.add('props');
         return 'props';
       case 'loop':
         return this.printLoop(root.name, root.index);
@@ -241,10 +264,12 @@ export class Emitter {
       case 'module':
         this.usage.modules.add(root.name);
         return root.name;
-      case 'event':
-        return this.fail('codegen-event', 'The event is read only as a whole event argument');
+      case 'local':
+        // The error of a `<Try>` catch view: a variable in the render code.
+        return getLocalName(root.name);
       default:
-        return this.fail('codegen-unsupported', `A ${root.kind} root is not generated yet`);
+        // The event root is the only one left.
+        return this.fail('codegen-event', 'The event is read only as a whole event argument');
     }
   }
 
@@ -273,11 +298,17 @@ export class Emitter {
       }
     }
     let out = this.printRoot(expr.root);
+    // After a `find` the item may be missing, so the rest of the path is optional.
+    let optional = expr.optional;
     for (const segment of expr.segments) {
       if (typeof segment === 'string') {
-        out += getAccessor(segment, expr.optional);
+        out += getAccessor(segment, optional);
       } else if (segment.kind === 'index') {
-        out += `${expr.optional ? '?.' : ''}[${this.expr(segment.value)}]`;
+        out += `${optional ? '?.' : ''}[${this.expr(segment.value)}]`;
+      } else if (segment.kind === 'keyed') {
+        const value = this.expr(segment.value, 9);
+        out += `${optional ? '?.' : '.'}find(($i) => $i${getAccessor(segment.field, false)} === ${value})`;
+        optional = true;
       } else {
         return this.fail('codegen-unsupported', `A ${segment.kind} segment is not an expression`);
       }

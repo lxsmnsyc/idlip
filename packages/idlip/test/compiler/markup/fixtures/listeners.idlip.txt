@@ -1,0 +1,35 @@
+import type { JSX } from 'idlip/jsx-runtime';
+import { every } from 'idlip/sources';
+
+export default function Clock(): JSX.Element {
+  let running = false;
+  let ticks = 0;
+  let x = 0;
+
+  function toggle() {
+    running = !running;
+  }
+  function tick(count: number) {
+    ticks = count;
+  }
+  function key(name: string) {
+    if (name === ' ') {
+      running = !running;
+    }
+  }
+  function move(next: number) {
+    x = next;
+  }
+
+  return (
+    <main>
+      <window on:keydown={(e) => key(e.key)} latest:pointermove={(e) => move(e.clientX)} />
+      <document on:visibilitychange={() => toggle()} />
+      #if (running) {
+        <subscribe to={every} input={1000} on:value={tick} />
+      }
+      <p>{ticks} ticks at {x}</p>
+      <button on:click={toggle}>{running ? 'Stop' : 'Start'}</button>
+    </main>
+  );
+}

@@ -155,8 +155,11 @@ describe('contract fixtures', () => {
     expect(analyzeFixture('counter.idlip.tsx.txt').ir.diagnostics).toEqual([]);
   });
 
-  it('never produces a dynamic hole', () => {
+  it('produces a dynamic hole only in dynamic.idlip.tsx.txt', () => {
     for (const name of listFixtures()) {
+      if (name === 'dynamic.idlip.tsx.txt') {
+        continue;
+      }
       for (const component of analyzeFixture(name).ir.components) {
         for (const hole of component.holes) {
           expect(hole.paths).not.toBe('dynamic');
