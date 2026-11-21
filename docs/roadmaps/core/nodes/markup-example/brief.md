@@ -1,7 +1,7 @@
 ---
 id: markup-example
 title: Todo example in the DSL
-status: todo
+status: active
 priority: should
 type: feature
 story: markup-frontend
