@@ -6,7 +6,7 @@ priority: should
 type: feature
 story:
 early: false
-outline: true
+outline: false
 milestone: apps
 target:
 ship: auto
@@ -15,27 +15,44 @@ from:
 size: M
 spike: false
 hypothesis:
-verify:
-exclusive: []
+verify: pnpm -C benchmarks/harness bench --scenario todos --only idlip,marko,qwik2 --rounds 1
+exclusive: [bench]
 fulfilled_by:
 gate: false
-added:
+added: 2026-11-21
 spent:
-owns: []
-shared: []
+owns:
+  - benchmarks/**
+shared:
+  - pnpm-workspace.yaml
+  - pnpm-lock.yaml
+  - package.json
 reserves: []
 provides: []
 depends_on:
   - on: example-todo
     kind: hard
-    why: needs the working todo example
+    why: copies its Vite and entry-server setup
 ---
 
 # Benchmarks against Qwik, Marko and brumate
 
 ## Goal
 
-Measure bytes loaded and time to first interaction for the todo app against Qwik, Marko and brumate, like brumate/benchmarks.
+Port brumate's todos scenario (`../brumate/benchmarks`, MIT, same author): the harness plus qwik1, qwik2, marko and npm brumate apps, and an idlip app that meets the harness's expectations (its README, Adding a framework). Report JS before load, JS after counter, toggle and add, SSR size and renders per second, and the cold first click at 150 ms RTT with the round-trip count. Commit the numbers in the README with the commit and machine.
 
-- Measure the first click at 150 ms RTT. With one chunk per handler and per binding group, round trips can cost more than bytes.
-- Compare the current split with a merge threshold, like brumate's 4096 B `merge` option, and report which gives the faster first click.
+## Context
+
+- Todos scenario only.
+- Copy the Vite and entry-server setup from `example-todo`.
+- `spike-chunk-merge` builds on this node.
+
+## Acceptance
+
+- [ ] Verify prints the todos table for all frameworks.
+- [ ] Root build, test and typecheck leave `benchmarks/*` out; results are git-ignored.
+- [ ] Fast check passes: `pnpm -C benchmarks/harness bench --scenario todos --only idlip,marko,qwik2 --rounds 1`
+
+## Sizing
+
+Several framework apps and a harness port; mostly copying, with install and build time.

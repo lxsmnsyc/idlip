@@ -77,6 +77,21 @@ depends_on:
   - on: errors
     kind: hard
     why: 0.1.0 reports handler and command errors
+  - on: write-sets
+    kind: hard
+    why: ships in 0.1.0
+  - on: global-events
+    kind: hard
+    why: ships in 0.1.0
+  - on: stock-sources
+    kind: hard
+    why: ships in 0.1.0
+  - on: nesting-format
+    kind: hard
+    why: ships in 0.1.0
+  - on: spike-chunk-merge
+    kind: hard
+    why: ships in 0.1.0
 ---
 
 # Release 0.1.0

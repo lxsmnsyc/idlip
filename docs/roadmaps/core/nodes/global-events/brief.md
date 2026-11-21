@@ -1,0 +1,62 @@
+---
+id: global-events
+title: Dev warning for deep event queues, and window and document events
+status: todo
+priority: should
+type: feature
+story:
+early: false
+outline: false
+milestone: apps
+target:
+ship: auto
+land: auto
+from:
+size: S
+spike: false
+hypothesis:
+verify: pnpm --filter idlip exec vitest run test/client/global
+exclusive: []
+fulfilled_by:
+gate: false
+added: 2026-11-21
+spent:
+owns:
+  - packages/idlip/src/core/dev.ts
+  - packages/idlip/test/client/global/**
+shared:
+  - packages/idlip/src/client/loader/resume.ts
+reserves: []
+provides: []
+depends_on:
+  - on: compiled-format
+    kind: contract
+    via: compiled-format
+  - on: core-api
+    kind: contract
+    via: core-api
+---
+
+# Dev warning for deep event queues, and window and document events
+
+## Goal
+
+Add a dev-only warning when one element's pending queue for one event name grows deep (`docs/proposals/0004-effects-refs-errors.md`, Window and document events). `<window>`, `<document>` and `latest:` already work end to end; prove them with tests through the real compiler and loader.
+
+## Context
+
+- Mount through `idlip/testing`. Keep the change in `resume.ts` to a few lines in the enqueue path.
+- The dev flag is this node's choice: pick the one Vite replaces in a dependency build and prove it with a build test. brumate reads NODE_ENV (`../brumate/packages/brumate/src/runtime/rate-limit.ts`).
+- `resume.ts` is also edited by `commands-subs`, `nesting-runtime`, `write-sets` and `custom-effects`. Keep the edit small and rebase on the batch.
+
+## Acceptance
+
+- [ ] `dev.ts` exports a dev flag that the production loader drops. The production loader stays at or under 4096 B gzip.
+- [ ] `<window on:keydown>` inside a condition stops getting keydown after the branch is removed.
+- [ ] `latest:pointermove` with a gated chunk delivers only the last event; a queued `on:input` keeps every value.
+- [ ] In a dev build, 20 queued events for one element and type warn once and name the event. A production build holds no warning text.
+- [ ] Fast check passes: `pnpm --filter idlip exec vitest run test/client/global`
+
+## Sizing
+
+Small: one dev module, a few lines in the loader, tests over existing behavior.

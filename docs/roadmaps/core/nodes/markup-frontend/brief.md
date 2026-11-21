@@ -3,10 +3,10 @@ id: markup-frontend
 title: Markup DSL with control-flow blocks for views
 status: todo
 priority: should
-type: feature
+type: story
 story:
 early: false
-outline: true
+outline: false
 milestone: apps
 target:
 ship: auto
@@ -35,11 +35,22 @@ depends_on:
 
 ## Goal
 
-Replace the TSX view syntax with an own DSL that has real control-flow blocks (`#if`, `#for`, `#switch`), modeled on brumate's markup without its `<script>` and `<style>` blocks. The closed hole grammar becomes the language's own expression grammar. The DSL parses into the same view IR, so the compiler after the analysis does not change.
+Replace the TSX view syntax with an own DSL that has real control-flow blocks (`#if`, `#for`, `#switch`), modeled on brumate's markup without its `<script>` and `<style>` blocks. A `.idlip` file is a plain TS module whose components are plain functions; the compiler lowers the markup to TSX and runs the existing analyzer unchanged, so everything after analysis stays as is.
 
-## Notes
+## Context
 
 - Decided in `debate/debate.md` (user overrule): TSX for the proof of concept, then the DSL.
-- Open design: how the TS parts of a component (state, derived values, handlers, imports) sit beside the markup without script blocks. Since 2026-11-21 a component is a plain function, so the DSL may only need to replace the `return` JSX. Styles are an imported sidecar CSS file.
-- The file stops being valid TS. Tooling follows brumate's route: a `toTypeScript()` emitter, Volar language-core, a `tsc` wrapper and an editor extension (`../brumate/packages/language-core`, `tsc`, `vscode`). oxlint and oxfmt will not read the files.
-- Refine into a story with child nodes when `plan.py refine` lists it.
+- Tooling follows brumate: a `toTypeScript()` emitter, Volar language-core, a `tsc` wrapper and an editor extension (`../brumate/packages/language-core`, `tsc`, `vscode`). oxlint and oxfmt will not read the files.
+- Styles stay an imported sidecar CSS file.
+- Children: `markup-syntax`, `markup-parser`, `markup-lower`, `markup-compile`, `markup-language-core`, `markup-vscode`, `markup-example`.
+- Open question for the user at the `markup-syntax` gate: GOAL.md says one published package, but the tooling needs `@idlip/language-core`, `@idlip/tsc` and a private VS Code extension.
+
+## Acceptance
+
+- [ ] The todo example written in the DSL passes the e2e tests with the same network request set.
+- [ ] `pnpm typecheck` checks `.idlip` files and reports a hole type error at the `.idlip` line.
+- [ ] VS Code shows diagnostics and hover for `.idlip` files.
+
+## Sizing
+
+XL: syntax design, three compiler stages, two tooling packages and an example; split into seven children.

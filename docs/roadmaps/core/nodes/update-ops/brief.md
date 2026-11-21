@@ -29,6 +29,9 @@ depends_on:
   - on: write-sets
     kind: hard
     why: ops carry exact write sets in the manifest
+  - on: keyed-writes
+    kind: hard
+    why: a toggle op targets one keyed item
   - on: benchmarks
     kind: hard
     why: the interpreter size must be measured before ops go on by default
