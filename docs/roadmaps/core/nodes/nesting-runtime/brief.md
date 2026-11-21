@@ -1,7 +1,7 @@
 ---
 id: nesting-runtime
 title: Runtime for nested components
-status: todo
+status: active
 priority: should
 type: feature
 story:

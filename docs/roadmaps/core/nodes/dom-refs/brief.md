@@ -1,7 +1,7 @@
 ---
 id: dom-refs
 title: Refs and Dom functions
-status: todo
+status: active
 priority: should
 type: feature
 story:
