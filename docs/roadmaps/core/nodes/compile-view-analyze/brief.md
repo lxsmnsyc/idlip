@@ -1,7 +1,7 @@
 ---
 id: compile-view-analyze
 title: Compiler: analyze view model paths and report errors
-status: todo
+status: active
 priority: must
 type: feature
 story:

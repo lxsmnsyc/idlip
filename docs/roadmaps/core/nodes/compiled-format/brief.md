@@ -1,7 +1,7 @@
 ---
 id: compiled-format
 title: Freeze the compiled module format with golden fixtures
-status: todo
+status: active
 priority: must
 type: contract
 story:

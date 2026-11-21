@@ -1,7 +1,7 @@
 ---
 id: jsx-types
 title: JSX types for intrinsic elements and events
-status: todo
+status: active
 priority: must
 type: feature
 story:
