@@ -18,6 +18,7 @@ export {
   removeBlock,
 } from './patch/index.ts';
 export { patchList };
+export { addChild, setProp } from './nesting.ts';
 
 export const patch: Patch = createPatch(patchList);
 

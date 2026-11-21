@@ -19,7 +19,8 @@ export interface Message<Tag extends string = string, Payload = unknown> {
  */
 export type DomMessage =
   | readonly [tag: string, payload: readonly unknown[]]
-  | readonly [tag: string, payload: readonly unknown[], modifiers: string];
+  | readonly [tag: string, payload: readonly unknown[], modifiers: string]
+  | readonly [tag: string, payload: readonly unknown[], modifiers: string, owner: string];
 
 /**
  * A payload item that the listener replaces when the event fires.
@@ -56,6 +57,8 @@ export interface Manifest {
   readonly groups: Readonly<Record<string, BindingGroup>>;
   /** `<For>` blocks by binding id, written as a string. */
   readonly lists: Readonly<Record<string, ListEntry>>;
+  /** Present when a project module renders this module as a child. */
+  readonly view?: { readonly chunk: string };
 }
 
 export interface HandlerEntry {
@@ -99,6 +102,17 @@ export interface PageState {
   readonly chunks: ChunkUrls;
   readonly model: Model;
   readonly props: Props;
+  /** Manifests of the child modules on the page and of what they can render, by module. */
+  readonly modules?: Readonly<Record<string, Manifest>>;
+  /** Rendered children by model path. */
+  readonly slots?: Readonly<Record<string, Slot>>;
+}
+
+/** A rendered child: its module, its model and the props the client reads. */
+export interface Slot {
+  readonly module: string;
+  readonly model: Model;
+  readonly props: Props;
 }
 
 /** Chunk id (`getChunkId`) to the URL the loader imports. */
@@ -114,6 +128,8 @@ export interface QueuedEvent {
   readonly target: Element;
   readonly type: string;
   readonly latest: boolean;
+  /** Item 3 of the message: the model path of the component that owns the handler. */
+  readonly owner?: string;
 }
 
 /** `self.$idlip`: the state records, and the queue the listener fills. */
@@ -148,6 +164,8 @@ export interface Scope {
   readonly model: Model;
   readonly props: Props;
   readonly rows: readonly Row[];
+  /** The model path of the component the binding belongs to. Absent means the root. */
+  readonly path?: string;
 }
 
 /** An `a<id>`, `t<id>` or `c<id>` export: patches the node it is given. */
@@ -156,7 +174,18 @@ export type NodeBinding = (node: Node, scope: Scope) => void;
 /** An `l<id>` export: returns the list of a `<For>` block. */
 export type ListBinding = (scope: Scope) => readonly unknown[];
 
-export type Binding = NodeBinding | ListBinding;
+/** A `p<id>` export: has no node. It passes a prop to a slot by path. */
+export type PropBinding = (scope: Scope) => void;
+
+export type Binding = NodeBinding | ListBinding | PropBinding;
+
+/** The `view` chunk of a child module. */
+export interface ViewChunk {
+  /** The initial model from the state initializers and the props. */
+  readonly init: (props: Props) => Model;
+  /** The whole view, without the boundary markers. */
+  readonly render: (scope: Scope) => string;
+}
 
 /** A handler export: the next model, or the next model and a task. */
 export type Update = (model: Model, payload: readonly unknown[]) => Model | Step;
@@ -213,6 +242,10 @@ export interface Page {
   readonly manifest: Manifest;
   readonly props: Props;
   readonly load: LoadChunk;
+  /** The model path of a child. Absent for the root. */
+  readonly path?: string;
+  /** The boundary start of a child: its bindings are looked up between it and its end. */
+  readonly start?: Comment;
 }
 
 /** Owned by `patch-bindings`. The loader awaits it before the next queued message. */

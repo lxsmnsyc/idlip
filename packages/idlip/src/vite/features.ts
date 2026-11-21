@@ -13,6 +13,11 @@ function hasKeyedPath({ manifest }: CompileResult): boolean {
   return false;
 }
 
+function hasChildren({ manifest, server }: CompileResult): boolean {
+  // The child has a `view` chunk. A parent has `uses`, even when the child is not compiled as one.
+  return manifest.view !== undefined || /^export const uses =/m.test(server);
+}
+
 /**
  * What turns each flag of `src/client/features.ts` on, by the name after `HAS_`. A flag is on
  * when any module of the app reports it.
@@ -21,6 +26,7 @@ const DETECTORS: Readonly<Record<string, Detector>> = {
   TASKS: ({ manifest }) => manifest.tasks !== undefined,
   KEYED: hasKeyedPath,
   REFS: ({ manifest }) => manifest.after === true,
+  CHILDREN: hasChildren,
 };
 
 /** Returns the flags that the compiled modules turn on. */

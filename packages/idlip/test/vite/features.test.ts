@@ -84,6 +84,14 @@ describe('feature detection', () => {
     expect([...getFeatures([compileKeyed('', '/src/todo.idlip.tsx')])]).toEqual(['KEYED']);
   });
 
+  it('turns CHILDREN on for a child module and for a module with children', () => {
+    const todo = compileFixture('', '/src/todo.idlip.tsx');
+    const child = { ...todo, manifest: { ...todo.manifest, view: { chunk: 'view' } } };
+    const parent = { ...todo, server: `${todo.server}\nexport const uses = [Counter];` };
+    expect([...getFeatures([child])]).toEqual(['CHILDREN']);
+    expect([...getFeatures([parent])]).toEqual(['CHILDREN']);
+  });
+
   it('unions the modules of an app', () => {
     const on = getFeatures([
       compileFixture('', '/src/effects.idlip.tsx'),
@@ -146,6 +154,12 @@ describe('feature flags in the client build', () => {
     const text = await buildClient('todo');
     expect(text).not.toContain(TASK_CODE);
     expect(text).not.toContain(KEYED_CODE);
+  }, 60_000);
+
+  it('drops the slot table from an app without children', async () => {
+    const text = await buildClient('todo');
+    // The slot table is the only code that writes the kind of a slot.
+    expect(text).not.toContain('kind: "removed"');
   }, 60_000);
 
   it('keeps the task runner of an app with an await handler', async () => {

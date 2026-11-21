@@ -5,8 +5,10 @@ import type {
   ListContext,
   NodeBinding,
   PatchList,
+  PropBinding,
   Scope,
 } from '../../core/format.ts';
+import { HAS_CHILDREN } from '../features.ts';
 import { isComment } from '../patch/guards.ts';
 import { addBlock, findInnerBlocks, parseHtml, removeBlock } from '../patch/index.ts';
 
@@ -23,18 +25,32 @@ function isElement(node: Node): node is Element {
   return node.nodeType === 1;
 }
 
-function walk(node: Node, nodes: Node[]): void {
+function walk(node: Node, nodes: Node[]): Node {
   nodes.push(node);
-  for (let child = node.firstChild; child !== null; child = child.nextSibling) {
-    walk(child, nodes);
+  if (HAS_CHILDREN && getData(node)?.startsWith('n:')) {
+    // A nested child has its own binding ids, so its markup is skipped whole.
+    let level = 0;
+    for (let next: Node | null = node; next !== null; next = next.nextSibling) {
+      const data = getData(next) ?? '';
+      level += data.startsWith('n:') ? 1 : 0;
+      level -= data === '/n' ? 1 : 0;
+      if (level === 0) {
+        return next;
+      }
+    }
+    return node;
   }
+  for (let child: Node | null = node.firstChild; child !== null; child = child.nextSibling) {
+    child = walk(child, nodes);
+  }
+  return node;
 }
 
 // The nodes of a row in document order, nested ones included.
 function getNodes(range: Range): Node[] {
   const nodes: Node[] = [];
   for (let node: Node | null = range.start; node !== null; node = node.nextSibling) {
-    walk(node, nodes);
+    node = walk(node, nodes);
     if (node === range.end) {
       break;
     }
@@ -166,6 +182,12 @@ async function patchRow(
   for (const name of context.list.bindings) {
     const binding = context.bindings.get(name);
     if (binding === undefined) {
+      continue;
+    }
+    if (HAS_CHILDREN && name[0] === 'p') {
+      // A props binding has no node.
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+      (binding as PropBinding)(next);
       continue;
     }
     nodes ??= findNodes(range);

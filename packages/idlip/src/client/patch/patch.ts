@@ -6,8 +6,10 @@ import type {
   Page,
   Patch,
   PatchList,
+  PropBinding,
   Scope,
 } from '../../core/format.ts';
+import { HAS_CHILDREN } from '../features.ts';
 import { diffPaths, getListKeys } from './diff.ts';
 import { isBinding, isComment, isRecord } from './guards.ts';
 import { findNode } from './nodes.ts';
@@ -28,7 +30,8 @@ function getPlan(manifest: Manifest): Plan {
     const paths: string[] = [];
     for (const group of Object.values(manifest.groups)) {
       for (const path of group.paths) {
-        if (path !== 'props' && !path.startsWith('props.')) {
+        // A child's props change, so the paths stay when children exist.
+        if (HAS_CHILDREN || (path !== 'props' && !path.startsWith('props.'))) {
           paths.push(path);
         }
       }
@@ -135,10 +138,16 @@ export function createPatch(patchList: PatchList): Patch {
     }
     // Ids follow view order, so a block runs before the bindings inside it.
     names.sort(compareNames);
-    const prevScope: Scope = { model: prev, props: page.props, rows: [] };
-    const nextScope: Scope = { model: next, props: page.props, rows: [] };
+    const prevScope: Scope = { model: prev, props: page.props, rows: [], path: page.path };
+    const nextScope: Scope = { model: next, props: page.props, rows: [], path: page.path };
     for (const name of names) {
-      const start = findNode(page.root, name);
+      if (HAS_CHILDREN && name[0] === 'p') {
+        // A props binding has no node.
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+        (bindings.get(name) as PropBinding)(nextScope);
+        continue;
+      }
+      const start = findNode(page.root, name, page.start);
       const binding = bindings.get(name);
       if (start === undefined || binding === undefined) {
         continue;

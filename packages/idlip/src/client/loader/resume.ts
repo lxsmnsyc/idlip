@@ -2,7 +2,8 @@
 import { DEV, warnDeepQueue } from '../../core/dev.ts';
 import { getChunkId } from '../../core/format.ts';
 import { runAfter } from '../dom/run.ts';
-import { HAS_REFS, HAS_TASKS } from '../features.ts';
+import { HAS_CHILDREN, HAS_REFS, HAS_TASKS } from '../features.ts';
+import { installNesting } from '../nesting.ts';
 import { runTask } from '../tasks/run.ts';
 import type {
   After,
@@ -12,14 +13,16 @@ import type {
   Page,
   PageState,
   Patch,
+  Props,
   QueuedEvent,
   Step,
   Update,
 } from '../../core/format.ts';
 
-interface Root {
+interface Component {
   readonly script: Element;
-  readonly page: Page;
+  /** A child replaces it when its props or its boundary change. */
+  page: Page;
   readonly state: PageState;
   /** The model after the last update. */
   model: Model;
@@ -29,9 +32,40 @@ interface Root {
   after?: After[];
 }
 
+/** The component of a state script. */
+export interface Root extends Component {
+  readonly kind: 'root';
+}
+
+/** A stateful child that the page renders, found by its model path. */
+export interface Child extends Component {
+  readonly kind: 'live';
+  /** The model path of the child. */
+  readonly path: string;
+  /** Counts the times the path was added, so late work for an old slot is told apart. */
+  readonly gen: number;
+  readonly top: Root;
+  /** The props the DOM shows. */
+  shown: Props;
+}
+
+/** What a message runs on, and what a patch updates. */
+export type Unit = Root | Child;
+
+/** What the loader asks of nesting. */
+export interface Nesting {
+  /** The component an event addresses. `undefined` drops the event. */
+  target: (root: Root, event: QueuedEvent) => Unit | undefined;
+  /** Tells whether a component still takes messages. */
+  live: (unit: Unit) => boolean;
+  /** Patches the DOM of a component whose model or props changed. */
+  patch: (unit: Unit) => Promise<void>;
+}
+
 interface Pending {
   readonly event: QueuedEvent;
   readonly root: Root;
+  readonly unit: Unit;
   update: Update | undefined;
   /** The chunk failed to load. The item waits for the next event with its tag. */
   failed: boolean;
@@ -77,6 +111,8 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
     logError(error);
     onError?.(error);
   }
+
+  const nest = HAS_CHILDREN ? installNesting(patch) : undefined;
 
   const queue: Pending[] = [];
   const roots = new Map<number, Root>();
@@ -124,6 +160,7 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
       script,
       model: state.model,
       rendered: state.model,
+      kind: 'root',
       state,
       page: {
         root: script.parentNode ?? document,
@@ -170,7 +207,11 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
         other.failed = false;
       }
     }
-    const item: Pending = { event, root, update: undefined, failed: false };
+    const unit = HAS_CHILDREN ? nest!.target(root, event) : root;
+    if (unit === undefined) {
+      return;
+    }
+    const item: Pending = { event, root, unit, update: undefined, failed: false };
     if (event.latest) {
       // Latest wins: the pending event of this element and type is replaced.
       for (let index = 0; index < queue.length; index++) {
@@ -187,7 +228,7 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
     queue.push(item);
   }
 
-  async function getUpdate(root: Root, tag: string): Promise<Update> {
+  async function getUpdate(root: Unit, tag: string): Promise<Update> {
     const { manifest, chunks } = root.state;
     const entry = Object.hasOwn(manifest.handlers, tag) ? manifest.handlers[tag] : undefined;
     const url = entry === undefined ? undefined : chunks[getChunkId(manifest.module, entry.chunk)];
@@ -207,7 +248,7 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
   }
 
   async function loadUpdate(item: Pending): Promise<void> {
-    item.update = await getUpdate(item.root, item.event.message.t);
+    item.update = await getUpdate(item.unit, item.event.message.t);
   }
 
   // Loads the chunks of the waiting events. An event that cannot run is dropped, and an event
@@ -264,7 +305,7 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
 
   // Runs one message. A built-in task settles here, so its continuation joins the batch. Any
   // other task runs on its own, and its continuation joins the queue when it settles.
-  async function apply(root: Root, update: Update, message: QueuedEvent['message']): Promise<void> {
+  async function apply(root: Unit, update: Update, message: QueuedEvent['message']): Promise<void> {
     const result = update(root.model, message.p);
     if (!((HAS_TASKS || HAS_REFS) && isStep(result))) {
       // oxlint-disable-next-line typescript/no-unsafe-type-assertion
@@ -284,7 +325,15 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
         apply: async (next, sent) => apply(root, next, sent),
         // The state script stands for the target, since a continuation has no element.
         push: (sent) => {
-          boot.q!.push({ message: sent, target: root.script, type: '', latest: false });
+          if (!HAS_CHILDREN || nest!.live(root)) {
+            boot.q!.push({
+              message: sent,
+              target: root.script,
+              type: '',
+              latest: false,
+              ...(HAS_CHILDREN && root.kind === 'live' && { owner: root.path }),
+            });
+          }
         },
         report,
       },
@@ -293,33 +342,39 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
   }
 
   async function runBatch(batch: readonly Pending[]): Promise<void> {
-    const touched = new Set<Root>();
-    for (const { event, root, update } of batch) {
-      touched.add(root);
+    const touched = new Set<Unit>();
+    for (const { event, unit, update } of batch) {
+      if (HAS_CHILDREN && !nest!.live(unit)) {
+        // The component left the page while the chunk loaded.
+        continue;
+      }
+      touched.add(unit);
       try {
-        await apply(root, update!, event.message);
+        await apply(unit, update!, event.message);
       } catch (error) {
         report(error);
       }
     }
-    for (const root of touched) {
+    for (const unit of touched) {
       if (stopped) {
         return;
       }
       let patched = true;
-      if (root.model !== root.rendered) {
-        try {
-          await patch(root.page, root.rendered, root.model);
-          root.rendered = root.model;
-        } catch (error) {
-          patched = false;
-          report(error);
+      try {
+        if (HAS_CHILDREN) {
+          await nest!.patch(unit);
+        } else if (unit.model !== unit.rendered) {
+          await patch(unit.page, unit.rendered, unit.model);
+          unit.rendered = unit.model;
         }
+      } catch (error) {
+        patched = false;
+        report(error);
       }
       if (HAS_REFS) {
-        const calls = root.after?.splice(0);
+        const calls = unit.after?.splice(0);
         if (patched && calls !== undefined) {
-          runAfter(root.page, calls);
+          runAfter(unit.page, calls);
         }
       }
     }
