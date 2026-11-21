@@ -1,7 +1,7 @@
 ---
 id: markup-parser
 title: Markup scanner and parser
-status: active
+status: done
 priority: should
 type: feature
 story: markup-frontend
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 172017
 owns:
   - packages/idlip/src/compiler/markup/scan.ts
   - packages/idlip/src/compiler/markup/parse.ts
@@ -48,10 +48,12 @@ Scan and parse `.idlip` source into an AST with source spans for every token, fo
 
 ## Acceptance
 
-- [ ] Each fixture in `test/compiler/markup/fixtures` parses to an AST whose spans cover the source.
-- [ ] Malformed blocks give an error with the span of the block.
-- [ ] Fast check passes: `pnpm --filter idlip exec vitest run test/compiler/markup/parse`
+- [x] Each fixture in `test/compiler/markup/fixtures` parses to an AST whose spans cover the source.
+- [x] Malformed blocks give an error with the span of the block.
+- [x] Fast check passes: `pnpm --filter idlip exec vitest run test/compiler/markup/parse`
 
 ## Sizing
 
 One parser over a frozen grammar.
+
+Landed as 6e45503 on `feat/markup-frontend` after one fresh review round.
