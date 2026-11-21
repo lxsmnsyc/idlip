@@ -1,7 +1,7 @@
 ---
 id: resume-loader
 title: Client event delegation, message decode and update dispatch
-status: todo
+status: active
 priority: must
 type: feature
 story:
@@ -50,6 +50,8 @@ The resume entry of `idlip/client`: one delegated listener per event type, decod
 
 ## Acceptance
 
+- [ ] `src/client/index.ts` is the loader: boot code at top level plus the helper exports binding chunks import (`vite-plugin` defaults the client input to `idlip/client` and fails the build if a chunk imports a file outside the loader's static graph). It re-exports `./patch/index.ts` from `patch-bindings` and wires `createPatch(patchList)` once `patch-lists` lands (build against a stub until then).
+- [ ] The gzip size of the built loader, including `idlip/client`, is measured and reported against the 4096 B budget.
 - [ ] In happy-dom, a click on the counter fixture loads only the `increment` chunk and calls the patcher with the old and new model.
 - [ ] Two clicks before the chunk resolves apply in order.
 - [ ] An event path placeholder (`e.currentTarget.value`) decodes from an `input` event.

@@ -1,7 +1,7 @@
 ---
 id: vite-plugin
 title: Vite plugin: compile, split chunks, serve SSR in dev
-status: active
+status: done
 priority: must
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added:
-spent:
+spent: 300374
 owns:
   - packages/idlip/src/vite/**
   - packages/idlip/test/vite/**
@@ -62,3 +62,5 @@ depends_on:
 ## Sizing
 
 L: blast radius medium, coupling high (compiler, server renderer, bundler).
+
+Landed on `batch/core` as 7e5c0c3.
