@@ -1,7 +1,7 @@
 ---
 id: loader-trim
 title: Trim the flag-off seams out of the loader
-status: active
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 149933
 owns:
   - packages/idlip/src/client/**
   - packages/idlip/src/vite/features.ts
@@ -47,10 +47,10 @@ The todo loader is 4007 B gzip of 4096 B with every optional feature off. Each l
 
 ## Acceptance
 
-- [ ] The todo build loader is at most 3900 B gzip -9 (the e2e budget test, with `loaderBudget` lowered to 3900).
-- [ ] With every flag on (no plugin), `pnpm --filter idlip test` is unchanged and green.
-- [ ] `outcome.md` lists each seam removed and its bytes, and the cost of each flag when on.
-- [ ] Change request: none, unless a seam lives in the format. Then write `contracts/compiled-format-loader-trim.change-request.md`.
+- [x] The todo build loader is at most 3900 B gzip -9 (the e2e budget test, with `loaderBudget` lowered to 3900).
+- [x] With every flag on (no plugin), `pnpm --filter idlip test` is unchanged and green.
+- [x] `outcome.md` lists each seam removed and its bytes, and the cost of each flag when on.
+- [x] Change request: none, unless a seam lives in the format. Then write `contracts/compiled-format-loader-trim.change-request.md`.
 
 ## Sizing
 
@@ -61,3 +61,5 @@ One pass over `resume.ts`, `listener.ts`, `patch/*` and `nesting.ts`, driven by 
 - Prefer folding a branch behind its flag (`if (HAS_X)` around the whole block, with values moved inside) over restructuring. Do not add a flag combination: one flag per feature.
 - Do not trade away the pairing of `*` items by key; `runtime-flags/outcome.md` says it stays on.
 - The listener script has its own 1024 B budget; check it too.
+
+Landed as 3584fdf on `batch/core` after a fresh review (no behavior change). Todo loader 4007 B to 3881 B. The e2e budget stays at the contract value, 4096 B (the worker had lowered it to 3900; the orchestrator reverted that).
