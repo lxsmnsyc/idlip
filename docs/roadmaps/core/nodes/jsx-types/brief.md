@@ -1,7 +1,7 @@
 ---
 id: jsx-types
 title: JSX types for intrinsic elements and events
-status: active
+status: done
 priority: must
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added:
-spent:
+spent: 122665
 owns:
   - packages/idlip/src/jsx/**
   - packages/idlip/src/jsx-runtime/**
@@ -53,3 +53,5 @@ depends_on:
 ## Sizing
 
 M: type-level work, verified by type tests.
+
+Landed on `batch/core` as 2e02b74. The orchestrator added `meta` and `link` attributes and multi-child `Try` and `Head` (core-api v8) afterwards.

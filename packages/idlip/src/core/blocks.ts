@@ -23,7 +23,7 @@ export function For<T>(_props: {
  */
 export function Try(_props: {
   catch: (error: unknown, reset: () => void) => JSX.Element;
-  children: JSX.Element;
+  children: JSX.Element | readonly JSX.Element[];
 }): JSX.Element {
   return failBlock('Try');
 }
@@ -31,7 +31,7 @@ export function Try(_props: {
 /**
  * Puts `children` in the document head. The compiler replaces it, so calling it throws.
  */
-export function Head(_props: { children: JSX.Element }): JSX.Element {
+export function Head(_props: { children: JSX.Element | readonly JSX.Element[] }): JSX.Element {
   return failBlock('Head');
 }
 

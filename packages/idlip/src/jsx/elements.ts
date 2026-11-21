@@ -131,6 +131,24 @@ export interface ImageAttributes {
   loading?: 'eager' | 'lazy';
 }
 
+export interface MetaAttributes {
+  name?: string;
+  content?: string;
+  charset?: string;
+  property?: string;
+  'http-equiv'?: string;
+}
+
+export interface LinkAttributes {
+  rel?: string;
+  href?: string;
+  type?: string;
+  media?: string;
+  sizes?: string;
+  as?: string;
+  crossorigin?: 'anonymous' | 'use-credentials' | '';
+}
+
 /**
  * Attributes that are specific to a tag. Tags that are not listed take only the common ones.
  */
@@ -144,6 +162,8 @@ export interface SpecificAttributes {
   form: FormAttributes;
   label: LabelAttributes;
   img: ImageAttributes;
+  meta: MetaAttributes;
+  link: LinkAttributes;
 }
 
 type ElementProps<Tag extends keyof HTMLElementTagNameMap> = CommonAttributes &

@@ -2,8 +2,8 @@
 // oxlint-disable typescript/no-namespace, typescript/no-empty-object-type
 
 /**
- * The JSX namespace that `idlip/jsx-runtime` exports. `jsx-types` fills in
- * `IntrinsicElements`.
+ * The core JSX namespace. `idlip/jsx-runtime` declares the namespace tsc reads, with
+ * `Element` as an alias of this one and `IntrinsicElements` filled.
  */
 export declare namespace JSX {
   /**

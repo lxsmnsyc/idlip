@@ -1,6 +1,6 @@
 ---
 name: core-api
-version: 7
+version: 8
 status: frozen
 defined_by: core-api
 ---
@@ -18,8 +18,8 @@ The public surface of `idlip`: the runtime values a component imports, the JSX t
 // Block components for the proof of concept. The markup DSL replaces them with blocks.
 function For<T>(props: { each: readonly T[]; key: keyof T & string; children: (item: T, index: number) => JSX.Element }): JSX.Element;
 // Exported as throwing stubs, like `For`. Implemented by `errors`, `document-head` and `commands-subs`.
-function Try(props: { catch: (error: unknown, reset: () => void) => JSX.Element; children: JSX.Element }): JSX.Element;
-function Head(props: { children: JSX.Element }): JSX.Element;
+function Try(props: { catch: (error: unknown, reset: () => void) => JSX.Element; children: JSX.Element | readonly JSX.Element[] }): JSX.Element;
+function Head(props: { children: JSX.Element | readonly JSX.Element[] }): JSX.Element;
 function Subscribe<I, V>(props: { to: (input: I, signal: AbortSignal) => AsyncIterable<V>; input: I; 'on:value': (value: V) => unknown }): JSX.Element;
 
 // Not exported yet: `commands-subs` and `custom-effects` add `Random`, `Time` and `until`, each with its own export line in `src/index.ts`.
@@ -87,6 +87,7 @@ Done by `core-api`: the old exports and `test/messages.test.ts` are deleted, and
 
 ## Changes
 
+- v8 (2026-11-21, found in the `jsx-types` review): `Try` and `Head` take one child or several. A head with a title and a meta tag, or a boundary around siblings, failed with TS2746.
 - v7 (frozen 2026-11-21 by `core-api` and `spike-view-analysis`): `For` children take `(item, index)`. `Try`, `Head` and `Subscribe` are exported as throwing stubs. `Random`, `Time`, `until` and `Dom` are not exported until their nodes. `jsx-runtime` exports `JSX`, `EventFor` and `EventProp`. The stub is removed.
 - v6 (amended 2026-11-21 by the subscriptions debate): `until`, `Time.sleep` with a signal, `latest:` props.
 - v6: function components replace `defineModule`. Block components `Try`, `Head` and `Subscribe`, the `<window>` and `<document>` elements, and `Random` and `Time`. Removes `defineModule`, the `Msg` types, `Handlers`, `ModelOf`, `MsgOf`, `Cmd`, `cmd`, `Sub`, `Result`, `task`, `defineSub`, `ref()` and the `event` placeholder. Event props take functions of the element's event. Adds `render` as a reserved signature. Source: `docs/proposals/0002-modules.md` and `docs/proposals/0004-effects-refs-errors.md`, revised 2026-11-21.
