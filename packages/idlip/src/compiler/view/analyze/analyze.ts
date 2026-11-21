@@ -28,6 +28,7 @@ import type {
   Component,
   Diagnostic,
   Event,
+  EventModifier,
   Expr,
   FreeKind,
   Handler,
@@ -1076,22 +1077,11 @@ class Analyzer {
       );
       return undefined;
     }
-    let body = expression.body;
-    if (
-      body.type === 'BlockStatement' &&
-      body.body.length === 1 &&
-      body.body[0].type === 'ExpressionStatement'
-    ) {
-      body = body.body[0].expression;
-    }
-    if (body.type !== 'CallExpression') {
-      this.reportError(
-        'event-closure',
-        'The body of an event arrow must be one handler call',
-        body,
-      );
+    const parsed = this.readEventBody(expression, param?.name);
+    if (parsed === undefined) {
       return undefined;
     }
+    const { body, modifiers } = parsed;
     const target = this.resolveTarget(body.callee, scope);
     if (target === undefined) {
       return undefined;
@@ -1123,13 +1113,128 @@ class Analyzer {
         );
         continue;
       }
+      if (param !== undefined && readsEventOutsidePath(argument, param.name)) {
+        this.reportError(
+          'event-placeholder',
+          `An argument reads ${param.name} only as a whole path such as ${param.name}.currentTarget.value`,
+          argument,
+        );
+        continue;
+      }
       args.push(this.lower(argument, inner));
     }
     const paths: Path[] = [];
     for (const argument of args) {
       this.collectPaths(argument, paths);
     }
-    return { name, mode, target, args, paths: minimizePaths(paths), modifiers: [], span };
+    this.checkPassivePrevent(modifiers, expression);
+    return { name, mode, target, args, paths: minimizePaths(paths), modifiers, span };
+  }
+
+  /**
+   * Reads the body of an event arrow: one handler call, optionally behind leading
+   * `e.preventDefault();` and `e.stopPropagation();` statements, or behind one `if` with a key test.
+   */
+  readEventBody(
+    arrow: ArrowFunctionExpression,
+    param: string | undefined,
+  ): { body: CallExpression; modifiers: EventModifier[] } | undefined {
+    const fail = (node: AstNode): void => {
+      this.reportError(
+        'event-closure',
+        'The body of an event arrow must be one handler call, optionally behind e.preventDefault(), e.stopPropagation() or an if on e.key',
+        node,
+      );
+    };
+    if (arrow.body.type !== 'BlockStatement') {
+      if (arrow.body.type === 'CallExpression') {
+        return { body: arrow.body, modifiers: [] };
+      }
+      fail(arrow.body);
+      return undefined;
+    }
+    const statements = arrow.body.body;
+    const modifiers: EventModifier[] = [];
+    let index = 0;
+    while (index < statements.length) {
+      const modifier = readEventModifier(statements[index], param);
+      if (modifier === undefined) {
+        break;
+      }
+      // A repeated modifier stays in the remaining statements and fails below.
+      if (!addModifier(modifiers, modifier)) {
+        break;
+      }
+      index++;
+    }
+    if (statements.length - index !== 1) {
+      fail(arrow.body);
+      return undefined;
+    }
+    const last = statements[index];
+    if (last.type === 'ExpressionStatement') {
+      if (last.expression.type === 'CallExpression') {
+        return { body: last.expression, modifiers };
+      }
+      fail(last.expression);
+      return undefined;
+    }
+    // `if (<test>) <call>` carries the key filter. Modifier statements before it do not mix.
+    if (
+      last.type !== 'IfStatement' ||
+      index > 0 ||
+      last.alternate !== null ||
+      param === undefined
+    ) {
+      fail(last);
+      return undefined;
+    }
+    const filter = readKeyFilter(last.test, param);
+    if (filter === undefined) {
+      fail(last.test);
+      return undefined;
+    }
+    modifiers.push({ kind: 'key', filter });
+    let inner = last.consequent;
+    const consequent = inner.type === 'BlockStatement' ? inner.body : [inner];
+    let position = 0;
+    while (position < consequent.length) {
+      const modifier = readEventModifier(consequent[position], param);
+      if (modifier === undefined) {
+        break;
+      }
+      if (!addModifier(modifiers, modifier)) {
+        break;
+      }
+      position++;
+    }
+    inner = consequent[position];
+    if (
+      consequent.length - position !== 1 ||
+      inner.type !== 'ExpressionStatement' ||
+      inner.expression.type !== 'CallExpression'
+    ) {
+      fail(last.consequent);
+      return undefined;
+    }
+    return { body: inner.expression, modifiers };
+  }
+
+  /** `passive` promises the handler never calls `preventDefault`. No source form gives `passive` yet. */
+  checkPassivePrevent(modifiers: EventModifier[], node: AstNode): void {
+    let passive = false;
+    let prevent = false;
+    for (const modifier of modifiers) {
+      passive ||= modifier.kind === 'passive';
+      prevent ||= modifier.kind === 'prevent';
+    }
+    if (passive && prevent) {
+      this.reportError(
+        'event-passive-prevent',
+        'An event cannot be both passive and prevent',
+        node,
+      );
+    }
   }
 
   resolveTarget(node: AstNode, scope: Scope): Target | { event: Event } | undefined {
@@ -1484,6 +1589,14 @@ class Analyzer {
       const attrName =
         name.type === 'JSXNamespacedName' ? `${name.namespace.name}:${name.name.name}` : name.name;
       const value = attribute.value;
+      if (attrName.startsWith('i-')) {
+        this.reportError(
+          'attr-reserved',
+          `${attrName} starts with i-, which the compiled format reserves`,
+          attribute,
+        );
+        continue;
+      }
       if (attrName === 'ref') {
         ref = this.lowerRef(value, scope, context, attribute);
         continue;
@@ -1515,6 +1628,9 @@ class Analyzer {
       open: [...context.open, tag],
     };
     const children = this.lowerChildren(node.children, scope, inner);
+    if (namespace === 'html') {
+      this.checkRawText(tag, children, node.openingElement);
+    }
     if (html !== undefined && children.length > 0) {
       this.report(
         'html-children',
@@ -1534,6 +1650,22 @@ class Analyzer {
       children,
       span: this.readSpan(node),
     };
+  }
+
+  /** A hole cannot sit in a raw text element, or share a `<textarea>` or `<title>` with other content. */
+  checkRawText(tag: string, children: Node[], node: AstNode): void {
+    const raw = tag === 'script' || tag === 'style';
+    if (!raw && tag !== 'textarea' && tag !== 'title') {
+      return;
+    }
+    if (!hasTextHole(children) || (!raw && children.length === 1)) {
+      return;
+    }
+    this.reportError(
+      'html-raw-text',
+      raw ? `A hole cannot be inside <${tag}>` : `A hole inside <${tag}> must be its only content`,
+      node,
+    );
   }
 
   lowerRef(
@@ -2443,6 +2575,65 @@ class Analyzer {
     const isState = (id: string): boolean =>
       resolveLocal(id) === undefined && lookupBinding(scope, id)?.binding.kind === 'state';
 
+    // Locals that hold a part of a state value, such as `const t = todos[0]`.
+    const aliases = new WeakMap<Map<string, number>, Set<string>>();
+    const findScope = (id: string): Map<string, number> | undefined => {
+      for (let index = scopes.length - 1; index >= 0; index--) {
+        if (scopes[index].has(id)) {
+          return scopes[index];
+        }
+      }
+      return undefined;
+    };
+    /** An alias belongs to the scope that declares it, so a shadowing name is not one. */
+    const isAlias = (id: string): boolean => {
+      const declaring = findScope(id);
+      return declaring !== undefined && aliases.get(declaring)?.has(id) === true;
+    };
+    const ALIAS_CALLS = new Set(['find', 'findLast', 'at']);
+
+    /** True when the value is a state value, or a member or element of one, reached by a local. */
+    const isStateRooted = (node: AstNode): boolean => {
+      let current = node;
+      for (;;) {
+        if (current.type === 'MemberExpression') {
+          current = current.object;
+        } else if (
+          current.type === 'CallExpression' &&
+          current.callee.type === 'MemberExpression' &&
+          !current.callee.computed &&
+          ALIAS_CALLS.has(current.callee.property.name)
+        ) {
+          current = current.callee.object;
+        } else if (
+          current.type === 'TSNonNullExpression' ||
+          current.type === 'ParenthesizedExpression' ||
+          current.type === 'ChainExpression'
+        ) {
+          current = current.expression;
+        } else {
+          break;
+        }
+      }
+      if (current.type !== 'Identifier') {
+        return false;
+      }
+      return isState(current.name) || isAlias(current.name);
+    };
+
+    const addAliases = (pattern: AstNode, source: AstNode | null | undefined): void => {
+      if (source !== null && source !== undefined && isStateRooted(source)) {
+        for (const id of listPatternNames(pattern)) {
+          const declaring = findScope(id);
+          if (declaring !== undefined) {
+            const names = aliases.get(declaring) ?? new Set<string>();
+            names.add(id);
+            aliases.set(declaring, names);
+          }
+        }
+      }
+    };
+
     const checkWrite = (target: AstNode): void => {
       if (target.type === 'Identifier') {
         if (resolveLocal(target.name) !== undefined) {
@@ -2462,7 +2653,7 @@ class Analyzer {
       }
       if (target.type === 'MemberExpression') {
         const root = findRootName(target);
-        if (root !== undefined && isState(root.name)) {
+        if (root !== undefined && (isState(root.name) || isAlias(root.name))) {
           this.reportError(
             'handler-mutate',
             `${name} changes ${root.name} in place; assign a new value instead`,
@@ -2586,6 +2777,9 @@ class Analyzer {
             declareBlock([init], loop);
           }
           scopes.push(loop);
+          if (node.type !== 'ForStatement' && node.left.type === 'VariableDeclaration') {
+            addAliases(node.left.declarations[0].id, node.right);
+          }
           const parts: (AstNode | null)[] =
             node.type === 'ForStatement'
               ? [node.init, node.test, node.update, node.body]
@@ -2615,6 +2809,7 @@ class Analyzer {
           return;
         }
         case 'VariableDeclarator':
+          addAliases(node.id, node.init);
           visit(collectPatternDefaults(node.id), next, nested);
           visit(node.init, next, nested);
           return;
@@ -2637,6 +2832,10 @@ class Analyzer {
         }
         case 'AssignmentExpression':
           checkWrite(node.left);
+          if (node.operator === '=' && node.left.type === 'Identifier') {
+            // `let t; t = items[0];`
+            addAliases(node.left, node.right);
+          }
           if (node.left.type === 'Identifier' && node.operator === '=') {
             // A plain write does not read the target.
           } else {
@@ -2652,7 +2851,11 @@ class Analyzer {
           const callee = node.callee;
           if (callee.type === 'MemberExpression' && !callee.computed) {
             const root = findRootName(callee.object);
-            if (root !== undefined && isState(root.name) && MUTATORS.has(callee.property.name)) {
+            if (
+              root !== undefined &&
+              (isState(root.name) || isAlias(root.name)) &&
+              MUTATORS.has(callee.property.name)
+            ) {
               this.reportError(
                 'handler-mutate',
                 `${name} calls ${callee.property.name}() on ${root.name}; assign a new value instead`,
@@ -2783,6 +2986,186 @@ interface ViewContext {
 
 // ---------------------------------------------------------------------------------------------
 // Helpers
+
+function hasTextHole(nodes: readonly Node[]): boolean {
+  for (const node of nodes) {
+    if (node.kind === 'text-hole') {
+      return true;
+    }
+    if (node.kind === 'condition' && (hasTextHole(node.then) || hasTextHole(node.else))) {
+      return true;
+    }
+    if (node.kind === 'for' && hasTextHole(node.body)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function addModifier(modifiers: EventModifier[], modifier: EventModifier): boolean {
+  for (const other of modifiers) {
+    if (other.kind === modifier.kind) {
+      return false;
+    }
+  }
+  modifiers.push(modifier);
+  return true;
+}
+
+/** `e.preventDefault();` or `e.stopPropagation();` */
+function readEventModifier(
+  statement: AstNode,
+  param: string | undefined,
+): EventModifier | undefined {
+  if (param === undefined || statement.type !== 'ExpressionStatement') {
+    return undefined;
+  }
+  const call = statement.expression;
+  if (
+    call.type !== 'CallExpression' ||
+    call.arguments.length > 0 ||
+    call.optional ||
+    call.callee.type !== 'MemberExpression' ||
+    call.callee.computed ||
+    call.callee.optional ||
+    call.callee.object.type !== 'Identifier' ||
+    call.callee.object.name !== param
+  ) {
+    return undefined;
+  }
+  if (call.callee.property.name === 'preventDefault') {
+    return { kind: 'prevent' };
+  }
+  if (call.callee.property.name === 'stopPropagation') {
+    return { kind: 'stop' };
+  }
+  return undefined;
+}
+
+const KEY_FLAGS: Record<string, string | undefined> = {
+  ctrlKey: 'Ctrl',
+  altKey: 'Alt',
+  shiftKey: 'Shift',
+  metaKey: 'Meta',
+};
+
+const KEY_ORDER = ['Ctrl', 'Alt', 'Shift', 'Meta'];
+
+/** `e.key === 'Escape'`, joined with `&&` to `e.ctrlKey`, `e.altKey`, `e.shiftKey`, `e.metaKey`. */
+function readKeyFilter(test: Expression, param: string): string | undefined {
+  const flags = new Set<string>();
+  let key: string | undefined;
+  const queue: Expression[] = [test];
+  while (queue.length > 0) {
+    let part = queue.pop();
+    while (part?.type === 'ParenthesizedExpression') {
+      part = part.expression;
+    }
+    if (part === undefined) {
+      break;
+    }
+    if (part.type === 'LogicalExpression') {
+      if (part.operator !== '&&') {
+        return undefined;
+      }
+      queue.push(part.left, part.right);
+      continue;
+    }
+    if (part.type === 'MemberExpression') {
+      const flag = readEventMember(part, param);
+      const name = flag === undefined ? undefined : KEY_FLAGS[flag];
+      if (name === undefined || flags.has(name)) {
+        return undefined;
+      }
+      flags.add(name);
+      continue;
+    }
+    if (
+      part.type === 'BinaryExpression' &&
+      part.operator === '===' &&
+      part.left.type === 'MemberExpression' &&
+      readEventMember(part.left, param) === 'key' &&
+      part.right.type === 'Literal' &&
+      typeof part.right.value === 'string' &&
+      part.right.value !== '' &&
+      key === undefined
+    ) {
+      key = part.right.value;
+      continue;
+    }
+    return undefined;
+  }
+  if (key === undefined) {
+    return undefined;
+  }
+  let filter = '';
+  for (const name of KEY_ORDER) {
+    if (flags.has(name)) {
+      filter += `${name}+`;
+    }
+  }
+  return filter + key;
+}
+
+/** The property of `param.<name>`, or undefined for any other member. */
+function readEventMember(node: AstNode, param: string): string | undefined {
+  if (
+    node.type === 'MemberExpression' &&
+    !node.computed &&
+    !node.optional &&
+    node.object.type === 'Identifier' &&
+    node.object.name === param
+  ) {
+    return node.property.name;
+  }
+  return undefined;
+}
+
+/** True when the argument reads the event other than as a whole member path. */
+function readsEventOutsidePath(argument: AstNode, param: string): boolean {
+  let node: AstNode = argument;
+  while (node.type === 'ParenthesizedExpression') {
+    node = node.expression;
+  }
+  if (node.type === 'Identifier') {
+    return false;
+  }
+  if (node.type === 'MemberExpression') {
+    let root: AstNode = node;
+    while (root.type === 'MemberExpression') {
+      if (root.computed && mentionsName(root.property, param)) {
+        return true;
+      }
+      root = root.object;
+    }
+    return root.type === 'Identifier' ? false : mentionsName(root, param);
+  }
+  return mentionsName(node, param);
+}
+
+function mentionsName(node: unknown, name: string): boolean {
+  if (typeof node !== 'object' || node === null) {
+    return false;
+  }
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      if (mentionsName(item, name)) {
+        return true;
+      }
+    }
+    return false;
+  }
+  const record = node as { type?: unknown; name?: unknown };
+  if (record.type === 'Identifier' && record.name === name) {
+    return true;
+  }
+  for (const value of Object.values(record)) {
+    if (mentionsName(value, name)) {
+      return true;
+    }
+  }
+  return false;
+}
 
 function readModule(program: Program): ModuleScope {
   const module: ModuleScope = {

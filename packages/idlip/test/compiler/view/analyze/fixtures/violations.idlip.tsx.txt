@@ -82,6 +82,25 @@ export default function Broken({ size = 1 }: { size?: number }) {
   function add() {
     items.push(draft); // handler-mutate
     mode.length = 2; // handler-mutate
+    const first = items[0];
+    first.done = true; // handler-mutate: a write through an alias of a state value
+    const [second] = items;
+    second.tags.push('x'); // handler-mutate: a mutator call through an alias
+    for (const item of items) {
+      item.done = false; // handler-mutate: a loop variable aliases an element
+    }
+    const copy = { ...items[0] };
+    copy.done = true; // a copy is not an alias
+    [1].forEach((first) => {
+      first.done = true; // a parameter shadows the alias
+    });
+    {
+      const second = { done: false };
+      second.done = true; // a block-scoped local shadows the alias
+    }
+    let late;
+    late = items[1];
+    late.done = true; // handler-mutate: an alias assigned after let
     loopA = 'x'; // handler-assign
     draft = String(Math.random()); // handler-impure
     const when = new Date(); // handler-impure
@@ -242,6 +261,77 @@ export default function Broken({ size = 1 }: { size?: number }) {
       <For each={items} key="id">
         {(item, [index]) => <li>{item}</li>}
       </For>
+      {/* attr-reserved: the i- prefix belongs to the compiled format */}
+      <div i-a="x" />
+      {/* event-placeholder: the event is read through a method */}
+      <input on:input={(e) => setDraft(e.currentTarget.value.trim())} />
+      {/* event-placeholder: the event is read inside an object */}
+      <input on:input={(e) => setDraft({ v: e.currentTarget.value })} />
+      {/* event-closure: prevent before an if stays a closure */}
+      <input
+        on:keydown={(e) => {
+          e.preventDefault();
+          if (e.key === 'a') {
+            save();
+          }
+        }}
+      />
+      {/* event-closure: an if with an else stays a closure */}
+      <input
+        on:keydown={(e) => {
+          if (e.key === 'a') {
+            save();
+          } else {
+            setDraft('');
+          }
+        }}
+      />
+      {/* event-closure: a test that is not a key test */}
+      <input
+        on:keydown={(e) => {
+          if (e.code === 'KeyA') {
+            save();
+          }
+        }}
+      />
+      {/* event-closure: a repeated preventDefault */}
+      <form
+        on:submit={(e) => {
+          e.preventDefault();
+          e.preventDefault();
+          save();
+        }}
+      />
+      {/* event-closure: two calls */}
+      <form
+        on:submit={(e) => {
+          e.preventDefault();
+          save();
+          save();
+        }}
+      />
+      {/* html-raw-text: a hole in a script */}
+      <script>{draft}</script>
+      {/* html-raw-text: a hole next to text in a textarea */}
+      <textarea>a {draft}</textarea>
+      {/* html-nesting: a text hole directly in a table row */}
+      <table>
+        <tbody>
+          <tr>{draft}</tr>
+        </tbody>
+      </table>
+      {/* html-nesting: text in a table part through a condition */}
+      <table>
+        <tbody>{draft && 'text'}</tbody>
+      </table>
+      {/* html-nesting: text in a table part through a For */}
+      <table>
+        <tbody>
+          <For each={items} key="id">
+            {(item) => item}
+          </For>
+        </tbody>
+      </table>
       {/* hole-unknown: size is dropped with the rejected pattern */}
       {size}
     </main>

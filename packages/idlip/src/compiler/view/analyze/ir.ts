@@ -118,7 +118,7 @@ export interface Event {
   args: Expr[];
   /** Model paths the arguments read at render, so the payload attribute can patch. */
   paths: Path[];
-  /** Reserved for the modifiers of `compiled-format` (`prevent`, `stop`, key filters). Always empty yet. */
+  /** `prevent`, `stop` and key filters, from the block body forms of view-ir v9. */
   modifiers: EventModifier[];
   span: Span;
 }

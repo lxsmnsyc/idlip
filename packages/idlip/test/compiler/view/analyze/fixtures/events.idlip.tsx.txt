@@ -1,0 +1,25 @@
+// events.idlip.tsx: the block body forms of view-ir v9
+export default function Events() {
+  let draft = '';
+
+  function add() {
+    draft = '';
+  }
+  function setDraft(text: string) {
+    draft = text;
+  }
+
+  return (
+    <form on:submit={(e) => { e.preventDefault(); add(); }}>
+      <input on:keydown={(e) => { e.stopPropagation(); e.preventDefault(); add(); }} />
+      <input on:keydown={(e) => { if (e.key === 'Escape') { add(); } }} />
+      <input on:keydown={(e) => { if (e.key === 'Enter') add(); }} />
+      <input on:keydown={(e) => { if (e.metaKey && e.shiftKey && e.key === 's') { e.preventDefault(); add(); } }} />
+      <input on:keydown={(e) => { if (e.key === 'a' && e.altKey && e.ctrlKey) { e.stopPropagation(); e.preventDefault(); add(); } }} />
+      <input on:input={(e) => setDraft(e.currentTarget.value)} />
+      <input on:input={(e) => { setDraft(e.currentTarget.value); }} />
+      <textarea>{draft}</textarea>
+      <title>{draft}</title>
+    </form>
+  );
+}

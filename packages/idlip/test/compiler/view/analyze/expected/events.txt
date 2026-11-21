@@ -1,0 +1,35 @@
+file events.idlip.tsx
+
+component Events (stateful, exported)
+  state:
+    draft = ""
+  handlers:
+    add()
+      free: -
+      writes: draft
+    setDraft(text)
+      free: -
+      writes: draft
+  view:
+    <form [on:submit -> add()  modifiers prevent]>
+      <input [on:keydown -> add()  modifiers stop prevent]>
+      <input [on:keydown -> add()  modifiers key:Escape]>
+      <input [on:keydown -> add()  modifiers key:Enter]>
+      <input [on:keydown -> add()  modifiers key:Shift+Meta+s prevent]>
+      <input [on:keydown -> add()  modifiers key:Ctrl+Alt+a stop prevent]>
+      <input [on:input -> setDraft($event.currentTarget.value)]>
+      <input [on:input -> setDraft($event.currentTarget.value)]>
+      <textarea>
+        {#0}
+      <title>
+        {#1}
+  holes:
+    #0 draft
+        expr  draft
+        paths draft
+    #1 draft
+        expr  draft
+        paths draft
+
+diagnostics: 1
+  22:7 error title-outside-head: <title> belongs in <Head>

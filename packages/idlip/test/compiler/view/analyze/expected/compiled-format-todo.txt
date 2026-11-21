@@ -1,0 +1,61 @@
+file todo.idlip.tsx
+
+component TodoApp (stateful, exported)
+  props: props
+  state:
+    draft = ""
+    todos = props.initial
+    next = (props.initial.length + 1)
+  derived:
+    left = countLeft(todos)
+  handlers:
+    setDraft(text)
+      free: -
+      writes: draft
+    clear()
+      free: -
+      writes: draft
+    add()
+      free: draft:state todos:state next:state
+      writes: todos next draft
+    toggle(id)
+      free: todos:state
+      writes: todos
+  view:
+    <main>
+      <form [on:submit -> add()  modifiers prevent]>
+        <input value={#0} [on:input -> setDraft($event.currentTarget.value)] [on:keydown -> clear()  modifiers key:Escape]>
+        <button disabled={#1}>
+          "Add"
+      <p>
+        {#2}
+        " left"
+      <ul>
+        for #3 key=id item=t
+          <li class={#4}>
+            <input type="checkbox" checked={#5} [on:click -> toggle(t.id)  render reads todos.*.id]>
+            {#6}
+  holes:
+    #0 draft
+        expr  draft
+        paths draft
+    #1 draft === ''
+        expr  (draft === "")
+        paths draft
+    #2 left
+        expr  countLeft(todos)
+        paths todos
+    #3 todos
+        expr  todos
+        paths todos
+    #4 { done: t.done }
+        expr  { done: t.done }
+        paths todos.*.done
+    #5 t.done
+        expr  t.done
+        paths todos.*.done
+    #6 t.text
+        expr  t.text
+        paths todos.*.text
+
+diagnostics: 0

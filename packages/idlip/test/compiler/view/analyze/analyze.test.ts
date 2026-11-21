@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import { describe, expect, it } from 'vitest';
-import { analyze, printModule } from '../../../../src/compiler/view/analyze/index.ts';
+import { analyze, printModule, printPath } from '../../../../src/compiler/view/analyze/index.ts';
 import type { Diagnostic, ModuleIR } from '../../../../src/compiler/view/analyze/index.ts';
 
 // The fixtures are stored as `.txt`, so `tsc`, the linter and the formatter skip them:
@@ -76,6 +76,10 @@ for (const rule of [
   'event-param',
   'event-mode-twice',
   'event-message-args',
+  'event-placeholder',
+  'event-passive-prevent',
+  'attr-reserved',
+  'html-raw-text',
   'try-catch',
   'subscribe-source',
   'subscribe-input-key',
@@ -177,8 +181,8 @@ describe('rule ids', () => {
   });
 
   for (const rule of Object.keys(RULES)) {
-    // The analysis never produces a `dynamic` hole, so `hole-dynamic` cannot fire.
-    if (rule === 'hole-dynamic') {
+    // The analysis never produces a `dynamic` hole, and no source form gives `passive` in v9.
+    if (rule === 'hole-dynamic' || rule === 'event-passive-prevent') {
       continue;
     }
     it(`fires ${rule}`, () => {
@@ -223,6 +227,94 @@ describe('rule ids', () => {
       expect(markers).toBeGreaterThan(0);
     });
   }
+});
+
+describe('event modifiers', () => {
+  it('reads the block body forms of view-ir v9', () => {
+    const { ir } = analyzeFixture('events.idlip.tsx.txt');
+    const [form] = ir.components[0].view;
+    if (form.kind !== 'element') {
+      throw new Error('expected a form');
+    }
+    const found: unknown[] = [];
+    found.push(form.events[0].modifiers);
+    for (const child of form.children) {
+      if (child.kind === 'element' && child.events.length > 0) {
+        found.push(child.events[0].modifiers);
+      }
+    }
+    expect(found).toEqual([
+      [{ kind: 'prevent' }],
+      [{ kind: 'stop' }, { kind: 'prevent' }],
+      [{ kind: 'key', filter: 'Escape' }],
+      [{ kind: 'key', filter: 'Enter' }],
+      [{ kind: 'key', filter: 'Shift+Meta+s' }, { kind: 'prevent' }],
+      [{ kind: 'key', filter: 'Ctrl+Alt+a' }, { kind: 'stop' }, { kind: 'prevent' }],
+      [],
+      [],
+    ]);
+    // `textarea` and `title` with one hole are allowed; only the `title` is outside `<Head>`.
+    const rules: string[] = [];
+    for (const diagnostic of ir.diagnostics) {
+      rules.push(diagnostic.rule);
+    }
+    expect(rules).toEqual(['title-outside-head']);
+  });
+});
+
+describe('the todo fixture of compiled-format', () => {
+  const sources: Record<string, string | undefined> = import.meta.glob(
+    '../../../fixtures/todo/todo.idlip.tsx',
+    { query: '?raw', import: 'default', eager: true },
+  );
+  const source = Object.values(sources)[0] ?? '';
+
+  it('analyzes with no diagnostics', async () => {
+    const ir = analyze('todo.idlip.tsx', source);
+    expect(ir.diagnostics).toEqual([]);
+    await expect(`${printModule(ir, source)}\n`).toMatchFileSnapshot(
+      './expected/compiled-format-todo.txt',
+    );
+  });
+});
+
+describe('the todo manifest', () => {
+  const sources: Record<string, string | undefined> = import.meta.glob(
+    '../../../fixtures/todo/todo.idlip.tsx',
+    { query: '?raw', import: 'default', eager: true },
+  );
+  const manifests: Record<
+    string,
+    { groups: Record<string, { paths: string[]; bindings: string[] }> }
+  > = import.meta.glob('../../../fixtures/todo/expected/manifest.json', {
+    import: 'default',
+    eager: true,
+  });
+  const source = Object.values(sources)[0] ?? '';
+  const manifest = Object.values(manifests)[0];
+
+  it('matches the hole ids and path sets of the analysis', () => {
+    const component = analyze('todo.idlip.tsx', source).components[0];
+    // Binding ids are the hole id after one letter; the event payload takes the next id.
+    const paths = new Map<number, string[]>();
+    for (const hole of component.holes) {
+      expect(hole.paths).not.toBe('dynamic');
+      const printed: string[] = [];
+      for (const path of hole.paths === 'dynamic' ? [] : hole.paths) {
+        printed.push(printPath(path));
+      }
+      paths.set(hole.id, printed);
+    }
+    paths.set(component.holes.length, ['todos.*.id']);
+    let checked = 0;
+    for (const group of Object.values(manifest.groups)) {
+      for (const binding of group.bindings) {
+        expect(paths.get(Number(binding.slice(1))), binding).toEqual(group.paths);
+        checked++;
+      }
+    }
+    expect(checked).toBe(paths.size);
+  });
 });
 
 describe('impure globals in holes', () => {

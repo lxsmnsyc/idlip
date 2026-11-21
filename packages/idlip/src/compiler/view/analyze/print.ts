@@ -141,7 +141,12 @@ function printEvent(event: Event): string {
     args.push(printExpr(arg));
   }
   const render = event.paths.length > 0 ? `  render reads ${printPaths(event.paths)}` : '';
-  return `${event.mode}:${event.name} -> ${target}(${args.join(', ')})${render}`;
+  const names: string[] = [];
+  for (const modifier of event.modifiers) {
+    names.push(modifier.kind === 'key' ? `key:${modifier.filter}` : modifier.kind);
+  }
+  const modifiers = names.length > 0 ? `  modifiers ${names.join(' ')}` : '';
+  return `${event.mode}:${event.name} -> ${target}(${args.join(', ')})${render}${modifiers}`;
 }
 
 function printNodes(nodes: Node[], indent: string, out: string[]): void {
