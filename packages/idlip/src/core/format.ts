@@ -44,6 +44,12 @@ export interface Manifest {
   readonly events: readonly string[];
   /** Message tag to its update chunk. Continuation tags have entries too. */
   readonly handlers: Readonly<Record<string, HandlerEntry>>;
+  /**
+   * Continuation tag to the chunk that runs its awaited call: `task=<tag>`, or the handler's
+   * own chunk for a built-in such as `Random.id`, which exports `task$<tag>`. Absent when no
+   * handler awaits.
+   */
+  readonly tasks?: Readonly<Record<string, string>>;
   /** Binding groups by key, ordered so a group comes before the groups it covers. */
   readonly groups: Readonly<Record<string, BindingGroup>>;
   /** `<For>` blocks by binding id, written as a string. */
@@ -158,14 +164,14 @@ export interface Step {
   readonly task: Task;
 }
 
-/** Reserved for `custom-effects`: an awaited call, run by `runTask`. */
+/** An awaited call, run by `runTask`. */
 export interface Task {
-  /** The awaited call site, such as `Random.id` or `persist:0`. */
+  /** The awaited call site: the continuation tag, such as `persist$1`. A key of `manifest.tasks`. */
   readonly site: string;
   readonly args: readonly unknown[];
   /** The continuation tag, such as `persist$1`. */
   readonly then: string;
-  /** Locals read after the `await`, in the order of `segments[n].carried`. */
+  /** Locals read after the `await` in the order of `segments[n].carried`, then props values. */
   readonly carried: readonly unknown[];
 }
 

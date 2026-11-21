@@ -17,6 +17,7 @@ import type { ChunkContext } from './chunks.ts';
 import { Emitter, createUsage, mergeUsage } from './expr.ts';
 import { HtmlBuilder, toExpression } from './html.ts';
 import { ModuleSource } from './module.ts';
+import { getTaskChunk, isBuiltinTask } from '../../update/tasks.ts';
 import { getStatePaths, planBindings, planGroups } from './plan.ts';
 import type { Binding, Group, Plan } from './plan.ts';
 import { getAccessor, getKey, getLocalName, printHelperImport, quote, toLiteral } from './text.ts';
@@ -36,9 +37,16 @@ function createEmptyManifest(id: string): Manifest {
 
 function buildManifest(id: string, component: Component, plan: Plan, groups: Group[]): Manifest {
   const handlers: Record<string, HandlerEntry> = {};
+  const tasks: Record<string, string> = {};
   for (const handler of component.handlers) {
     for (const segment of handler.segments) {
-      handlers[segment.tag] = { chunk: `handler=${segment.tag}` };
+      // A continuation lives in the chunk of its handler.
+      handlers[segment.tag] = { chunk: `handler=${handler.name}` };
+      const root = segment.awaits;
+      if (root !== undefined) {
+        const builtin = root.kind === 'import' && isBuiltinTask(root.name, root.source);
+        tasks[segment.tag] = getTaskChunk(handler.name, segment.tag, builtin);
+      }
     }
   }
   const groupEntries: Record<string, BindingGroup> = {};
@@ -83,6 +91,7 @@ function buildManifest(id: string, component: Component, plan: Plan, groups: Gro
     module: id,
     events: plan.events,
     handlers,
+    ...(Object.keys(tasks).length === 0 ? {} : { tasks }),
     groups: groupEntries,
     lists,
   };
@@ -201,9 +210,14 @@ function emitServer(
   // The chunk map writes each id as its own URL.
   const urls: string[] = [];
   const chunkNames: string[] = [];
-  for (const handler of component.handlers) {
-    for (const segment of handler.segments) {
-      chunkNames.push(`handler=${segment.tag}`);
+  for (const entry of Object.values(manifest.handlers)) {
+    if (!chunkNames.includes(entry.chunk)) {
+      chunkNames.push(entry.chunk);
+    }
+  }
+  for (const chunk of Object.values(manifest.tasks ?? {})) {
+    if (!chunkNames.includes(chunk)) {
+      chunkNames.push(chunk);
     }
   }
   for (const group of Object.values(manifest.groups)) {

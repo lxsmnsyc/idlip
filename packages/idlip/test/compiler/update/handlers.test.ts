@@ -228,22 +228,6 @@ export default function List(props: { seed: number }): JSX.Element {
 });
 
 describe('errors', () => {
-  it('rejects an await', () => {
-    const { code, rules } = compile(`${HEAD}
-import { save } from './save.ts';
-export default function A(): JSX.Element {
-  let done = false;
-  async function run() {
-    await save();
-    done = true;
-  }
-  return <button on:click={run}>{done}</button>;
-}
-`);
-    expect(rules).toContain('handler-await');
-    expect(code).toEqual({});
-  });
-
   it('rejects a change in place', () => {
     const { code, rules } = compile(`${HEAD}
 export default function A(): JSX.Element {

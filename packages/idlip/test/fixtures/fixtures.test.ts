@@ -18,7 +18,7 @@ vi.mock('idlip/client', () => ({
   removeBlock: vi.fn(),
 }));
 
-const FIXTURES = ['counter', 'todo'];
+const FIXTURES = ['counter', 'todo', 'effects'];
 
 type Exports = Record<string, unknown>;
 
@@ -137,6 +137,9 @@ function listChunks(manifest: Manifest): string[] {
   const chunks = new Set<string>();
   for (const entry of Object.values(manifest.handlers)) {
     chunks.add(entry.chunk);
+  }
+  for (const chunk of Object.values(manifest.tasks ?? {})) {
+    chunks.add(chunk);
   }
   for (const group of Object.values(manifest.groups)) {
     chunks.add(group.chunk);

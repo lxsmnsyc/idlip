@@ -800,8 +800,10 @@ describe('manifest', () => {
     const component: Component = ir.components[0];
     const result = generate(ir, source, '/src/test.idlip.tsx');
     for (const segment of component.handlers[0].segments) {
-      expect(result.manifest.handlers[segment.tag]).toEqual({ chunk: `handler=${segment.tag}` });
+      // A continuation lives in the chunk of its handler.
+      expect(result.manifest.handlers[segment.tag]).toEqual({ chunk: 'handler=save' });
     }
+    expect(result.manifest.tasks).toEqual({ save$1: 'task=save$1' });
   });
 
   it('sorts groups so a group comes before the groups it covers', () => {

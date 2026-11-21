@@ -1,0 +1,82 @@
+{
+  "module": "/src/effects.idlip.tsx",
+  "events": [
+    "click",
+    "input"
+  ],
+  "handlers": {
+    "setDraft": {
+      "chunk": "handler=setDraft"
+    },
+    "add": {
+      "chunk": "handler=add"
+    },
+    "add$1": {
+      "chunk": "handler=add"
+    },
+    "persist": {
+      "chunk": "handler=persist"
+    },
+    "persist$1": {
+      "chunk": "handler=persist"
+    },
+    "rename": {
+      "chunk": "handler=rename"
+    },
+    "rename$1": {
+      "chunk": "handler=rename"
+    },
+    "rename$2": {
+      "chunk": "handler=rename"
+    }
+  },
+  "tasks": {
+    "add$1": "task=add$1",
+    "persist$1": "task=persist$1",
+    "rename$1": "task=rename$1",
+    "rename$2": "task=rename$2"
+  },
+  "groups": {
+    "save.state": {
+      "paths": [
+        "save.state"
+      ],
+      "chunk": "binding=save.state",
+      "bindings": [
+        "t3"
+      ],
+      "covers": []
+    },
+    "draft": {
+      "paths": [
+        "draft"
+      ],
+      "chunk": "binding=draft",
+      "bindings": [
+        "a0"
+      ],
+      "covers": []
+    },
+    "label": {
+      "paths": [
+        "label"
+      ],
+      "chunk": "binding=label",
+      "bindings": [
+        "t1"
+      ],
+      "covers": []
+    },
+    "saved": {
+      "paths": [
+        "saved"
+      ],
+      "chunk": "binding=saved",
+      "bindings": [
+        "t2"
+      ],
+      "covers": []
+    }
+  },
+  "lists": {}
+}
