@@ -1,7 +1,7 @@
 ---
 id: document-head
 title: Document head
-status: active
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-20
-spent:
+spent: 286357
 owns:
   - packages/idlip/src/compiler/view/codegen/head.ts
   - packages/idlip/src/client/head.ts
@@ -66,12 +66,12 @@ Behind `HAS_HEAD` (detector: a manifest has a head entry). Flag-off cost at most
 
 ## Acceptance
 
-- [ ] The server writes the last title first in `<head>`; a nested `<Head>` in a condition adds and removes its `<meta>` on patch (happy-dom, real loader).
-- [ ] The last title wins after a block adds or removes one.
-- [ ] `<title>` outside `<Head>` is still a compile error; inside `<svg>` it is allowed.
-- [ ] A module with no `<Head>` compiles to identical output; the todo loader grows by at most 10 B.
-- [ ] Fast check passes: `pnpm --filter idlip test`
-- [ ] Change request: `contracts/compiled-format-head.change-request.md`.
+- [x] The server writes the last title first in `<head>`; a nested `<Head>` in a condition adds and removes its `<meta>` on patch (happy-dom, real loader).
+- [x] The last title wins after a block adds or removes one.
+- [x] `<title>` outside `<Head>` is still a compile error; inside `<svg>` it is allowed.
+- [x] A module with no `<Head>` compiles to identical output; the todo loader grows by at most 10 B.
+- [x] Fast check passes: `pnpm --filter idlip test`
+- [x] Change request: `contracts/compiled-format-head.change-request.md`.
 
 ## Sizing
 
@@ -80,3 +80,5 @@ Compiler, server and client, but each is small; the shared block hook already ex
 ## Notes for the worker
 
 - `testing/index.ts` renders a component into a root without a document head; extend the harness only through its public surface.
+
+Landed as a771e78 on `batch/core` after one fresh review round. The last `<title>` in document order wins; `render()` warns in DEV when it drops head output, `renderPage()` returns `{ head, body }`; a failed `<Try>` body rolls back its head output. Flag off +0 B, flag on +307 B. Known limit: a `<Head>` in a child can rank after a later `<Head>` of its parent.
