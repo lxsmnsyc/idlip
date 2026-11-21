@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: true
 added:
-spent: 579003
+spent: 463269
 owns:
   - packages/idlip/test/fixtures/**
   - packages/idlip/src/core/format.ts
