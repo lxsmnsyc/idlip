@@ -29,6 +29,9 @@ shared:
 reserves: []
 provides: []
 depends_on:
+  - on: row-list-exports
+    kind: hard
+    why: the example needs the fixed chunk exports
   - on: vite-plugin
     kind: hard
     why: the example builds through the plugin
