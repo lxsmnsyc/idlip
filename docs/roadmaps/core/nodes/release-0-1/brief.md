@@ -26,6 +26,9 @@ shared: []
 reserves: []
 provides: []
 depends_on:
+  - on: safe-urls
+    kind: hard
+    why: 0.1.0 must not ship javascript URLs from model data
   - on: errors-client
     kind: hard
     why: ships in 0.1.0
