@@ -17,7 +17,7 @@ import { Emitter, createUsage, mergeUsage } from './expr.ts';
 import { HtmlBuilder, toExpression } from './html.ts';
 import { ModuleSource } from './module.ts';
 import { getStatePaths, planBindings, planGroups } from './plan.ts';
-import type { Group, Plan } from './plan.ts';
+import type { Binding, Group, Plan } from './plan.ts';
 import { getAccessor, getKey, getLocalName, printHelperImport, quote, toLiteral } from './text.ts';
 
 export interface GenerateResult {
@@ -118,7 +118,11 @@ export function generate(ir: ModuleIR, source: string, id: string): GenerateResu
     groups.set(group.key, group);
   }
   const moduleSource = new ModuleSource(ir.file, source);
-  const context: ChunkContext = { component, plan, source: moduleSource, report };
+  const byId = new Map<number, Binding>();
+  for (const binding of plan.bindings) {
+    byId.set(binding.id, binding);
+  }
+  const context: ChunkContext = { component, plan, byId, source: moduleSource, report };
 
   // Client chunks.
   const client: Module[] = [];

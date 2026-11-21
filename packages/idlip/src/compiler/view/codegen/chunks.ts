@@ -12,6 +12,8 @@ import { getLocalName, printHelperImport, quote } from './text.ts';
 export interface ChunkContext {
   component: Component;
   plan: Plan;
+  /** The bindings of the plan by id. */
+  byId: Map<number, Binding>;
   source: ModuleSource;
   report: Report;
 }
@@ -174,10 +176,46 @@ export function emitGroupChunk(
       }
     }
   }
+  addListExports(group, groups, emitted, context, sections, usage);
   return {
     module: { chunk: `binding=${group.key}`, code: assemble(usage, sections, context) },
     usage,
   };
+}
+
+/**
+ * Exports the list binding of every list that holds a row binding of the chunk, up to the
+ * outermost, so the patcher can reach the rows when only state outside the list changed.
+ */
+function addListExports(
+  group: Group,
+  groups: Map<string, Group>,
+  emitted: Map<number, Emitted>,
+  context: ChunkContext,
+  sections: string[],
+  usage: Usage,
+): void {
+  const chunkBindings: Binding[] = [...group.bindings];
+  for (const key of group.covers) {
+    chunkBindings.push(...(groups.get(key)?.bindings ?? []));
+  }
+  const present = new Set<number>();
+  for (const binding of chunkBindings) {
+    present.add(binding.id);
+  }
+  for (const binding of chunkBindings) {
+    // A list's id is the id of its `l` binding.
+    let owner = binding.list === undefined ? undefined : context.byId.get(binding.list);
+    while (owner !== undefined && !present.has(owner.id)) {
+      present.add(owner.id);
+      const item = emitted.get(owner.id);
+      if (item !== undefined) {
+        sections.push(item.code);
+        mergeUsage(usage, item.usage);
+      }
+      owner = owner.list === undefined ? undefined : context.byId.get(owner.list);
+    }
+  }
 }
 
 /** Joins the runtime import, the module's imports, its helpers and the code into a chunk. */

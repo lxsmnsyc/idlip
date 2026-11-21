@@ -161,6 +161,48 @@ function generateSource(source: string, id = '/src/test.idlip.tsx'): GenerateRes
   return generate(analyze('test.idlip.tsx', source), source, id);
 }
 
+const NESTED = `
+      import { For } from 'idlip';
+      export default function App() {
+        let columns = [{ id: 'a', cards: [{ id: 'x' }] }];
+        let selected = 'x';
+        function pick() {
+          selected = 'y';
+        }
+        return (
+          <main on:click={pick}>
+            <For each={columns} key="id">
+              {(column) => (
+                <section>
+                  <For each={column.cards} key="id">
+                    {(card) => <p class={selected === card.id}>c</p>}
+                  </For>
+                </section>
+              )}
+            </For>
+          </main>
+        );
+      }
+    `;
+
+/** The names of the `l` exports of a chunk, sorted. */
+function listExports(code: string): string[] {
+  const names: string[] = [];
+  for (const match of code.matchAll(/export function (l\d+)\(/g)) {
+    names.push(match[1]);
+  }
+  return names.sort();
+}
+
+/** The source of one exported function, or an empty string. */
+function readFunction(code: string, name: string): string {
+  const start = code.indexOf(`export function ${name}(`);
+  if (start === -1) {
+    return '';
+  }
+  return code.slice(start, code.indexOf('\n}', start) + 2);
+}
+
 describe.each(['counter', 'todo'])('fixture %s', (name) => {
   const { result, input } = generateFixture(name);
 
@@ -639,6 +681,83 @@ describe('client chunks', () => {
     });
     const group = result.manifest.groups['columns.*.cards'];
     expect(group.covers).toEqual(['columns']);
+  });
+
+  it('exports the list binding from a chunk that holds a row binding', () => {
+    const source = `
+      import { For } from 'idlip';
+      export default function App() {
+        let todos = [{ id: 'a' }];
+        let selected = 'a';
+        function pick() {
+          selected = 'b';
+        }
+        return (
+          <ul on:click={pick}>
+            <For each={todos} key="id">{(t) => <li class={selected === t.id}>x</li>}</For>
+          </ul>
+        );
+      }
+    `;
+    const result = generateSource(source);
+    expect(result.diagnostics.filter((item) => item.severity === 'error')).toEqual([]);
+    const list = result.client.find((module) => module.chunk === 'list=0');
+    expect(list).toBeDefined();
+    const chunk = result.client.find((module) => module.chunk.includes('selected'));
+    expect(chunk?.code).toMatch(/export function a\d+\(/);
+    expect(chunk?.code).toMatch(/export function l\d+\(/);
+  });
+
+  it('exports every enclosing list binding from a chunk that holds a nested row binding', () => {
+    const source = NESTED;
+    const result = generateSource(source);
+    expect(result.diagnostics.filter((item) => item.severity === 'error')).toEqual([]);
+    const chunk = result.client.find((module) => module.chunk.includes('selected'));
+    // The inner list is l1 and the outer list is l0, each exported once.
+    expect(listExports(chunk?.code ?? '')).toEqual(['l0', 'l1']);
+    expect(result.manifest.lists['1'].parent).toBe('0');
+  });
+
+  it('exports the same list code as the chunk that owns the list', () => {
+    const result = generateSource(NESTED);
+    const chunk = result.client.find((module) => module.chunk.includes('selected'));
+    const outer = result.client.find((module) => module.chunk === 'binding=columns');
+    const inner = result.client.find((module) => module.chunk === 'binding=columns.*.cards');
+    expect(readFunction(chunk?.code ?? '', 'l0')).toBe(readFunction(outer?.code ?? '', 'l0'));
+    expect(readFunction(chunk?.code ?? '', 'l1')).toBe(readFunction(inner?.code ?? '', 'l1'));
+    expect(readFunction(chunk?.code ?? '', 'l0')).not.toBe('');
+  });
+
+  it('exports the lists of both lists when a row group spans two lists', () => {
+    const source = `
+      import { For } from 'idlip';
+      export default function App() {
+        let xs = [{ id: 1 }];
+        let ys = [{ id: 2 }];
+        let selected = 0;
+        function pick() {
+          selected = 1;
+          xs = [];
+          ys = [];
+        }
+        return (
+          <div on:click={pick}>
+            <For each={xs} key="id">{(x) => <i class={selected}>x</i>}</For>
+            <For each={ys} key="id">{(y) => <b class={selected}>y</b>}</For>
+          </div>
+        );
+      }
+    `;
+    const result = generateSource(source);
+    expect(result.diagnostics.filter((item) => item.severity === 'error')).toEqual([]);
+    const chunk = result.client.find((module) => module.chunk === 'binding=selected');
+    expect(listExports(chunk?.code ?? '')).toEqual(['l0', 'l2']);
+  });
+
+  it('does not export a list binding twice when the chunk already holds it', () => {
+    const result = generateSource(NESTED);
+    const chunk = result.client.find((module) => module.chunk === 'binding=columns.*.cards');
+    expect(listExports(chunk?.code ?? '')).toEqual(['l0', 'l1']);
   });
 
   it('reports blocks that are not generated yet', () => {
