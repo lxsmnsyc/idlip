@@ -1393,14 +1393,16 @@ svg {
   background: var(--text);
 }
 
-/* With the script, the bars start empty and grow once, 220ms each, when the chart is on screen. */
-.grow-chart.is-armed .grow-fill {
-  transform: scaleX(0);
-}
+/* With the `js` class, the bars start empty and grow once, 220ms each, when the chart is on
+   screen. Without it, or with reduced motion, they show their end state. */
+@media (prefers-reduced-motion: no-preference) {
+  .js .grow-chart:not(.is-in) .grow-fill {
+    transform: scaleX(0);
+  }
 
-.grow-chart.is-armed.is-in .grow-fill {
-  transform: none;
-  transition: transform 220ms var(--ease-out) calc(var(--i) * 70ms);
+  .js .grow-chart.is-in .grow-fill {
+    transition: transform 220ms var(--ease-out) calc(var(--i) * 70ms);
+  }
 }
 
 .grow-row.is-own .grow-bar:last-child .grow-fill {
@@ -1504,6 +1506,7 @@ svg {
 .final .display {
   font-size: clamp(2.5rem, 6vw, 5.25rem);
   line-height: 0.98;
+  text-wrap: balance;
 }
 
 .final {
@@ -1551,9 +1554,20 @@ svg {
   color: var(--ink);
 }
 
+.install .code-copy:hover,
 .install .code-copy.is-done {
   background: var(--accent-fill);
   color: var(--on-accent);
+}
+
+.install .code-copy:active {
+  transform: scale(0.94);
+}
+
+/* The focus color is olive for light tiles. On the ink tile the ring is chartreuse. */
+.install .code-copy:focus-visible {
+  outline: 3px solid var(--accent-fill);
+  outline-offset: 2px;
 }
 
 /* Facts before you start. */
@@ -1617,6 +1631,7 @@ svg {
   top: 0.55rem;
   inset-inline-end: 0.6rem;
   min-width: 4.25rem;
+  min-height: 1.5rem;
   padding: 0.3rem 0.9rem;
   border: 0;
   border-radius: var(--radius);

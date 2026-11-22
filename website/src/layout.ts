@@ -9,8 +9,11 @@ const renderer = createRenderer();
 /** Escapes text for HTML. */
 export const escape = renderer.utils.escapeHtml;
 
-/** Sets the saved theme before the first paint, so a page never flashes the other one. */
-const THEME_SCRIPT = `<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t}catch{}</script>`;
+/**
+ * Sets the saved theme before the first paint, so a page never flashes the other one. It also
+ * marks `<html>` with `js`, which the stylesheet reads to hold the chart bars before they grow.
+ */
+const THEME_SCRIPT = `<script>document.documentElement.classList.add('js');try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t}catch{}</script>`;
 
 /** The icons of the site: one set, 24px grid, 1.8px stroke. */
 export const ICON = {

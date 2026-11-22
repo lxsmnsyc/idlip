@@ -6,7 +6,7 @@ import type { DemoData, DemoFile } from '../src/demo/data.ts';
 import { isBenchmarks, readGrowth, writeHeadline } from '../src/landing/benchmarks.ts';
 import type { Benchmarks } from '../src/landing/benchmarks.ts';
 import { FEATURES } from '../src/landing/features.ts';
-import { INSTALL_COMMAND } from '../src/landing/index.ts';
+import { INSTALL_COMMAND, renderLanding } from '../src/landing/index.ts';
 import { SAMPLE_SOURCE } from '../src/landing/sample.ts';
 import { EXAMPLES } from '../src/repl/examples.ts';
 import { loadPages, renderSite } from '../src/site.ts';
@@ -73,7 +73,12 @@ describe('the landing page', () => {
       `<h1 class="display">Pages ready on <em>${value}</em> of JavaScript, at any size.</h1>`,
     );
     expect(landing).toContain('before the load event');
-    expect(landing).toContain('Server renders, browser resumes.');
+    expect(landing).toContain(
+      'idlip is a UI framework for TypeScript apps that the server renders.',
+    );
+    expect(landing).not.toContain('Server renders, browser resumes.');
+    expect(landing).toContain('A 991 B inline listener is in the HTML.');
+    expect(landing).not.toContain('4.9 kB');
   });
 
   it('falls back to a plain headline when the cost grows', () => {
@@ -83,12 +88,12 @@ describe('the landing page', () => {
         group.metrics[group.metrics.length - 1].values.idlip = 50;
       }
     }
-    const headline = writeHeadline(grown);
+    const headline = writeHeadline(grown, '991 B');
     expect(headline.conditions).toBe('');
     expect(headline.before + headline.value + headline.after).toBe(
       'Pages that run no view code on load.',
     );
-    expect(writeHeadline(benchmarksData).value).toMatch(/kB$/);
+    expect(writeHeadline(benchmarksData, '991 B').value).toMatch(/kB$/);
   });
 
   it('has the install command with a copy button in the hero and at the end', () => {
@@ -106,7 +111,7 @@ describe('the landing page', () => {
       landing.indexOf('id="facts-title"'),
       landing.indexOf('id="final-title"'),
     );
-    for (const word of ['MIT', '0.x', 'Node 22', 'Vite 7', 'TypeScript', 'browsers']) {
+    for (const word of ['MIT', '0.x', 'Node 22', 'Vite 7', 'TypeScript']) {
       expect(facts, word).toContain(word);
     }
   });
@@ -118,6 +123,39 @@ describe('the landing page', () => {
     expect(landing).toMatch(/property="og:image" content="[^"]*og\.png"/);
     expect(landing).toContain('name="twitter:card"');
     expect(existsSync(new URL('../public/og.png', import.meta.url))).toBe(true);
+  });
+
+  it('makes the share image address absolute when SITE_URL is set', () => {
+    const before = process.env.SITE_URL;
+    process.env.SITE_URL = 'https://idlip.example/';
+    try {
+      const page = renderSite(pages, '/', demo).get('index.html') ?? '';
+      expect(page).toContain('property="og:image" content="https://idlip.example/og.png"');
+    } finally {
+      if (before === undefined) {
+        delete process.env.SITE_URL;
+      } else {
+        process.env.SITE_URL = before;
+      }
+    }
+  });
+
+  it('escapes hostile strings from benchmarks.json', () => {
+    const hostile = structuredClone(benchmarksData);
+    hostile.machine = '"><script>alert(1)</script>';
+    hostile.date = '<b>date</b>';
+    for (const group of hostile.groups) {
+      if (group.name === hostile.headline) {
+        for (const metric of group.metrics) {
+          metric.label = '<img src=x onerror=alert(1)>';
+        }
+      }
+    }
+    const page = renderLanding({ base: '/', start: 'docs/', pages, demo, benchmarks: hostile });
+    expect(page).not.toContain('<img src=x');
+    expect(page).not.toContain('<script>alert(1)');
+    expect(page).not.toContain('<b>date</b>');
+    expect(page).toContain('&lt;img src=x');
   });
 
   it('shows the sample in one container and sends no one to the REPL', () => {
@@ -146,7 +184,7 @@ describe('the landing page', () => {
     const block = code.slice(0, code.indexOf('</pre>'));
     expect(block).toContain('data-lit="3"');
     expect(block).toContain('data-lit="4"');
-    expect(block).toMatch(/<span[^>]*style=|<span class=/);
+    expect(block).toContain('tok tag_name');
   });
 
   it('says the hydration lane is a model and announces steps in one live element', () => {
