@@ -58,3 +58,8 @@ From `brumate-lessons` rows 1 and 3, approved by the user on 2026-11-22.
 - `benchmarks/prefetch/run.mjs` and the dashboard first-click metric: before/after with preload on, gain above noise, numbers in outcome.md.
 - JS before `load` unchanged (preload links are fetched, not executed, before `load`; check the scale benchmark's headline metric stays flat).
 - e2e todo spec passes; loader budget holds.
+
+## Updates 2026-11-22
+
+- `shared-helpers` moved the runtime helpers into one shared module (`chunks.helpers` in the chunk map) that the loader fetches with the first click's chunks: the first click is 3 requests (todo 613 B to 1.2 kB). `renderPreload` now names the helpers URL too. Preload and import it at idle with the handler and binding chunks, so the click path drops back to cached modules. The todo loader has ~33 B of budget left: put idle pre-import behind a feature flag or move code out of the loader.
+- Add an interleaved first-click A/B to the harness (the current waterfall is single-session) and measure todos and dashboard first click after idle with a fixed N.
