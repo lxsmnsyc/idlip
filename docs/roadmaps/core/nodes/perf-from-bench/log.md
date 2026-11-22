@@ -1,0 +1,23 @@
+# Log: perf-from-bench
+
+- Branch `node/perf-from-bench` from `batch/core` `ed831e4`.
+- `pnpm --filter idlip build`, then every benchmark app script (`build`, `build:rows`, `build:dashboard`, `build:scale` where present, for idlip, brumate, marko, brumate-0.3, qwik1, qwik2): all exit 0.
+- The idlip todos and rows pages render preload links by default, so the todos and rows browser and waterfall numbers of this run are with links. The dashboard scenario runs a main session with links and a `?preload=off` session. `first-click-ab.mjs` gives the first click with and without links for todos and the dashboard.
+- Copied `benchmarks/idlip/dist` and `benchmarks/idlip/dashboard/dist` to the scratchpad for `first-click-ab.mjs` before the runs.
+- Runner script waits for a 1-minute load under 3 before each scenario (checks every 3 minutes, gives up after 90 minutes), then runs todos, rows, dashboard (each `bench --no-build`), the two first-click A/Bs and `scale.mjs run`, and logs the load before and after.
+- `scale.mjs run` builds each framework at each size inside its loop, so the load it records before a size is before that size's builds.
+- Runs, 1-minute load before and after (`sysctl vm.loadavg`, the runner's log):
+  - todos 01:20 to 01:23, 2.76 to 1.87;
+  - rows 01:23 to 01:36, 1.87 to 2.64;
+  - dashboard 01:36 to 01:37, 2.64 to 3.18;
+  - first-click A/B todos 01:40 to 01:42, 2.72 to 4.06;
+  - first-click A/B dashboard 01:45 to 01:46, 2.80 to 3.17;
+  - the runner waited 6 minutes for the load to fall under 3 before the scale run;
+  - scale 01:52 to 01:55, 2.66 to 5.87 (the builds inside the run raised the load to 6.9);
+  - scale again 01:58 to 02:01, 2.53 to 5.28. The README uses the second scale run's timings (lower load at every size). Bytes are identical between the two.
+- brumate 0.8.1 todos: 6 files, 35.6 kB before `load` against 5 files, 33.3 kB in the 2026-11-21 run. Same package version and source. Not looked into.
+- Rows: brumate and Marko create 1,000 rose about 50% against the previous run while idlip's fell. Read as even.
+- Share image: the only changed number is idlip's 4.7 kB, now 4.8 kB. Rebuilt from an HTML copy of the old layout (`og.html` in this folder; copy `website/public/fonts/*.woff2` next to it and screenshot at 1200 x 630 with Chrome). The image's headline is the old hero (`Your app grows. Its startup JavaScript doesn't.`). The landing hero is now "Only the code you click loads." Left as is.
+- `website/test/landing.test.ts` pinned the lead "idlip loads 4.7 kB". Changed to 4.8 kB.
+- `website/docs/resuming.md` tables: compared with `website/dist/demo-server/demo.json` and a render of the demo page with `?preload=off` (4787 B / 2090 B). The loader row was stale (10001 B / 3986 B, now 9779 B / 3936 B). Two gzip counts moved by 1 B.
+- Read `nodes/website-landing/log.md` for how `og.png` was made, against the rule of reading only outcomes. Its outcome does not say how.

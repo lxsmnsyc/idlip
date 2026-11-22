@@ -11,35 +11,39 @@ The command prints a markdown table for each scenario and writes `results/<times
 
 ## Results
 
-The idlip todos, rows and dashboard pages now render `renderPreload` links by default. The Todos, Rows and Dashboard tables below were measured before that: every idlip number in them is without preload links (JS before `load`, the requests and JS of each first click, the total JS, the click times and the waterfall). The loader in them is unchanged. [First click, preload on and off](#first-click-preload-on-and-off) has the first click with the links. The scale page has no links.
+All tables below come from one run on 2026-11-23, at `batch/core` `ed831e4` (branch `node/perf-from-bench`, no benchmark changes), on an Apple M2 with 8 cores and 8 GB, macOS (darwin 27.0.0), Node 26.12.1 and Chrome 158. Every scenario started only once the 1-minute load average was under 3; the load at the start and end of each is given with its table. Other agents were working on the machine, so the load was not zero. Read timings that differ by less than 20% as equal. Sizes are raw / gzip -9.
+
+The idlip todos, rows and dashboard pages render `renderPreload` links by default, so the idlip numbers in the Todos, Rows and Dashboard tables are with preload links: the chunks of the first click load before `load`, and the first click fetches nothing. The Dashboard table also has a session without the links (`?preload=off`), and [First click, preload on and off](#first-click-preload-on-and-off) has both for todos and the dashboard. The scale page has no links. The previous run (2026-11-21 and 2026-11-22, before `cloned-templates`, `shared-helpers`, `perf-ssr-state`, `perf-list-kept`, the preload links and `text-anchor`) was without links; [Changes since the previous run](#changes-since-the-previous-run) compares the two.
 
 ### Todos
 
-A run of `pnpm -C benchmarks/harness bench --scenario todos` on branch `feat/bench-brumate-latest` at `f5ec645` (the benchmark changes were uncommitted), on 2026-11-21. The machine was an Apple M2 with 8 cores and 8 GB, Node 26.12.1 and Chrome 158. Other agents were building and testing at the same time: the load average was 4.92 4.61 4.64 at the start and 4.13 4.72 4.70 at the end, which is about 0.6 per core. Read timings that differ by less than 20% as equal. Sizes are raw / gzip -9. Renders per second are the median of 5 rounds, with the min and max.
+`pnpm -C benchmarks/harness bench --scenario todos --no-build` after building every app. Load average 2.76 3.26 4.15 at the start and 1.87 2.90 3.85 at the end. Renders per second are the median of 5 rounds, with the min and max. idlip is with preload links.
 
-| Metric                                     | idlip                   | brumate 0.8.1           | brumate 0.3.0           | Marko 6                | Qwik 1                | Qwik 2                 |
-| ------------------------------------------ | ----------------------- | ----------------------- | ----------------------- | ---------------------- | --------------------- | ---------------------- |
-| JS before `load`                           | 1 file, 9.7 kB / 3.8 kB | 5, 33.3 kB / 13.9 kB    | 3, 26.4 kB / 11.2 kB    | 1, 9.1 kB / 4.4 kB     | 3, 53.4 kB / 22.4 kB  | 3, 97.2 kB / 36.4 kB   |
-| JS fetched while idle 3 s                  | 0                       | 0                       | 3, 1.8 kB / 1.2 kB      | 0                      | 1, 935 B / 452 B      | 9, 2.4 kB / 1.8 kB     |
-| First counter click: requests, JS          | 2, 473 B / 351 B        | 0                       | 0                       | 0                      | 0                     | 0                      |
-| First todo toggle: requests, JS            | 2, 997 B / 613 B        | 0                       | 0                       | 0                      | 0                     | 0                      |
-| Total JS after counter, toggle, add        | 11, 13.7 kB / 6.4 kB    | 5, 33.3 kB / 13.9 kB    | 6, 28.2 kB / 12.3 kB    | 1, 9.1 kB / 4.4 kB     | 4, 54.4 kB / 22.8 kB  | 12, 99.6 kB / 38.2 kB  |
-| Click to update (counter / toggle / add)   | 113 / 56 / 95 ms        | 95 / 36 / 77 ms         | 56 / 32 / 162 ms        | 37 / 8 / 33 ms         | 56 / 41 / 66 ms       | 70 / 49 / 66 ms        |
-| Client JS emitted in dist                  | 13, 14.6 kB / 7.0 kB    | 8, 85.5 kB / 30.2 kB    | 8, 74.3 kB / 26.6 kB    | 1, 9.1 kB / 4.4 kB     | 5, 55.0 kB / 23.3 kB  | 15, 100.4 kB / 38.8 kB |
-| SSR HTML, 0 todos                          | 4.4 kB / 1.9 kB         | 1.1 kB / 592 B          | 960 B / 541 B           | 812 B / 557 B          | 2.3 kB / 1.1 kB       | 3.0 kB / 1.4 kB        |
-| SSR HTML, 3 todos                          | 4.9 kB / 2.0 kB         | 1.6 kB / 723 B          | 1.4 kB / 672 B          | 1.2 kB / 692 B         | 2.9 kB / 1.3 kB       | 3.6 kB / 1.5 kB        |
-| SSR HTML, 100 todos                        | 21.8 kB / 3.3 kB        | 16.3 kB / 2.1 kB        | 16.1 kB / 2.1 kB        | 15.7 kB / 2.8 kB       | 21.5 kB / 3.9 kB      | 20.7 kB / 3.3 kB       |
-| SSR HTML, per extra todo                   | 178 B / 14 B            | 155 B / 15 B            | 155 B / 15 B            | 153 B / 23 B           | 197 B / 28 B          | 181 B / 19 B           |
-| SSR renders/s, 3 todos                     | 36,047 (28,752-47,446)  | 81,464 (59,962-111,400) | 83,307 (69,140-118,650) | 77,944 (25,876-91,091) | 10,757 (8,403-15,278) | 6,184 (5,804-10,279)   |
-| SSR renders/s, 100 todos                   | 7,501 (1,991-8,583)     | 9,034 (3,107-9,857)     | 8,805 (2,870-10,587)    | 5,892 (1,325-7,616)    | 1,864 (513-2,251)     | 1,140 (387-1,523)      |
-| First counter click after idle, 150 ms RTT | 220 ms, 1 RT, 2 req     | 83 ms, 0 RT             | 101 ms, 0 RT            | 44 ms, 0 RT            | 63 ms, 0 RT           | 68 ms, 0 RT            |
-| First counter click cold, 150 ms RTT       | 226 ms, 1 RT, 2 req     | 108 ms, 0 RT            | 177 ms, 1 RT, 3 req     | 50 ms, 0 RT            | 240 ms, 1 RT, 1 req   | 491 ms, 1 RT, 9 req    |
+| Metric                                     | idlip                     | brumate 0.8.1             | brumate 0.3.0             | Marko 6                   | Qwik 1                 | Qwik 2                 |
+| ------------------------------------------ | ------------------------- | ------------------------- | ------------------------- | ------------------------- | ---------------------- | ---------------------- |
+| JS before `load`                           | 6 files, 12.2 kB / 5.4 kB | 6, 35.6 kB / 15.1 kB      | 3, 26.4 kB / 11.2 kB      | 1, 9.1 kB / 4.4 kB        | 3, 53.4 kB / 22.4 kB   | 3, 97.2 kB / 36.4 kB   |
+| JS fetched while idle 3 s                  | 0                         | 0                         | 3, 1.8 kB / 1.2 kB        | 0                         | 1, 935 B / 452 B       | 9, 2.4 kB / 1.8 kB     |
+| First counter click: requests, JS          | 0                         | 0                         | 0                         | 0                         | 0                      | 0                      |
+| First todo toggle: requests, JS            | 0                         | 0                         | 0                         | 0                         | 0                      | 0                      |
+| Total JS after counter, toggle, add        | 12, 13.4 kB / 6.4 kB      | 6, 35.6 kB / 15.1 kB      | 6, 28.2 kB / 12.4 kB      | 1, 9.1 kB / 4.4 kB        | 4, 54.4 kB / 22.8 kB   | 12, 99.6 kB / 38.2 kB  |
+| Click to update (counter / toggle / add)   | 64 / 48 / 99 ms           | 83 / 17 / 47 ms           | 69 / 24 / 48 ms           | 51 / 23 / 49 ms           | 77 / 64 / 65 ms        | 87 / 42 / 83 ms        |
+| Client JS emitted in dist                  | 14, 14.0 kB / 6.9 kB      | 9, 87.8 kB / 31.3 kB      | 8, 74.3 kB / 26.6 kB      | 1, 9.1 kB / 4.4 kB        | 5, 55.0 kB / 23.3 kB   | 15, 100.4 kB / 38.8 kB |
+| SSR HTML, 0 todos                          | 4.8 kB / 2.0 kB           | 1.2 kB / 608 B            | 960 B / 544 B             | 812 B / 558 B             | 2.3 kB / 1.1 kB        | 3.0 kB / 1.4 kB        |
+| SSR HTML, 3 todos                          | 5.3 kB / 2.1 kB           | 1.6 kB / 739 B            | 1.4 kB / 676 B            | 1.2 kB / 693 B            | 2.9 kB / 1.3 kB        | 3.6 kB / 1.5 kB        |
+| SSR HTML, 100 todos                        | 20.6 kB / 3.4 kB          | 16.3 kB / 2.2 kB          | 16.1 kB / 2.1 kB          | 15.7 kB / 2.8 kB          | 21.5 kB / 3.9 kB       | 20.7 kB / 3.3 kB       |
+| SSR HTML, per extra todo                   | 162 B / 14 B              | 155 B / 15 B              | 155 B / 15 B              | 153 B / 23 B              | 197 B / 28 B           | 181 B / 19 B           |
+| SSR renders/s, 3 todos                     | 135,135 (131,861-137,768) | 113,233 (108,351-116,140) | 119,449 (116,459-121,372) | 141,196 (133,647-143,649) | 16,178 (15,550-16,953) | 9,497 (8,679-12,853)   |
+| SSR renders/s, 100 todos                   | 11,125 (10,911-11,174)    | 11,971 (11,944-12,127)    | 11,745 (11,361-12,027)    | 8,031 (7,082-8,526)       | 2,662 (753-2,698)      | 1,808 (813-2,544)      |
+| First counter click after idle, 150 ms RTT | 61 ms, 0 RT               | 80 ms, 0 RT               | 72 ms, 0 RT               | 77 ms, 0 RT               | 60 ms, 0 RT            | 79 ms, 0 RT            |
+| First counter click cold, 150 ms RTT       | 56 ms, 0 RT               | 108 ms, 0 RT              | 182 ms, 1 RT, 3 req       | 54 ms, 0 RT               | 250 ms, 1 RT, 1 req    | 500 ms, 1 RT, 9 req    |
 
-The SSR rates spread widely at 5 rounds on a busy machine. A second run of only `ssr-speed` for idlip, brumate 0.8.1 and Marko, with 11 rounds (load average 4.41 at the start, 3.49 at the end), was steadier: 3 todos 46,924 (idlip), 108,833 (brumate 0.8.1), 130,717 (Marko); 100 todos 9,289, 11,243 and 8,219. The ratios match the table.
+- **idlip's JS before `load`** is the loader (9.9 kB / 4.0 kB), the shared helpers module (2.0 kB / 968 B) and the handler and binding chunks of the counter click and the toggle, five files from the preload links. Without the links the page loads the loader only.
+- **The add click** still fetches chunks (the list chunk and the `todos.*.id` and `todos.*.text` bindings), since the links name only the first click's chunks. Its 99 ms includes that fetch on localhost.
+- **brumate 0.8.1** loads 6 files and 35.6 kB before `load` in this run against 5 and 33.3 kB in the previous run, with the same package version and app source. The cause was not looked into; it is not idlip code.
 
 ### Rows and dashboard
 
-A run of `pnpm -C benchmarks/harness bench --scenario rows,dashboard --only idlip,brumate,marko` on `batch/core` 087996d plus the bench-rows apps and harness (squashed into this node's commit; the dashboard click check was tightened after the run), on 2026-11-21. Same machine (Apple M2, 8 cores, 8 GB, Node 26.12.1, Chrome 158). Other agents were working: the load average from the harness (`os.loadavg()` in the result file) was 11.09 9.05 7.53 at the start and 3.91 5.49 6.46 at the end, about 1.4 per core at the start. The rows timings are the median of 10 runs with the min and max; their spread is small next to the gaps below. Sizes are raw / gzip -9. SSR rates are the median of 5 rounds; a second `ssr-speed` run with 11 rounds (load 4.33 at the start, 9.51 at the end) is in brackets.
+`pnpm -C benchmarks/harness bench --scenario rows --no-build` (load 1.87 2.90 3.85 at the start, 2.64 3.02 3.30 at the end), then `--scenario dashboard --no-build` (load 2.64 3.02 3.30 at the start, 3.18 3.07 3.29 at the end). The rows timings are the median of 10 runs with the min and max. SSR rates are the median of 5 rounds. idlip is with preload links: the rows page names 9 files, the dashboard 21.
 
 #### Rows
 
@@ -47,76 +51,79 @@ Main thread from click to paint, in ms.
 
 | Metric                                                             | idlip                      | brumate 0.8.1        | Marko 6             |
 | ------------------------------------------------------------------ | -------------------------- | -------------------- | ------------------- |
-| Create 1,000 rows                                                  | 35.4 (33.9-41.8)           | 22.1 (20.5-24.2)     | 21.0 (20.1-22.7)    |
-| Replace 1,000 rows                                                 | 42.9 (40.2-48.7)           | 27.5 (25.5-28.5)     | 24.1 (23.3-25.5)    |
-| Update every 10th of 1,000 rows                                    | 13.5 (12.7-15.1)           | 10.5 (9.8-11.4)      | 9.0 (8.2-10.0)      |
-| Select a row of 1,000                                              | 4.3 (3.8-4.6)              | 1.6 (1.4-1.9)        | 1.2 (0.9-1.4)       |
-| Swap 2 of 1,000 rows                                               | 9.7 (9.0-10.8)             | 5.6 (4.6-6.8)        | 4.4 (3.8-4.8)       |
-| Remove a row of 1,000                                              | 11.4 (10.8-13.2)           | 7.2 (5.7-8.4)        | 6.4 (5.7-7.5)       |
-| Create 10,000 rows                                                 | 380.8 (361.4-404.5)        | 257.8 (249.1-266.2)  | 237.7 (231.7-254.4) |
-| Append 1,000 rows to 1,000                                         | 62.0 (50.1-66.3)           | 31.0 (30.1-35.6)     | 27.9 (27.0-31.6)    |
-| Clear 1,000 rows                                                   | 5.1 (4.3-5.4)              | 3.4 (3.2-3.5)        | 2.5 (2.2-2.8)       |
+| Create 1,000 rows                                                  | 27.9 (23.5-33.8)           | 32.7 (25.7-35.7)     | 32.4 (30.0-33.3)    |
+| Replace 1,000 rows                                                 | 31.6 (28.7-33.1)           | 28.2 (25.4-29.6)     | 26.4 (26.0-27.6)    |
+| Update every 10th of 1,000 rows                                    | 11.5 (10.2-12.6)           | 12.3 (11.6-13.1)     | 11.3 (9.0-12.0)     |
+| Select a row of 1,000                                              | 1.9 (1.6-2.1)              | 1.5 (1.3-1.7)        | 1.1 (1.0-1.3)       |
+| Swap 2 of 1,000 rows                                               | 8.5 (7.0-9.2)              | 6.5 (5.1-8.6)        | 6.5 (4.6-8.2)       |
+| Remove a row of 1,000                                              | 8.3 (7.8-11.1)             | 7.5 (6.4-8.4)        | 7.3 (6.5-8.4)       |
+| Create 10,000 rows                                                 | 247.3 (226.5-257.0)        | 229.8 (202.6-240.3)  | 222.6 (210.4-227.1) |
+| Append 1,000 rows to 1,000                                         | 42.3 (38.9-43.7)           | 32.2 (30.9-33.6)     | 30.1 (27.5-33.6)    |
+| Clear 1,000 rows                                                   | 3.7 (3.0-4.4)              | 3.7 (3.5-4.1)        | 2.8 (2.6-3.5)       |
 | JS heap after creating 1,000 rows                                  | 2.4 MB                     | 2.6 MB               | 2.6 MB              |
-| Server page, 1,000 rows: main thread busy during load and 3 s idle | 55.2 (49.5-61.1)           | 55.9 (51.1-61.3)     | 57.4 (52.4-89.3)    |
-| Server page: longest task                                          | 21.8 (21.0-23.4)           | 24.8 (23.0-27.9)     | 27.6 (23.7-43.5)    |
+| Server page, 1,000 rows: main thread busy during load and 3 s idle | 52.4 (45.2-59.9)           | 52.0 (49.3-53.3)     | 51.7 (50.3-57.7)    |
+| Server page: longest task                                          | 20.5 (18.9-21.5)           | 20.5 (19.9-20.9)     | 23.2 (21.8-25.8)    |
 | Server page: JS heap                                               | 0.8 MB                     | 1.4 MB               | 1.3 MB              |
-| First select from the server page, main thread / to paint          | 13.6 / 31.0                | 7.2 / 14.2           | 6.8 / 13.2          |
-| First update every 10th from the server page                       | 30.5 / 39.5                | 25.6 / 28.3          | 28.4 / 31.8         |
-| First remove from the server page                                  | 38.3 / 45.8                | 24.9 / 28.6          | 24.8 / 29.1         |
-| Client JS emitted in dist                                          | 15 files, 14.8 kB / 7.1 kB | 7, 85.1 kB / 29.9 kB | 1, 9.3 kB / 4.5 kB  |
-| SSR HTML, 1,000 rows                                               | 353.0 kB / 23.5 kB         | 307.2 kB / 24.3 kB   | 269.4 kB / 31.8 kB  |
-| SSR renders/s, 1,000 rows                                          | 553 (473-677) [979]        | 693 (627-716) [946]  | 432 (366-469) [725] |
+| First select from the server page, main thread / to paint          | 11.3 / 31.4                | 6.2 / 14.4           | 5.5 / 14.7          |
+| First update every 10th from the server page                       | 21.2 / 38.3                | 24.2 / 27.6          | 24.0 / 27.7         |
+| First remove from the server page                                  | 27.4 / 41.9                | 20.4 / 24.9          | 20.2 / 24.1         |
+| Client JS emitted in dist                                          | 17 files, 15.1 kB / 7.4 kB | 7, 85.1 kB / 29.9 kB | 1, 9.3 kB / 4.5 kB  |
+| SSR HTML, 1,000 rows                                               | 328.2 kB / 23.4 kB         | 307.2 kB / 24.3 kB   | 269.4 kB / 31.8 kB  |
+| SSR renders/s, 1,000 rows                                          | 1,115 (1,039-1,149)        | 1,216 (1,165-1,245)  | 814 (813-822)       |
 
-Every operation runs in idlip, swap included, and passes the page checks. The first clicks from a server page include idlip's chunk fetch.
+Every operation passes the page checks. The create 1,000 times of brumate 0.8.1 and Marko are about 50% above their previous run (22.1 and 21.0 ms) while idlip's fell; the min-max ranges overlap, so read create 1,000 as even among the three. The first clicks from a server page include idlip's first-event work: the state script is decoded and the preloaded chunks are imported on the click.
 
 #### Dashboard
 
-| Metric                                                          | idlip                    | brumate 0.8.1               | Marko 6                     |
-| --------------------------------------------------------------- | ------------------------ | --------------------------- | --------------------------- |
-| JS before `load`                                                | 1 file, 12.2 kB / 4.6 kB | 4, 110.6 kB / 23.3 kB       | 1, 66.7 kB / 10.5 kB        |
-| JS fetched while idle 3 s                                       | 0                        | 0                           | 0                           |
-| First click, widget 1: requests, JS                             | 3, 1.5 kB / 983 B        | 0                           | 0                           |
-| First click, widget 30 (below the fold): JS on scroll, on click | 0; 3, 1.5 kB / 953 B     | 0                           | 0                           |
-| Widget 30 after widget 1 (scroll and click)                     | 3, 1.5 kB / 953 B        | 0                           | 0                           |
-| Widget 45 Mode after both (scroll and click)                    | 3, 1.1 kB / 785 B        | 0                           | 0                           |
-| Total JS after 3 widgets                                        | 10, 16.2 kB / 7.3 kB     | 4, 110.6 kB / 23.3 kB       | 1, 66.7 kB / 10.5 kB        |
-| Click to update (widget 1 / 30 / 45)                            | 69 / 47 / 48 ms          | 53 / 18 / 18 ms             | 48 / 19 / 19 ms             |
-| Client JS emitted in dist                                       | 364, 197.4 kB / 123.0 kB | 7, 162.8 kB / 39.5 kB       | 1, 66.7 kB / 10.5 kB        |
-| SSR HTML                                                        | 108.8 kB / 9.1 kB        | 33.6 kB / 6.0 kB            | 27.5 kB / 5.4 kB            |
-| SSR renders/s                                                   | 953 (847-1,004) [1,382]  | 2,367 (2,225-3,103) [4,588] | 3,976 (3,412-4,057) [6,359] |
-| First click on widget 1 after idle, 150 ms RTT                  | 219 ms, 1 RT, 3 req      | 56 ms, 0 RT                 | 47 ms, 0 RT                 |
-| First click on widget 1 cold, 150 ms RTT                        | 216 ms, 1 RT, 3 req      | 480 ms, 0 RT                | 50 ms, 0 RT                 |
+| Metric                                                          | idlip                       | brumate 0.8.1         | Marko 6              |
+| --------------------------------------------------------------- | --------------------------- | --------------------- | -------------------- |
+| JS before `load`                                                | 22 files, 20.1 kB / 10.2 kB | 4, 110.6 kB / 23.3 kB | 1, 66.7 kB / 10.5 kB |
+| JS fetched while idle 3 s                                       | 0                           | 0                     | 0                    |
+| First click, widget 1: requests, JS                             | 0                           | 0                     | 0                    |
+| First click, widget 30 (below the fold): JS on scroll, on click | 0; 3, 999 B / 700 B         | 0                     | 0                    |
+| Widget 30 after widget 1 (scroll and click)                     | 3, 999 B / 700 B            | 0                     | 0                    |
+| Widget 45 Mode after both (scroll and click)                    | 3, 610 B / 529 B            | 0                     | 0                    |
+| Total JS after 3 widgets                                        | 28, 21.7 kB / 11.4 kB       | 4, 110.6 kB / 23.3 kB | 1, 66.7 kB / 10.5 kB |
+| Click to update (widget 1 / 30 / 45)                            | 84 / 62 / 47 ms             | 82 / 41 / 18 ms       | 77 / 38 / 18 ms      |
+| Without links: first click, widget 1                            | 4, 2.3 kB / 1.4 kB          | n/a                   | n/a                  |
+| Without links: total JS after 3 widgets                         | 11, 16.2 kB / 7.4 kB        | n/a                   | n/a                  |
+| Without links: click to update (widget 1 / 30 / 45)             | 73 / 58 / 49 ms             | n/a                   | n/a                  |
+| Client JS emitted in dist                                       | 365, 153.4 kB / 104.2 kB    | 7, 162.8 kB / 39.5 kB | 1, 66.7 kB / 10.5 kB |
+| SSR HTML                                                        | 93.6 kB / 8.4 kB            | 33.6 kB / 6.0 kB      | 27.5 kB / 5.4 kB     |
+| SSR renders/s                                                   | 4,996 (4,549-5,038)         | 4,706 (3,843-4,821)   | 6,057 (5,649-6,867)  |
+| First click on widget 1 after idle, 150 ms RTT                  | 67 ms, 0 RT                 | 95 ms, 0 RT           | 81 ms, 0 RT          |
+| First click on widget 1 cold, 150 ms RTT                        | 72 ms, 0 RT                 | 482 ms, 0 RT          | 84 ms, 0 RT          |
 
-No framework here had an idle preload to turn off when this ran, so the "preload off" session is n/a for all three. idlip's page now preloads the click chunks of the 4 widgets above the fold, and `?preload=off` turns that off (see below). Without preload links, as measured here, idlip loads the least JS before `load` and in total after 3 widgets, and pays 3 requests on each widget's first click.
+The "without links" rows are the harness's preload-off session (`?preload=off`). Neither brumate 0.8.1 nor Marko has an idle preload to turn off. With links idlip loads 10.2 kB gzip before `load`, about the same as Marko's 10.5 kB, in 22 files: the loader (12.6 kB / 4.8 kB), the helpers module and the 20 chunks of the 4 widgets above the fold. A widget below the fold still fetches 3 chunks on its first click.
 
 ### First click, preload on and off
 
-The first click after idle at 150 ms latency, interleaved between idlip builds of branch `node/preimport-chunks`, on 2026-11-22. Apple M2, 8 cores, Chrome 158. N = 21 runs per side, fixed before the run, one warmup run dropped. Load average 2.24 at the start and 2.25 at the end of each scenario. Median (median absolute deviation); a change is real when it is larger than 3 times the larger deviation.
+The first click after idle at 150 ms latency, interleaved between the two idlip pages of one build, on 2026-11-23. N = 21 runs per side, fixed before the run, one warmup run dropped. Todos: load average 2.72 at the start and 4.06 at the end. Dashboard: 2.80 at the start and 3.17 at the end. Median (median absolute deviation); a change is real when it is larger than 3 times the larger deviation.
 
 - **off**: no preload links. The click fetches its chunks.
-- **links**: `renderPreload` links in the head, as the pages now render them. The click imports modules the browser already fetched.
+- **links**: `renderPreload` links in the head, as the pages render them. The click imports modules the browser already fetched.
 
 "Click to update" is the harness's waterfall number: from the Playwright click call to the check passing, polled every 5 ms. "Click to write" and "click to frame" use the page's own clock from the click event: to the first DOM change, and to a task queued from the next animation frame after it. They leave out the Playwright round trips.
 
 | Todos, counter  | off            | links         |
 | --------------- | -------------- | ------------- |
 | Requests        | 3              | 0             |
-| Click to update | 232.0 ms (4.0) | 66.0 ms (2.0) |
-| Click to write  | 185.0 ms (2.1) | 15.9 ms (0.2) |
-| Click to frame  | 186.1 ms (2.0) | 31.3 ms (0.2) |
+| Click to update | 236.0 ms (5.0) | 69.0 ms (5.0) |
+| Click to write  | 189.7 ms (2.2) | 16.4 ms (0.5) |
+| Click to frame  | 190.9 ms (2.1) | 31.2 ms (0.4) |
 
 | Dashboard, widget 1 | off            | links         |
 | ------------------- | -------------- | ------------- |
 | Requests            | 4              | 0             |
-| Click to update     | 247.0 ms (4.0) | 68.0 ms (5.0) |
-| Click to write      | 194.9 ms (2.1) | 17.6 ms (0.6) |
-| Click to frame      | 196.9 ms (3.2) | 31.7 ms (0.2) |
+| Click to update     | 250.0 ms (5.0) | 74.0 ms (5.0) |
+| Click to write      | 197.8 ms (2.9) | 17.9 ms (0.8) |
+| Click to frame      | 199.5 ms (2.5) | 31.9 ms (0.4) |
 
-- **The links remove the round trip**: 232 and 247 ms down to 66 and 68 ms, far beyond the noise. brumate 0.8.1 loads its code at start and measured 83 ms (todos) and 56 ms (dashboard) in the tables above, Marko 44 and 47 ms, so with the links idlip is in the same range on the same loading choice: the click's code fetched before the click.
-- **Cost**: the links add the first click's chunks to every page load, also for visitors who never click: 3 files for todos (the shared helpers module, the handler and the binding), 21 for the dashboard (the helpers and 20 chunks). The loader is unchanged.
-- **Dropped: importing the preloaded modules at idle.** A loader option imported every modulepreload of the page after `load`, as brumate `af923d74` does. Against "links" it moved the DOM write from 15.9 to 2.9 ms (todos) and 17.6 to 4.6 ms (dashboard), but the frame only from 31.3 to 28.0 and 31.7 to 28.9 ms, within the noise, and the harness number trended slower (73 and 72 ms, within the noise). It cost 86 B gzip of loader and ran third-party modulepreloads too, so it was removed.
+- **The links remove the round trip**: 236 and 250 ms down to 69 and 74 ms (-71% and -70%, noise 15 ms), as in the `preimport-chunks` run (232 to 66 ms and 247 to 68 ms). In the waterfall of this run brumate 0.8.1 measured 80 ms (todos) and 95 ms (dashboard), Marko 77 and 81 ms, so with the links idlip is in the same range on the same loading choice: the click's code fetched before the click.
+- **Cost**: the links add the first click's chunks to every page load, also for visitors who never click: 5 files for todos (the helpers module and the handler and binding chunks of the counter and the toggle), 21 for the dashboard (the helpers and 20 chunks). In the todos table that is 12.2 kB / 5.4 kB before `load` against the 9.9 kB / 4.0 kB loader alone.
+- **Dropped: importing the preloaded modules at idle.** A loader option imported every modulepreload of the page after `load`, as brumate `af923d74` does. Against "links" it moved the DOM write from 15.9 to 2.9 ms (todos) and 17.6 to 4.6 ms (dashboard), but the frame only from 31.3 to 28.0 and 31.7 to 28.9 ms, within the noise, and the harness number trended slower (73 and 72 ms, within the noise). It cost 86 B gzip of loader and ran third-party modulepreloads too, so it was removed (`preimport-chunks`, 2026-11-22).
 
-`benchmarks/prefetch/run.mjs --rounds 20 --no-build` (the todos page with and without links, click right at `load`, load 2.6 to 2.8; the build still had the dropped idle import, which waits for `load`): click to update 227 ms (224-234) off and 60 ms (53-66) on; navigation to update 617 ms against 489 ms; `load` 389 ms against 432 ms, since the preloads delay it.
+`benchmarks/prefetch/run.mjs --rounds 20 --no-build` (2026-11-22, not rerun; the todos page with and without links, click right at `load`, load 2.6 to 2.8): click to update 227 ms (224-234) off and 60 ms (53-66) on; navigation to update 617 ms against 489 ms; `load` 389 ms against 432 ms, since the preloads delay it.
 
 To repeat (copy `dist` away first, so the server modules of each side stay apart):
 
@@ -124,129 +131,146 @@ To repeat (copy `dist` away first, so the server modules of each side stay apart
 uptime   # 1-minute load under 3
 pnpm -C benchmarks/idlip build   # copy benchmarks/idlip/dist to links/
 node benchmarks/harness/first-click-ab.mjs --scenario todos --runs 21 \
-  --side links=links --side off=links:off
+  --side off=links:off --side links=links
 ```
 
 For the dashboard, build with `build:dashboard` and copy `benchmarks/idlip/dashboard/dist`.
 
 ### Scale
 
-Does startup stay flat as the app grows? One page per size, with N distinct widget components (N = 10, 50, 200 and 1,000), built by idlip, brumate 0.8.1, Marko 6 and Qwik 2. The widgets are the dashboard's (see [Scale scenario](#scale-scenario)). Run on 2026-11-22, Apple M2, Chrome 158. Every page passed its checks: all widgets in the HTML and the DOM, a first click that shows what Node computes, and no page errors.
+Does startup stay flat as the app grows? One page per size, with N distinct widget components (N = 10, 50, 200 and 1,000), built by idlip, brumate 0.8.1, Marko 6 and Qwik 2. The widgets are the dashboard's (see [Scale scenario](#scale-scenario)). `node benchmarks/harness/scale.mjs run`, twice, on 2026-11-23. Every page passed its checks in both runs: all widgets in the HTML and the DOM, a first click that shows what Node computes, and no page errors.
 
-Bytes are exact and do not depend on load. The timings are from the run with the lowest load of the three runs made (the 1-minute load average before and after each size: 10 widgets 2 before and 2.22 after; 50 widgets 2.22 before and 2.34 after; 200 widgets 2.34 before and 2.84 after; 1,000 widgets 2.84 before and 3.16 after). The two earlier runs, at 1-minute loads of 2.4 to 8.2 and 3.4 to 4.8, agree on script times within about 20% and show the same order. Their task times at 1,000 widgets differ by 30% (idlip 481 and 614 ms), so read the task times as an order of magnitude.
+Bytes are exact and do not depend on load; both runs gave the same bytes (brumate's gzip moved by a few bytes). Both runs started under a 1-minute load of 3, but the builds the script runs before each size pushed it above. The timings are from the second run, which had the lower load (1-minute load before and after each size: 10 widgets 2.53 and 3.65; 50 widgets 3.65 and 3.83; 200 widgets 3.83 and 4.13; 1,000 widgets 4.13 and 5.28). The first run (2.69 to 3.11 at 10 widgets, then up to 6.9) agrees on script times within 10%, except idlip at 50 widgets (2.7 against 3.2 ms), and on task times within 5%.
 
 Gzip -9, kB. "Before the first click" is the page load plus a 3 s idle wait. "All bytes" adds up the HTML, the JS and every other fetch (Qwik 2's `bundle-graph.json` and similar).
 
 | Metric                                | App   | idlip | brumate 0.8.1 | Marko 6 |  Qwik 2 |
 | ------------------------------------- | ----- | ----: | ------------: | ------: | ------: |
-| JS before `load`                      | 10    |   4.7 |          15.9 |     5.9 |    37.3 |
-|                                       | 50    |   4.7 |          23.8 |    10.8 |    37.3 |
-|                                       | 200   |   4.7 |          52.6 |    28.1 |    37.3 |
-|                                       | 1,000 |   4.7 |         201.5 |   117.8 |    37.3 |
-| JS before the first click             | 10    |   4.7 |          15.9 |     5.9 |    51.2 |
-|                                       | 50    |   4.7 |          23.8 |    10.8 |   106.3 |
-|                                       | 200   |   4.7 |          52.6 |    28.1 |   312.0 |
-|                                       | 1,000 |   4.7 |         201.5 |   117.8 | 1,409.1 |
+| JS before `load`                      | 10    |   4.8 |          15.9 |     5.9 |    37.3 |
+|                                       | 50    |   4.8 |          23.8 |    10.8 |    37.3 |
+|                                       | 200   |   4.8 |          52.6 |    28.1 |    37.3 |
+|                                       | 1,000 |   4.8 |         201.5 |   117.8 |    37.3 |
+| JS before the first click             | 10    |   4.8 |          15.9 |     5.9 |    51.2 |
+|                                       | 50    |   4.8 |          23.8 |    10.8 |   106.3 |
+|                                       | 200   |   4.8 |          52.6 |    28.1 |   312.0 |
+|                                       | 1,000 |   4.8 |         201.5 |   117.8 | 1,409.1 |
+| JS fetched by the first click         | every |   1.5 |             0 |       0 |       0 |
 | HTML                                  | 10    |   3.4 |           1.8 |     1.7 |     4.3 |
-|                                       | 50    |   8.5 |           6.2 |     5.6 |    16.5 |
+|                                       | 50    |   8.4 |           6.2 |     5.6 |    16.5 |
 |                                       | 200   |  25.9 |          22.3 |    19.0 |    63.5 |
-|                                       | 1,000 | 112.0 |         103.9 |    87.9 |   302.6 |
+|                                       | 1,000 | 111.5 |         103.9 |    87.9 |   302.6 |
 | Non-JS fetches before the first click | 10    |   0.0 |           0.0 |     0.0 |     1.0 |
 |                                       | 50    |   0.0 |           0.0 |     0.0 |     4.7 |
 |                                       | 200   |   0.0 |           0.0 |     0.0 |    18.5 |
 |                                       | 1,000 |   0.0 |           0.0 |     0.0 |    92.2 |
-| All bytes before `load`               | 10    |   8.1 |          17.8 |     7.6 |    42.7 |
-|                                       | 50    |  13.2 |          30.0 |    16.3 |    58.5 |
-|                                       | 200   |  30.6 |          74.9 |    47.1 |   119.3 |
-|                                       | 1,000 | 116.7 |         305.3 |   205.8 |   432.1 |
-| All bytes before the first click      | 10    |   8.1 |          17.8 |     7.6 |    56.6 |
-|                                       | 50    |  13.2 |          30.0 |    16.3 |   127.5 |
-|                                       | 200   |  30.6 |          74.9 |    47.1 |   394.0 |
-|                                       | 1,000 | 116.7 |         305.3 |   205.8 | 1,803.9 |
+| All bytes before `load`               | 10    |   8.2 |          17.8 |     7.6 |    42.7 |
+|                                       | 50    |  13.3 |          30.0 |    16.3 |    58.5 |
+|                                       | 200   |  30.7 |          74.9 |    47.1 |   119.3 |
+|                                       | 1,000 | 116.4 |         305.3 |   205.8 |   432.1 |
+| All bytes before the first click      | 10    |   8.2 |          17.8 |     7.6 |    56.6 |
+|                                       | 50    |  13.3 |          30.0 |    16.3 |   127.5 |
+|                                       | 200   |  30.7 |          74.9 |    47.1 |   394.0 |
+|                                       | 1,000 | 116.4 |         305.3 |   205.8 | 1,803.9 |
 
-Raw sizes, kB. idlip's JS is 12.5 kB at every size. Its HTML is 21.8, 101.0, 400.3, 2,001.2 kB, against 5.9, 28.2, 113.7, 579.5 kB for Marko 6. brumate's HTML is 7.3 to 696.9 kB and Qwik 2's 14.8 to 1,382.7 kB. Raw JS at 1,000 widgets: brumate 1,699.1 kB, Marko 1,226.9 kB, Qwik 2 99.4 kB before `load` and 2,179.1 kB before the first click.
+Raw sizes, kB. idlip's JS is 12.6 kB at every size, one file. Its HTML is 20.5, 94.3, 373.3, 1,865.7 kB, against 5.9, 28.2, 113.7, 579.5 kB for Marko 6. brumate's HTML is 7.3 to 696.9 kB and Qwik 2's 14.8 to 1,382.7 kB. Raw JS at 1,000 widgets: brumate 1,699.1 kB, Marko 1,226.9 kB, Qwik 2 99.4 kB before `load` and 2,179.1 kB before the first click.
 
 Main-thread time from navigation to `load`, 4x CPU slowdown, median of 10 loads, ms:
 
 | Metric      | App   | idlip | brumate 0.8.1 | Marko 6 | Qwik 2 |
 | ----------- | ----- | ----: | ------------: | ------: | -----: |
-| Script time | 10    |   2.7 |           5.0 |     7.4 |    2.6 |
-|             | 50    |   2.5 |           6.6 |    15.3 |    2.6 |
-|             | 200   |   3.1 |           9.1 |    34.8 |    3.2 |
-|             | 1,000 |   2.7 |          17.6 |   124.5 |    5.1 |
-| Task time   | 10    |    52 |            54 |      55 |     53 |
-|             | 50    |    68 |            69 |      77 |     68 |
-|             | 200   |   129 |           123 |     150 |    119 |
-|             | 1,000 |   451 |           424 |     507 |    387 |
+| Script time | 10    |   2.3 |           5.2 |     8.2 |    2.5 |
+|             | 50    |   3.2 |           6.3 |    15.2 |    2.8 |
+|             | 200   |   2.7 |           9.0 |    34.7 |    3.7 |
+|             | 1,000 |   3.0 |          17.6 |   124.1 |    5.5 |
+| Task time   | 10    |    53 |            57 |      56 |     54 |
+|             | 50    |    69 |            72 |      78 |     68 |
+|             | 200   |   129 |           122 |     148 |    122 |
+|             | 1,000 |   445 |           431 |     505 |    387 |
 
-Script time is what the page runs as JavaScript (CDP `ScriptDuration`). Task time is all main-thread work (`TaskDuration`), which includes parsing the HTML and laying out N widgets of 480 px each, so it grows for every framework and is mostly the page, not the framework.
+Script time is the time the page spends running scripts (CDP `ScriptDuration`). Task time is all main-thread work (`TaskDuration`), which includes parsing the HTML and laying out N widgets of 480 px each, so it grows for every framework and is mostly the page, not the framework.
 
 What the numbers say:
 
-- **JS on load is flat for idlip**: 4.7 kB gzip from 10 to 1,000 widgets, one file. The first click fetches about 1 kB more. brumate grows 12.7x and Marko 20x from 10 to 1,000 widgets. Qwik 2 is flat too, at 37.3 kB.
-- **Qwik 2 keeps loading while idle.** Its JS before the first click grows with the app (51.2 kB to 1,409.1 kB, 44 to 4,004 files), because it preloads the code of every widget. That is background work, not part of `load`, so the "before `load`" rows are the fairer view of its startup. The landing chart uses them.
-- **Total bytes are not flat for idlip.** All bytes before the first click go from 8.1 to 116.7 kB, 14x. The HTML is the cost: idlip writes each widget's state and listeners into the page, 2.0 MB raw at 1,000 widgets, 3.5x Marko 6's HTML. It still has the fewest bytes from 50 widgets up (16.3 kB for Marko 6 at 50 widgets and 205.8 kB at 1,000). At 10 widgets Marko 6 is smaller (7.6 kB against 8.1 kB).
-- **Script time is flat for idlip** (2.5 to 3.1 ms) and for Qwik 2 (2.6 to 5.1 ms). Marko 6 grows 17x, brumate 4x.
-- **Task time does not separate the frameworks.** All four are within about 30% of each other at every size (52 to 451 ms for idlip, 53 to 387 ms for Qwik 2), and the run-to-run spread is as large.
+- **JS on load is flat for idlip**: 4.8 kB gzip from 10 to 1,000 widgets, one file (the dashboard loader with its features). The first click fetches 1.5 kB more: the helpers module and the widget's chunks. brumate grows 12.7x and Marko 20x from 10 to 1,000 widgets. Qwik 2 is flat too, at 37.3 kB.
+- **Qwik 2 keeps loading while idle.** Its JS before the first click grows with the app (51.2 kB to 1,409.1 kB), because it preloads the code of every widget. That is background work, not part of `load`, so the "before `load`" rows are the fairer view of its startup. The landing chart uses them.
+- **Total bytes are not flat for idlip.** All bytes before the first click go from 8.2 to 116.4 kB, 14x. The HTML is the cost: idlip writes each widget's state and listeners into the page, 1.9 MB raw at 1,000 widgets, 3.2x Marko 6's HTML. It still has the fewest bytes from 50 widgets up (16.3 kB for Marko 6 at 50 widgets and 205.8 kB at 1,000). At 10 widgets Marko 6 is smaller (7.6 kB against 8.2 kB).
+- **Script time is flat for idlip** (2.3 to 3.2 ms) and for Qwik 2 (2.5 to 5.5 ms). Marko 6 grows 15x, brumate 3.4x.
+- **Task time does not separate the frameworks.** All four are within about 30% of each other at every size (53 to 445 ms for idlip, 54 to 387 ms for Qwik 2).
+
+Against the 2026-11-22 run: idlip's JS on load went from 4.7 to 4.8 kB gzip (12.5 to 12.6 kB raw, the loader), its HTML at 1,000 widgets from 2,001.2 to 1,865.7 kB raw (`text-anchor` and `perf-ssr-state`), and its first click from about 1 kB to 1.5 kB (the helpers module of `shared-helpers` loads with the first click). The other frameworks' bytes did not change, and the timings agree within the spread of both runs.
 
 The widgets are made from 17 handler steps and 12 formatters with random constants, so 1,000 of them repeat much code. That helps every bundler's gzip and Marko most, which ships one file. A real app of 1,000 components would compress less.
 
 ### Where idlip loses
 
-Each row is a metric where idlip is behind brumate 0.8.1 or Marko 6 by more than 20%. `perf-from-bench` works from this list.
+Each row is a metric of this run where idlip is behind brumate 0.8.1 or Marko 6 by more than 20%. Ratios are idlip over the other. **Design cost** marks a loss that follows from idlip's loading design (no component code runs on load, state is decoded and chunks are imported on the first event, and the page carries the state and the listeners in its HTML). Removing it would mean changing the design, not the code. The other rows are code costs that later work can cut.
 
-| Metric                                                | idlip                               | Behind                                             | Gap                                                                                                                   |
-| ----------------------------------------------------- | ----------------------------------- | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| First counter click and first toggle: requests and JS | 2 requests, 473 B and 997 B         | brumate 0.8.1, Marko: 0                            | The page of idlip loads the handler and binding chunks on the first event. The others hold all code before the click. |
-| First counter click, 150 ms RTT, after idle           | 220 ms                              | Marko 44 ms, brumate 83 ms                         | 5.0x and 2.7x                                                                                                         |
-| First counter click, 150 ms RTT, cold                 | 226 ms                              | Marko 50 ms, brumate 108 ms                        | 4.5x and 2.1x                                                                                                         |
-| Click to update, toggle                               | 56 ms                               | Marko 8 ms, brumate 36 ms                          | 7x and 1.6x                                                                                                           |
-| Click to update, add                                  | 95 ms                               | Marko 33 ms, brumate 77 ms (inside the noise)      | 2.9x against Marko                                                                                                    |
-| Click to update, counter                              | 113 ms                              | Marko 37 ms (brumate 95 ms is inside the noise)    | 3.1x against Marko                                                                                                    |
-| Total JS after counter, toggle, add                   | 13.7 kB / 6.4 kB, 11 files          | Marko 9.1 kB / 4.4 kB, 1 file                      | +51% raw, +45% gzip                                                                                                   |
-| Client JS emitted in dist                             | 14.6 kB / 7.0 kB                    | Marko 9.1 kB / 4.4 kB                              | +60% raw, +59% gzip                                                                                                   |
-| SSR HTML, 0 todos                                     | 4.4 kB / 1.9 kB                     | brumate 1.1 kB / 592 B, Marko 812 B / 557 B        | 4.0x and 5.4x raw                                                                                                     |
-| SSR HTML, 3 todos                                     | 4.9 kB / 2.0 kB                     | brumate 1.6 kB / 723 B, Marko 1.2 kB / 692 B       | 3.1x and 4.1x raw                                                                                                     |
-| SSR HTML, 100 todos                                   | 21.8 kB / 3.3 kB                    | brumate 16.3 kB / 2.1 kB, Marko 15.7 kB            | +34% raw, +57% gzip against brumate; +39% raw against Marko                                                           |
-| SSR renders/s, 3 todos                                | 36,047 (46,924 in the 11-round run) | brumate 81,464, Marko 77,944 (108,833 and 130,717) | 2.3x and 2.2x (2.3x and 2.8x)                                                                                         |
+| Metric                                        | idlip                            | Behind                                           | Gap                                                | Kind                                                                                                                                             |
+| --------------------------------------------- | -------------------------------- | ------------------------------------------------ | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Todos: JS before `load`, with links           | 12.2 kB / 5.4 kB, 6 files        | Marko 9.1 kB / 4.4 kB, 1 file                    | +34% raw, +23% gzip                                | Design cost of the links: 5 preloaded chunks next to the loader. Without links it is the loader alone, 9.9 kB / 4.0 kB, below Marko in gzip.     |
+| Todos: total JS after counter, toggle, add    | 13.4 kB / 6.4 kB, 12 files       | Marko 9.1 kB / 4.4 kB, 1 file                    | +47% raw, +45% gzip                                | Code: the loader is 9.9 kB / 4.0 kB on its own.                                                                                                  |
+| Todos: client JS in dist                      | 14.0 kB / 6.9 kB                 | Marko 9.1 kB / 4.4 kB                            | +54% raw, +57% gzip                                | Code: as above.                                                                                                                                  |
+| Todos: click to update, toggle                | 48 ms                            | brumate 17 ms, Marko 23 ms                       | 2.8x, 2.1x                                         | Design cost: the first toggle decodes the state script and imports the preloaded chunks.                                                         |
+| Todos: click to update, add                   | 99 ms                            | brumate 47 ms, Marko 49 ms                       | 2.1x, 2.0x                                         | Design cost: the add fetches 3 chunks the links do not name.                                                                                     |
+| Todos: click to update, counter               | 64 ms                            | Marko 51 ms (brumate 83 ms is behind idlip)      | 1.25x                                              | Design cost: first event, as the toggle. Single session, close to the 20% line.                                                                  |
+| Todos: SSR HTML, 0 and 3 todos                | 4.8 kB / 2.0 kB, 5.3 kB / 2.1 kB | brumate 1.2 kB, 1.6 kB; Marko 812 B, 1.2 kB      | 4.0x and 3.3x raw; 5.9x and 4.4x raw               | Design cost: the state script, the inline listener (1.7 kB / 1.0 kB) and the 5 preload links.                                                    |
+| Todos: SSR HTML, 100 todos                    | 20.6 kB / 3.4 kB                 | brumate 16.3 kB / 2.2 kB, Marko 15.7 kB / 2.8 kB | +26% and +31% raw; +55% and +21% gzip              | Design cost: the state script holds the 100 todos next to the markup.                                                                            |
+| Rows: select a row                            | 1.9 ms                           | brumate 1.5, Marko 1.1                           | 1.27x, 1.7x                                        | Code: a change of `selected` runs the row class binding on every kept row (`perf-list-kept` keeps that rule; the skip moved to `row-own-reads`). |
+| Rows: swap 2 rows                             | 8.5 ms                           | 6.5, 6.5                                         | 1.31x, 1.31x                                       | Code: `readRows` and the kept-row binding pass on 1,000 rows. The unsound skip that made swap faster was removed in `perf-list-kept`.            |
+| Rows: append 1,000 rows to 1,000              | 42.3 ms                          | 32.2, 30.1                                       | 1.31x, 1.41x                                       | Code: the kept-row pass on the 1,000 kept rows, plus the clone of the new rows.                                                                  |
+| Rows: clear 1,000 rows                        | 3.7 ms                           | Marko 2.8 (brumate 3.7 is even)                  | 1.32x                                              | Code: `removeRange` per row where Marko clears the parent at once.                                                                               |
+| Rows: first select from the server page       | 11.3 / 31.4 ms                   | 6.2 / 14.4, 5.5 / 14.7                           | 1.8x, 2.1x main; 2.2x, 2.1x to paint               | Design cost: the first event decodes the state script and imports the preloaded chunks, then runs the select.                                    |
+| Rows: first update every 10th, to paint       | 38.3 ms                          | 27.6, 27.7                                       | 1.39x (main thread 21.2 ms is ahead)               | Design cost: first event, as above.                                                                                                              |
+| Rows: first remove from the server page       | 27.4 / 41.9 ms                   | 20.4 / 24.9, 20.2 / 24.1                         | 1.34x main, 1.7x to paint                          | Design cost: first event, as above.                                                                                                              |
+| Rows: client JS in dist                       | 15.1 kB / 7.4 kB                 | Marko 9.3 kB / 4.5 kB                            | +62% raw, +64% gzip                                | Code: the loader, the helpers module and the page's small chunks, 17 files.                                                                      |
+| Rows: SSR HTML, raw                           | 328.2 kB                         | Marko 269.4 kB (brumate 307.2 kB, +7%)           | +22%                                               | Design cost: the state script with the 1,000-row model and the row markers. In gzip idlip is the smallest (23.4 kB).                             |
+| Dashboard: click to update, widgets 30 and 45 | 62, 47 ms                        | 41, 18 and 38, 18                                | 1.5x and 2.6x; 1.6x and 2.6x                       | Design cost: a widget below the fold fetches 3 chunks on its first click.                                                                        |
+| Dashboard: client JS in dist                  | 365 files, 153.4 kB / 104.2 kB   | brumate 162.8 / 39.5, Marko 66.7 / 10.5          | 2.6x gzip (raw is 6% smaller); 2.3x raw, 9.9x gzip | Code and design: about 7 chunks per widget, each gzipped alone. Only the chunks a click needs load, so this is not what a visitor downloads.     |
+| Dashboard: SSR HTML                           | 93.6 kB / 8.4 kB                 | 33.6 / 6.0, 27.5 / 5.4                           | 2.8x, 3.4x raw; +40%, +56% gzip                    | Design cost and code: the state script (chunk URL map and manifests) and 21 preload links. `perf-ssr-state` cut the state script by 10.4 kB.     |
+| Dashboard: SSR renders/s                      | 4,996                            | Marko 6,057 (brumate 4,706 is behind idlip)      | 1.21x                                              | Code: seroval writes the per-render state. At the 20% line.                                                                                      |
 
-Rows and dashboard (the run above). Ratios are idlip over brumate 0.8.1 and over Marko 6. "Likely cost" names where in `packages/idlip` the time or bytes go. Profiled: create and append (Chrome CPU profile with `profile-rows.mjs` on an unminified build, 5 rounds), dashboard and rows SSR (Node inspector profile over 500 and 100 renders), and the state script split of both pages (measured from the HTML). The rest are guesses from reading the code.
+Without links (`?preload=off`, the design the GOAL describes) the first click of each page also costs one round trip: 236 ms (todos) and 250 ms (dashboard) at 150 ms latency, against 69 and 74 ms with links and 77 to 95 ms for brumate 0.8.1 and Marko. That is a design cost; the links are the answer, opt-in through `renderPreload`.
 
-| Metric                                                 | idlip                          | Behind                                  | Gap                                             | Likely cost                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| ------------------------------------------------------ | ------------------------------ | --------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Create 1,000 rows                                      | 35.4 ms                        | 22.1, 21.0                              | 1.6x, 1.7x                                      | Profiled. `patchList` (`src/client/list/index.ts`) parses each new row alone through `parseHtml` (`src/client/patch/dom.ts`): one `<template>` and one `innerHTML` per row, then `before(...nodes)` and `findInnerBlocks` / `collectBlocks` (`src/client/patch/blocks.ts`) per row. Of 16.5 ms script time a round, `parseHtml` takes 8.1 ms, `collectBlocks` 1.0, `isComment` 0.5. One parse for all new rows would cut most of it. |
-| Replace 1,000 rows                                     | 42.9 ms                        | 27.5, 24.1                              | 1.6x, 1.8x                                      | Create as above, plus `removeRange` of 1,000 old rows and their remove hooks (guess).                                                                                                                                                                                                                                                                                                                                                |
-| Create 10,000 rows                                     | 380.8 ms                       | 257.8, 237.7                            | 1.5x, 1.6x                                      | Same as create (guess: same path, 10x the rows).                                                                                                                                                                                                                                                                                                                                                                                     |
-| Append 1,000 rows to 1,000                             | 62.0 ms                        | 31.0, 27.9                              | 2.0x, 2.2x                                      | Profiled. Create cost for the new rows (`parseHtml` 6.9 ms), plus a pass over the 1,000 kept rows: `walk` 1.1, `findNodes` 0.9, `patchRow` 0.6, `readRows` 0.5, `checkKeyed` 0.4 ms (`src/client/list/index.ts`, `src/client/patch/diff.ts`). The comment in `patchList` says "A chosen row binding runs on every kept row".                                                                                                         |
-| Select a row                                           | 4.3 ms                         | 1.6, 1.2                                | 2.7x, 3.6x                                      | Guess. The row class reads `selected`, so the compiler makes one binding `rows._.id_selected`; a change of `selected` runs it on all 1,000 rows (the kept-row pass in `patchList`, or the binding dispatch in `src/client`) instead of the 2 rows whose class changes.                                                                                                                                                               |
-| Swap 2 rows                                            | 9.7 ms                         | 5.6, 4.4                                | 1.7x, 2.2x                                      | Guess. `readRows` walks every row marker, then the kept-row binding pass runs on 1,000 rows, as in append.                                                                                                                                                                                                                                                                                                                           |
-| Remove a row                                           | 11.4 ms                        | 7.2, 6.4                                | 1.6x, 1.8x                                      | Guess. Same kept-row pass as swap.                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Update every 10th                                      | 13.5 ms                        | 10.5, 9.0                               | 1.3x, 1.5x                                      | Guess. `checkKeyed` diff and `patchRow` on all 1,000 rows, not only the 100 changed labels.                                                                                                                                                                                                                                                                                                                                          |
-| Clear 1,000 rows                                       | 5.1 ms                         | 3.4, 2.5                                | 1.5x, 2.0x                                      | Guess. `removeRange` per row and `removeBlock` hooks (`src/client/patch/blocks.ts`) per row, where the others clear the parent at once.                                                                                                                                                                                                                                                                                              |
-| First select from the server page                      | 13.6 / 31.0 ms                 | 7.2 / 14.2, 6.8 / 13.2                  | 1.9x, 2.0x main thread; 2.2x, 2.3x to paint     | Guess. The click fetches the handler and binding chunks, reads the state script (seroval) and the server markers on the first event, then runs the select pass above.                                                                                                                                                                                                                                                                |
-| First update every 10th from the server page, to paint | 39.5 ms                        | 28.3, 31.8                              | 1.4x, 1.24x (main thread 30.5 ms is within 20%) | Guess. The chunk fetch on the click.                                                                                                                                                                                                                                                                                                                                                                                                 |
-| First remove from the server page                      | 38.3 / 45.8 ms                 | 24.9 / 28.6, 24.8 / 29.1                | 1.5x main thread, 1.6x to paint                 | Guess. Chunk fetch, state read, then the remove pass.                                                                                                                                                                                                                                                                                                                                                                                |
-| Rows client JS in dist                                 | 14.8 kB / 7.1 kB               | Marko 9.3 kB / 4.5 kB                   | +59% raw, +58% gzip                             | Measured. The loader is 9.9 kB / 4.0 kB on its own (`src/client`), and the rows page adds 14 small chunks.                                                                                                                                                                                                                                                                                                                           |
-| Rows SSR HTML, raw                                     | 353.0 kB                       | Marko 269.4 kB (brumate 307.2 kB, +15%) | +31%                                            | Measured. 38 kB is the state script with the 1,000-row model (`src/server/render.ts`). The rest is markers per row: `<!--i-->`, `<!--t2-->...<!--/t-->`, `i-a` attributes and the `on:click` JSON on two links (server codegen in `src/compiler`). In gzip idlip is the smallest (23.5 kB).                                                                                                                                          |
-| Dashboard first click: requests                        | 3                              | 0, 0                                    |                                                 | By design: handler, binding and list chunks load on the click.                                                                                                                                                                                                                                                                                                                                                                       |
-| Dashboard click to update, widgets 30 and 45           | 47, 48 ms                      | 18, 18 and 19, 19                       | 2.6x, 2.5x                                      | Measured as requests: the 3-chunk fetch is inside the click.                                                                                                                                                                                                                                                                                                                                                                         |
-| Dashboard click to update, widget 1                    | 69 ms                          | 53, 48                                  | 1.3x, 1.4x                                      | Same, plus the first state read.                                                                                                                                                                                                                                                                                                                                                                                                     |
-| Dashboard first click after idle, 150 ms RTT           | 219 ms                         | 56, 47                                  | 3.9x, 4.7x                                      | One round trip for 3 chunks.                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Dashboard first click cold, 150 ms RTT                 | 216 ms                         | Marko 50 (brumate 480 is behind idlip)  | 4.3x against Marko                              | Same.                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Dashboard client JS in dist                            | 364 files, 197.4 kB / 123.0 kB | 162.8 / 39.5, 66.7 / 10.5               | +21% raw and 3.1x gzip; 3.0x raw and 11.7x gzip | Measured. About 7 chunks per widget (run, cycle, 3 bindings, list, view) from the compiler's chunk split; each small file gzips alone and the module-level `summarize` and `listEntries` helpers are copied into each chunk that uses them.                                                                                                                                                                                          |
-| Dashboard SSR HTML                                     | 108.8 kB / 9.1 kB              | 33.6 / 6.0, 27.5 / 5.4                  | 3.2x, 4.0x raw; +52%, +69% gzip                 | Measured. Markup is 35.7 kB, close to the others. The state script is 75.8 kB: the chunk URL map 37.5 kB (every chunk of every child module, keyed by its full module id such as `/src/widgets/Widget00.tsx?idlip-handler=run&lang.js`), the child manifests (`modules`) 32.5 kB, `slots` 5.5 kB. `mergeState` and `collectModules` in `src/server/render.ts` put them all in.                                                       |
-| Dashboard SSR renders/s                                | 953 [1,382]                    | 2,367 [4,588], 3,976 [6,359]            | 2.5x, 4.2x [3.3x, 4.6x]                         | Profiled (Node, 500 renders, 1.04 ms a render). `mergeState` 14% self time (object spreads of the chunk maps), seroval parse and serialize of that state about 50% (`parsePlainObject` 11%, `createIndexForValue` 11%, `parseProperties` 7%, `serializeProperties` 7%, `serializeString` 6%). A smaller state script would cut both.                                                                                                 |
+No longer losses, compared with the previous run:
 
-Not losses in rows and dashboard: the JS heap (idlip is the smallest), the main thread while the server page loads, SSR rate at 1,000 rows (20% behind brumate at 5 rounds, ahead at 11 rounds, ahead of Marko in both), SSR HTML of 1,000 rows in gzip, JS before `load` and total JS after 3 widgets (idlip loads the least).
+- **Todos SSR renders/s at 3 todos**: 135,135, ahead of brumate 0.8.1 (113,233) and within 5% of Marko (141,196). It was 2.3x behind both (`perf-ssr-state`).
+- **First click at 150 ms RTT**, todos and dashboard, with links: 61 and 67 ms after idle, ahead of brumate and Marko. It was 220 and 219 ms (`preimport-chunks`).
+- **Todos first click and first toggle requests**: 0 with links. They were 2 requests.
+- **Rows create 1,000, replace, create 10,000, update every 10th, remove**: within 20% of both in this run. They were 1.3x to 1.8x behind (`cloned-templates`, `perf-list-kept`). Create 1,000 is the fastest of the three here, inside the spread.
+- **Dashboard SSR renders/s against brumate**: ahead. It was 2.5x behind (`perf-ssr-state`).
+- **Dashboard click to update, widget 1**: even with both (84 against 82 and 77 ms). It was 1.3x behind.
 
-Not losses in todos: JS before `load` (idlip 9.7 kB / 3.8 kB is 6% above Marko in raw bytes and 14% below in gzip, and well below brumate 0.8.1's 33.3 kB), SSR rate at 100 todos (17% behind brumate 0.8.1 in the table and 17% in the 11-round run, inside the noise; ahead of Marko), and the cost of an extra todo (178 B against 155 B and 153 B).
+Not losses in this run: the JS heap (idlip is the smallest), the main thread while the 1,000-row server page loads, SSR rate at 1,000 rows (8% behind brumate, ahead of Marko), SSR HTML of 1,000 rows in gzip, todos SSR rate at 100 todos (7% behind brumate, ahead of Marko), the cost of an extra todo (162 B against 155 B and 153 B), dashboard JS before `load` (10.2 kB gzip with links against Marko's 10.5 kB) and total JS after 3 widgets (11.4 kB gzip against 10.5 kB, within 20%; 7.4 kB without links, the least).
 
-Reading the table:
+### Perf work since the previous run
 
-- Brumate 0.8.1 loads 33.3 kB before `load` (up from 26.4 kB in 0.3.0) and then needs no request for any click. Brumate 0.3.0 and Qwik fetch some code while idle. idlip fetches nothing while idle, which is the design in the GOAL, and pays on the first click: 2 requests.
-- The SSR HTML of idlip is larger because it carries the serialized state and the loader listener. The cost per extra todo is close to the others.
-- Marko ships the page as one 9.1 kB file and needs no request, so it wins the click, the render rate at 3 todos and the emitted size.
-- The click-to-update times include the chunk fetch for idlip's first click of each kind, so they are not an update cost alone. They vary by 20% or more between runs (an earlier run with load 3.9 gave idlip 87 / 72 / 99 ms and brumate 0.8.1 376 / 47 / 116 ms, where brumate's counter click took 376 ms).
+Each perf node's claim, and whether this run shows it. Cross-run comparisons of timings carry the load difference between the runs. Where the other frameworks moved too, the ratio to them is given.
+
+| Node                   | Claimed                                                                                        | This run                                                                                                                                                                                 | Shown      |
+| ---------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `cloned-templates`     | Rows create 10,000 -22% and append -15% beyond noise; create 1,000 and replace within noise    | Create 10,000 380.8 to 247.3 ms (1.60x to 1.11x Marko), append 62.0 to 42.3 ms (2.22x to 1.41x), create 1,000 35.4 to 27.9 ms (1.69x to 0.86x), replace 42.9 to 31.6 ms (1.78x to 1.20x) | Yes        |
+| `cloned-templates-all` | No speed change; the todo toggle 65 to 49 ms in both pairs                                     | Toggle 48 ms (56 ms in the previous run, without links). No other claim to check                                                                                                         | Consistent |
+| `shared-helpers`       | Dashboard dist -31% gzip; later chunks smaller; a larger first click                           | Dashboard dist 104.2 kB gzip (146.9 kB before, harness measure in that node); widget 30 after widget 1: 999 B / 700 B against 1.5 kB / 953 B; widget 1 without links 4 requests, 1.4 kB  | Yes        |
+| `perf-ssr-state`       | Dashboard SSR 918 to 4,746 renders/s, todos 33,710 to 129,100; dashboard state script -10.4 kB | Dashboard 953 to 4,996 renders/s (0.24x to 1.06x brumate), todos 3 todos 36,047 to 135,135 (0.44x to 1.19x brumate); dashboard HTML 108.8 to 93.6 kB with `text-anchor`                  | Yes        |
+| `preimport-chunks`     | First click after idle 232 to 66 ms (todos), 247 to 68 ms (dashboard) with links               | 236 to 69 ms and 250 to 74 ms, real by 3x MAD                                                                                                                                            | Yes        |
+| `perf-list-kept`       | Script time: select -47%, remove -19%; swap, update every 10th, clear, append within noise     | Click to paint: select 4.3 to 1.9 ms (3.6x to 1.7x Marko), remove 11.4 to 8.3 ms (1.8x to 1.14x), swap 9.7 to 8.5 ms (2.2x to 1.31x), clear 5.1 to 3.7, update every 10th 13.5 to 11.5   | Yes        |
+| `text-anchor`          | SSR HTML: -16 B per todo, -26 B per row (rows page -26,000 B), dashboard -4,000 B              | Per extra todo 178 to 162 B; rows page 353.0 to 328.2 kB (the 9 preload links add about 0.6 kB); dashboard 108.8 to 93.6 kB (with `perf-ssr-state`)                                      | Yes        |
+| `fix-for-prop-each`    | A correctness fix, no speed claim                                                              | n/a                                                                                                                                                                                      | n/a        |
+| `bench-scale`          | The scale scenario                                                                             | Rerun in [Scale](#scale)                                                                                                                                                                 | n/a        |
+| `perf-list-create`     | Nothing shipped                                                                                | n/a                                                                                                                                                                                      | n/a        |
+
+### Changes since the previous run
+
+Regressions beyond noise against the previous README numbers:
+
+- **JS before `load` grew** on the todos page (3.8 to 5.4 kB gzip) and the dashboard (4.6 to 10.2 kB gzip). This is the preload links, by choice, and it buys the first click (see above). Without links the loader alone is 4.0 kB and 4.8 kB gzip.
+- **SSR HTML at 0 and 3 todos grew** by about 0.4 kB raw (4.4 to 4.8 kB and 4.9 to 5.3 kB): the 5 preload links. At 100 todos it shrank (21.8 to 20.6 kB) with `text-anchor`.
+- **Dashboard click to update, widget 30**: 47 ms in the previous run, 62 ms here (58 ms in the session without links). Both are single sessions, and the `cloned-templates-all` pairs measured 54 to 60 ms on its base and its branch, so this may have moved before that node. Not confirmed beyond noise.
+- **Rows client JS in dist**: 14.8 kB / 7.1 kB to 15.1 kB / 7.4 kB (+0.3 kB gzip), from the cloned templates and the helpers module.
+
+- **Dashboard click to update, widget 1**: 69 to 84 ms (+22%, at the 20% line), a single session. The session without links measured 73 ms. Not confirmed beyond noise.
+
+Nothing else is slower or larger beyond noise. The todos add click (95 to 99 ms) is inside the 20% band.
 
 ## Scenarios
 

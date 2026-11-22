@@ -1,0 +1,111 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      @font-face {
+        font-family: 'Bricolage Grotesque';
+        font-weight: 200 800;
+        src: url(bricolage-grotesque.woff2) format('woff2');
+      }
+      @font-face {
+        font-family: 'Martian Mono';
+        font-weight: 100 800;
+        src: url(martian-mono.woff2) format('woff2');
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1200px;
+        height: 630px;
+        background: #f2f2f4;
+        -webkit-font-smoothing: antialiased;
+      }
+      .card {
+        position: absolute;
+        inset: 14px;
+        background: #111113;
+        border-radius: 40px;
+        color: #f2f2f4;
+      }
+      h1 {
+        position: absolute;
+        left: 64px;
+        top: 52px;
+        margin: 0;
+        width: 1060px;
+        font: 800 81px/1.08 'Bricolage Grotesque';
+        letter-spacing: -0.035em;
+      }
+      mark {
+        background: #c6f135;
+        color: #111113;
+        border-radius: 12px;
+        padding: 0 12px;
+      }
+      .chart {
+        position: absolute;
+        left: 64px;
+        top: 340px;
+        width: 1040px;
+        font: 18px/1 'Martian Mono';
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        height: 37px;
+      }
+      .name {
+        width: 206px;
+      }
+      .own .name,
+      .own .value {
+        font-weight: 700;
+      }
+      .bar {
+        height: 22px;
+        border-radius: 5px;
+        background: #7a7a7c;
+        margin-right: 14px;
+      }
+      .own .bar {
+        background: #c6f135;
+      }
+      .foot {
+        position: absolute;
+        left: 64px;
+        top: 471px;
+        width: 1050px;
+        font: 400 21px/1.4 'Bricolage Grotesque';
+        color: #b4b4ba;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Your app grows. Its startup JavaScript <mark>doesn't</mark>.</h1>
+      <div class="chart">
+        <div class="row own">
+          <span class="name">idlip</span><span class="bar" style="width: 18px"></span
+          ><span class="value">4.8 kB</span>
+        </div>
+        <div class="row">
+          <span class="name">Qwik 2</span><span class="bar" style="width: 155px"></span
+          ><span class="value">37.3 kB</span>
+        </div>
+        <div class="row">
+          <span class="name">Marko 6</span><span class="bar" style="width: 490px"></span
+          ><span class="value">117.8 kB</span>
+        </div>
+        <div class="row">
+          <span class="name">brumate 0.8.1</span><span class="bar" style="width: 600px"></span
+          ><span class="value">201.5 kB</span>
+        </div>
+      </div>
+      <p class="foot">
+        JavaScript before the load event, gzip, at 1,000 widgets. In the benchmark app idlip loads
+        4.8 kB at 10 widgets too.
+      </p>
+    </div>
+  </body>
+</html>
