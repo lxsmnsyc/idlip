@@ -60,7 +60,7 @@ export default defineConfig({
 });
 ```
 
-The plugin compiles every `src/**/*.tsx` file as an idlip module, so a component file is a plain `.tsx` file with no special extension. Keep helpers and entry files as `.ts`. A `.tsx` file outside `src` stays plain TSX until you add its folder to the plugin's `modules` option. In `vite dev` it answers each HTML request with the string that `render(url)` of the entry returns.
+The plugin compiles every `src/**/*.tsx` file as an idlip module, so a component file is a plain `.tsx` file with no special extension. Keep helpers and entry files as `.ts`. A `.tsx` file with no component is left alone. A `.tsx` file outside `src` stays plain TSX until you add its folder to the plugin's `modules` option. Import a component with its `.tsx` extension, as in `./counter.tsx`. A `./counter` or `./counter.js` specifier, as NodeNext resolution writes it, does not work for components. In `vite dev` it answers each HTML request with the string that `render(url)` of the entry returns.
 
 ## Configure TypeScript
 

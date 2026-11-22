@@ -392,7 +392,7 @@ diagnostics: 104
   156:28 error hole-unknown: first is not a state field, derived value, prop, loop variable, import or module-level binding
   159:7 error global-children: <window> takes no children
   161:7 error subscribe-children: <Subscribe> takes no children
-  163:8 error component-import: Widget comes from ./widget, which is not a .tsx file
+  163:8 error component-import: Widget comes from ./widget, which is not a .tsx file. Import it with its .tsx extension, such as ./widget.tsx
   59:14 error props-whole: A stateless component must read props by name, not pass the props object along
   36:7 error component-recursive: <Loop> renders itself
   169:11 error hole-handler: The handler setDraft is allowed only in an event prop

@@ -2,7 +2,7 @@
 import { For, Head, Subscribe, Time, Try, trusted } from 'idlip';
 import styles from './board.module.css';
 import * as fmt from './format';
-import { Avatar } from './avatar.idlip';
+import { Avatar } from './avatar.tsx';
 
 interface Card {
   id: string;

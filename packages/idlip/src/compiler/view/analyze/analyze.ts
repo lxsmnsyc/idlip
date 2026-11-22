@@ -1631,10 +1631,12 @@ class Analyzer {
       return;
     }
     if (!root.source.endsWith('.tsx')) {
+      // `./counter` and `./counter.js` are the usual wrong forms, so the hint spells the fix.
+      const hint = `${root.source.replace(/\.[jt]sx?$/, '')}.tsx`;
       this.report(
         'component-import',
         'error',
-        `${root.name} comes from ${root.source}, which is not a .tsx file`,
+        `${root.name} comes from ${root.source}, which is not a .tsx file. Import it with its .tsx extension, such as ${hint}`,
         node,
       );
     }

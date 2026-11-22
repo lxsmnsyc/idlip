@@ -1,4 +1,4 @@
-import { globSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { globSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import type { ServerResponse } from 'node:http';
 import path from 'node:path';
 import { isRunnableDevEnvironment } from 'vite';
@@ -29,6 +29,10 @@ import {
 import { isChunkUrls, listChunks, parseChunkId, replaceChunkUrls } from './chunks.ts';
 
 const MODULE_FILE = /\.tsx$/;
+
+function toPosix(file: string): string {
+  return file.split(path.sep).join('/');
+}
 /**
  * The chunk URL map of the client build, under `build.outDir` and outside the served client
  * folder, for a server build in another process.
@@ -274,6 +278,8 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
   let isServe = false;
   /** Compiled modules by file, with the source they came from. */
   const cache = new Map<string, { source: string; child: boolean; result: CompileResult }>();
+  /** Files already warned about, so each warns once. */
+  const warned = new Set<string>();
   /** The files that another module renders as a child, found on first use. */
   let children: Set<string> | undefined;
   /** Emitted chunk references of the client build, by chunk id. */
@@ -288,6 +294,9 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
   function getModuleId(file: string): string {
     return `/${path.relative(root, file).split(path.sep).join('/')}`;
   }
+
+  /** Whether each `.tsx` file holds a component, with the source that was read. */
+  const components = new Map<string, { source: string; found: boolean }>();
 
   /** Module ids of the child specifiers that the last scan resolved, by importer and specifier. */
   const resolved = new Map<string, string>();
@@ -323,7 +332,8 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
         if (id === undefined || !MODULE_FILE.test(id)) {
           continue;
         }
-        // A `.tsx` file the globs miss is plain TSX, so it cannot be a component of idlip.
+        // A `.tsx` file that is not an idlip module (the globs miss it, or it holds no component)
+        // cannot be rendered as a component.
         if (!isModule(id)) {
           return context.error(
             `${importer} renders a component from ${getModuleId(id)}, which the idlip plugin does not compile. ` +
@@ -358,8 +368,12 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
     return result;
   }
 
-  /** The files the `modules` globs match, found on first use and again after a `.tsx` change. */
+  /**
+   * The idlip modules: the files the `modules` globs match that hold a function component, as
+   * posix paths. Found on first use and again after a `.tsx` change.
+   */
   let moduleFiles: string[] | undefined;
+  let moduleSet = new Set<string>();
 
   function findModules(): string[] {
     if (moduleFiles !== undefined) {
@@ -370,15 +384,32 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       cwd: root,
       exclude: ['**/node_modules/**'],
     })) {
-      files.push(path.resolve(root, name));
+      const file = toPosix(path.resolve(root, name));
+      // A `.tsx` file with no component, such as an entry or a helper, is left to Vite.
+      if (MODULE_FILE.test(file) && hasComponent(file, readFileSync(file, 'utf8'))) {
+        files.push(file);
+      }
     }
     moduleFiles = files.toSorted();
+    moduleSet = new Set(moduleFiles);
     return moduleFiles;
   }
 
-  /** Whether the `modules` globs match the file, so the plugin compiles it. */
+  /** Whether the plugin compiles the file: a `.tsx` file with a component that a glob matches. */
   function isModule(file: string): boolean {
-    return MODULE_FILE.test(file) && findModules().includes(file);
+    findModules();
+    return moduleSet.has(toPosix(file));
+  }
+
+  /** Whether the source declares a function component. The answer is kept per file and source. */
+  function hasComponent(file: string, source: string): boolean {
+    const known = components.get(file);
+    if (known?.source === source) {
+      return known.found;
+    }
+    const found = compiler.analyze(getModuleId(file), source).components.length > 0;
+    components.set(file, { source, found });
+    return found;
   }
 
   function readBuilt(): ChunkUrls {
@@ -442,7 +473,8 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
     },
 
     configResolved(config) {
-      root = config.root;
+      // The real path, since Vite names modules by it and a link would not match.
+      root = realpathSync(config.root);
       base = config.base;
       isServe = config.command === 'serve';
       chunksFile = path.resolve(root, outDir, CHUNKS_FILE);
@@ -510,8 +542,15 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
     transform: {
       filter: { id: MODULE_FILE },
       async handler(code, id) {
-        // A `.tsx` file outside the `modules` globs is left to Vite.
+        // Any other `.tsx` file is plain TSX, left to Vite.
         if (!isModule(id)) {
+          if (hasComponent(id, code) && !warned.has(id)) {
+            // A component the plugin does not compile would run as plain JSX.
+            warned.add(id);
+            this.warn(
+              `${getModuleId(id)} holds a component but is outside the \`modules\` option of idlip(), so the plugin does not compile it.`,
+            );
+          }
           return undefined;
         }
         // The client never imports a module: the loader takes chunk URLs from
@@ -548,7 +587,7 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       for (const [key, { id }] of emitted) {
         const file = fileByModule.get(id);
         if (file === undefined) {
-          return this.error(`The client build has no chunk for ${key}`);
+          this.error(`The client build has no chunk for ${key}`);
         }
         files.add(file);
         urls[key] = `${base}${file}`;
@@ -593,7 +632,8 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       if (MODULE_FILE.test(file)) {
         moduleFiles = undefined;
       }
-      if (!isModule(file)) {
+      // A module that was compiled stays one when an edit breaks it, so the page reloads.
+      if (!isModule(file) && !cache.has(file)) {
         return undefined;
       }
       // The edit may add or drop a child import, in any environment.

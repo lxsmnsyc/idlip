@@ -6,3 +6,4 @@
 - Recorded analyzer outputs had spans that shifted with the shorter text. Updated the file snapshots and regenerated `counter.json` and `todo.json`.
 - Removed the "dropped feature" check in the transform and its test. A compiled module is always one of the counted modules now.
 - e2e: port 4173 was busy, so it ran with `E2E_PORT=48611 E2E_COUNTERS_PORT=48612 E2E_SUBS_PORT=48613 E2E_HOT_PORT=48614`. 18 passed.
+- Review round: skipped component-less files, fixed same-name chunk URLs (own commit), normalized paths, added the warning and the import hint.

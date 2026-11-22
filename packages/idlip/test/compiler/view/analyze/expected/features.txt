@@ -297,5 +297,4 @@ component Board (stateful, exported)
         expr  ticks
         paths ticks
 
-diagnostics: 1
-  182:14 error component-import: Avatar comes from ./avatar.idlip, which is not a .tsx file
+diagnostics: 0

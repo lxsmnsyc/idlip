@@ -1,7 +1,9 @@
 # vite
 
 - `features.ts` replaces `__IDLIP_HAS_*__` as text, one literal per line, with `map: null`. Keep line counts the same. Why: there is no source map for the replacement.
-- A component outside the plugin's `modules` globs that needs a flag that is off fails the build. Do not fall back to on silently. Why: the loader would lack code the page needs.
+- The plugin compiles a `.tsx` file only when a `modules` glob matches it and it holds a function component. Any other `.tsx` file goes to Vite untouched. Why: entries and helper files in `src` are plain TSX.
+- A component outside `modules` warns, and rendering one as a child fails the build, both naming `modules`. Do not compile it silently. Why: it would run as plain JSX.
+- A chunk URL comes from the bundle chunk whose `facadeModuleId` is the chunk id, never from the chunk name. Why: modules of the same file name in two folders emit chunks of the same name.
 - Chunk kinds are `handler`, `binding`, `list`, `task`, `source`, `try` and `view`. A new kind needs `parseChunkId`, `listChunks` and `getChunkFile` (`../core/format.ts`) together. Why: a kind that one of them misses fails only in the build.
 - A flag is on from a detector in `DETECTORS` (`features.ts`) that reads the compile result, such as `manifest.fallback`. `HAS_SKEW` is the exception: the plugin option `skew` (default on) sets it through `getDefines(on, skew)`. Why: skew has no manifest sign. A detector must read everything that needs the loader code (`HAS_KEYED` reads group paths only: see `keyed-writes`).
 - Skew retention keeps the files of the previous build and deletes older ones through `<outDir>/.idlip/builds.json`, with `emptyOutDir: false` for the client environment. It never touches `publicDir` files. Why: a page cached from the last deploy still needs its chunks, and a page two builds old recovers by reload.
