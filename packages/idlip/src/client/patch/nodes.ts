@@ -37,7 +37,7 @@ function forgetNodes(start: Comment): void {
   }
 }
 
-onBlock(forgetNodes, forgetNodes);
+onBlock(forgetNodes, forgetNodes, true);
 
 /** Moves the walker from a start boundary comment to its end comment. */
 function skipChild(walker: TreeWalker): void {

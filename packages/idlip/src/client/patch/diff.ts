@@ -41,7 +41,6 @@ function checkKeyed(
   key: string,
   segments: readonly string[],
   at: number,
-  itemPath: string,
   keys: Keys,
   roots: Roots,
 ): boolean {
@@ -54,7 +53,7 @@ function checkKeyed(
   }
   for (const item of next) {
     const id = readField(item, key);
-    if (before.has(id) && checkChanged(before.get(id), item, segments, at, itemPath, keys, roots)) {
+    if (before.has(id) && checkChanged(before.get(id), item, segments, at, keys, roots)) {
       return true;
     }
   }
@@ -66,7 +65,6 @@ function checkChanged(
   next: unknown,
   segments: readonly string[],
   at: number,
-  prefix: string,
   keys: Keys,
   roots: Roots,
 ): boolean {
@@ -85,21 +83,20 @@ function checkChanged(
     const after = findItem(next, roots.next, keyed);
     return before === undefined || after === undefined
       ? before !== after
-      : checkChanged(before, after, segments, at + 1, `${prefix}.${segment}`, keys, roots);
+      : checkChanged(before, after, segments, at + 1, keys, roots);
   }
   if (segment !== '*') {
-    const path = prefix === '' ? segment : `${prefix}.${segment}`;
     return checkChanged(
       readField(prev, segment),
       readField(next, segment),
       segments,
       at + 1,
-      path,
       keys,
       roots,
     );
   }
-  const itemPath = prefix === '' ? '*' : `${prefix}.*`;
+  // The path of the list, such as `columns.*.cards`.
+  const prefix = segments.slice(0, at).join('.');
   // Under a keyed list the path changes when it differs by key or by index. By key covers
   // row bindings after a reorder. By index covers holes such as `todos[selected].done`.
   const key = keys[prefix];
@@ -107,7 +104,7 @@ function checkChanged(
     // Rows move by a computed key, so no item pairing is safe: the list changed.
     return true;
   }
-  if (key !== undefined && checkKeyed(prev, next, key, segments, at + 1, itemPath, keys, roots)) {
+  if (key !== undefined && checkKeyed(prev, next, key, segments, at + 1, keys, roots)) {
     return true;
   }
   const before = isRecord(prev) ? prev : {};
@@ -116,7 +113,7 @@ function checkChanged(
   for (const field of Object.keys(before)) {
     if (
       !Object.hasOwn(after, field) ||
-      checkChanged(before[field], after[field], segments, at + 1, itemPath, keys, roots)
+      checkChanged(before[field], after[field], segments, at + 1, keys, roots)
     ) {
       return true;
     }
@@ -154,7 +151,7 @@ export function diffPaths(
 ): Set<string> {
   const changed = new Set<string>();
   for (const path of paths) {
-    if (checkChanged(prev, next, path.split(SPLIT), 0, '', keys, { prev, next })) {
+    if (checkChanged(prev, next, path.split(SPLIT), 0, keys, { prev, next })) {
       changed.add(path);
     }
   }

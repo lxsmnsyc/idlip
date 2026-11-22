@@ -1,21 +1,22 @@
 // oxlint-disable import/prefer-default-export
-import type {
-  ListBinding,
-  ListChunk,
-  ListContext,
-  NodeBinding,
-  PatchList,
-  PropBinding,
-  Scope,
-} from '../../core/format.ts';
+import type { ListBinding, ListChunk, NodeBinding, PropBinding, Scope } from '../../core/format.ts';
 import { failRegion } from '../errors.ts';
 import { HAS_CHILDREN, HAS_ERRORS, HAS_INNER_LISTS, HAS_KEY_FN } from '../features.ts';
-import { isComment, isElement } from '../patch/guards.ts';
-import { added } from '../patch/blocks.ts';
+import { isComment, isElement, matchMarker } from '../patch/guards.ts';
+import { added, rowHooks } from '../patch/blocks.ts';
+import type { RowContext } from '../patch/patch.ts';
 import { addBlock, findInnerBlocks, readField, removeBlock } from '../patch/index.ts';
 
+/**
+ * The start marker of a row. It keeps the nodes of the row found so far, since a row stays in
+ * the page between patches and is walked once.
+ */
+interface RowStart extends Comment {
+  rowNodes?: Map<string, Node>;
+}
+
 interface Range {
-  readonly start: Comment;
+  readonly start: RowStart;
   readonly end: Comment;
 }
 
@@ -23,9 +24,19 @@ function getData(node: Node | null): string | undefined {
   return isComment(node) ? node.data : undefined;
 }
 
-function walk(node: Node, nodes: Node[]): Node {
-  nodes.push(node);
-  if (HAS_CHILDREN && getData(node)?.startsWith('n:')) {
+// Maps the binding names in a node and its subtree to their nodes, and returns the last node of
+// the walk at its level.
+function indexNode(node: Node, nodes: Map<string, Node>): Node {
+  if (isElement(node)) {
+    for (const id of node.getAttribute('i-a')?.split(' ') ?? []) {
+      nodes.set(`a${id}`, node);
+    }
+  }
+  const name = isComment(node) ? matchMarker(node.data) : undefined;
+  if (name !== undefined) {
+    nodes.set(name, node);
+  }
+  if (HAS_CHILDREN && name === 'n:') {
     // A nested child has its own binding ids, so its markup is skipped whole.
     let level = 0;
     for (let next: Node | null = node; next !== null; next = next.nextSibling) {
@@ -39,16 +50,16 @@ function walk(node: Node, nodes: Node[]): Node {
     return node;
   }
   for (let child: Node | null = node.firstChild; child !== null; child = child.nextSibling) {
-    child = walk(child, nodes);
+    child = indexNode(child, nodes);
   }
   return node;
 }
 
-// The nodes of a row in document order, nested ones included.
-function getNodes(range: Range): Node[] {
-  const nodes: Node[] = [];
+// Maps the binding names inside a row to their nodes, nested ones included.
+function findNodes(range: Range): Map<string, Node> {
+  const nodes = new Map<string, Node>();
   for (let node: Node | null = range.start; node !== null; node = node.nextSibling) {
-    node = walk(node, nodes);
+    node = indexNode(node, nodes);
     if (node === range.end) {
       break;
     }
@@ -68,50 +79,26 @@ function getTopNodes(range: Range): ChildNode[] {
 }
 
 // The rows between a list's markers, and the end marker. A nested list's rows can be siblings
-// of this row's markers, so the end of a row is found by counting depth.
+// of this row's markers, so rows and the end are found by counting depth.
 function readRows(start: Comment): { rows: Range[]; end: Comment } {
   const rows: Range[] = [];
-  let node = start.nextSibling;
-  while (isComment(node) ? node.data !== '/l' : node !== null) {
-    if (isComment(node) && node.data === 'i') {
-      const first = node;
-      let depth = 0;
-      for (; node !== null; node = node.nextSibling) {
-        const data = getData(node);
-        if (data === 'i') {
-          depth++;
-        } else if (data === '/i') {
-          depth--;
-        }
-        if (depth === 0) {
-          break;
-        }
-      }
-      if (isComment(node)) {
-        rows.push({ start: first, end: node });
-      }
+  let first = start;
+  let depth = 0;
+  for (let node = start.nextSibling; node !== null; node = node.nextSibling) {
+    if (!isComment(node)) {
+      continue;
     }
-    node = node?.nextSibling ?? null;
+    const { data } = node;
+    if (depth === 0 && data === '/l') {
+      return { rows, end: node };
+    }
+    if (data === 'i' && depth++ === 0) {
+      first = node;
+    } else if (data === '/i' && --depth === 0) {
+      rows.push({ start: first, end: node });
+    }
   }
-  if (!isComment(node)) {
-    throw new Error('A list has no end marker');
-  }
-  return { rows, end: node };
-}
-
-function removeRange(range: Range): void {
-  // Children go before their parents.
-  for (const block of findInnerBlocks(range.start, range.end)) {
-    removeBlock(block);
-  }
-  // Only the top-level nodes are removed, with their subtrees.
-  for (const node of getTopNodes(range)) {
-    node.remove();
-  }
-}
-
-function moveRange(range: Range, before: ChildNode): void {
-  before.before(...getTopNodes(range));
+  throw new Error('A list has no end marker');
 }
 
 // The positions in `olds` of a longest increasing run, skipping -1.
@@ -137,7 +124,7 @@ function getStayers(olds: readonly number[]): Set<number> {
     tails[low] = j;
   }
   const stay = new Set<number>();
-  for (let j = tails.length > 0 ? tails[tails.length - 1] : -1; j >= 0; j = before[j]) {
+  for (let j = tails.at(-1) ?? -1; j >= 0; j = before[j]) {
     stay.add(j);
   }
   return stay;
@@ -147,32 +134,25 @@ function getRowScope(scope: Scope, item: unknown, index: number): Scope {
   return { ...scope, rows: [...scope.rows, { item, index }] };
 }
 
-// Maps the binding names inside a row to their nodes.
-function findNodes(range: Range): Map<string, Node> {
-  const nodes = new Map<string, Node>();
-  for (const node of getNodes(range)) {
-    if (isElement(node)) {
-      const ids = node.getAttribute('i-a');
-      for (const id of ids?.split(' ') ?? []) {
-        nodes.set(`a${id}`, node);
-      }
-    } else if (isComment(node)) {
-      const name = /^[tcl]\d+/.exec(node.data);
-      if (name !== null) {
-        nodes.set(name[0], node);
-      }
-    }
+// Returns the node of a binding in a row. A node that left the page, such as one in a branch an
+// earlier binding swapped out, makes the row be walked again.
+function findRowNode(range: Range, name: string): Node | undefined {
+  const { start } = range;
+  let node = start.rowNodes?.get(name);
+  if (!node?.isConnected) {
+    start.rowNodes = findNodes(range);
+    node = start.rowNodes.get(name);
   }
-  return nodes;
+  return node;
 }
 
+// Runs the chosen bindings of a kept row.
 async function patchRow(
   range: Range,
-  context: ListContext,
+  context: RowContext,
   prev: Scope,
   next: Scope,
 ): Promise<void> {
-  let nodes: Map<string, Node> | undefined;
   for (const name of context.list.bindings) {
     const binding = context.bindings.get(name);
     if (binding === undefined) {
@@ -184,10 +164,8 @@ async function patchRow(
       (binding as PropBinding)(next);
       continue;
     }
-    nodes ??= findNodes(range);
-    const node = nodes.get(name);
-    // A binding earlier in the row may have swapped out the branch that holds this node.
-    if (!node?.parentNode) {
+    const node = findRowNode(range, name);
+    if (node === undefined) {
       continue;
     }
     if (name[0] !== 'l') {
@@ -196,11 +174,10 @@ async function patchRow(
           // oxlint-disable-next-line typescript/no-unsafe-type-assertion
           (binding as NodeBinding)(node, next);
         } catch (error) {
+          // The swap replaces nodes of the row, which the lookup then walks for again.
           if (!(await failRegion(context.page, node, error, next))) {
             throw error;
           }
-          // The swap replaced the nodes of the row, so they are looked up again.
-          nodes = undefined;
         }
       } else {
         // oxlint-disable-next-line typescript/no-unsafe-type-assertion
@@ -222,8 +199,12 @@ async function patchRow(
   }
 }
 
-export async function patchList(...args: Parameters<PatchList>): Promise<void> {
-  const [start, prev, next, context] = args;
+export async function patchList(
+  start: Comment,
+  prev: readonly unknown[],
+  next: readonly unknown[],
+  context: RowContext,
+): Promise<void> {
   const { list, page } = context;
   // A branch that swapped earlier in this patch rendered the list from the new model.
   if (HAS_INNER_LISTS && added.has(start)) {
@@ -268,7 +249,17 @@ export async function patchList(...args: Parameters<PatchList>): Promise<void> {
   const { rows, end } = readRows(start);
   for (let i = 0; i < rows.length; i++) {
     if (!used.has(i)) {
-      removeRange(rows[i]);
+      const row = rows[i];
+      // Children go before their parents. Only hooks that act inside rows need the walk.
+      if (rowHooks > 0) {
+        for (const block of findInnerBlocks(row.start, row.end)) {
+          removeBlock(block);
+        }
+      }
+      // Only the top-level nodes are removed, with their subtrees.
+      for (const node of getTopNodes(row)) {
+        node.remove();
+      }
     }
   }
 
@@ -283,15 +274,14 @@ export async function patchList(...args: Parameters<PatchList>): Promise<void> {
       placed.push(rows[olds[j]]);
       continue;
     }
-    // A row is a cloned fragment that holds its row markers.
+    // A row is a cloned fragment that starts and ends with its row markers.
     const nodes = [
       ...chunk!.render(getRowScope(context.next, next[j], j), start.ownerDocument).childNodes,
     ];
-    const first = nodes[0];
-    const last = nodes[nodes.length - 1];
-    if (!isComment(first) || !isComment(last)) {
-      throw new Error('A row has no markers');
-    }
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+    const first = nodes[0] as Comment;
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+    const last = nodes.at(-1) as Comment;
     placed.push({ start: first, end: last });
     inserts[j] = nodes;
     // The blocks of a row, found before it moves into the page. The chunk says whether its rows
@@ -308,15 +298,17 @@ export async function patchList(...args: Parameters<PatchList>): Promise<void> {
         addBlock(block);
       }
     } else if (!stay.has(j)) {
-      moveRange(row, before);
+      before.before(...getTopNodes(row));
     }
     before = row.start;
   }
 
-  // A chosen row binding runs on every kept row: its paths may include state outside the list.
+  // A kept row whose item is the same reference is left as it is when the bindings read nothing
+  // else that changed.
   for (let j = 0; j < next.length; j++) {
-    if (olds[j] >= 0) {
-      const prevScope = getRowScope(context.prev, prev[olds[j]], olds[j]);
+    const old = olds[j];
+    if (old >= 0 && !(context.items && prev[old] === next[j])) {
+      const prevScope = getRowScope(context.prev, prev[old], old);
       const nextScope = getRowScope(context.next, next[j], j);
       await patchRow(placed[j], context, prevScope, nextScope);
     }

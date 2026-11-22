@@ -7,7 +7,6 @@ import type {
   NodeBinding,
   Page,
   Patch,
-  PatchList,
   PropBinding,
   Scope,
 } from '../../core/format.ts';
@@ -25,7 +24,27 @@ interface Plan {
   readonly keys: Readonly<Record<string, string | undefined>>;
   /** The export names of bindings inside rows. */
   readonly rowNames: ReadonlySet<string>;
+  /** The paths each binding reads, by export name. */
+  readonly reads: ReadonlyMap<string, readonly string[]>;
 }
+
+/** What `patchList` gets from `patch()`. */
+export interface RowContext extends ListContext {
+  /**
+   * True when each chosen row binding changed only through paths under its list's item, such as
+   * `todos.*.done`: a kept row whose item is the same reference needs no binding run. False or
+   * absent: the bindings run on every kept row.
+   */
+  readonly items?: boolean;
+}
+
+/** `PatchList` with the context `patch()` passes. */
+export type PatchRows = (
+  start: Comment,
+  prev: readonly unknown[],
+  next: readonly unknown[],
+  context: RowContext,
+) => Promise<void>;
 
 const plans = new WeakMap<Manifest, Plan>();
 
@@ -33,9 +52,14 @@ function getPlan(manifest: Manifest): Plan {
   let plan = plans.get(manifest);
   if (plan === undefined) {
     const paths: string[] = [];
+    const reads = new Map<string, readonly string[]>();
     for (const group of Object.values(manifest.groups)) {
       for (const path of group.paths) {
         paths.push(path);
+      }
+      // A group's paths are the paths of each of its bindings.
+      for (const name of group.bindings) {
+        reads.set(name, group.paths);
       }
     }
     const rowNames = new Set<string>();
@@ -44,15 +68,14 @@ function getPlan(manifest: Manifest): Plan {
         rowNames.add(name);
       }
     }
-    plan = { paths, keys: getListKeys(manifest), rowNames };
+    plan = { paths, keys: getListKeys(manifest), rowNames, reads };
     plans.set(manifest, plan);
   }
   return plan;
 }
 
 /** Returns the keys of the groups to load: changed groups in manifest order, minus covered. */
-export function selectGroups(manifest: Manifest, plan: Plan, prev: Model, next: Model): string[] {
-  const changed = diffPaths(prev, next, plan.paths, plan.keys);
+export function selectGroups(manifest: Manifest, changed: ReadonlySet<string>): string[] {
   const handled = new Set<string>();
   const selected: string[] = [];
   for (const [key, group] of Object.entries(manifest.groups)) {
@@ -131,14 +154,16 @@ function readList(binding: Binding, scope: Scope): readonly unknown[] {
 /**
  * Returns `patch()`, which calls `patchList` for the `<For>` blocks whose `l` binding a
  * loaded chunk exports. A chunk that holds a row binding of a list exports the list's `l`
- * too, so the row binding runs on every kept row even when the list itself did not change.
+ * too, so the row binding runs on kept rows even when the list itself did not change: on every
+ * kept row, or only on those whose item changed when `items` says so.
  * `patch-lists` provides `patchList`.
  */
-export function createPatch(patchList: PatchList): Patch {
+export function createPatch(patchList: PatchRows): Patch {
   const runPatch: Patch = async (page, prev, next) => {
     const { manifest } = page;
     const plan = getPlan(manifest);
-    const selected = selectGroups(manifest, plan, prev, next);
+    const paths = diffPaths(prev, next, plan.paths, plan.keys);
+    const selected = selectGroups(manifest, paths);
     const changed = HAS_DYNAMIC ? getDynamic(page, prev, next, plan.keys) : [];
     if (HAS_DYNAMIC && changed.length > 0) {
       selected.push(DYNAMIC_GROUP);
@@ -189,20 +214,31 @@ export function createPatch(patchList: PatchList): Patch {
       const id = name.slice(1);
       // The chosen row bindings of the list and of the lists inside its rows.
       const rows = new Map<string, Binding>();
+      let items = true;
       for (const inner of getBranch(manifest, id)) {
-        for (const rowName of manifest.lists[inner].bindings) {
+        const list = manifest.lists[inner];
+        for (const rowName of list.bindings) {
           const rowBinding = bindings.get(rowName);
-          if (rowBinding !== undefined) {
-            rows.set(rowName, rowBinding);
+          if (rowBinding === undefined) {
+            continue;
+          }
+          rows.set(rowName, rowBinding);
+          // A changed path outside the item, which is `<list>.*`. Every binding a chunk exports is
+          // in a group. A list with no path reads `undefined.*.`, which no state name starts.
+          for (const path of plan.reads.get(rowName)!) {
+            if (paths.has(path) && !`${path}.`.startsWith(`${list.path}.*.`)) {
+              items = false;
+            }
           }
         }
       }
-      const context: ListContext = {
+      const context: RowContext = {
         page,
         list: manifest.lists[id],
         prev: prevScope,
         next: nextScope,
         bindings: rows,
+        items,
       };
       if (isComment(start)) {
         await patchList(start, readList(binding, prevScope), readList(binding, nextScope), context);

@@ -6,13 +6,21 @@ type BlockHook = (start: Comment) => void;
 const addHooks: BlockHook[] = [];
 const removeHooks: BlockHook[] = [];
 
+/** The number of hooks that act on blocks inside list rows. */
+// oxlint-disable-next-line import/no-mutable-exports
+export let rowHooks = 0;
+
 /**
  * Registers code that runs when a condition or list block is added or removed.
- * Hooks are synchronous, and nothing awaits what they start.
+ * Hooks are synchronous, and nothing awaits what they start. `outside` marks hooks that do
+ * nothing for blocks inside rows, so removed rows need no walk for them.
  */
-export function onBlock(add: BlockHook, remove: BlockHook): void {
+export function onBlock(add: BlockHook, remove: BlockHook, outside?: true): void {
   addHooks.push(add);
   removeHooks.push(remove);
+  if (!outside) {
+    rowHooks++;
+  }
 }
 
 /**
