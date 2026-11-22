@@ -14,7 +14,6 @@ import { createBuilder } from 'vite';
 import { describe, expect, it } from 'vitest';
 import { compile as compileSource } from '../../src/compiler/index.ts';
 import type { CompileResult } from '../../src/core/format.ts';
-import { idlip } from '../../src/vite/index.ts';
 import { getDefines, getFeatures, replaceFeatures } from '../../src/vite/features.ts';
 import { compileFixture, createCheckedCompile, createConfig } from './app.ts';
 
