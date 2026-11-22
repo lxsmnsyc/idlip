@@ -111,13 +111,15 @@ class TemplateBuilder {
     } else if (node.kind === 'text-hole') {
       emitter.usage.helpers.add('putText');
       const mark = this.addMark();
-      const value = this.printHole(node.hole, `t${node.hole.id}`, 1);
+      const { id } = node.hole;
+      const { plan } = this.context;
+      // The only child of an element is found through the element's `i-a`, without markers.
+      const filled = plan.filled.has(id);
+      const value = this.printHole(node.hole, `${filled ? 'a' : 't'}${id}`, 1);
       this.writes.push(`putText$(${this.variable}[${mark}], ${value});`);
       const placeholder = `<!--x${mark}-->`;
-      const id = node.hole.id;
-      this.html += this.context.plan.bound.has(id)
-        ? `<!--t${id}-->${placeholder}<!--/t-->`
-        : placeholder;
+      this.html +=
+        plan.bound.has(id) && !filled ? `<!--t${id}-->${placeholder}<!--/t-->` : placeholder;
     } else if (node.kind === 'element') {
       this.addElement(node);
     } else if (node.kind === 'condition') {

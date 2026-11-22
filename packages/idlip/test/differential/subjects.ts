@@ -74,6 +74,22 @@ export const SUBJECTS: readonly Subject[] = [
     },
   },
   {
+    // Bound text that is the only child of its element, which has no markers.
+    name: 'text-anchor',
+    source: read(import.meta.dirname, 'subjects/text-anchor.tsx'),
+    props: {
+      title: '\nHello',
+      items: [
+        { id: 'a1', label: 'One' },
+        { id: 'a2', label: '' },
+      ],
+    },
+    pairs: (initial) => [
+      [initial, { ...initial, title: '', picked: 'a1', open: false }],
+      [{ ...initial, title: '', items: [] }, initial],
+    ],
+  },
+  {
     // Holes that read the length of a string, at the top level and in a row.
     name: 'string-length',
     source: read(import.meta.dirname, 'subjects/string-length.tsx'),

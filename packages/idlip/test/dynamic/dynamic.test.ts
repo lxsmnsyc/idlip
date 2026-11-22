@@ -48,7 +48,7 @@ describe('compile', () => {
     expect(manifest.groups.$dynamic).toEqual({
       paths: [],
       chunk: 'binding=$dynamic',
-      bindings: ['t0', 'a1', 't2'],
+      bindings: ['a0', 'a1', 'a2'],
       covers: [],
     });
     expect(client.map((chunk) => chunk.chunk)).toContain('binding=$dynamic');
@@ -66,7 +66,7 @@ describe('compile', () => {
     const { diagnostics, manifest } = compile(source, '/src/app.tsx');
     expect(diagnostics.filter((item) => item.severity === 'error')).toEqual([]);
     // The row's hole is in a static group, and the dynamic group keeps the top-level holes.
-    expect(manifest.groups.$dynamic.bindings).toEqual(['t0', 'a1', 't2']);
+    expect(manifest.groups.$dynamic.bindings).toEqual(['a0', 'a1', 'a2']);
   });
 
   it('keeps a dynamic hole on a URL attribute behind safeUrl', () => {
@@ -105,10 +105,10 @@ describe('track$', () => {
 describe('server', () => {
   it('writes the paths each dynamic hole read into the state script', async () => {
     const html = await renderBoard(BOARD, { initial: INITIAL });
-    expect(html).toContain('<!--t0-->1 left, filter all<!--/t-->');
+    expect(html).toContain('<p i-a="0">1 left, filter all</p>');
     expect(html).toContain('title="1 left, filter all"');
     const state = /<script i-state[^>]*>([\s\S]*)<\/script>/.exec(html)?.[1] ?? '';
-    for (const name of ['t0', 'a1', 't2']) {
+    for (const name of ['a0', 'a1', 'a2']) {
       expect(state).toContain(`${name}:["filter","todos.*.done","todos.length"]`);
     }
   });

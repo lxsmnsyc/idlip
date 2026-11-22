@@ -96,6 +96,12 @@ export interface Plan {
   bindings: Binding[];
   /** Hole ids that have a binding. */
   bound: Set<number>;
+  /**
+   * Bound text holes that are the only child of their element. The element's `i-a` holds the
+   * id, the binding is `a<id>` and sets the element's text, and the hole writes no
+   * `<!--t<id>-->` markers.
+   */
+  filled: Set<number>;
   /** Hole ids of the dynamic holes. */
   dynamic: Set<number>;
   eventIds: Map<Event, number>;
@@ -120,6 +126,21 @@ export interface Plan {
   tryIds: Map<Node, number>;
   /** The id of the marker block of each `<Head>`. */
   heads: Map<Node, number>;
+}
+
+/**
+ * Elements whose text cannot hold the hole alone: the parser reads the text of the first four
+ * as text, and drops a newline that starts the text of the last two.
+ */
+const UNFILLED_TAGS = new Set(['script', 'style', 'textarea', 'title', 'pre', 'listing']);
+
+/** Returns the text hole that is the only child of an element, if the element can hold it alone. */
+export function getFilledHole(node: ElementNode): Hole | undefined {
+  const [only] = node.children;
+  if (node.children.length !== 1 || only.kind !== 'text-hole' || UNFILLED_TAGS.has(node.tag)) {
+    return undefined;
+  }
+  return only.hole;
 }
 
 /** Prints the source of a keyed segment: the model path of its value. */
@@ -187,6 +208,7 @@ interface WalkContext {
 class Planner {
   bindings = new Map<number, Binding>();
   bound = new Set<number>();
+  filled = new Set<number>();
   dynamic = new Set<number>();
   eventIds = new Map<Event, number>();
   anchors = new Map<Node, number[]>();
@@ -504,10 +526,21 @@ class Planner {
               ids.push(id);
             }
           }
+          // A bound text that is the element's only child is patched through the element.
+          const only = getFilledHole(node);
+          const filled =
+            only === undefined
+              ? undefined
+              : this.bindHole(only, 'a', context, { kind: 'text', hole: only });
+          if (filled === undefined) {
+            this.walk(node.children, context);
+          } else {
+            ids.push(filled);
+            this.filled.add(filled);
+          }
           if (ids.length > 0) {
             this.anchors.set(node, ids);
           }
-          this.walk(node.children, context);
           break;
         }
         case 'for': {
@@ -628,6 +661,7 @@ export function planBindings(component: Component, report: Report, child = false
   return {
     bindings,
     bound: planner.bound,
+    filled: planner.filled,
     dynamic: planner.dynamic,
     eventIds: planner.eventIds,
     anchors: planner.anchors,

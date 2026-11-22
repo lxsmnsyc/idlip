@@ -23,6 +23,6 @@ function setText$(start, value) {
 	}
 }
 
-export function t3(start, { model }) {
+export function a3(start, { model }) {
 setText$(start, model.save.state);
 }

@@ -109,12 +109,17 @@ export class HtmlBuilder {
       case 'text-hole': {
         emitter.at = node.hole.span;
         emitter.usage.helpers.add('text');
-        const inner = this.plan.dynamic.has(node.hole.id)
-          ? printTracked(emitter, this.component, node.hole, `t${node.hole.id}`)
+        const { id } = node.hole;
+        const filled = this.plan.filled.has(id);
+        const inner = this.plan.dynamic.has(id)
+          ? printTracked(emitter, this.component, node.hole, `${filled ? 'a' : 't'}${id}`)
           : emitter.expr(node.hole.expr, 1);
         const value = `text$(${inner})`;
-        // A raw text element cannot hold the comment markers.
-        if (this.plan.bound.has(node.hole.id) && content === 'html') {
+        // A raw text element cannot hold the comment markers, and the only child of an element
+        // is found through the element's `i-a`.
+        if (filled) {
+          addCode(built, value);
+        } else if (this.plan.bound.has(id) && content === 'html') {
           addText(built, `<!--t${node.hole.id}-->`);
           addCode(built, value);
           addText(built, '<!--/t-->');

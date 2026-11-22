@@ -1,5 +1,5 @@
 import { setText$ } from 'idlip/helpers';
 
-export function t1(start, { model }) {
+export function a1(start, { model }) {
 setText$(start, model.count);
 }

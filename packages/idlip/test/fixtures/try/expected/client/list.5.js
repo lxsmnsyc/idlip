@@ -1,6 +1,6 @@
 import { clone$, putText$ } from 'idlip/helpers';
 
-const templateE2_0$ = { h: '<span><!--t6--><!--x1--><!--/t--></span>', n: 1 };
+const templateE2_0$ = { h: '<span i-a="6"><!--x1--></span>', n: 1 };
 const templateE2_1$ = { h: '<button on:click=\'["$reset",[2]]\'><!--x1--></button>', n: 1 };
 const templateL5$ = { h: '<!--i--><li><!--e2:x1--><!--/e--></li><!--/i-->', n: 1 };
 

@@ -41,7 +41,7 @@
       ],
       "chunk": "binding=items.*.n",
       "bindings": [
-        "t6"
+        "a6"
       ],
       "covers": [
         "items"
@@ -74,7 +74,7 @@
       "path": "items",
       "chunk": "list=5",
       "bindings": [
-        "t6"
+        "a6"
       ]
     }
   }

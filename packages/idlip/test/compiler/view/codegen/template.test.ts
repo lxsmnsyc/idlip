@@ -86,7 +86,7 @@ describe('cloned templates', () => {
       'list=',
     );
     expect(code).toMatch(
-      /const templateL\d+\$ = \{ h: '<!--i--><li i-x="1"[^>]*><a i-x="2"[^>]*><!--t\d+--><!--x3-->/,
+      /const templateL\d+\$ = \{ h: '<!--i--><li i-x="1"[^>]*><a i-x="2" i-a="3 2"><!--x3--><\/a>/,
     );
     expect(code).toContain('putAttr$($n[1], ');
     expect(code).toContain("setOn$($n[2], 'click', ['select', [row.id]]);");
@@ -242,7 +242,7 @@ describe('cloned templates', () => {
 
   it('clones a row inside svg and math in its namespace', () => {
     const svg = findRowChunk('<text>{row.label}</text>', 'svg');
-    expect(svg).toContain('<!--i--><text><!--t');
+    expect(svg).toContain('<!--i--><text i-a="1"><!--x1--></text>');
     expect(svg).toContain("s: 'svg' };");
     expect(findRowChunk('<mi>{row.label}</mi>', 'math')).toContain("s: 'mathml' };");
     const [fragment] = clone$({ h: '<circle i-x="1"></circle>', n: 1, s: 'svg' }, document);
@@ -329,7 +329,7 @@ describe('cloned templates', () => {
       /putAttr\$\(\$n\[1\], 'class', track\$\(dynamic, 'a\d+', model, \(model\) => /,
     );
     expect(code).toMatch(
-      /putText\$\(\$n\[2\], track\$\(dynamic, 't\d+', model, \(model\) => model\.title\)\);/,
+      /putText\$\(\$n\[2\], track\$\(dynamic, 'a\d+', model, \(model\) => model\.title\)\);/,
     );
     expect([...usage.scope].toSorted()).toEqual(['dynamic', 'model']);
   });

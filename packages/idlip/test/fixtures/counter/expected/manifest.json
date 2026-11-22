@@ -47,7 +47,7 @@
       "chunk": "binding=count",
       "bindings": [
         "a0",
-        "t1",
+        "a1",
         "c2"
       ],
       "covers": []

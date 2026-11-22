@@ -46,7 +46,9 @@ describe('generated locals', () => {
         );
       }
     `);
-    expect(html.replaceAll(/<!--.*?-->/g, '')).toBe('<ul><li>A</li><li>B</li></ul>');
+    expect(html.replaceAll(/<!--.*?-->/g, '')).toBe(
+      '<ul><li i-a="1">A</li><li i-a="1">B</li></ul>',
+    );
   });
 
   it('keeps state named like other generated locals apart', () => {

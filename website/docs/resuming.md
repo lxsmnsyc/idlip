@@ -19,7 +19,7 @@ The browser does not run view code to start the page. The server sends the HTML,
 ```
 
 - **`on:click`** holds the message as data: the handler name and its arguments.
-- **`i-a`** and the `<!--t6-->` comments mark the places that bindings patch.
+- **`i-a`** and the `<!--t6-->` comments mark the places that bindings patch. A bound text that is the only child of its element has no comments: the element's `i-a` holds its id, as in `<span i-a="3">Ada</span>`.
 - **The state script**, `<script i-state>` at the end of the body, holds the model, the props and the manifest. The manifest lists each handler, its chunk and the model paths it writes.
 
 The `<head>` holds two scripts:

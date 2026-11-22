@@ -477,7 +477,7 @@ describe('server module', () => {
     expect(result.server).toContain('function text(value) {');
     const html = runServer(result.server, {});
     expect(html).toContain('title="xx"');
-    expect(html).toContain('<!--t1-->xx<!--/t-->');
+    expect(html).toContain('i-a="0 1">xx</b>');
     const chunk = result.client.find((module) => module.chunk === 'binding=attr');
     expect(chunk?.code).toContain("import { setAttr$, setText$ } from 'idlip/helpers';");
     expect(chunk?.code).not.toContain('idlip/client');
@@ -531,7 +531,7 @@ describe('server module', () => {
     expect(result.server).not.toContain('<!--t0-->');
     expect(result.server).not.toContain('<!--c1:');
     expect(result.manifest.groups).toEqual({
-      n: { paths: ['n'], chunk: 'binding=n', bindings: ['t2'], covers: [] },
+      n: { paths: ['n'], chunk: 'binding=n', bindings: ['a2'], covers: [] },
     });
   });
 
@@ -686,7 +686,7 @@ describe('client chunks', () => {
       key: 'id',
       path: 'columns.*.cards',
       chunk: 'list=1',
-      bindings: ['t2'],
+      bindings: ['a2'],
       parent: '0',
     });
     const group = result.manifest.groups['columns.*.cards'];

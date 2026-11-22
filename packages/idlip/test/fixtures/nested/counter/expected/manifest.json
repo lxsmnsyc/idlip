@@ -26,7 +26,7 @@
       ],
       "chunk": "binding=props.label",
       "bindings": [
-        "t0"
+        "a0"
       ],
       "covers": []
     },
@@ -46,7 +46,7 @@
       ],
       "chunk": "binding=count",
       "bindings": [
-        "t1"
+        "a1"
       ],
       "covers": []
     }

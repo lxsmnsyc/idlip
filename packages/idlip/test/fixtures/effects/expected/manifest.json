@@ -111,7 +111,7 @@
       ],
       "chunk": "binding=save.state",
       "bindings": [
-        "t3"
+        "a3"
       ],
       "covers": []
     },
@@ -131,7 +131,7 @@
       ],
       "chunk": "binding=label",
       "bindings": [
-        "t1"
+        "a1"
       ],
       "covers": []
     },
@@ -141,7 +141,7 @@
       ],
       "chunk": "binding=saved",
       "bindings": [
-        "t2"
+        "a2"
       ],
       "covers": []
     }

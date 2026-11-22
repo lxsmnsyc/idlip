@@ -152,7 +152,7 @@ describe('a throwing binding', () => {
     await view.settled();
     view.click('p button');
     await view.settled();
-    expect(view.root.innerHTML).toContain('<!--e0:0--><span>');
+    expect(view.root.innerHTML).toContain('<!--e0:0--><span i-a="0">');
     expect(view.text('span')).toBe('1');
     // The bindings of the new body work.
     view.click('main > button:nth-of-type(2)');

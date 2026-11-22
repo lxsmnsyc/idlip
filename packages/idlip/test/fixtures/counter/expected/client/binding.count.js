@@ -6,7 +6,7 @@ export function a0(el, { model }) {
 setAttr$(el, 'class', { even: model.count % 2 === 0 });
 }
 
-export function t1(start, { model }) {
+export function a1(start, { model }) {
 setText$(start, model.count);
 }
 

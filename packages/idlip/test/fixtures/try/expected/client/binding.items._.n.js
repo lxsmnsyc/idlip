@@ -7,7 +7,7 @@ function check(value) {
   return value;
 }
 
-export function t6(start, { rows }) {
+export function a6(start, { rows }) {
 setText$(start, check(rows[0].item.n));
 }
 

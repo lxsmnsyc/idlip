@@ -164,14 +164,14 @@ describe('a file with several components in a build', () => {
       throw new Error('The server entry has no render functions');
     }
     const html = await render();
-    expect(html).toContain('<output><!--t0-->7<!--/t--></output>');
+    expect(html).toContain('<output i-a="0">7</output>');
     expect(html).toContain('/src/widgets.tsx#Counter');
     expect(html).toContain('/src/widgets.tsx#Row');
     expect(html).toMatch(/\/assets\/widgets\.Counter\.handler\.increment[^"]*\.js/);
     expect(html).toMatch(/\/assets\/widgets\.Row\.handler\.toggle[^"]*\.js/);
     // A named component renders as a page root too.
     const alone = await renderCounter();
-    expect(alone).toContain('<output><!--t0-->3<!--/t--></output>');
+    expect(alone).toContain('<output i-a="0">3</output>');
     expect(alone).toMatch(/\/assets\/widgets\.Counter\.binding\.count[^"]*\.js/);
   });
 

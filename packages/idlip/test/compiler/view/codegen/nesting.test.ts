@@ -305,7 +305,7 @@ describe('nested behavior', () => {
     const printed = printRow(call(actual, 'render', scope, document));
     expect(printed).toBe(printRow(call(golden, 'render', scope, document)));
     // The clone holds the nodes the server's HTML parses to.
-    const server = `<div><span><!--t0-->${text(props.label)}<!--/t--></span><button on:click='["increment",[]]'>+</button><output><!--t1-->0<!--/t--></output><button${on('click', props.onRemove)} i-a="2">Remove</button></div>`;
+    const server = `<div><span i-a="0">${text(props.label)}</span><button on:click='["increment",[]]'>+</button><output i-a="1">0</output><button${on('click', props.onRemove)} i-a="2">Remove</button></div>`;
     expect(printed).toBe(printRow(server));
   });
 });
