@@ -1,0 +1,43 @@
+/* Token classes of the @twinkleplop highlighter, mapped to the --syn-* tokens of a direction. */
+
+.tok.keyword,
+.tok.boolean {
+  color: var(--syn-keyword);
+}
+
+.tok.string,
+.tok.template {
+  color: var(--syn-string);
+}
+
+.tok.function {
+  color: var(--syn-function);
+}
+
+.tok.tag_name {
+  color: var(--syn-tag);
+}
+
+.tok.attr_name,
+.tok.property {
+  color: var(--syn-attr);
+}
+
+.tok.type,
+.tok.class_name,
+.tok.constant {
+  color: var(--syn-type);
+}
+
+.tok.number {
+  color: var(--syn-number);
+}
+
+.tok.comment {
+  color: var(--syn-comment);
+}
+
+.tok.punctuation,
+.tok.operator {
+  color: var(--syn-punct);
+}
