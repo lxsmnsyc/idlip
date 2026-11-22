@@ -1,7 +1,7 @@
 ---
 id: website-repl
 title: Add a REPL to the website
-status: todo
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-22
-spent:
+spent: 1270000
 owns:
   - website/src/repl/**
   - website/test/repl*
