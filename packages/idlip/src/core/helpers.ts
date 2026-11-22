@@ -7,7 +7,7 @@
 // the sources:
 // - Every function is named with a `$` suffix, so a copy cannot clash with a name in the module.
 // - No comment inside a body, since the copy is the text of the function.
-// - A function mentions only what `HELPERS` lists for it.
+// - A function calls only the functions of `HELPERS` and the forwarders, by their names.
 // - A loader export is called as `name$`, through the forwarding function below. In a chunk the
 //   name is the import alias, `parseHtml as parseHtml$`. A bundler or a test runner renames
 //   imported bindings in the text of a function, but not a function declared in the module.
@@ -400,44 +400,35 @@ export function getRows$(
 
 type Source = (...args: never[]) => unknown;
 
-interface Helper {
-  source: Source;
-  /** The helpers whose copy this one needs, by function name. */
-  uses: string[];
-  /** The names of the loader's exports this one calls, such as `parseHtml`. */
-  client: string[];
-}
-
-/** Every function that can be copied, in the order the copies print. */
-const HELPERS: Record<string, Helper | undefined> = {
-  getText$: { source: getText$, uses: [], client: [] },
-  escapeText$: { source: escapeText$, uses: [], client: [] },
-  escapeAttr$: { source: escapeAttr$, uses: [], client: [] },
-  joinClass$: { source: joinClass$, uses: [], client: [] },
-  encode$: { source: encode$, uses: [], client: [] },
-  findEnd$: { source: findEnd$, uses: [], client: [] },
-  getRows$: { source: getRows$, uses: [], client: [] },
-  text$: { source: text$, uses: ['getText$', 'escapeText$'], client: [] },
-  safeUrl$: { source: safeUrl$, uses: [], client: [] },
-  attr$: { source: attr$, uses: ['getText$', 'escapeAttr$', 'joinClass$'], client: [] },
-  on$: { source: on$, uses: [], client: [] },
-  slot$: { source: slot$, uses: ['encode$'], client: [] },
-  setText$: { source: setText$, uses: ['getText$'], client: [] },
-  setAttr$: { source: setAttr$, uses: ['getText$', 'joinClass$'], client: [] },
-  setOn$: { source: setOn$, uses: [], client: [] },
-  track$: { source: track$, uses: [], client: [] },
-  isElement$: { source: isElement$, uses: [], client: [] },
-  clone$: { source: clone$, uses: ['isElement$'], client: ['parseHtml'] },
-  putAttr$: { source: putAttr$, uses: ['getText$', 'joinClass$'], client: [] },
-  putText$: { source: putText$, uses: ['getText$'], client: [] },
-  setBranch$: {
-    source: setBranch$,
-    uses: ['findEnd$'],
-    client: ['addBlock', 'findInnerBlocks', 'parseHtml', 'removeBlock'],
-  },
+/**
+ * Every function the module holds, by name. A copy calls only functions of this table and the
+ * forwarders, by these names. The order does not matter, since function declarations hoist.
+ */
+const HELPERS: Record<string, Source | undefined> = {
+  getText$,
+  escapeText$,
+  escapeAttr$,
+  joinClass$,
+  encode$,
+  findEnd$,
+  getRows$,
+  text$,
+  safeUrl$,
+  attr$,
+  on$,
+  slot$,
+  setText$,
+  setAttr$,
+  setOn$,
+  track$,
+  isElement$,
+  clone$,
+  putAttr$,
+  putText$,
+  setBranch$,
 };
 
-/** The forwarding functions. A chunk replaces each by an import of the loader's export. */
+/** The forwarding functions. The module replaces each by an import of the loader's export. */
 const FORWARDERS: Record<string, Source | undefined> = {
   addBlock$,
   findInnerBlocks$,
@@ -455,35 +446,24 @@ export const HELPER_NAMES: readonly string[] = [
 export const HELPERS_MODULE = 'idlip/helpers';
 
 /**
- * Returns the source of the `idlip/helpers` module: a copy of every helper, dependencies first,
- * the loader exports they call as imports from `idlip/client`, and an export of each helper a
- * chunk can import.
+ * Returns the source of the `idlip/helpers` module: a copy of every helper, the loader exports
+ * they call as imports from `idlip/client`, and an export of each helper. It throws when a
+ * bundler renamed a function, since the copies call each other by name.
  */
 export function printHelpersModule(): string {
-  const exported: string[] = [];
   const code: string[] = [];
-  const client = new Set<string>();
-  for (const [name, helper] of Object.entries(HELPERS)) {
-    if (helper === undefined) {
-      continue;
+  for (const [name, source] of Object.entries(HELPERS)) {
+    if (source?.name !== name) {
+      throw new Error(`The helper ${name} was renamed to ${source?.name}`);
     }
-    // A bundler may rename a function, which would break the names the copies call.
-    if (helper.source.name !== name) {
-      throw new Error(`The helper ${name} was renamed to ${helper.source.name}`);
-    }
-    code.push(helper.source.toString());
-    exported.push(name);
-    for (const imported of helper.client) {
-      client.add(imported);
-    }
+    code.push(source.toString());
   }
   const specifiers: string[] = [];
-  for (const imported of [...client].sort()) {
-    const forwarder = FORWARDERS[`${imported}$`];
-    if (forwarder?.name !== `${imported}$`) {
-      throw new Error(`The forwarder ${imported}$ was renamed to ${forwarder?.name}`);
+  for (const [name, forwarder] of Object.entries(FORWARDERS)) {
+    if (forwarder?.name !== name) {
+      throw new Error(`The forwarder ${name} was renamed to ${forwarder?.name}`);
     }
-    specifiers.push(`${imported} as ${imported}$`);
+    specifiers.push(`${name.slice(0, -1)} as ${name}`);
   }
-  return `import { ${specifiers.join(', ')} } from 'idlip/client';\n\n${code.join('\n\n')}\n\nexport { ${exported.join(', ')} };\n`;
+  return `import { ${specifiers.join(', ')} } from 'idlip/client';\n\n${code.join('\n\n')}\n\nexport { ${Object.keys(HELPERS).join(', ')} };\n`;
 }

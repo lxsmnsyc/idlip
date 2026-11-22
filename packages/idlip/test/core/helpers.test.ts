@@ -64,15 +64,13 @@ describe('chunk helpers', () => {
     copies = await importHelpers('$idlipHelpersTest');
   });
 
-  it('defines each helper once, after the helpers it calls', () => {
+  it('defines and exports each helper once', () => {
     const names: string[] = [];
     for (const match of printHelpersModule().matchAll(/^function (\w+\$)/gm)) {
       names.push(match[1]);
     }
     expect(new Set(names).size).toBe(names.length);
-    expect(names.indexOf('getText$')).toBeLessThan(names.indexOf('text$'));
-    expect(names.indexOf('joinClass$')).toBeLessThan(names.indexOf('attr$'));
-    expect(names.indexOf('isElement$')).toBeLessThan(names.indexOf('clone$'));
+    expect(Object.keys(copies).toSorted()).toEqual(names.toSorted());
   });
 
   it('imports only the loader, and keeps comments and module references out', () => {
