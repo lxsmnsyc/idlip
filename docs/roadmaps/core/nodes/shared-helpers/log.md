@@ -13,3 +13,4 @@
 - The todo `list.3.js` golden is the HTML-string version on purpose (the codegen test compares rows, not text). Kept its body, swapped the copies for an import.
 - e2e: a new test proves one round trip: every request of the first click starts before the first response. It fails with the loader's preload removed (checked).
 - Harness bytes (load-independent) for todos and dashboard, base and branch, in the outcome. Timing waits for load under 3.
+- Review fixes: untracked `.vitest/` output; `renderPreload` names the helpers URL; explored a failed helpers fetch in Chromium 158 (12 runs: aborted at once, after the binding request, and 50 ms later). Only the 50 ms case failed the binding chunk; the next event recovered every time, since Chromium fetches a failed module again. Dropped `uses`/`client` from the helpers table. Minified-source test with Vite's bundler. Dev helpers import test. e2e round-trip test now compares request timing.

@@ -3,11 +3,11 @@
 ## Built
 
 - **One helpers module.** Chunks no longer copy runtime helpers. A chunk imports the ones it uses, `import { setAttr$, setText$ } from 'idlip/helpers'`. The Vite plugin resolves `idlip/helpers` to the virtual module `\0idlip-helpers`, whose code is `printHelpersModule()` (`core/helpers.ts`, exported by `idlip/compiler`): each helper's `toString()` once, with the loader exports they call imported from `idlip/client`. The bundler keeps the helpers the app uses in one file, `_idlip-helpers.<hash>.js`. `printHelpers` is gone.
-- **Loader preload.** `generateBundle` writes the helpers file URL into the chunk map under `helpers` (`HELPERS_KEY` in `core/format.ts`). `render()` keeps it in the state's `chunks`. `getUpdate` (`client/loader/resume.ts`) loads it with the handler chunk and the binding chunks of the event, so the first click is one round trip with 3 parallel requests. `checkChunkImports` allows that one file and checks its own imports against the loader.
+- **Loader preload.** `generateBundle` writes the helpers file URL into the chunk map under `helpers` (`HELPERS_KEY` in `core/format.ts`). `render()` keeps it in the state's `chunks`. `getUpdate` (`client/loader/resume.ts`) loads it with the handler chunk and the binding chunks of the event, so the first click is one round trip with 3 parallel requests. `checkChunkImports` allows that one file and checks its own imports against the loader. One round trip holds in a build only: in dev there is no `helpers` key, so the browser fetches the helpers module after the binding chunk that imports it. `renderPreload` names `chunks.helpers` first, outside `max`, whenever it names a chunk.
 - **One file per view.** A list or branch chunk imports a child's view by name (`import { init as $init_Row, render as $render_Row }`) and passes `{ init, render }` to `addChild`. The namespace import made the bundler emit each view twice (`counter.view.<hash>.js` re-exporting `counter.tsx_idlip-view_lang.<hash>.js`).
 - **idlip/testing and tests.** `importHelpers(key)` (`testing/modules.ts`) runs the helpers module bound to the scope's `client`. `mount`, the differential harness and `helpers.test.ts` use it. `vitest.config.ts` aliases `idlip/helpers` to the helper sources for golden chunks. The loader harness serves the helpers module next to its chunk copies.
 - **Website.** A REPL run and a live sample serve `idlip-helpers.js` next to the chunks and point their imports at it (`website/src/repl/chunks.ts`). The REPL output panel and the Compiled tab list it once. `Project.helpers` holds the module text from the worker.
-- **New tests.** `test/vite/vite.test.ts` "declares each runtime helper in one file" (todo fixture build, `findCopiedHelpers` in `test/vite/app.ts`). `test/vite/components.test.ts` "ships each view in one file" (fails with the namespace import). `website/test/repl.test.ts`: no chunk of a run copies a helper. e2e `todo.spec.ts` "the first click requests every file before any arrives, so it is one round trip" (fails with the loader preload removed).
+- **New tests.** `test/vite/vite.test.ts` "declares each runtime helper in one file" (todo fixture build, `findCopiedHelpers` in `test/vite/app.ts`). `test/vite/components.test.ts` "ships each view in one file" (fails with the namespace import). `website/test/repl.test.ts`: no chunk of a run copies a helper. e2e `todo.spec.ts` "the first click requests every file before any arrives, so it is one round trip" (fails with the loader preload removed; it compares request timing: every request starts before the earliest response ends). e2e "a helpers module that fails to load once costs at most the first patch". `test/core/helpers-minified.test.ts`: `core/helpers.ts` minified by Vite's bundler throws the rename error, and with `keepNames` writes a working module. `test/server/preload.test.ts`: the helpers URL in the preload. `test/vite/dev-loader.test.ts`: the dev helpers module imports the loader from the URL a chunk does.
 - Docs and rules: `compiler/CLAUDE.md`, `client/CLAUDE.md`, `vite/CLAUDE.md`, `website/docs/reference/client.md`, `reference/server.md`. Change request `contracts/compiled-format-shared-helpers.change-request.md`.
 
 ## Options measured
@@ -89,6 +89,14 @@ Every first click stays one round trip. The todos first click after idle was 22 
 uptime   # 1-minute load under 3
 pnpm -C benchmarks/harness bench --scenario todos,dashboard --only idlip --no-build --metrics browser,waterfall
 ```
+
+## Review fixes
+
+- `packages/idlip/.vitest/json/output.json` was committed by mistake. Removed, and `.vitest/` is ignored.
+- `renderPreload` (`server/preload.ts`): the helpers URL first whenever any chunk is named, outside `max`.
+- A failed helpers fetch, as Chromium 158 handles it. When the helpers request fails before a binding chunk's static import reaches it, Chromium fetches it again for that import, and the first click applies. When the import waits on the fetch that fails, the binding chunk fails with it and the first patch does not run. The next event asks for the chunk under a new URL (`#1`), Chromium fetches the helpers again (it keeps no failed module fetch), and the patch brings the DOM to the model of both clicks. No loader change was needed. Rule in `client/CLAUDE.md`; Firefox and Safari are not tested.
+- `core/helpers.ts`: `HELPERS` is a table of functions by name, without `uses` and `client`. The module imports the four forwarders. The header comment says what a copy may call.
+- Minified sources: with the bundler's renaming, `printHelpersModule()` throws `The helper <name> was renamed to <x>`. With `keepNames` it works. The published package is not minified (tsdown, no `minify`).
 
 ## Deviations
 
