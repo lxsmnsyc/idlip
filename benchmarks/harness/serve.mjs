@@ -25,7 +25,9 @@ const server = createServer(async (request, response) => {
   try {
     if (url.pathname === '/') {
       let html;
-      if (scenario === 'dashboard') {
+      if (scenario === 'scale') {
+        html = await app.render();
+      } else if (scenario === 'dashboard') {
         html = await app.render({ preload: url.searchParams.get('preload') !== 'off' });
       } else if (scenario === 'rows') {
         html = await app.render(Number(url.searchParams.get('n') ?? 0));

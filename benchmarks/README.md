@@ -87,6 +87,68 @@ Every operation runs in idlip, swap included, and passes the page checks. The fi
 
 No framework here has an idle preload to turn off, so the "preload off" session is n/a for all three. idlip loads the least JS before `load` and in total after 3 widgets, and pays 3 requests on each widget's first click.
 
+### Scale
+
+Does startup stay flat as the app grows? One page per size, with N distinct widget components (N = 10, 50, 200 and 1,000), built by idlip, brumate 0.8.1, Marko 6 and Qwik 2. The widgets are the dashboard's (see [Scale scenario](#scale-scenario)). Run on 2026-11-22, Apple M2, Chrome 158. Every page passed its checks: all widgets in the HTML and the DOM, a first click that shows what Node computes, and no page errors.
+
+Bytes are exact and do not depend on load. The timings are from the run with the lowest load of the three runs made (the 1-minute load average before and after each size: 10 widgets 2 before and 2.22 after; 50 widgets 2.22 before and 2.34 after; 200 widgets 2.34 before and 2.84 after; 1,000 widgets 2.84 before and 3.16 after). The two earlier runs, at 1-minute loads of 2.4 to 8.2 and 3.4 to 4.8, agree on script times within about 20% and show the same order. Their task times at 1,000 widgets differ by 30% (idlip 481 and 614 ms), so read the task times as an order of magnitude.
+
+Gzip -9, kB. "Before the first click" is the page load plus a 3 s idle wait. "All bytes" adds up the HTML, the JS and every other fetch (Qwik 2's `bundle-graph.json` and similar).
+
+| Metric                                | App   | idlip | brumate 0.8.1 | Marko 6 |  Qwik 2 |
+| ------------------------------------- | ----- | ----: | ------------: | ------: | ------: |
+| JS before `load`                      | 10    |   4.7 |          15.9 |     5.9 |    37.3 |
+|                                       | 50    |   4.7 |          23.8 |    10.8 |    37.3 |
+|                                       | 200   |   4.7 |          52.6 |    28.1 |    37.3 |
+|                                       | 1,000 |   4.7 |         201.5 |   117.8 |    37.3 |
+| JS before the first click             | 10    |   4.7 |          15.9 |     5.9 |    51.2 |
+|                                       | 50    |   4.7 |          23.8 |    10.8 |   106.3 |
+|                                       | 200   |   4.7 |          52.6 |    28.1 |   312.0 |
+|                                       | 1,000 |   4.7 |         201.5 |   117.8 | 1,409.1 |
+| HTML                                  | 10    |   3.4 |           1.8 |     1.7 |     4.3 |
+|                                       | 50    |   8.5 |           6.2 |     5.6 |    16.5 |
+|                                       | 200   |  25.9 |          22.3 |    19.0 |    63.5 |
+|                                       | 1,000 | 112.0 |         103.9 |    87.9 |   302.6 |
+| Non-JS fetches before the first click | 10    |   0.0 |           0.0 |     0.0 |     1.0 |
+|                                       | 50    |   0.0 |           0.0 |     0.0 |     4.7 |
+|                                       | 200   |   0.0 |           0.0 |     0.0 |    18.5 |
+|                                       | 1,000 |   0.0 |           0.0 |     0.0 |    92.2 |
+| All bytes before `load`               | 10    |   8.1 |          17.8 |     7.6 |    42.7 |
+|                                       | 50    |  13.2 |          30.0 |    16.3 |    58.5 |
+|                                       | 200   |  30.6 |          74.9 |    47.1 |   119.3 |
+|                                       | 1,000 | 116.7 |         305.3 |   205.8 |   432.1 |
+| All bytes before the first click      | 10    |   8.1 |          17.8 |     7.6 |    56.6 |
+|                                       | 50    |  13.2 |          30.0 |    16.3 |   127.5 |
+|                                       | 200   |  30.6 |          74.9 |    47.1 |   394.0 |
+|                                       | 1,000 | 116.7 |         305.3 |   205.8 | 1,803.9 |
+
+Raw sizes, kB. idlip's JS is 12.5 kB at every size. Its HTML is 21.8, 101.0, 400.3, 2,001.2 kB, against 5.9, 28.2, 113.7, 579.5 kB for Marko 6. brumate's HTML is 7.3 to 696.9 kB and Qwik 2's 14.8 to 1,382.7 kB. Raw JS at 1,000 widgets: brumate 1,699.1 kB, Marko 1,226.9 kB, Qwik 2 99.4 kB before `load` and 2,179.1 kB before the first click.
+
+Main-thread time from navigation to `load`, 4x CPU slowdown, median of 10 loads, ms:
+
+| Metric      | App   | idlip | brumate 0.8.1 | Marko 6 | Qwik 2 |
+| ----------- | ----- | ----: | ------------: | ------: | -----: |
+| Script time | 10    |   2.7 |           5.0 |     7.4 |    2.6 |
+|             | 50    |   2.5 |           6.6 |    15.3 |    2.6 |
+|             | 200   |   3.1 |           9.1 |    34.8 |    3.2 |
+|             | 1,000 |   2.7 |          17.6 |   124.5 |    5.1 |
+| Task time   | 10    |    52 |            54 |      55 |     53 |
+|             | 50    |    68 |            69 |      77 |     68 |
+|             | 200   |   129 |           123 |     150 |    119 |
+|             | 1,000 |   451 |           424 |     507 |    387 |
+
+Script time is what the page runs as JavaScript (CDP `ScriptDuration`). Task time is all main-thread work (`TaskDuration`), which includes parsing the HTML and laying out N widgets of 480 px each, so it grows for every framework and is mostly the page, not the framework.
+
+What the numbers say:
+
+- **JS on load is flat for idlip**: 4.7 kB gzip from 10 to 1,000 widgets, one file. The first click fetches about 1 kB more. brumate grows 12.7x and Marko 20x from 10 to 1,000 widgets. Qwik 2 is flat too, at 37.3 kB.
+- **Qwik 2 keeps loading while idle.** Its JS before the first click grows with the app (51.2 kB to 1,409.1 kB, 44 to 4,004 files), because it preloads the code of every widget. That is background work, not part of `load`, so the "before `load`" rows are the fairer view of its startup. The landing chart uses them.
+- **Total bytes are not flat for idlip.** All bytes before the first click go from 8.1 to 116.7 kB, 14x. The HTML is the cost: idlip writes each widget's state and listeners into the page, 2.0 MB raw at 1,000 widgets, 3.5x Marko 6's HTML. It still has the fewest bytes from 50 widgets up (16.3 kB for Marko 6 at 50 widgets and 205.8 kB at 1,000). At 10 widgets Marko 6 is smaller (7.6 kB against 8.1 kB).
+- **Script time is flat for idlip** (2.5 to 3.1 ms) and for Qwik 2 (2.6 to 5.1 ms). Marko 6 grows 17x, brumate 4x.
+- **Task time does not separate the frameworks.** All four are within about 30% of each other at every size (52 to 451 ms for idlip, 53 to 387 ms for Qwik 2), and the run-to-run spread is as large.
+
+The widgets are made from 17 handler steps and 12 formatters with random constants, so 1,000 of them repeat much code. That helps every bundler's gzip and Marko most, which ships one file. A real app of 1,000 components would compress less.
+
 ### Where idlip loses
 
 Each row is a metric where idlip is behind brumate 0.8.1 or Marko 6 by more than 20%. `perf-from-bench` works from this list.
@@ -177,6 +239,22 @@ The idlip widgets are `*.idlip.tsx` modules: `let` for the state, `const` for th
 
 - `<For>` keys by a field, so the list of numbers renders from a derived list of `{ index, value }` entries.
 - A view hole has no spread (`Math.max(...items)` fails with `hole-spread`), so the summary is a module-level helper, which the compiler copies into the chunks that use it.
+
+### Scale scenario
+
+The dashboard widgets, generated at N = 10, 50, 200 and 1,000 for idlip, brumate 0.8.1, Marko 6 and Qwik 2. Each widget is its own module, with its own seeded handler code, so the code size grows with N. The page is the dashboard's: a row of 4 widgets and the rest stacked below. Each app has a `scale/` project (`vite.config`, the server entry) and a `build:scale` script that writes the widgets into `scale/src` at build time, with `BENCH_SCALE` as N. Git ignores the generated code.
+
+```bash
+node benchmarks/harness/scale.mjs run                       # all sizes, all four frameworks
+node benchmarks/harness/scale.mjs run --sizes 10 --only idlip --bytes-only
+```
+
+It builds each framework at each size, then measures:
+
+- **Bytes**: one session without throttling loads the page, waits for `networkidle` and 3 s more, then clicks widget 1. It records the HTML (fetched on its own), and the bytes of every other response by phase, raw and gzip -9, split into scripts and the rest. A page is marked `failed`, with the reason, when the click does not show the result that Node computes, when the DOM or the HTML does not hold all N widgets, or when the page throws. A build that fails or a server that does not start in 60 s is `failed` too, with the error.
+- **Script and task time**: 10 loads per framework and size with `Emulation.setCPUThrottlingRate` at 4, in a new context each time, with the framework order rotating each round. A warm-up round is dropped. The metrics come from `Performance.getMetrics` right after `load`.
+
+The harness records the load average before and after each size. Timings need a quiet machine, so repeat them when it is quiet. The result goes to `results/scale-<timestamp>.json`. `pnpm -C benchmarks/harness test` builds every framework at 10 widgets and checks that the server renders them.
 
 ## Folders
 

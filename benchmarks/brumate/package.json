@@ -5,7 +5,8 @@
   "scripts": {
     "build": "vite build --outDir dist/client && vite build --ssr src/server.ts --outDir dist/server",
     "build:dashboard": "node ../harness/dashboard.mjs brumate && vite build dashboard --outDir dist/client && vite build dashboard --ssr src/server.ts --outDir dist/server",
-    "build:rows": "vite build rows --outDir dist/client && vite build rows --ssr src/server.ts --outDir dist/server"
+    "build:rows": "vite build rows --outDir dist/client && vite build rows --ssr src/server.ts --outDir dist/server",
+    "build:scale": "node ../harness/scale.mjs write brumate && vite build scale --outDir dist/client && vite build scale --ssr src/server.ts --outDir dist/server"
   },
   "dependencies": {
     "brumate": "npm:brumate@0.8.1"

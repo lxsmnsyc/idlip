@@ -44,3 +44,12 @@ export async function loadRows() {
     render: (n) => server.page(n, loader),
   };
 }
+
+export async function loadScale() {
+  const server = await import(`${dir}scale/dist/server/entry-server.js`);
+  const loader = await findLoader(`${dir}scale/`);
+  return {
+    staticDir: `${dir}scale/dist/client`,
+    render: () => server.page(loader),
+  };
+}

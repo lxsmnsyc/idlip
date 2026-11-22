@@ -323,9 +323,9 @@ function pipeline(rand, count, exclude) {
   };
 }
 
-/** The spec of every widget. */
-export function widgets() {
-  return Array.from({ length: COUNT }, (_, index) => {
+/** The spec of every widget. `count` is 50 for the dashboard and 10 to 1,000 for the scale pages. */
+export function widgets(count = COUNT) {
+  return Array.from({ length: count }, (_, index) => {
     const rand = random((index + 1) * 7919);
     const id = `w${String(index).padStart(2, '0')}`;
     const items = Array.from({ length: 6 }, () => 1 + Math.floor(rand() * 99));
@@ -337,7 +337,7 @@ export function widgets() {
       id,
       component: `Widget${String(index).padStart(2, '0')}`,
       tag: `widget-${String(index).padStart(2, '0')}`,
-      title: `Widget ${index}: ${NAMES[index]}`,
+      title: `Widget ${index}: ${NAMES[index] ?? `Item ${index}`}`,
       verb: VERBS[index % VERBS.length],
       items,
       modes,
@@ -616,7 +616,7 @@ ${layout(list, (w) => `<${w.component} />`, '      ')}
   };
 }
 
-const WRITERS = {
+export const WRITERS = {
   idlip: { dir: 'widgets', files: writeIdlipFiles },
   brumate: {
     dir: 'widgets',
@@ -644,17 +644,20 @@ ${layout(list, (w) => `<${w.component} />`, '')}
 // benchmarks/brumate-0.3 builds the same widgets with brumate 0.3.0.
 WRITERS['brumate-0.3'] = WRITERS.brumate;
 
-/** Writes the generated components of a framework into `<framework>/dashboard/src/<dir>`. */
-export async function write(framework) {
+/**
+ * Writes the generated components of a framework into `<framework>/<folder>/src/<dir>`. The
+ * dashboard has 50 widgets. The scale pages pass their own folder and count.
+ */
+export async function write(framework, folder = 'dashboard', count = COUNT) {
   const writer = WRITERS[framework];
   if (!writer) {
     throw new Error(`No dashboard writer for "${framework}"`);
   }
   const benchDir = fileURLToPath(new URL('..', import.meta.url));
-  const dir = path.join(benchDir, framework, 'dashboard/src', writer.dir);
+  const dir = path.join(benchDir, framework, folder, 'src', writer.dir);
   await rm(dir, { recursive: true, force: true });
   await mkdir(dir, { recursive: true });
-  for (const [file, source] of Object.entries(writer.files(widgets()))) {
+  for (const [file, source] of Object.entries(writer.files(widgets(count)))) {
     await writeFile(path.join(dir, file), source);
   }
 }

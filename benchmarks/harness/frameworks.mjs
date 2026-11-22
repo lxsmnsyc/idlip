@@ -36,7 +36,8 @@ export async function loadAdapter(name) {
 export const SCENARIOS = ['todos', 'dashboard', 'rows'];
 
 // The app of a scenario: `load()` of the adapter for todos, `loadDashboard()` for the
-// dashboard and `loadRows()` for the rows.
+// dashboard, `loadRows()` for the rows and `loadScale()` for the scale pages. The scale scenario
+// is not in SCENARIOS: `scale.mjs` runs it on its own.
 export async function loadApp(name, scenario = 'todos') {
   const adapter = await loadAdapter(name);
   if (scenario === 'dashboard') {
@@ -44,6 +45,9 @@ export async function loadApp(name, scenario = 'todos') {
   }
   if (scenario === 'rows') {
     return adapter.loadRows();
+  }
+  if (scenario === 'scale') {
+    return adapter.loadScale();
   }
   return adapter.load();
 }

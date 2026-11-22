@@ -50,3 +50,12 @@ export async function loadRows() {
     render: (n) => server.page(n, scripts, bundles),
   };
 }
+
+export async function loadScale() {
+  const server = await import(`${dir}scale/dist/server/server.js`);
+  const { scripts, bundles } = await entry(`${dir}scale`);
+  return {
+    staticDir: `${dir}scale/dist/client`,
+    render: () => server.page(scripts, bundles),
+  };
+}

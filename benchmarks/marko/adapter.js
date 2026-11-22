@@ -29,3 +29,11 @@ export async function loadRows() {
     render: (n) => server.render(n),
   };
 }
+
+export async function loadScale() {
+  const server = await import(`${dir}scale/dist/server/server.js`);
+  return {
+    staticDir: `${dir}scale/dist/client`,
+    render: () => server.render(),
+  };
+}

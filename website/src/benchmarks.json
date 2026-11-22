@@ -1,9 +1,253 @@
 {
-  "date": "2026-11-21",
+  "date": "2026-11-22",
   "machine": "Apple M2, 8 cores, 8 GB, Node 26.12.1, Chrome 158",
   "source": "benchmarks/README.md",
   "frameworks": ["idlip", "brumate 0.8.1", "Marko 6", "Qwik 1", "Qwik 2"],
   "groups": [
+    {
+      "name": "JS before the first click, by app size",
+      "metrics": [
+        {
+          "name": "Scale: JS before the first click, 10 widgets",
+          "unit": "kB",
+          "better": "lower",
+          "noise": 0,
+          "values": {
+            "idlip": 4.7,
+            "brumate 0.8.1": 15.9,
+            "Marko 6": 5.9,
+            "Qwik 1": null,
+            "Qwik 2": 51.2
+          },
+          "label": "10 widgets"
+        },
+        {
+          "name": "Scale: JS before the first click, 50 widgets",
+          "unit": "kB",
+          "better": "lower",
+          "noise": 0,
+          "values": {
+            "idlip": 4.7,
+            "brumate 0.8.1": 23.8,
+            "Marko 6": 10.8,
+            "Qwik 1": null,
+            "Qwik 2": 106.3
+          },
+          "label": "50 widgets"
+        },
+        {
+          "name": "Scale: JS before the first click, 200 widgets",
+          "unit": "kB",
+          "better": "lower",
+          "noise": 0,
+          "values": {
+            "idlip": 4.7,
+            "brumate 0.8.1": 52.6,
+            "Marko 6": 28.1,
+            "Qwik 1": null,
+            "Qwik 2": 312.0
+          },
+          "label": "200 widgets"
+        },
+        {
+          "name": "Scale: JS before the first click, 1,000 widgets",
+          "unit": "kB",
+          "better": "lower",
+          "noise": 0,
+          "values": {
+            "idlip": 4.7,
+            "brumate 0.8.1": 201.5,
+            "Marko 6": 117.8,
+            "Qwik 1": null,
+            "Qwik 2": 1409.1
+          },
+          "label": "1,000 widgets"
+        }
+      ]
+    },
+    {
+      "name": "JS on load, by app size",
+      "metrics": [
+        {
+          "name": "Scale: JS before `load`, 10 widgets",
+          "unit": "kB",
+          "better": "lower",
+          "noise": 0,
+          "values": {
+            "idlip": 4.7,
+            "brumate 0.8.1": 15.9,
+            "Marko 6": 5.9,
+            "Qwik 1": null,
+            "Qwik 2": 37.3
+          },
+          "label": "10 widgets"
+        },
+        {
+          "name": "Scale: JS before `load`, 50 widgets",
+          "unit": "kB",
+          "better": "lower",
+          "noise": 0,
+          "values": {
+            "idlip": 4.7,
+            "brumate 0.8.1": 23.8,
+            "Marko 6": 10.8,
+            "Qwik 1": null,
+            "Qwik 2": 37.3
+          },
+          "label": "50 widgets"
+        },
+        {
+          "name": "Scale: JS before `load`, 200 widgets",
+          "unit": "kB",
+          "better": "lower",
+          "noise": 0,
+          "values": {
+            "idlip": 4.7,
+            "brumate 0.8.1": 52.6,
+            "Marko 6": 28.1,
+            "Qwik 1": null,
+            "Qwik 2": 37.3
+          },
+          "label": "200 widgets"
+        },
+        {
+          "name": "Scale: JS before `load`, 1,000 widgets",
+          "unit": "kB",
+          "better": "lower",
+          "noise": 0,
+          "values": {
+            "idlip": 4.7,
+            "brumate 0.8.1": 201.5,
+            "Marko 6": 117.8,
+            "Qwik 1": null,
+            "Qwik 2": 37.3
+          },
+          "label": "1,000 widgets"
+        }
+      ]
+    },
+    {
+      "name": "All bytes before the first click, by app size",
+      "metrics": [
+        {
+          "name": "Scale: all bytes before the first click, 10 widgets",
+          "unit": "kB",
+          "better": "lower",
+          "noise": 0,
+          "values": {
+            "idlip": 8.1,
+            "brumate 0.8.1": 17.8,
+            "Marko 6": 7.6,
+            "Qwik 1": null,
+            "Qwik 2": 56.6
+          },
+          "label": "10 widgets"
+        },
+        {
+          "name": "Scale: all bytes before the first click, 50 widgets",
+          "unit": "kB",
+          "better": "lower",
+          "noise": 0,
+          "values": {
+            "idlip": 13.2,
+            "brumate 0.8.1": 30.0,
+            "Marko 6": 16.3,
+            "Qwik 1": null,
+            "Qwik 2": 127.5
+          },
+          "label": "50 widgets"
+        },
+        {
+          "name": "Scale: all bytes before the first click, 200 widgets",
+          "unit": "kB",
+          "better": "lower",
+          "noise": 0,
+          "values": {
+            "idlip": 30.6,
+            "brumate 0.8.1": 74.9,
+            "Marko 6": 47.1,
+            "Qwik 1": null,
+            "Qwik 2": 394.0
+          },
+          "label": "200 widgets"
+        },
+        {
+          "name": "Scale: all bytes before the first click, 1,000 widgets",
+          "unit": "kB",
+          "better": "lower",
+          "noise": 0,
+          "values": {
+            "idlip": 116.7,
+            "brumate 0.8.1": 305.3,
+            "Marko 6": 205.8,
+            "Qwik 1": null,
+            "Qwik 2": 1803.9
+          },
+          "label": "1,000 widgets"
+        }
+      ]
+    },
+    {
+      "name": "Script time to load, by app size",
+      "metrics": [
+        {
+          "name": "Scale: script time to load, 4x CPU, 10 widgets",
+          "unit": "ms",
+          "better": "lower",
+          "noise": 0.2,
+          "values": {
+            "idlip": 2.7,
+            "brumate 0.8.1": 5.0,
+            "Marko 6": 7.4,
+            "Qwik 1": null,
+            "Qwik 2": 2.6
+          },
+          "label": "10 widgets"
+        },
+        {
+          "name": "Scale: script time to load, 4x CPU, 50 widgets",
+          "unit": "ms",
+          "better": "lower",
+          "noise": 0.2,
+          "values": {
+            "idlip": 2.5,
+            "brumate 0.8.1": 6.6,
+            "Marko 6": 15.3,
+            "Qwik 1": null,
+            "Qwik 2": 2.6
+          },
+          "label": "50 widgets"
+        },
+        {
+          "name": "Scale: script time to load, 4x CPU, 200 widgets",
+          "unit": "ms",
+          "better": "lower",
+          "noise": 0.2,
+          "values": {
+            "idlip": 3.1,
+            "brumate 0.8.1": 9.1,
+            "Marko 6": 34.8,
+            "Qwik 1": null,
+            "Qwik 2": 3.2
+          },
+          "label": "200 widgets"
+        },
+        {
+          "name": "Scale: script time to load, 4x CPU, 1,000 widgets",
+          "unit": "ms",
+          "better": "lower",
+          "noise": 0.2,
+          "values": {
+            "idlip": 2.7,
+            "brumate 0.8.1": 17.6,
+            "Marko 6": 124.5,
+            "Qwik 1": null,
+            "Qwik 2": 5.1
+          },
+          "label": "1,000 widgets"
+        }
+      ]
+    },
     {
       "name": "JS before the first click",
       "metrics": [
@@ -157,5 +401,5 @@
       ]
     }
   ],
-  "headline": "JS before the first click"
+  "headline": "JS on load, by app size"
 }
