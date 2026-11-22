@@ -26,6 +26,9 @@ shared: []
 reserves: []
 provides: []
 depends_on:
+  - on: short-chunk-names
+    kind: hard
+    why: the chunk naming changes before the first release
   - on: for-key-callback
     kind: hard
     why: the <For> API changes before the first release
