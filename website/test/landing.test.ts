@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import benchmarks from '../src/benchmarks.json' with { type: 'json' };
 import type { DemoData, DemoFile } from '../src/demo/data.ts';
-import { isBenchmarks, judge } from '../src/landing/benchmarks.ts';
+import { isBenchmarks, judge, pickLeads } from '../src/landing/benchmarks.ts';
 import type { Benchmarks, Metric } from '../src/landing/benchmarks.ts';
 import { FEATURES } from '../src/landing/features.ts';
 import { loadPages, renderSite } from '../src/site.ts';
@@ -35,6 +35,10 @@ const demo: DemoData = {
 };
 
 const pages = loadPages();
+if (!isBenchmarks(benchmarks)) {
+  throw new TypeError('benchmarks.json has the wrong shape');
+}
+const benchmarksData: Benchmarks = benchmarks;
 const landing = renderSite(pages, '/', demo).get('index.html') ?? '';
 
 describe('the landing page', () => {
@@ -42,7 +46,6 @@ describe('the landing page', () => {
     const order = [
       'class="tile tile-ink hero"',
       'id="resume-title"',
-      'id="demo-title"',
       'id="features-title"',
       'id="benchmarks"',
       'id="sample-title"',
@@ -71,13 +74,19 @@ describe('the landing page', () => {
     const head = /<thead><tr>([\s\S]*?)<\/tr><\/thead>/.exec(landing)?.[1] ?? '';
     const columns = head.match(/<th /g)?.length;
     expect(landing).toContain(`colspan="${columns}"`);
-    expect(landing).toContain('within 20% of the best as even');
   });
 
-  it('embeds the demo frame and its network panel', () => {
-    expect(landing).toContain('<iframe class="demo-frame" src="/demo/"');
-    expect(landing).toContain('data-net-load');
-    expect(landing).toContain('data-net-events');
+  it('shows only the rows where idlip leads, and links to every result', () => {
+    const table = /<tbody>([\s\S]*?)<\/tbody>/.exec(landing)?.[1] ?? '';
+    const rows = table.match(/<tr><th scope="row">/g)?.length ?? 0;
+    let leads = 0;
+    for (const group of pickLeads(benchmarksData)) {
+      leads += group.metrics.length;
+    }
+    expect(rows).toBe(leads);
+    expect(rows).toBeGreaterThan(0);
+    expect(landing).toContain('All results and how they were measured');
+    expect(landing).not.toContain('demo-frame');
   });
 
   it('links every feature card to an existing page', () => {
@@ -120,7 +129,7 @@ describe('the benchmark data', () => {
     }
   });
 
-  it('shows losses as well as wins', () => {
+  it('holds losses as well as wins for the full results', () => {
     const verdicts = new Set<string>();
     for (const group of data.groups) {
       for (const metric of group.metrics) {

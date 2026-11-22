@@ -1,5 +1,5 @@
-// The landing page: the hero, the resume diagram, the live demo, the feature grid, the
-// benchmarks and the todo sample, in that order.
+// The landing page: the hero, the resume diagram, the feature grid, the benchmarks and the todo
+// sample, in that order.
 import type { DemoData } from '../demo/data.ts';
 import { ICON, REPOSITORY, escape, renderFooter, renderHead, renderHeader } from '../layout.ts';
 import { createRenderer } from '../markdown.ts';
@@ -7,7 +7,6 @@ import type { RenderEnv } from '../markdown.ts';
 import type { Page } from '../site.ts';
 import { renderBenchmarks } from './benchmarks.ts';
 import type { Benchmarks } from './benchmarks.ts';
-import { renderDemo } from './demo.ts';
 import { renderFeatures } from './features.ts';
 import { formatBytes } from './format.ts';
 import { renderResume } from './resume.ts';
@@ -22,7 +21,7 @@ export interface LandingContext {
   pages: readonly Page[];
   /** The source of the todo example, shown highlighted. Empty for none. */
   example: string;
-  /** The demo build. The diagram and the demo need it. */
+  /** The demo build. The diagram and the sample notes read its names and sizes. */
   demo: DemoData;
   benchmarks: Benchmarks;
 }
@@ -83,7 +82,6 @@ ${renderHeader(base, start)}
 <main id="content" class="landing">
   ${renderHero(base, start)}
   ${renderResume(demo)}
-  ${renderDemo(demo, base)}
   ${renderFeatures(pages, base)}
   ${renderBenchmarks(benchmarks, findBenchmarksLink(pages, base, benchmarks.source))}
   ${renderSample(example, demo)}

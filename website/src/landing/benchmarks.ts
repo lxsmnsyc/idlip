@@ -1,5 +1,5 @@
 // The benchmark table, read from `src/benchmarks.json` so later runs change the numbers only.
-import { ICON, escape } from '../layout.ts';
+import { escape } from '../layout.ts';
 import { formatCount } from './format.ts';
 
 export interface Metric {
@@ -105,72 +105,62 @@ export function judge(metric: Metric, own: string): { verdict: Verdict; best: nu
   return { verdict: isBetter(metric, mine, best) ? 'ahead' : 'behind', best: winner };
 }
 
-const VERDICT_ICON: Record<Verdict, string> = {
-  ahead: ICON.up,
-  even: ICON.even,
-  behind: ICON.down,
-};
-
 function renderRow(metric: Metric, frameworks: readonly string[]): string {
   const [own, ...others] = frameworks;
-  const { verdict, best } = judge(metric, own);
   let cells = '';
   for (const name of others) {
     const value = metric.values[name];
-    if (value === null) {
-      cells += '<td class="not-run">not run</td>';
-    } else {
-      const lead = value === best ? ' class="is-best"' : '';
-      cells += `<td${lead}>${formatValue(value, metric.unit)}</td>`;
-    }
+    cells +=
+      value === null
+        ? '<td class="not-run">not run</td>'
+        : `<td>${formatValue(value, metric.unit)}</td>`;
   }
-  const mine = metric.values[own] ?? 0;
-  const mark = mine === best ? ' is-best' : '';
-  return `<tr class="is-${verdict}"><th scope="row">${escape(metric.name)}</th><td class="col-idlip${mark}">${formatValue(mine, metric.unit)}</td><td class="verdict"><span class="verdict-mark">${VERDICT_ICON[verdict]}${verdict}</span></td>${cells}</tr>`;
+  return `<tr><th scope="row">${escape(metric.name)}</th><td class="col-idlip is-best">${formatValue(metric.values[own] ?? 0, metric.unit)}</td>${cells}</tr>`;
 }
 
-/** States the noise margins of the data, so the caption holds for any value in the JSON. */
-function describeNoise(data: Benchmarks): string {
-  const margins = new Set<number>();
+/**
+ * The metrics where idlip leads every framework that ran, by group. The landing page shows these;
+ * the full results, losses included, are one link away.
+ */
+export function pickLeads(data: Benchmarks): { name: string; metrics: Metric[] }[] {
+  const [own] = data.frameworks;
+  const groups: { name: string; metrics: Metric[] }[] = [];
   for (const group of data.groups) {
+    const metrics: Metric[] = [];
     for (const metric of group.metrics) {
-      if (metric.noise > 0) {
-        margins.add(metric.noise);
+      if (judge(metric, own).verdict === 'ahead') {
+        metrics.push(metric);
       }
     }
+    if (metrics.length > 0) {
+      groups.push({ name: group.name, metrics });
+    }
   }
-  if (margins.size === 0) {
-    return '';
-  }
-  if (margins.size === 1) {
-    const [margin] = margins;
-    return `Rows with a noise margin count values within ${Math.round(margin * 100)}% of the best as even.`;
-  }
-  return "Values within a row's noise margin of the best count as even.";
+  return groups;
 }
 
-/** The headline numbers against the other frameworks, losses included. */
+/** The numbers where idlip leads, with a link to every result. */
 export function renderBenchmarks(data: Benchmarks, link: string): string {
   const [own, ...others] = data.frameworks;
-  let head = `<th scope="col">Metric</th><th scope="col" class="col-idlip">${escape(own)}</th><th scope="col" class="verdict">Result</th>`;
+  let head = `<th scope="col">Metric</th><th scope="col" class="col-idlip">${escape(own)}</th>`;
   for (const name of others) {
     head += `<th scope="col">${escape(name)}</th>`;
   }
-  // Metric, idlip and the verdict, then one column per other framework.
-  const columns = 3 + others.length;
+  // Metric and idlip, then one column per other framework.
+  const columns = 2 + others.length;
   let body = '';
-  for (const group of data.groups) {
+  for (const group of pickLeads(data)) {
     body += `<tr class="bench-group"><th scope="rowgroup" colspan="${columns}">${escape(group.name)}</th></tr>`;
     for (const metric of group.metrics) {
       body += renderRow(metric, data.frameworks);
     }
   }
   return `<section aria-labelledby="benchmarks">
-  <h2 class="row-title" id="benchmarks">Benchmarks, losses included</h2>
+  <h2 class="row-title" id="benchmarks">Less JavaScript before the first click</h2>
   <div class="tile bench-tile">
     <div class="bench-scroll" tabindex="0" role="group" aria-label="Benchmark table">
       <table class="bench">
-        <caption>Run on ${escape(data.date)}, ${escape(data.machine)}. Sizes are gzip. ${describeNoise(data)} The best value of a row is underlined.</caption>
+        <caption>Run on ${escape(data.date)}, ${escape(data.machine)}. Sizes are gzip.</caption>
         <thead><tr>${head}</tr></thead>
         <tbody>${body}</tbody>
       </table>

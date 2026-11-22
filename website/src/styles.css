@@ -1374,10 +1374,6 @@ svg {
   font-weight: 800;
 }
 
-.bench .verdict {
-  text-align: start;
-}
-
 .bench td.is-best {
   font-weight: 600;
   text-decoration: underline;
@@ -1398,37 +1394,6 @@ svg {
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-}
-
-.verdict-mark {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.2rem 0.7rem 0.2rem 0.5rem;
-  border-radius: var(--radius);
-  font-family: var(--font);
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.verdict-mark svg {
-  width: 15px;
-  height: 15px;
-}
-
-.is-ahead .verdict-mark {
-  background: var(--accent-fill);
-  color: var(--on-accent);
-}
-
-.is-even .verdict-mark {
-  box-shadow: inset 0 0 0 1.5px var(--muted);
-  color: var(--text);
-}
-
-.is-behind .verdict-mark {
-  box-shadow: inset 0 0 0 1.5px var(--danger);
-  color: var(--danger);
 }
 
 .tile-foot {
