@@ -39,6 +39,9 @@ depends_on:
   - on: docs-live
     kind: hard
     why: samples run in place before the site goes public
+  - on: landing-trim
+    kind: hard
+    why: the trimmed landing page goes public
   - on: website-landing
     kind: hard
     why: the landing page sells the benefit before the site goes public
