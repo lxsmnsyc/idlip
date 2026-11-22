@@ -6,13 +6,29 @@ import { createRenderer } from '../markdown.ts';
 import type { RenderEnv } from '../markdown.ts';
 import type { Page } from '../site.ts';
 import { renderBenchmarks, writeHeadline } from './benchmarks.ts';
-import type { Benchmarks } from './benchmarks.ts';
+import type { Benchmarks, Sizes } from './benchmarks.ts';
 import { renderFeatures } from './features.ts';
 import { formatBytes } from './format.ts';
 import { renderResume } from './resume.ts';
 import { SAMPLE_FILE, SAMPLE_SOURCE } from './sample.ts';
 
 const renderer = createRenderer();
+
+/**
+ * The gzip -9 size of the loader with every optional feature flag of `vite/features.ts` on and
+ * `skew` on. Measured by bundling `idlip/client` with the flags defined as `true`. With none on
+ * and `skew` off the loader is the demo's own, so the demo build supplies the smallest size.
+ */
+const LOADER_MAX_GZIP = 7336;
+
+/** The loader range and the inline listener, as the copy shows them. */
+function readSizes(demo: DemoData): Sizes {
+  return {
+    loaderMin: formatBytes(demo.loader.gzip),
+    loaderMax: formatBytes(LOADER_MAX_GZIP),
+    listener: formatBytes(demo.listener.gzip),
+  };
+}
 
 /** The install command. The package is not on npm before the 0.1 release. */
 export const INSTALL_COMMAND = 'pnpm add idlip';
@@ -34,7 +50,7 @@ function renderInstall(): string {
 }
 
 function renderHero(base: string, start: string, benchmarks: Benchmarks, demo: DemoData): string {
-  const headline = writeHeadline(benchmarks, formatBytes(demo.listener.gzip));
+  const headline = writeHeadline(benchmarks, readSizes(demo));
   const conditions =
     headline.conditions === ''
       ? ''
@@ -74,7 +90,7 @@ function renderSample(demo: DemoData): string {
         <li><code>${escape(demo.binding.name)}</code><span>${formatBytes(demo.binding.gzip)}, the same click</span></li>
         <li><code>${rest} more chunks</code><span>The event that needs each one</span></li>
       </ul>
-      <p class="chunks-foot">The chart above counts the loader file of the benchmark dashboard. That build keeps the default <code>skew</code> recovery, which adds code to its loader. This demo sets <code>skew: false</code>. Sizes are gzip -9.</p>
+      <p class="chunks-foot">The loader grows with the optional features an app uses: ${escape(readSizes(demo).loaderMin)} with none, ${escape(readSizes(demo).loaderMax)} with all of them and <code>skew</code> on. This demo uses none. The chart counts the benchmark dashboard, which uses some. Sizes are gzip -9.</p>
     </div>
   </div>
 </section>`;
@@ -138,7 +154,7 @@ ${renderHeader(base, start)}
   ${renderHero(base, start, benchmarks, demo)}
   ${renderResume(demo)}
   ${renderFeatures(pages, base)}
-  ${renderBenchmarks(benchmarks, findBenchmarksLink(pages, base, benchmarks.source), formatBytes(demo.listener.gzip))}
+  ${renderBenchmarks(benchmarks, findBenchmarksLink(pages, base, benchmarks.source), readSizes(demo))}
   ${renderSample(demo)}
   ${renderObjections()}
   ${renderFinal(base, start)}

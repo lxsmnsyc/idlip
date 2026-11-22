@@ -39,6 +39,7 @@ const demo: DemoData = {
   ],
 };
 
+const sizes = { loaderMin: '3.9 kB', loaderMax: '7.3 kB', listener: '991 B' };
 const pages = loadPages();
 if (!isBenchmarks(benchmarks)) {
   throw new TypeError('benchmarks.json has the wrong shape');
@@ -65,20 +66,26 @@ describe('the landing page', () => {
     }
   });
 
-  it('leads with the flat JavaScript cost from the data', () => {
-    const growth = readGrowth(benchmarksData);
-    const own = growth.rows[0].values.at(-1) ?? 0;
-    const value = `${String(Number(own.toFixed(1)))} kB`;
+  it('leads with the claim that holds for every app, and gives the measured facts', () => {
     expect(landing).toContain(
-      `<h1 class="display">Pages ready on <em>${value}</em> of JavaScript, at any size.</h1>`,
+      `<h1 class="display">Your app grows. Its startup JavaScript <em>doesn't</em>.</h1>`,
     );
-    expect(landing).toContain('before the load event');
+    expect(landing).not.toMatch(/<h1[^>]*>[^<]*\d/);
+    expect(landing).toContain(
+      'one loader file, 3.9 kB to 7.3 kB gzip depending on the features the app uses, the same from 10 widgets to 1,000 widgets.',
+    );
+    expect(landing).toContain('A 991 B listener is inline in the HTML.');
+    expect(landing).toContain('Each click loads the handler and bindings it needs.');
     expect(landing).toContain(
       'idlip is a UI framework for TypeScript apps that the server renders.',
     );
     expect(landing).not.toContain('Server renders, browser resumes.');
-    expect(landing).toContain('A 991 B inline listener is in the HTML.');
     expect(landing).not.toContain('4.9 kB');
+  });
+
+  it('names the chart by what it measures, not by the headline', () => {
+    expect(landing).toContain('>JavaScript before the page is ready, by app size</h2>');
+    expect(landing.match(/Its startup JavaScript/g)).toHaveLength(1);
   });
 
   it('falls back to a plain headline when the cost grows', () => {
@@ -88,12 +95,12 @@ describe('the landing page', () => {
         group.metrics[group.metrics.length - 1].values.idlip = 50;
       }
     }
-    const headline = writeHeadline(grown, '991 B');
+    const headline = writeHeadline(grown, sizes);
     expect(headline.conditions).toBe('');
     expect(headline.before + headline.value + headline.after).toBe(
       'Pages that run no view code on load.',
     );
-    expect(writeHeadline(benchmarksData, '991 B').value).toMatch(/kB$/);
+    expect(writeHeadline(benchmarksData, sizes).conditions).not.toBe('');
   });
 
   it('has the install command with a copy button in the hero and at the end', () => {

@@ -186,6 +186,13 @@ function readFlatCost(
   return { value: last, small: growth.apps[0], large: growth.apps.at(-1) ?? growth.apps[0] };
 }
 
+/** Sizes the copy names, already formatted: the loader range and the inline listener. */
+export interface Sizes {
+  loaderMin: string;
+  loaderMax: string;
+  listener: string;
+}
+
 export interface Headline {
   before: string;
   /** The highlighted part: the number, or the fallback's key words. */
@@ -196,17 +203,17 @@ export interface Headline {
 }
 
 /** The hero headline: the flat cost as a number, or a plain headline when the data is not flat. */
-export function writeHeadline(data: Benchmarks, listener: string): Headline {
+export function writeHeadline(data: Benchmarks, sizes: Sizes): Headline {
   const growth = readGrowth(data);
   const flat = readFlatCost(growth, data.frameworks[0]);
   if (flat === undefined) {
     return { before: 'Pages that run no view code ', value: 'on load', after: '.', conditions: '' };
   }
   return {
-    before: 'Pages ready on ',
-    value: formatValue(flat.value, growth.unit),
-    after: ' of JavaScript, at any size.',
-    conditions: `From ${flat.small} to ${flat.large}: the loader file, gzip, before the load event. A ${listener} inline listener is in the HTML.`,
+    before: 'Your app grows. Its startup JavaScript ',
+    value: "doesn't",
+    after: '.',
+    conditions: `Before the load event, one loader file, ${sizes.loaderMin} to ${sizes.loaderMax} gzip depending on the features the app uses, the same from ${flat.small} to ${flat.large}. A ${sizes.listener} listener is inline in the HTML. Each click loads the handler and bindings it needs.`,
   };
 }
 
@@ -214,16 +221,16 @@ export function writeHeadline(data: Benchmarks, listener: string): Headline {
  * The lead under the heading, from the data: when idlip's cost stays within 10% from the smallest
  * app to the largest, it names that cost and both app sizes.
  */
-function writeLead(growth: Growth, own: string, listener: string): string {
+function writeLead(growth: Growth, own: string, sizes: Sizes): string {
   const flat = readFlatCost(growth, own);
   if (flat === undefined) {
     return 'idlip runs no component code on load. Code arrives with the first click that needs it.';
   }
-  return `With ${escape(flat.small)} or ${escape(flat.large)}, idlip loads the same ${formatValue(flat.value, growth.unit)} of JavaScript before the page is ready, in its loader file, plus a ${escape(listener)} inline listener in the HTML. The code of each widget arrives with the first click that needs it.`;
+  return `With ${escape(flat.small)} or ${escape(flat.large)}, idlip loads the same ${formatValue(flat.value, growth.unit)} of JavaScript before the page is ready in this app. A loader file is ${escape(sizes.loaderMin)} to ${escape(sizes.loaderMax)} depending on the features an app uses, plus a ${escape(sizes.listener)} listener inline in the HTML. The code of each widget arrives with the first click that needs it.`;
 }
 
 /** The startup chart: how much JavaScript each framework loads as the app grows. */
-export function renderBenchmarks(data: Benchmarks, link: string, listener: string): string {
+export function renderBenchmarks(data: Benchmarks, link: string, sizes: Sizes): string {
   const growth = readGrowth(data);
   let max = 0;
   for (const row of growth.rows) {
@@ -244,8 +251,8 @@ export function renderBenchmarks(data: Benchmarks, link: string, listener: strin
     notes += ` ${escape(joinNames(growth.partial))} ran on some sizes only.`;
   }
   return `<section aria-labelledby="benchmarks">
-  <h2 class="row-title" id="benchmarks">Your app grows. Its startup doesn't.</h2>
-  <p class="row-lead">${writeLead(growth, own, listener)}</p>
+  <h2 class="row-title" id="benchmarks">JavaScript before the page is ready, by app size</h2>
+  <p class="row-lead">${writeLead(growth, own, sizes)}</p>
   <div class="tile grow-tile">
     <div class="grow-chart" role="list" aria-label="JavaScript before the page is ready, gzip, per framework">${rows}</div>
     <p class="tile-foot">JavaScript files loaded before the <code>load</code> event, gzip. The inline listener is in the HTML, not in these bars. Run on ${escape(data.date)}, ${escape(data.machine)}.${notes} <a href="${link}">All results and how they were measured</a></p>
