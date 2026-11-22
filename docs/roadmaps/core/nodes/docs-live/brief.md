@@ -40,6 +40,9 @@ shared:
 reserves: []
 provides: []
 depends_on:
+  - on: landing-trim
+    kind: hard
+    why: both edit the landing sample and styles.css
   - on: website-repl
     kind: hard
     why: reuses the REPL's compile, render and frame pipeline
