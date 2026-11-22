@@ -11,6 +11,8 @@ The command prints a markdown table for each scenario and writes `results/<times
 
 ## Results
 
+The idlip todos, rows and dashboard pages now render `renderPreload` links by default, and their loaders import the preloaded chunks at idle (`idlip({ preimport: true })`). The Todos, Rows and Dashboard tables below were measured before that, with no links: read their idlip first-click rows as "preload off". [First click, preload on and off](#first-click-preload-on-and-off) has the numbers with the links. The scale page has no links.
+
 ### Todos
 
 A run of `pnpm -C benchmarks/harness bench --scenario todos` on branch `feat/bench-brumate-latest` at `f5ec645` (the benchmark changes were uncommitted), on 2026-11-21. The machine was an Apple M2 with 8 cores and 8 GB, Node 26.12.1 and Chrome 158. Other agents were building and testing at the same time: the load average was 4.92 4.61 4.64 at the start and 4.13 4.72 4.70 at the end, which is about 0.6 per core. Read timings that differ by less than 20% as equal. Sizes are raw / gzip -9. Renders per second are the median of 5 rounds, with the min and max.
@@ -85,7 +87,49 @@ Every operation runs in idlip, swap included, and passes the page checks. The fi
 | First click on widget 1 after idle, 150 ms RTT                  | 219 ms, 1 RT, 3 req      | 56 ms, 0 RT                 | 47 ms, 0 RT                 |
 | First click on widget 1 cold, 150 ms RTT                        | 216 ms, 1 RT, 3 req      | 480 ms, 0 RT                | 50 ms, 0 RT                 |
 
-No framework here has an idle preload to turn off, so the "preload off" session is n/a for all three. idlip loads the least JS before `load` and in total after 3 widgets, and pays 3 requests on each widget's first click.
+No framework here had an idle preload to turn off when this ran, so the "preload off" session is n/a for all three. idlip's page now preloads the click chunks of the 4 widgets above the fold, and `?preload=off` turns that off (see below). idlip loads the least JS before `load` and in total after 3 widgets, and pays 3 requests on each widget's first click.
+
+### First click, preload on and off
+
+The first click after idle at 150 ms latency, interleaved between three idlip builds of branch `node/preimport-chunks` at `ed724be` plus the page-clock harness change, on 2026-11-22. Apple M2, 8 cores, Chrome 158. N = 21 runs per side, fixed before the run, one warmup run dropped. Load average 2.24 at the start and 2.25 at the end of each scenario. Median (median absolute deviation); a change is real when it is larger than 3 times the larger deviation.
+
+- **off**: no preload links. The click fetches its chunks.
+- **links**: `renderPreload` links in the head, the loader built without `preimport`. The click imports modules the browser already fetched.
+- **preimport**: the links, and the loader imports the preloaded modules at idle after `load`. The click awaits settled promises.
+
+"Click to update" is the harness's waterfall number: from the Playwright click call to the check passing, polled every 5 ms. "Click to write" and "click to frame" use the page's own clock from the click event: to the first DOM change, and to a task queued from the next animation frame after it. They leave out the Playwright round trips.
+
+| Todos, counter  | off            | links         | preimport     | preimport vs links |
+| --------------- | -------------- | ------------- | ------------- | ------------------ |
+| Requests        | 3              | 0             | 0             |                    |
+| Click to update | 232.0 ms (4.0) | 66.0 ms (2.0) | 73.0 ms (5.0) | +11%, within noise |
+| Click to write  | 185.0 ms (2.1) | 15.9 ms (0.2) | 2.9 ms (0.2)  | -82%, real         |
+| Click to frame  | 186.1 ms (2.0) | 31.3 ms (0.2) | 28.0 ms (1.4) | -11%, within noise |
+
+| Dashboard, widget 1 | off            | links         | preimport     | preimport vs links |
+| ------------------- | -------------- | ------------- | ------------- | ------------------ |
+| Requests            | 4              | 0             | 0             |                    |
+| Click to update     | 247.0 ms (4.0) | 68.0 ms (5.0) | 72.0 ms (5.0) | +6%, within noise  |
+| Click to write      | 194.9 ms (2.1) | 17.6 ms (0.6) | 4.6 ms (0.4)  | -74%, real         |
+| Click to frame      | 196.9 ms (3.2) | 31.7 ms (0.2) | 28.9 ms (1.7) | -9%, within noise  |
+
+- **The links are the large gain**: the first click goes from one round trip (232 and 247 ms) to no request (66 and 68 ms). brumate 0.8.1 loads its code at start and measured 83 ms (todos) and 56 ms (dashboard) in the tables above, Marko 44 and 47 ms, so with the links idlip is in the same range on the same loading choice: all code fetched before the click.
+- **Preimport moves the DOM write, not yet the frame.** Without it, the click's `import()` of a preloaded module resolves in a task of its own after the next frame, so the write lands at 16 to 18 ms. With it the write lands at 3 to 5 ms. The frame that shows it comes 3 ms sooner in the median, inside the noise, and the harness number does not move beyond the noise either (it trends slower, +7 and +4 ms, in this run and in an earlier one with load 2.2 to 4.8: todos 67 to 80 ms, dashboard 70 to 81 ms). In these runs the frame came about 25 ms after a write made inside the click task, so the earlier write mostly waits for the same frame.
+- **Cost**: preimport adds 86 B gzip to the todos loader (4044 to 4130 B) and 91 B to the dashboard loader. The links add the chunks of the first click to every page load: 3 files for todos, 21 for the dashboard (the shared helpers module and 20 chunks), also for visitors who never click.
+
+`benchmarks/prefetch/run.mjs --rounds 20 --no-build` (the todos page with and without links, click right at `load`, preimport on in both, load 2.6 to 2.8): click to update 227 ms (224-234) off and 60 ms (53-66) on; navigation to update 617 ms against 489 ms; `load` 389 ms against 432 ms, since the preloads delay it.
+
+To repeat (copy each `dist` away before building the next side):
+
+```bash
+uptime   # 1-minute load under 3
+IDLIP_PREIMPORT=0 pnpm -C benchmarks/idlip build   # copy dist to links/
+pnpm -C benchmarks/idlip build                      # copy dist to preimport/
+node benchmarks/harness/first-click-ab.mjs --scenario todos --runs 21 \
+  --side links=links --side preimport=preimport --side off=preimport:off
+```
+
+For the dashboard, build with `build:dashboard` and copy `benchmarks/idlip/dashboard/dist`.
 
 ### Scale
 
@@ -296,6 +340,8 @@ The dashboard scenario:
 - `browser`: three sessions on fresh contexts with the 3 s idle wait. The main one clicks the button of widget 1, scrolls widget 30 into view and clicks it, then scrolls to widget 45 and clicks its Mode button. The second one clicks widget 30 first. The third repeats the main one with the idle preload off, for frameworks that have one (none here). Each click waits until the widget shows the output, mode, summary and list items that the handler computes in Node.
 - `dist`, `ssr-size` and `ssr-speed`: as for todos, with the one dashboard page. The worker checks that the HTML shows every widget's title, first item and first mode.
 - `waterfall`: as for todos, with a click on the button of widget 1.
+
+`node benchmarks/harness/first-click-ab.mjs` interleaves the "after idle" waterfall run between idlip builds of the todos or dashboard page, with the page-clock times described in [First click, preload on and off](#first-click-preload-on-and-off). Each `--side name=<dist>` serves one build, and `name=<dist>:off` serves it without preload links. `?preload=off` turns the links off on the idlip pages served by `serve.mjs`.
 
 ## Options
 

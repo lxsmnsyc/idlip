@@ -1,6 +1,10 @@
 // Interleaved A/B of the first click after idle between idlip builds of the todos or dashboard
 // page. The "idle" run of the waterfall metric: load, wait for the network to go quiet and
 // `--idle` ms more, throttle the network to `--latency`, click, and time the click to the update.
+// It reports two times: "click to update" as the harness measures it (from the Playwright click
+// call to the check passing, polled every 5 ms), and by the page's own clock from the click event,
+// which leaves out the Playwright round trips: "click to write" (the first DOM change) and "click
+// to the frame after the write".
 //
 // Each `--side` is `name=<dist>` or `name=<dist>:off`, where `<dist>` is the `dist/` folder of a
 // build (`benchmarks/idlip/dist` for todos, `benchmarks/idlip/dashboard/dist` for the dashboard,
@@ -106,6 +110,8 @@ function printLoad(when) {
 printLoad('at the start');
 const sides = [];
 const results = {};
+const writes = {};
+const frames = {};
 const requests = {};
 let browser;
 try {
@@ -115,6 +121,8 @@ try {
     const dist = path.resolve(off ? spec.slice(0, -':off'.length) : spec);
     sides.push({ name, ...(await serve(dist, !off)) });
     results[name] = [];
+    writes[name] = [];
+    frames[name] = [];
     requests[name] = [];
   }
   browser = await chromium.launch({ ...findChrome(), headless: true });
@@ -134,6 +142,8 @@ try {
       }
       if (run > 0) {
         results[side.name].push(sample.ms);
+        writes[side.name].push(Math.round(sample.write.write * 10) / 10);
+        frames[side.name].push(Math.round(sample.write.frame * 10) / 10);
         requests[side.name].push(sample.requests);
       }
     }
@@ -146,22 +156,28 @@ try {
 }
 printLoad('at the end');
 
-// Print the medians, the deviation and the change against the baseline.
+// Print the medians, the deviation and the change against the baseline, for each metric.
 console.log(
   `${values.scenario}, first click after ${values.idle} ms idle, ${values.latency} ms latency, ${values.runs} runs`,
 );
-const [first, ...rest] = sides;
-const baseline = results[first.name];
-console.log(
-  `${first.name} ${median(baseline).toFixed(1)} ms (MAD ${getDeviation(baseline).toFixed(1)}), ${median(requests[first.name])} requests`,
-);
-for (const side of rest) {
-  const list = results[side.name];
-  const change = (median(list) - median(baseline)) / median(baseline);
-  const noise = 3 * Math.max(getDeviation(list), getDeviation(baseline));
-  const real = Math.abs(median(list) - median(baseline)) > noise;
+function report(title, bySide) {
+  console.log(title);
+  const [first, ...rest] = sides;
+  const baseline = bySide[first.name];
   console.log(
-    `${side.name} ${median(list).toFixed(1)} ms (MAD ${getDeviation(list).toFixed(1)}), ${median(requests[side.name])} requests, ${(change * 100).toFixed(1)}% noise ${noise.toFixed(1)} ${real ? 'real' : 'within noise'}`,
+    `  ${first.name} ${median(baseline).toFixed(1)} ms (MAD ${getDeviation(baseline).toFixed(1)}), ${median(requests[first.name])} requests`,
   );
+  for (const side of rest) {
+    const list = bySide[side.name];
+    const change = (median(list) - median(baseline)) / median(baseline);
+    const noise = 3 * Math.max(getDeviation(list), getDeviation(baseline));
+    const real = Math.abs(median(list) - median(baseline)) > noise;
+    console.log(
+      `  ${side.name} ${median(list).toFixed(1)} ms (MAD ${getDeviation(list).toFixed(1)}), ${median(requests[side.name])} requests, ${(change * 100).toFixed(1)}% noise ${noise.toFixed(1)} ${real ? 'real' : 'within noise'}`,
+    );
+  }
 }
-console.log(JSON.stringify({ results, requests }));
+report('click to update (harness)', results);
+report('click to write (page clock)', writes);
+report('click to the frame after the write (page clock)', frames);
+console.log(JSON.stringify({ results, writes, frames, requests }));

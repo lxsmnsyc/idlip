@@ -194,10 +194,33 @@ function roundTrips(requests) {
   return max;
 }
 
+// Runs in the page before the click. By the page's own clock, from the click event: the first
+// DOM change after it (`window.__write`), and the frame that shows it (`window.__frame`, a task
+// queued from the next animation frame, so the frame has rendered).
+function installWriteTimer() {
+  let clicked = 0;
+  document.addEventListener('click', (event) => (clicked = event.timeStamp), { capture: true });
+  new MutationObserver(() => {
+    if (clicked !== 0 && window.__write === undefined) {
+      window.__write = performance.now() - clicked;
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          window.__frame = performance.now() - clicked;
+        });
+      });
+    }
+  }).observe(document.body, {
+    subtree: true,
+    childList: true,
+    characterData: true,
+    attributes: true,
+  });
+}
+
 // Clicks on a throttled network and records the requests until the update.
 // "idle": the page loads, idles, then the network slows down before the click.
 // "cold": the network is slow from the start and the click comes right after load.
-async function waterfallRun(browser, base, { latency, idleMs, cold, url, step }) {
+async function waterfallRun(browser, base, { latency, idleMs, cold, url, step, timeWrite }) {
   const context = await browser.newContext();
   const page = await context.newPage();
   const cdp = await context.newCDPSession(page);
@@ -234,6 +257,9 @@ async function waterfallRun(browser, base, { latency, idleMs, cold, url, step })
   }
   page.on('requestfinished', finish);
   page.on('requestfailed', finish);
+  if (timeWrite) {
+    await page.evaluate(installWriteTimer);
+  }
   start = performance.now();
   await step.run(page);
   let ms;
@@ -243,6 +269,11 @@ async function waterfallRun(browser, base, { latency, idleMs, cold, url, step })
   } catch {
     ms = 'FAILED';
   }
+  let write;
+  if (timeWrite && ms !== 'FAILED') {
+    await page.waitForFunction(() => window.__frame !== undefined);
+    write = await page.evaluate(() => ({ write: window.__write, frame: window.__frame }));
+  }
   const list = [];
   for (const entry of requests.values()) {
     if (ms === 'FAILED' || entry.start <= ms) {
@@ -250,7 +281,7 @@ async function waterfallRun(browser, base, { latency, idleMs, cold, url, step })
     }
   }
   await context.close();
-  return { ms, requests: list.length, roundTrips: roundTrips(list), log: list };
+  return { ms, write, requests: list.length, roundTrips: roundTrips(list), log: list };
 }
 
 async function waterfall(browser, base, options) {
@@ -376,7 +407,7 @@ export function measureDashboardWaterfall(browser, base, options) {
 // One first click after idle on a throttled network, the "idle" run of the waterfall: the
 // counter of the todos page, or widget 1 of the dashboard. `first-click-ab.mjs` interleaves it.
 export function measureFirstClick(browser, base, { scenario, latency, idleMs }) {
-  const options = { latency, idleMs, cold: false };
+  const options = { latency, idleMs, cold: false, timeWrite: true };
   if (scenario === 'dashboard') {
     return waterfallRun(browser, base, {
       ...options,
