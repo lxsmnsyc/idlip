@@ -1,7 +1,7 @@
 ---
 id: bench-scale
 title: Measure how startup cost grows with app size
-status: todo
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: [benchmark]
 fulfilled_by:
 gate: false
 added: 2026-11-22
-spent:
+spent: 480000
 owns:
   - benchmarks/harness/**
   - benchmarks/*/scale/**
