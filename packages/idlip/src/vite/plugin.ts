@@ -42,8 +42,11 @@ const CHUNKS_FILE = '.idlip/chunks.json';
 const DEFAULT_MODULES = ['src/**/*.tsx'];
 /** The id of a child's view chunk, with the component's name for a named component. */
 const VIEW_CHUNK = /\?idlip-(?:[A-Z][^.&=?]*\.)?view&lang\.js$/;
-/** The id of a list chunk, whose item template renders a child with its view. */
-const LIST_CHUNK = /\?idlip-(?:[A-Z][^.&=?]*\.)?list=[^&]*&lang\.js$/;
+/**
+ * The id of a chunk that can render a child with its view: a list's item template, a binding
+ * chunk that renders a condition branch, or a `<Try>` region.
+ */
+const RENDER_CHUNK = /\?idlip-(?:[A-Z][^.&=?]*\.)?(?:list|binding|try)=[^&]*&lang\.js$/;
 
 export interface IdlipOptions {
   /** Globs of the idlip modules, relative to the root. Default: `src/**\/*.tsx`. */
@@ -209,7 +212,8 @@ function checkChunkImports(
     }
   }
   // Every static import of an idlip chunk must already be loaded. The one exception is a view
-  // reached from a list chunk, which loads when rows are added, or from another view file.
+  // reached from a chunk that can add a child in the browser: a list row, a condition branch in
+  // a binding chunk, a `<Try>` region, or another view.
   const errors: string[] = [];
   for (const file of chunkFiles) {
     const item = items[file];
@@ -217,9 +221,9 @@ function checkChunkImports(
       continue;
     }
     const ids = [...item.moduleIds, item.facadeModuleId ?? ''];
-    const fromList = ids.some((id) => LIST_CHUNK.test(id) || VIEW_CHUNK.test(id));
+    const addsChild = ids.some((id) => RENDER_CHUNK.test(id) || VIEW_CHUNK.test(id));
     for (const imported of item.imports) {
-      if (!loaded.has(imported) && !(fromList && views.has(imported))) {
+      if (!loaded.has(imported) && !(addsChild && views.has(imported))) {
         errors.push(`${file} imports ${imported}, which the loader does not import`);
       }
     }
