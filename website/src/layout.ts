@@ -1,74 +1,89 @@
-import { readFileSync } from 'node:fs';
 import { createRenderer } from './markdown.ts';
-import type { RenderEnv } from './markdown.ts';
 import type { NavSection, Page } from './site.ts';
 
-const REPOSITORY = 'https://github.com/lxsmnsyc/idlip';
+export const REPOSITORY = 'https://github.com/lxsmnsyc/idlip';
 
 const renderer = createRenderer();
-const escape = renderer.utils.escapeHtml;
 
-/** The `:root { ... }` block of a syntax theme, which holds its colors. */
-function readColors(file: string): string {
-  const css = readFileSync(new URL(import.meta.resolve(file)), 'utf8');
-  const start = css.indexOf(':root');
-  return css.slice(css.indexOf('{', start), css.indexOf('}', start) + 1);
-}
-
-// The comments of the light theme are darker than GitHub's, so they reach 4.5:1 on the code panel.
-const light = readColors('@twinkleplop/theme-github/light').replace(
-  /--twp-comment:\s*#6e7781/,
-  '--twp-comment: #59636e',
-);
-const dark = readColors('@twinkleplop/theme-github/dark');
-
-/** The rules after the `:root` block of a syntax theme, which give each token class its color. */
-function readTokenRules(file: string): string {
-  const css = readFileSync(new URL(import.meta.resolve(file)), 'utf8');
-  const start = css.indexOf(':root');
-  return css.slice(css.indexOf('}', start) + 1).replaceAll(/\s*\n\s*/g, '');
-}
-
-const tokenRules = readTokenRules('@twinkleplop/theme-github/light');
-
-/** The colors of code in both themes, inlined so a page paints highlighted before any file loads. */
-const SYNTAX = `<style>:root${light}:root[data-theme='dark']${dark}@media (prefers-color-scheme: dark){:root:not([data-theme='light'])${dark}}${tokenRules}</style>`;
+/** Escapes text for HTML. */
+export const escape = renderer.utils.escapeHtml;
 
 /** Sets the saved theme before the first paint, so a page never flashes the other one. */
 const THEME_SCRIPT = `<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t}catch{}</script>`;
 
-const ICON = {
+/** The icons of the site: one set, 24px grid, 1.8px stroke. */
+export const ICON = {
   sun: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
   moon: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>',
   github:
     '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.76 2.69 1.25 3.35.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.04 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.58.23 2.75.11 3.04.74.81 1.19 1.83 1.19 3.09 0 4.42-2.7 5.4-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5z"/></svg>',
+  arrow:
+    '<svg class="icon-arrow" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+  back: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>',
+  reload:
+    '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>',
+  up: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg>',
+  down: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg>',
+  even: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5 9h14M5 15h14"/></svg>',
+  check:
+    '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  plug: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>',
+  pointer:
+    '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" stroke="var(--bg-elevated)" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M5 3l14 7.5-6.2 1.6L10 18z"/></svg>',
+  lock: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
+  open: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/></svg>',
 };
 
-/** The header, the same on every page. */
-function renderHeader(base: string, start: string): string {
+/**
+ * The links of the header after the search slot. `website-repl` adds its link here.
+ * `wide` links hide on narrow screens.
+ */
+export const HEADER_LINKS: {
+  label: string;
+  href: (base: string, start: string) => string;
+  wide?: boolean;
+}[] = [
+  { label: 'Docs', href: (base, start) => `${base}${start}` },
+  { label: 'Benchmarks', href: (base) => `${base}#benchmarks`, wide: true },
+];
+
+/** The header, the same on every page. `.header-slot` is empty until `website-search` fills it. */
+export function renderHeader(base: string, start: string): string {
+  let links = '';
+  for (const link of HEADER_LINKS) {
+    const wide = link.wide === true ? ' class="nav-wide"' : '';
+    links += `<a${wide} href="${link.href(base, start)}">${escape(link.label)}</a>`;
+  }
   return `<header class="site-header">
   <div class="header-inner">
     <a class="brand" href="${base}">idlip</a>
+    <div class="header-slot"></div>
     <nav class="header-nav" aria-label="Site">
-      <a href="${base}${start}">Docs</a>
-      <a class="icon-link" href="${REPOSITORY}" target="_blank" rel="noreferrer" aria-label="GitHub">${ICON.github}</a>
-      <button class="theme-toggle" type="button" aria-label="Switch the theme"><span class="icon-sun">${ICON.sun}</span><span class="icon-moon">${ICON.moon}</span></button>
+      ${links}
+      <a class="icon-button" href="${REPOSITORY}" target="_blank" rel="noreferrer" aria-label="GitHub" title="GitHub">${ICON.github}</a>
+      <button class="icon-button theme-toggle" type="button" aria-label="Switch the theme" title="Switch the theme"><span class="icon-sun">${ICON.sun}</span><span class="icon-moon">${ICON.moon}</span></button>
     </nav>
   </div>
 </header>`;
 }
 
-function renderHead(base: string, title: string, description: string): string {
+/** The `<head>` of every page: the theme script, the stylesheet, the one script and the fonts. */
+export function renderHead(base: string, title: string, description: string): string {
   return `<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escape(title)}</title>
 <meta name="description" content="${escape(description)}">
 ${THEME_SCRIPT}
-${SYNTAX}
+<link rel="preload" href="${base}fonts/bricolage-grotesque.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="${base}assets/site.css">
 <script type="module" src="${base}assets/site.js"></script>
 </head>`;
+}
+
+/** The footer of every page. */
+export function renderFooter(): string {
+  return `<footer class="site-footer"><span>idlip</span><a href="${REPOSITORY}" target="_blank" rel="noreferrer">MIT license, on GitHub</a></footer>`;
 }
 
 export interface PageContext {
@@ -128,54 +143,14 @@ ${renderHeader(base, start)}
 <div class="docs-layout">
   ${renderSidebar(nav, page, base)}
   <main id="content" class="prose">
-    <p class="eyebrow">${escape(page.section)}</p>
+    <p class="crumb">${escape(page.section)}</p>
     <h1>${escape(page.title)}</h1>
 ${page.html}
     ${renderPager(base, previous, next)}
   </main>
   ${renderContents(page)}
 </div>
-</body>
-</html>
-`;
-}
-
-export interface LandingContext {
-  base: string;
-  /** The source of the todo example, shown highlighted. Empty for none. */
-  example: string;
-  /** The address of the first page of the guide. */
-  start: string;
-}
-
-/** The landing page: the claim, a link to the guide and the todo example. */
-export function renderLanding({ base, example, start }: LandingContext): string {
-  let sample = '';
-  if (example !== '') {
-    const env: RenderEnv = { headings: [], lead: '', link: (href) => href };
-    sample = `<section class="landing-sample">
-  <p class="eyebrow">examples/todo</p>
-  ${renderer.render(`\`\`\`tsx no-check\n${example}\`\`\`\n`, env)}
-</section>`;
-  }
-  return `<!doctype html>
-<html lang="en">
-${renderHead(base, 'idlip', 'A UI framework that resumes in the browser where the server stopped.')}
-<body>
-<a class="skip" href="#content">Skip to the content</a>
-${renderHeader(base, start)}
-<main id="content" class="landing">
-  <section class="hero">
-    <p class="eyebrow">Resumable UI</p>
-    <h1 class="display">The server rendered it. The browser <em>resumes</em> it.</h1>
-    <p class="lead">No view code runs on load. A click loads one update handler and only the bindings whose model paths changed.</p>
-    <p class="actions">
-      <a class="button primary" href="${base}${start}">Read the guide<svg class="icon-arrow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-      <a class="button" href="${REPOSITORY}" target="_blank" rel="noreferrer">GitHub</a>
-    </p>
-  </section>
-  ${sample}
-</main>
+${renderFooter()}
 </body>
 </html>
 `;

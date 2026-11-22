@@ -21,7 +21,6 @@
     "@twinkleplop/css": "0.1.7",
     "@twinkleplop/json": "0.1.7",
     "@twinkleplop/markdown-it": "0.1.7",
-    "@twinkleplop/theme-github": "0.2.4",
     "@twinkleplop/tsx": "0.1.7",
     "@twinkleplop/typescript": "0.1.7",
     "@types/markdown-it": "14.1.2",

@@ -1,0 +1,133 @@
+/* The styles of the demo frame, `examples/todo` as it renders. The build inlines them after the
+   site's tokens, so the frame needs no request for its styles. */
+
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url(/fonts/bricolage-grotesque.woff2) format('woff2');
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font: 400 var(--text-base) / 1.5 var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+
+main {
+  display: grid;
+  gap: 1rem;
+  padding: 0.5rem 1.5rem 1.5rem;
+}
+
+form {
+  display: flex;
+  gap: 0.5rem;
+}
+
+input:not([type]) {
+  flex: 1;
+  min-width: 0;
+  min-height: 3rem;
+  padding: 0 1.1rem;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 2px transparent;
+  color: var(--text);
+  font: inherit;
+  transition: box-shadow var(--duration-fast);
+}
+
+input:not([type]):hover {
+  box-shadow: inset 0 0 0 2px var(--border-strong);
+}
+
+button {
+  min-height: 3rem;
+  padding: 0 1.4rem;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  font: 600 var(--text-base) var(--font);
+  cursor: pointer;
+  transition:
+    transform var(--duration-fast) var(--ease),
+    opacity var(--duration-fast);
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+button:disabled {
+  background: var(--surface-strong);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+p {
+  margin: 0.25rem 0 0;
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+ul {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+li {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-height: 3.25rem;
+  padding: 0 1.1rem;
+  border-radius: 14px;
+  background: var(--surface);
+  font-weight: 500;
+  transition: background var(--duration);
+}
+
+li.done {
+  background: var(--accent-tint);
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+input[type='checkbox'] {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  accent-color: var(--text);
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.001ms !important;
+  }
+}

@@ -5,7 +5,13 @@ import { splitFrontMatter } from './front-matter.ts';
 import type { FrontMatter } from './front-matter.ts';
 import { createRenderer } from './markdown.ts';
 import type { Heading, RenderEnv } from './markdown.ts';
-import { renderLanding, renderPage } from './layout.ts';
+import benchmarks from './benchmarks.json' with { type: 'json' };
+import { DEMO_DATA } from './demo/data.ts';
+import type { DemoData } from './demo/data.ts';
+import { isBenchmarks } from './landing/benchmarks.ts';
+import type { Benchmarks } from './landing/benchmarks.ts';
+import { renderLanding } from './landing/index.ts';
+import { renderPage } from './layout.ts';
 
 const DOCS = fileURLToPath(new URL('../docs/', import.meta.url));
 const TODO_SOURCE = fileURLToPath(
@@ -111,8 +117,15 @@ export function buildNav(pages: readonly Page[]): NavSection[] {
   return nav;
 }
 
-/** Renders the whole site: the landing page and one page per Markdown file, by output path. */
-export function renderSite(pages: readonly Page[], base = '/'): Map<string, string> {
+/**
+ * Renders the whole site by output path: one page per Markdown file, and the landing page when
+ * the demo build is given.
+ */
+export function renderSite(
+  pages: readonly Page[],
+  base = '/',
+  demo?: DemoData,
+): Map<string, string> {
   const nav = buildNav(pages);
   const flat: Page[] = [];
   for (const section of nav) {
@@ -125,19 +138,64 @@ export function renderSite(pages: readonly Page[], base = '/'): Map<string, stri
       renderPage({ page, nav, base, previous: flat[index - 1], next: flat[index + 1] }),
     );
   }
+  if (demo === undefined) {
+    return files;
+  }
   let example = '';
   try {
     example = dropLeadingComments(readFileSync(TODO_SOURCE, 'utf8'));
   } catch {
     // The landing page shows no sample when the example is missing.
   }
-  files.set('index.html', renderLanding({ base, example, start: flat[0]?.url ?? 'docs/' }));
+  files.set(
+    'index.html',
+    renderLanding({
+      base,
+      start: flat[0]?.url ?? 'docs/',
+      pages,
+      example,
+      demo,
+      benchmarks: readBenchmarks(),
+    }),
+  );
   return files;
 }
 
-/** Writes the pages into a folder. The Vite build has already put the assets there. */
+function readBenchmarks(): Benchmarks {
+  if (!isBenchmarks(benchmarks)) {
+    throw new TypeError('src/benchmarks.json does not have the fields the landing page reads');
+  }
+  return benchmarks;
+}
+
+function isDemoData(value: unknown): value is DemoData {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof Reflect.get(value, 'frame') === 'string' &&
+    Array.isArray(Reflect.get(value, 'chunks'))
+  );
+}
+
+/** Reads the demo build. The landing page is not written without it. */
+export function readDemo(file = DEMO_DATA): DemoData {
+  let value: unknown;
+  try {
+    value = JSON.parse(readFileSync(file, 'utf8'));
+  } catch (error) {
+    throw new Error(`${file} is missing. The Vite build of the site writes it: run it first.`, {
+      cause: error,
+    });
+  }
+  if (!isDemoData(value)) {
+    throw new TypeError(`${file} is not a demo build`);
+  }
+  return value;
+}
+
+/** Writes the pages into a folder. The Vite build has already put the assets and the demo there. */
 export function writeSite(outDir: string, base = '/'): string[] {
-  const files = renderSite(loadPages(DOCS, base), base);
+  const files = renderSite(loadPages(DOCS, base), base, readDemo());
   for (const [name, html] of files) {
     const target = path.join(outDir, name);
     mkdirSync(path.dirname(target), { recursive: true });

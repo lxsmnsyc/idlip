@@ -1,0 +1,158 @@
+{
+  "date": "2026-11-21",
+  "machine": "Apple M2, 8 cores, 8 GB, Node 26.12.1, Chrome 158",
+  "source": "benchmarks/README.md",
+  "frameworks": ["idlip", "brumate 0.8.1", "Marko 6", "Qwik 1", "Qwik 2"],
+  "groups": [
+    {
+      "name": "JS before the first click",
+      "metrics": [
+        {
+          "name": "Todos: JS on load and 3 s idle",
+          "unit": "kB",
+          "better": "lower",
+          "noise": 0,
+          "values": {
+            "idlip": 3.8,
+            "brumate 0.8.1": 13.9,
+            "Marko 6": 4.4,
+            "Qwik 1": 22.9,
+            "Qwik 2": 38.2
+          }
+        },
+        {
+          "name": "Dashboard: JS on load",
+          "unit": "kB",
+          "better": "lower",
+          "noise": 0,
+          "values": {
+            "idlip": 4.6,
+            "brumate 0.8.1": 23.3,
+            "Marko 6": 10.5,
+            "Qwik 1": null,
+            "Qwik 2": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "The first click",
+      "metrics": [
+        {
+          "name": "First todo toggle: JS fetched",
+          "unit": "B",
+          "better": "lower",
+          "noise": 0,
+          "values": {
+            "idlip": 613,
+            "brumate 0.8.1": 0,
+            "Marko 6": 0,
+            "Qwik 1": 0,
+            "Qwik 2": 0
+          }
+        },
+        {
+          "name": "First counter click, cold, 150 ms RTT",
+          "unit": "ms",
+          "better": "lower",
+          "noise": 0.2,
+          "values": {
+            "idlip": 226,
+            "brumate 0.8.1": 108,
+            "Marko 6": 50,
+            "Qwik 1": 240,
+            "Qwik 2": 491
+          }
+        }
+      ]
+    },
+    {
+      "name": "SSR throughput",
+      "metrics": [
+        {
+          "name": "Renders per second, 3 todos",
+          "unit": "/s",
+          "better": "higher",
+          "noise": 0.2,
+          "values": {
+            "idlip": 36047,
+            "brumate 0.8.1": 81464,
+            "Marko 6": 77944,
+            "Qwik 1": 10757,
+            "Qwik 2": 6184
+          }
+        },
+        {
+          "name": "Renders per second, 100 todos",
+          "unit": "/s",
+          "better": "higher",
+          "noise": 0.2,
+          "values": {
+            "idlip": 7501,
+            "brumate 0.8.1": 9034,
+            "Marko 6": 5892,
+            "Qwik 1": 1864,
+            "Qwik 2": 1140
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rows, main thread from click to paint",
+      "metrics": [
+        {
+          "name": "Create 1,000 rows",
+          "unit": "ms",
+          "better": "lower",
+          "noise": 0.2,
+          "values": {
+            "idlip": 35.4,
+            "brumate 0.8.1": 22.1,
+            "Marko 6": 21.0,
+            "Qwik 1": null,
+            "Qwik 2": null
+          }
+        },
+        {
+          "name": "Update every 10th of 1,000 rows",
+          "unit": "ms",
+          "better": "lower",
+          "noise": 0.2,
+          "values": {
+            "idlip": 13.5,
+            "brumate 0.8.1": 10.5,
+            "Marko 6": 9.0,
+            "Qwik 1": null,
+            "Qwik 2": null
+          }
+        },
+        {
+          "name": "Swap 2 of 1,000 rows",
+          "unit": "ms",
+          "better": "lower",
+          "noise": 0.2,
+          "values": {
+            "idlip": 9.7,
+            "brumate 0.8.1": 5.6,
+            "Marko 6": 4.4,
+            "Qwik 1": null,
+            "Qwik 2": null
+          }
+        },
+        {
+          "name": "Server page of 1,000 rows: JS heap",
+          "unit": "MB",
+          "better": "lower",
+          "noise": 0,
+          "values": {
+            "idlip": 0.8,
+            "brumate 0.8.1": 1.4,
+            "Marko 6": 1.3,
+            "Qwik 1": null,
+            "Qwik 2": null
+          }
+        }
+      ]
+    }
+  ]
+}

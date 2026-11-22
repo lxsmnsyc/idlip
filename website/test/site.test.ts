@@ -21,7 +21,7 @@ function makeDocs(files: Record<string, [string, number, string]>): string {
 }
 
 describe('pages', () => {
-  it('renders a page per Markdown file, plus the landing page', () => {
+  it('renders a page per Markdown file, and no landing page without the demo build', () => {
     const folder = makeDocs({
       'index.md': ['Start', 0, 'Start'],
       'a.md': ['A', 1, 'Guide'],
@@ -32,7 +32,6 @@ describe('pages', () => {
       'docs/a/index.html',
       'docs/deep/b/index.html',
       'docs/index.html',
-      'index.html',
     ]);
     expect(files.get('docs/a/index.html')).toContain('<h1>A</h1>');
   });
