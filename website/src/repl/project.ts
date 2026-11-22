@@ -1,5 +1,5 @@
 // Compiles the files of a REPL session. The REPL worker runs it, and the tests run it in Node.
-import { compile, listChildren } from 'idlip/compiler';
+import { compile, listChildren, printHelpersModule } from 'idlip/compiler';
 import { resolveName } from './chunks.ts';
 import { PROPS_FILE, isModuleName } from './files.ts';
 import type { ReplFile } from './files.ts';
@@ -37,6 +37,8 @@ export interface Project {
   props: Record<string, unknown>;
   /** True when no problem is an error, so the project can run. */
   ok: boolean;
+  /** The `idlip/helpers` module that the client chunks import. */
+  helpers: string;
 }
 
 function getPosition(source: string, offset: number): { line: number; column: number } {
@@ -184,5 +186,5 @@ export function compileProject(files: readonly ReplFile[]): Project {
       ok = false;
     }
   }
-  return { files: compiled, problems, props, ok };
+  return { files: compiled, problems, props, ok, helpers: printHelpersModule() };
 }

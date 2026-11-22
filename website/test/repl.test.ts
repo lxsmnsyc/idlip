@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
-import { listChunks } from '../src/repl/chunks.ts';
+import { HELPERS_PATH, listChunks } from '../src/repl/chunks.ts';
 import { EXAMPLES } from '../src/repl/examples.ts';
 import {
   decodeFiles,
@@ -34,6 +34,12 @@ describe('repl examples', () => {
       for (const chunk of chunks) {
         for (const match of chunk.code.matchAll(/\bfrom\s*'([^']+)'/g)) {
           expect(served).toContain(match[1]);
+        }
+      }
+      // The chunks share one helpers module and copy no helper.
+      for (const chunk of chunks) {
+        if (chunk.path !== HELPERS_PATH) {
+          expect(chunk.code).not.toMatch(/^function \w+\$\(/m);
         }
       }
       const rendered = await renderProject(project, chunks, FOLDER, createDataUrl);

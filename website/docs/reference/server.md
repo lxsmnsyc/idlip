@@ -111,7 +111,7 @@ interface PreloadOptions {
 
 ## Render helpers
 
-Compiled server modules import these helpers. The compiler also copies them into the client chunks that use them. Application code does not need to call them.
+Compiled server modules import these helpers. Client chunks import the same functions from `idlip/helpers`, the module the Vite plugin writes. Application code does not need to call them.
 
 ### `attr`
 

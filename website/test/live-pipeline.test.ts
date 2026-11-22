@@ -23,7 +23,12 @@ const COUNTER = `export default function Counter() {
 const RENDERED = { head: '', body: '<p>ok</p>' };
 
 function createRequest(id: number): ToWorker {
-  return { id, project: { files: [], problems: [], props: {}, ok: true }, chunks: [], folder: '' };
+  return {
+    id,
+    project: { files: [], problems: [], props: {}, ok: true, helpers: '' },
+    chunks: [],
+    folder: '',
+  };
 }
 
 /** A fake worker that keeps the requests it gets and answers when asked. */

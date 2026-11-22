@@ -1,7 +1,7 @@
 // The Compiled tab of a live sample: the server module and each client chunk, with its gzip size.
 // The site build writes it for the code as the page ships it, and the page writes it again after
 // an edit. It takes code that is already highlighted, so it pulls in no highlighter.
-import { listFileChunks } from '../repl/chunks.ts';
+import { HELPERS_PATH, listFileChunks } from '../repl/chunks.ts';
 import type { ServedChunk } from '../repl/chunks.ts';
 import REPL_ICON from '../repl/icons.ts';
 import type { Project } from '../repl/project.ts';
@@ -60,6 +60,12 @@ export function listCompiledModules(
       });
     }
   }
+  // The REPL serves every helper. A build keeps only the ones the chunks use.
+  modules.push({
+    title: HELPERS_PATH,
+    note: 'helpers the chunks share, loads with the first chunk',
+    code: project.helpers,
+  });
   return modules;
 }
 

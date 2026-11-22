@@ -3,7 +3,7 @@
 // compiles the files in the REPL worker and, when they compile, runs them in the frame. Files
 // from a share link only compile until the reader chooses Run.
 import type { NetworkPanel, watchFrame } from '../client/lib/network.ts';
-import { listFileChunks } from './chunks.ts';
+import { HELPERS_PATH, listFileChunks } from './chunks.ts';
 import { createEditor } from './editor.ts';
 import { EXAMPLES } from './examples.ts';
 import {
@@ -436,6 +436,14 @@ export function startRepl(root: HTMLElement, watch: typeof watchFrame): void {
           chunk.code,
         );
       }
+    }
+    // The chunks import their helpers from one module. A build keeps only the helpers they use.
+    if (js !== '') {
+      js += renderModule(
+        'idlip/helpers: shared by the chunks',
+        HELPERS_PATH,
+        result.project.helpers,
+      );
     }
     jsPanel.innerHTML = js === '' ? '<p class="net-empty">Nothing compiled</p>' : js;
     const body = served?.rendered.body ?? '';

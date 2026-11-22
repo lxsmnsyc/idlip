@@ -50,6 +50,9 @@ function getChunkId(id: string, chunk: string): string {
   return `${id}?idlip-${chunk}&lang.js`;
 }
 
+/** The file name of the helpers module in a run folder. */
+export const HELPERS_PATH = 'idlip-helpers.js';
+
 /** The file name of a chunk: `counter.tsx` and `binding=items.*.id` give `counter.binding.items._.id.js`. */
 function getChunkPath(file: string, chunk: string): string {
   const stem = file.slice(0, -'.tsx'.length);
@@ -83,19 +86,23 @@ function addNames(names: Set<string>, list: string): void {
 export function writeFrameShim(project: Project): string {
   const names = new Set<string>();
   const imports = /import\s*\{([^}]*)\}\s*from\s*'idlip(?:\/client)?'/g;
+  const codes = [project.helpers];
   for (const file of project.files) {
     for (const module of listFileChunks(file)) {
-      for (const match of module.code.matchAll(imports)) {
-        addNames(names, match[1]);
-      }
+      codes.push(module.code);
+    }
+  }
+  for (const code of codes) {
+    for (const match of code.matchAll(imports)) {
+      addNames(names, match[1]);
     }
   }
   return `const m = globalThis.__idlipFrame;\nexport const { ${[...names].join(', ')} } = m;\n`;
 }
 
 /**
- * The client chunks of a run. `folder` is the URL of the run folder and `runtime` the URL of
- * the module that `writeFrameShim` writes.
+ * The client chunks of a run, and last the helpers module they share. `folder` is the URL of
+ * the run folder and `runtime` the URL of the module that `writeFrameShim` writes.
  */
 export function listChunks(project: Project, folder: string, runtime: string): ServedChunk[] {
   const urls = new Map<string, string>();
@@ -113,10 +120,16 @@ export function listChunks(project: Project, folder: string, runtime: string): S
       chunks.push({ file: file.name, chunk: module.chunk, path, code: module.code });
     }
   }
+  // The chunks import their helpers from one module, as in a build. The REPL has no bundler,
+  // so it serves every helper.
+  chunks.push({ file: '', chunk: 'helpers', path: HELPERS_PATH, code: project.helpers });
   for (const chunk of chunks) {
     chunk.code = rewriteImports(chunk.code, (specifier) => {
       if (specifier === 'idlip/client' || specifier === 'idlip') {
         return runtime;
+      }
+      if (specifier === 'idlip/helpers') {
+        return `${folder}${HELPERS_PATH}`;
       }
       return urls.get(specifier) ?? specifier;
     });
