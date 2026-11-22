@@ -92,7 +92,7 @@ describe('cloned templates', () => {
     expect(code).toContain("setOn$($n[2], 'click', ['select', [row.id]]);");
   });
 
-  it('clones a row with a condition and a nested list, and renders HTML for a static branch', () => {
+  it('clones a row with a condition and a nested list, and a static branch', () => {
     const code = findChunk(
       `
       import { For } from 'idlip';
@@ -129,12 +129,14 @@ describe('cloned templates', () => {
     expect(code).toContain('$n[2].before(');
     expect(code).toContain('export const blocks = true;');
     expect(code).not.toContain('text$(');
-    expect(
-      findChunk(
-        DISCLOSURE.replace('<h2>{title}</h2>', '').replace(' class={{ open }}', ''),
-        'binding=open',
-      ),
-    ).not.toContain('clone$');
+    // A branch with nothing to write clones its template as it is, and an empty one is an
+    // empty fragment.
+    const branch = findChunk(
+      DISCLOSURE.replace('<h2>{title}</h2>', '').replace(' class={{ open }}', ''),
+      'binding=open',
+    );
+    expect(branch).toContain('return clone$(templateC0_0$, $doc)[0];');
+    expect(branch).toContain('return $doc.createDocumentFragment();');
   });
 
   // A row body in a list of `{ id, label }` rows. `show` reads by the state, so `show(view)`
@@ -178,13 +180,6 @@ describe('cloned templates', () => {
     }
     throw new Error('No list chunk');
   }
-
-  it.each([['static events only', '<li><a on:click={() => touch()}>static</a></li>', 'ul']])(
-    'renders HTML for %s',
-    (_name, row, parent) => {
-      expect(findRowChunk(row, parent)).not.toContain('clone$');
-    },
-  );
 
   it.each([
     ['a text hole directly in a table row', '<tr>{row.label}</tr>', 'tbody', 'html-nesting'],
@@ -336,6 +331,7 @@ describe('cloned templates', () => {
 
   it.each([
     ['a text hole directly in a select', '<li><select>{row.label}<option>o</option></select></li>'],
+    ['a row with static events only', '<li><a on:click={() => touch()}>static</a></li>'],
     ['a static template next to a hole', '<li>{row.label}<template><b>x</b></template></li>'],
     ['an svg element inside an HTML row', '<li><svg><text>{row.label}</text></svg></li>'],
     ['a cell of a table row', '<tr><td>{row.label}</td></tr>'],

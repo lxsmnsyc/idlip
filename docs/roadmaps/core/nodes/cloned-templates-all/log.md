@@ -78,3 +78,12 @@ The `nested-blocks` subject failed on the base, with the HTML path: a click that
 - `plan.ts` makes a hole dynamic only at the top of a root view (no rows, no blocks, not a child: "Rows, blocks and children render from templates that record no reads"), and that part renders on the server only. So no client body holds one today. The template writer no longer refuses one: a dynamic text, attribute or text-element hole prints through `printTracked` (`track$(dynamic, 't<id>', model, (model) => ...)`), as `HtmlBuilder` did, and the scope takes `dynamic` and `model`.
 - No differential subject can reach it, so `template.test.ts` builds a branch from a plan whose holes are all marked dynamic and checks the writes and the scope.
 - Sizes: no loader or helpers code change.
+
+## Step 8: bodies with nothing to write
+
+- `canClone` no longer asks for a write: a static row, branch, view or catch view clones its parsed template as it is (`clone$(template, $doc)[0]`, one `importNode` of the fragment cached per document). An empty top-level branch returns `$doc.createDocumentFragment()`.
+- The reason for the old rule was bytes: `clone$` was copied into each chunk. With one shared helpers module a static template costs the chunk about what its HTML string did (the template constant plus one call), and the rule in `compiler/CLAUDE.md` says so now.
+- After this step only a body that holds raw HTML (`html=`) still renders HTML.
+- Goldens: `counter/expected/client/binding.count.js` (its `<span>even</span>` branch) and the `try` fixture.
+- Differential subject `static-bodies`: static rows, a row with static branches, a static branch and an empty one, a static catch view (kept regions that recover stay caught, the accepted divergence lists this subject too).
+- Sizes: todo loader 4073 B, helpers 969 B, counters loader 5113 B, rows dist 7711 B, dashboard dist 107015 B (no change in these apps: their static bodies were few or none).

@@ -155,11 +155,17 @@ function emitCondition(
   branchEmitter.frames = emitter.frames;
   const builder = new HtmlBuilder(context.component, context.plan, branchEmitter);
   const clone = createCloneContext(context.component, context.plan, branchEmitter);
-  // A branch that writes a value clones its templates. Other branches render HTML.
+  // A branch clones its templates, and an empty one is an empty fragment. A branch with raw
+  // HTML renders HTML.
   let cloned = false;
   const branches: string[][] = [];
   const expressions: string[] = [];
   for (const [index, nodes] of [node.then, node.else].entries()) {
+    if (nodes.length === 0) {
+      branches.push(['return $doc.createDocumentFragment();']);
+      cloned = true;
+      continue;
+    }
     if (canClone(nodes, context.component, context.plan)) {
       const body = buildBody(nodes, node.namespace, `templateC${node.test.id}_${index}$`, clone);
       branches.push([...body.pre, `return ${body.expr};`]);
@@ -330,8 +336,7 @@ export function emitListChunk(info: ListInfo, context: ChunkContext): GroupChunk
   const frame: Frame = { item: info.node.item, index: info.node.index, row: undefined };
   emitter.frames = [...info.frames, frame];
   const builder = new HtmlBuilder(context.component, context.plan, emitter);
-  // A row that writes a value clones a template that holds its row markers. Other rows render
-  // HTML.
+  // A row clones a template that holds its row markers. A row with raw HTML renders HTML.
   let body: string[];
   let cloned = false;
   let blocks = false;

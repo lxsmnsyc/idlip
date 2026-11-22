@@ -139,6 +139,17 @@ export const SUBJECTS: readonly Subject[] = [
     },
   },
   {
+    // Static rows, branches and catch views, which clone with no writes.
+    name: 'static-bodies',
+    source: read(import.meta.dirname, 'subjects/static-bodies.tsx'),
+    props: {
+      items: [
+        { id: 'a1', on: true },
+        { id: 'a2', on: false },
+      ],
+    },
+  },
+  {
     name: 'nested-board',
     source: read(FIXTURES, 'nested/board/board.tsx'),
     props: {

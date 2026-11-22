@@ -588,24 +588,15 @@ function hasFreeMessage(events: readonly Event[], component: Component): boolean
 }
 
 /**
- * Tells whether a client body renders by a clone: it has nodes, holds only elements, static
- * text, text holes, children, `<Subscribe>`, `<Head>`, global listeners, and conditions, lists
- * and `<Try>` regions whose bodies clone, and writes at least one value. A body in SVG or MathML
- * parses its template in an `<svg>` or `<math>` wrapper. A static body renders HTML: its parse
- * is short. Raw HTML renders HTML. A dynamic hole records its reads. A text hole in an HTML
- * text element sets the element's text, and the content of a `<template>` with a write clones
- * from its own template.
+ * Tells whether a client body renders by a clone: it holds only elements, static text, text
+ * holes, children, `<Subscribe>`, `<Head>`, global listeners, and conditions, lists and `<Try>`
+ * regions whose bodies clone. A body in SVG or MathML parses its template in an `<svg>` or
+ * `<math>` wrapper. A body with nothing to write clones its parsed template as it is. Raw HTML
+ * renders HTML. A dynamic hole records its reads. A text hole in an HTML text element sets the
+ * element's text, and the content of a `<template>` with a write clones from its own template.
  */
 export function canClone(nodes: readonly Node[], component: Component, plan: Plan): boolean {
-  if (nodes.length === 0 || !isClonedBody(nodes, component, plan)) {
-    return false;
-  }
-  for (const node of nodes) {
-    if (hasWrite(node, component)) {
-      return true;
-    }
-  }
-  return false;
+  return isClonedBody(nodes, component, plan);
 }
 
 /**

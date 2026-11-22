@@ -3,6 +3,7 @@ import { clone$, putText$, setBranch$ } from 'idlip/helpers';
 const templateE1_0$ = { h: '<b><!--x1--></b>', n: 1 };
 const templateE1_1$ = { h: '<em><!--x1--></em>', n: 1 };
 const templateC2_0$ = { h: '<!--e1:x1--><!--/e-->', n: 1 };
+const templateC2_1$ = { h: '<i>hidden</i>', n: 0 };
 
 function check(value) {
   if (value < 0) {
@@ -34,5 +35,5 @@ $n[1].data += 1;
 $n[1].after($nc1);
 return $n[0];
 }
-return '<i>hidden</i>';
+return clone$(templateC2_1$, $doc)[0];
 }
