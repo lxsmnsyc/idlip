@@ -1,7 +1,7 @@
 ---
 id: short-chunk-names
 title: Name build chunks by a short hash instead of their readable path
-status: todo
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: [benchmark]
 fulfilled_by:
 gate: false
 added: 2026-11-22
-spent:
+spent: 90000
 owns:
   - packages/idlip/src/vite/**
   - packages/idlip/test/vite/**
