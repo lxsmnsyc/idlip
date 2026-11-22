@@ -258,6 +258,14 @@ function printHelpersModule(): string;
 
 Returns the source of the `idlip/helpers` module: a copy of every helper, the loader exports they call as imports from `idlip/client`, and an export of each helper. It throws when a bundler renamed a function, since the copies call each other by name.
 
+### `TEMPLATES_MODULE`
+
+```ts
+const TEMPLATES_MODULE = 'idlip/templates';
+```
+
+The specifier that chunks import a template from when more than one chunk renders it. The export of a template is `t` and the hash of its namespace and markup. The Vite plugin finds the shared templates, passes their hashes as `shared` to `compile`, and resolves the specifier to a virtual module written by `printTemplatesModule(templates)`. Without `shared`, every chunk declares its templates.
+
 ## Printing
 
 ### `printModule`

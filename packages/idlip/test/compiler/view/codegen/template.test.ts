@@ -220,6 +220,21 @@ describe('cloned templates', () => {
     expect(clone$(template, document)[1].ownerDocument).toBe(document);
   });
 
+  it('walks from mark to mark through siblings, ancestors and descendants', () => {
+    // Marks 3 and 1 are out of order on purpose: the mark number names the node, not the walk.
+    const template = {
+      h: '<p i-x="3"><b><i i-x="1"></i></b><u></u><s i-x="4"></s></p><!--x2--><div><em><a i-x="5"></a></em><span i-x="6"></span></div>',
+      n: 6,
+    };
+    const [fragment, ...marks] = clone$(template, document);
+    const names = marks.map((node) => (node instanceof Element ? node.localName : '#text'));
+    expect(names).toEqual(['i', '#text', 'p', 's', 'a', 'span']);
+    expect(marks[0].parentNode?.parentNode).toBe(marks[2]);
+    expect(marks[3].previousSibling?.nodeName).toBe('U');
+    expect(marks[5].parentNode).toBe(fragment.lastChild);
+    expect(marks[4].parentNode?.parentNode).toBe(fragment.lastChild);
+  });
+
   it('drops the newline a pre and a textarea drop, as a browser parses the server markup', () => {
     const result = compileRows(
       "<li><pre>{row.label}</pre><pre>{'fixed'}</pre><textarea>{'fixed'}</textarea><pre html={trusted(a)} /></li>",

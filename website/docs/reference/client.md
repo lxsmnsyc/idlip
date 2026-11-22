@@ -13,7 +13,7 @@ const loader = `<script type="module" src="/@id/idlip/client"></script>`;
 
 In `vite dev` the plugin serves `/@id/idlip/client` as a module that imports `idlip/client`. A chunk that imports from the loader gets the same URL, so the page runs one copy of the loader. The Vite plugin uses `idlip/client` as the input of the client build, so a production page points at the built loader file. See [idlip/vite](./vite.md).
 
-The other exports are what binding, list and handler chunks import. Application code does not call them. The DOM and render helpers are in one module that the chunks share, `idlip/helpers`, which the Vite plugin writes. A build keeps the helpers the chunks use, and ships each one once. The loader starts loading that module with the chunks of the first event, so the first click stays one round trip.
+The other exports are what binding, list and handler chunks import. Application code does not call them. The DOM and render helpers are in one module that the chunks share, `idlip/helpers`, which the Vite plugin writes. A build keeps the helpers the chunks use, and ships each one once. The loader starts loading that module with the chunks of the first event, so the first click stays one round trip. Templates that more than one chunk renders are in a second shared module, `idlip/templates`, which loads with the helpers.
 
 ## Patching
 
