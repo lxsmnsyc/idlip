@@ -37,6 +37,9 @@ shared:
 reserves: []
 provides: []
 depends_on:
+  - on: differential-render-test
+    kind: hard
+    why: guards the second render output
   - on: plain-tsx
     kind: hard
     why: edits the renamed fixtures and expected outputs
@@ -64,3 +67,7 @@ Brumate had the same design and moved away from it. Read first:
 - Create 1,000 rows, replace, append and create 10,000 rows faster by more than the noise, before/after in outcome.md. The disclosure case (a branch shown on click) renders through a clone, with a test.
 - Server and client renders agree (an existing differential test, or add one as brumate's `differential-render-test` did).
 - `pnpm --filter idlip test` and the e2e todo spec pass; loader budget holds.
+
+## Updates 2026-11-22 (from brumate-lessons)
+
+- Expected gain is smaller than the gap: brumate's template step saved 2.7 ms of script (8.0 to 5.3) on top of a batched parse, and idlip's create script is 12.9 to 16.5 ms against brumate's 3 to 6. Profile first and report where the rest of idlip's create script goes; most of it is probably not the parse. If clones alone do not clear the noise, keep them only if they also remove per-row marker walks and allocation (brumate `425a046f`, `68715696`, `9c221048`), and list the other costs for the orchestrator.

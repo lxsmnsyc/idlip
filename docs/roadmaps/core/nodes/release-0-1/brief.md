@@ -26,6 +26,15 @@ shared: []
 reserves: []
 provides: []
 depends_on:
+  - on: differential-render-test
+    kind: hard
+    why: ships in 0.1.0
+  - on: preimport-chunks
+    kind: hard
+    why: ships in 0.1.0
+  - on: text-anchor
+    kind: hard
+    why: ships in 0.1.0
   - on: brumate-lessons
     kind: hard
     why: its findings may add work before the first release

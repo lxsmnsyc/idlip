@@ -1,7 +1,7 @@
 ---
 id: brumate-lessons
 title: Map what brumate learned to idlip
-status: todo
+status: done
 priority: should
 type: experiment
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: true
 added: 2026-11-22
-spent:
+spent: 191000
 owns: []
 shared: []
 reserves: []

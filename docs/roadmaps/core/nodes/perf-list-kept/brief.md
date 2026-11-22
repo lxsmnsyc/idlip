@@ -66,3 +66,4 @@ Select, swap, remove, update every 10th and clear stop doing work on every kept 
 ## Updates 2026-11-22
 
 - Run after `cloned-templates` (the list code changes under you). Read brumate's `docs/performance.md` "What the costs were" first: a longest increasing subsequence for moves, no re-run of updates on freshly rendered rows, no loader rescan after insert. Check each against `src/client/list/index.ts`.
+- From `brumate-lessons` row 2: each kept row builds two scopes with array spreads (`client/list/index.ts` 145-147, 302-303), `findNodes` walks each row (150-165), and `patchRow` is `async` and awaited once per row (168, 304). Make `patchRow` synchronous when no binding can fail, and compare old and new values before walking a row.
