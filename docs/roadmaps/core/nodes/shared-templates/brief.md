@@ -1,7 +1,7 @@
 ---
 id: shared-templates
 title: One template per markup across chunks, cached parse, encoded walk
-status: todo
+status: done
 priority: must
 type: perf
 story:
@@ -20,7 +20,7 @@ exclusive: [benchmark]
 fulfilled_by:
 gate: false
 added: 2026-11-23
-spent:
+spent: 300000
 owns:
   - packages/idlip/src/compiler/view/codegen/**
   - packages/idlip/test/compiler/view/codegen/**
@@ -64,3 +64,5 @@ Read first: `nodes/cloned-templates/outcome.md`, `nodes/cloned-templates-all/out
 - A test builds an app with two components that render identical markup and finds the template HTML once across all client chunks.
 - Dashboard client JS and template copies before/after in outcome.md; perf numbers before/after.
 - Build, unit, differential and e2e pass.
+
+Landed as 0cb089e..6b6fb2d on `batch/core` after one fresh review round (per-file count and size guard added). Encoded walk built and dropped: same speed, larger helpers.
