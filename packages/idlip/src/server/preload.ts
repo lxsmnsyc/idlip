@@ -33,7 +33,8 @@ function escapeTarget(value: string): string {
  * manifests in the given order, then the handler names of that event in sorted order. For each
  * handler it takes the handler chunk and then the binding chunks of its `bindings`. It stops
  * at `max`, so the earliest events and handlers win. When it names any chunk, the shared
- * helpers and templates modules (`chunks.helpers`, `chunks.templates`) come first, outside `max`, since the chunks import it.
+ * helpers and templates modules (`chunks.helpers`, `chunks.templates`) come first, outside
+ * `max`, since the chunks import them.
  */
 function findUrls(
   chunks: ChunkUrls,

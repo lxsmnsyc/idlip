@@ -10,7 +10,7 @@
 
 Step 1 design:
 
-- `Module.templates` lists each chunk's templates by hash (cyrb53 of namespace and markup, 14 hex digits). `GenerateOptions.shared` is the set of hashes to import. The Vite plugin compiles every module, counts the chunks per hash, and compiles again with the set.
+- `Module.templates` lists each chunk's templates by hash (cyrb53 of namespace and markup, 14 hex digits). `GenerateOptions.shared` is the set of hashes to import. The Vite plugin compiles every module, counts the files that render each hash, and compiles again with the set. A file counts once, since its view, list and binding chunks render the same rows and load together. A hash moves only when two or more files render it and `(files - 1) x declaration length` is over `SHARE_COST` (100 B, the export and import).
 - One virtual module `idlip/templates` (`\0idlip-templates`) exports `t<hash>` for each shared template. One module, not one per hash, because the loader cannot learn which template files a chunk needs within its 4096 B budget. The chunk map key is `templates` (`TEMPLATES_KEY`). The loader (`getUpdate`) and `renderPreload` load it next to `helpers`. The first click is still one round trip.
 - `checkChunkImports` allows the templates file. If the bundler puts the templates in the helpers file, the key is omitted.
 - Dev and the REPL compile without `shared`: each chunk declares its templates, so the dev server and HMR need nothing new.
@@ -38,6 +38,23 @@ Timings (interleaved, N fixed before the run, load 2.9 to 3.2 at start and end; 
 
 Step 3: the helpers module went from 1391 to 1632 B raw and 763 to 879 B gzip (dashboard build), with no speed change on rows. The rows template is shallow, so walking from the root costs little. Dropped by the brief's rule.
 
+## Review fix: per file count and size guard
+
+The first version counted chunks, so a child's `view` chunk and its `list` chunk made every row template shared. A generated app (`gen.mjs`: 100 widgets, 100 row variants, 3 lists per widget, built with `vite build gen`) loaded the whole templates file on the first click:
+
+| Generated app, W0 first click (helpers, templates and W0 chunks) | Chunks counted        | Files counted, size guard |
+| ---------------------------------------------------------------- | --------------------- | ------------------------- |
+| Files, raw / gzip                                                | 10, 121769 B / 9976 B | 10, 5742 B / 3160 B       |
+| Templates file, raw / gzip                                       | 118312 B / 7810 B     | 180 B / 138 B             |
+| Client JS in dist, raw / gzip                                    | 339370 B / 153857 B   | 435429 B / 233207 B       |
+
+The fix trades dist size for the first click: rows that both chunks of one file render stay in each chunk. Dashboard and scale are unchanged by the fix (the row template is in 49 files and is 45 B, so `(files - 1) x 45` is over 100): dashboard 0 extra copies, 156561 / 106295 B raw / gzip; scale 0 extra copies (base 19 extra copies, 855 B), 42671 / 25939 B. Tests: a child component whose view and list chunks render one row keeps it inline; a small template in two files stays inline.
+
+Limits that remain:
+
+- Duplication inside one component stays: a view chunk and a list chunk each declare the row, so the browser parses it once more per chunk loaded.
+- The `i-a` index is in the markup, so the same row at a different position hashes apart and is not shared.
+
 ## Checks
 
 `pnpm lint` (no errors), `pnpm exec oxfmt --check`, `pnpm typecheck`, `pnpm --filter idlip build && pnpm --filter idlip test` (including the differential test), and `pnpm --filter e2e test` with free ports pass.
@@ -46,3 +63,4 @@ Step 3: the helpers module went from 1391 to 1632 B raw and 763 to 879 B gzip (d
 
 - The templates file loads whole on the first click, so an app with many shared templates pays for all of them. A per-hash split needs the loader to know a chunk's template files.
 - Dev does not share templates.
+- `clone$` keeps the first document alive through `k` (noted on the field).

@@ -302,8 +302,8 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
     if (url === undefined) {
       throw new DropError(`idlip: no chunk for ${tag}`);
     }
-    // The binding chunks and the helpers and templates modules they import start with the handler chunk, not
-    // after it. A failure surfaces in the patch.
+    // The binding chunks and the helpers and templates modules they import start with the
+    // handler chunk, not after it. A failure surfaces in the patch.
     for (const key of [HELPERS_KEY, TEMPLATES_KEY]) {
       if (Object.hasOwn(chunks, key)) {
         load(chunks[key]).catch(() => {});

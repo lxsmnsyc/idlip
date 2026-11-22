@@ -259,7 +259,7 @@ export interface Template {
   readonly n: number;
   /** The namespace the HTML is parsed in, for a body inside `<svg>` or `<math>`. */
   readonly s?: Namespace;
-  /** The parse for the first document that cloned it, the page's. */
+  /** The parse for the first document that cloned it, the page's. It holds that document. */
   k?: { d: Document; c: ParentNode; p: number[][] };
   /** The parse for any other document, such as an iframe's. */
   m?: WeakMap<Document, { d: Document; c: ParentNode; p: number[][] }>;

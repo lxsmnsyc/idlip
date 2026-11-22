@@ -14,13 +14,7 @@ import type {
 import * as compiler from '../compiler/index.ts';
 import { HELPERS_MODULE, printHelpersModule } from '../core/helpers.ts';
 import type { CompileOptions } from '../compiler/index.ts';
-import type {
-  ChunkUrls,
-  Compile,
-  CompileDiagnostic,
-  CompileResult,
-  Module,
-} from '../core/format.ts';
+import type { ChunkUrls, Compile, CompileDiagnostic, CompileResult } from '../core/format.ts';
 import {
   HELPERS_KEY,
   TEMPLATES_KEY,
@@ -241,10 +235,10 @@ function checkChunkImports(
     }
   }
   // Every static import of an idlip chunk must already be loaded. The exceptions are the helpers
-  // and templates modules, which the loader loads with the first chunk in the same round trip, and a view
-  // reached from a chunk that can add a child in the browser: a list row, a condition branch in
-  // a binding chunk, a `<Try>` region, or another view. The helpers and templates modules
-  // themselves may import only what the loader holds.
+  // and templates modules, which the loader loads with the first chunk in the same round trip,
+  // and a view reached from a chunk that can add a child in the browser: a list row, a condition
+  // branch in a binding chunk, a `<Try>` region, or another view. The helpers and templates
+  // modules themselves may import only what the loader holds.
   const errors: string[] = [];
   const checked = [...chunkFiles, ...sharedFiles];
   for (const file of checked) {
@@ -285,32 +279,45 @@ function findSharedFile(bundle: Rolldown.OutputBundle, module: string): string |
 }
 
 /**
- * Finds the templates that more than one chunk of the compiled modules renders: the hash to the
- * declaration. Two different declarations under one hash stay in their chunks.
+ * The bytes a shared template costs in the templates module and in each importing chunk, which
+ * the saving from the removed copies must exceed: `export const t<hash> = ` and
+ * `import { t<hash> as templateL0$ } from 'idlip/templates';`, about 100 B.
+ */
+const SHARE_COST = 100;
+
+/**
+ * Finds the templates to move to the shared templates module: the hash to the declaration. A
+ * template moves when two or more files render it and the copies it removes outweigh `SHARE_COST`.
+ * One file counts once, since its chunks (a child's view and list, a list and its bindings)
+ * render the same rows and are loaded together. Two different declarations under one hash stay
+ * in their chunks.
  */
 function findSharedTemplates(results: readonly CompileResult[]): Map<string, string> {
-  const chunks = new Map<string, number>();
+  const files = new Map<string, number>();
   const inits = new Map<string, string>();
   const clashes = new Set<string>();
-  const modules: Module[] = [];
   for (const result of results) {
+    const hashes = new Set<string>();
     for (const { client } of listCompiled(result)) {
-      modules.push(...client);
-    }
-  }
-  for (const module of modules) {
-    for (const { hash, init } of module.templates ?? []) {
-      chunks.set(hash, (chunks.get(hash) ?? 0) + 1);
-      if (inits.has(hash) && inits.get(hash) !== init) {
-        clashes.add(hash);
+      for (const module of client) {
+        for (const { hash, init } of module.templates ?? []) {
+          hashes.add(hash);
+          if (inits.has(hash) && inits.get(hash) !== init) {
+            clashes.add(hash);
+          }
+          inits.set(hash, init);
+        }
       }
-      inits.set(hash, init);
+    }
+    for (const hash of hashes) {
+      files.set(hash, (files.get(hash) ?? 0) + 1);
     }
   }
   const found = new Map<string, string>();
-  for (const [hash, count] of chunks) {
-    if (count > 1 && !clashes.has(hash)) {
-      found.set(hash, inits.get(hash)!);
+  for (const [hash, count] of files) {
+    const init = inits.get(hash)!;
+    if (count > 1 && !clashes.has(hash) && (count - 1) * init.length > SHARE_COST) {
+      found.set(hash, init);
     }
   }
   return found;
@@ -628,8 +635,8 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       for (const file of findModules()) {
         results.push(compileFile(this, file));
       }
-      // A template that more than one chunk renders moves to the shared templates module, so
-      // its markup is downloaded and parsed once. The chunks compile again to import it.
+      // A template that more than one file renders moves to the shared templates module, so its
+      // markup is downloaded and parsed once. The chunks compile again to import it.
       shared = findSharedTemplates(results);
       if (shared.size > 0) {
         results = [];
