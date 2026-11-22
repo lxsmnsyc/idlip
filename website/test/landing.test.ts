@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import benchmarks from '../src/benchmarks.json' with { type: 'json' };
 import type { DemoData, DemoFile } from '../src/demo/data.ts';
-import { isBenchmarks, judge, pickLeads } from '../src/landing/benchmarks.ts';
-import type { Benchmarks, Metric } from '../src/landing/benchmarks.ts';
+import { isBenchmarks, readGrowth } from '../src/landing/benchmarks.ts';
+import type { Benchmarks } from '../src/landing/benchmarks.ts';
 import { FEATURES } from '../src/landing/features.ts';
 import { loadPages, renderSite } from '../src/site.ts';
 
@@ -70,21 +70,14 @@ describe('the landing page', () => {
     expect(landing.match(/aria-live="polite"/g)).toHaveLength(1);
   });
 
-  it('spans every column of the benchmark table with the group headers', () => {
-    const head = /<thead><tr>([\s\S]*?)<\/tr><\/thead>/.exec(landing)?.[1] ?? '';
-    const columns = head.match(/<th /g)?.length;
-    expect(landing).toContain(`colspan="${columns}"`);
-  });
-
-  it('shows only the rows where idlip leads, and links to every result', () => {
-    const table = /<tbody>([\s\S]*?)<\/tbody>/.exec(landing)?.[1] ?? '';
-    const rows = table.match(/<tr><th scope="row">/g)?.length ?? 0;
-    let leads = 0;
-    for (const group of pickLeads(benchmarksData)) {
-      leads += group.metrics.length;
-    }
-    expect(rows).toBe(leads);
-    expect(rows).toBeGreaterThan(0);
+  it('charts the headline group: one row per framework run on every app', () => {
+    const growth = readGrowth(benchmarksData);
+    expect(growth.apps.length).toBeGreaterThanOrEqual(2);
+    expect(landing.match(/class="grow-row/g)).toHaveLength(growth.rows.length);
+    expect(landing.match(/class="grow-bar /g)).toHaveLength(
+      growth.rows.length * growth.apps.length,
+    );
+    expect(landing).toContain('class="grow-row is-own"');
     expect(landing).toContain('All results and how they were measured');
     expect(landing).not.toContain('demo-frame');
   });
@@ -129,27 +122,13 @@ describe('the benchmark data', () => {
     }
   });
 
-  it('holds losses as well as wins for the full results', () => {
-    const verdicts = new Set<string>();
+  it('labels each app of the headline group', () => {
     for (const group of data.groups) {
-      for (const metric of group.metrics) {
-        verdicts.add(judge(metric, 'idlip').verdict);
+      if (group.name === data.headline) {
+        for (const metric of group.metrics) {
+          expect(metric.label, metric.name).toBeTruthy();
+        }
       }
     }
-    expect(verdicts).toContain('ahead');
-    expect(verdicts).toContain('behind');
-  });
-
-  it('judges against the best of the others, with the noise as even', () => {
-    const metric: Metric = {
-      name: 'm',
-      unit: 'ms',
-      better: 'lower',
-      noise: 0.2,
-      values: { idlip: 11, a: 10, b: 30 },
-    };
-    expect(judge(metric, 'idlip').verdict).toBe('even');
-    expect(judge({ ...metric, values: { idlip: 20, a: 10 } }, 'idlip').verdict).toBe('behind');
-    expect(judge({ ...metric, values: { idlip: 5, a: 10 } }, 'idlip').verdict).toBe('ahead');
   });
 });

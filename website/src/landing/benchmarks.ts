@@ -10,6 +10,8 @@ export interface Metric {
   noise: number;
   /** A value per framework, `null` where it was not run. */
   values: Record<string, number | null>;
+  /** A short name for the app the metric measures, for the landing chart. */
+  label?: string;
 }
 
 export interface Benchmarks {
@@ -20,9 +22,12 @@ export interface Benchmarks {
   /** The column order. The first is idlip. */
   frameworks: string[];
   groups: { name: string; metrics: Metric[] }[];
+  /**
+   * The group the landing page charts: one metric per app, from the smallest app to the largest,
+   * so the chart shows how the cost grows with the app.
+   */
+  headline: string;
 }
-
-type Verdict = 'ahead' | 'even' | 'behind';
 
 const UNITS: readonly string[] = ['kB', 'B', 'MB', 'ms', '/s'];
 
@@ -55,6 +60,7 @@ export function isBenchmarks(value: unknown): value is Benchmarks {
     typeof value.date !== 'string' ||
     typeof value.machine !== 'string' ||
     typeof value.source !== 'string' ||
+    typeof value.headline !== 'string' ||
     !Array.isArray(value.frameworks) ||
     !Array.isArray(value.groups)
   ) {
@@ -77,95 +83,106 @@ function formatValue(value: number, unit: Metric['unit']): string {
   if (unit === '/s') {
     return `${formatCount(value)}/s`;
   }
-  return `${unit === 'B' ? formatCount(value) : String(value)} ${unit}`;
+  if (unit === 'B') {
+    return `${formatCount(value)} B`;
+  }
+  return `${String(Number(value.toFixed(1)))} ${unit}`;
 }
 
-/** Whether `a` is better than `b` for this metric. */
-function isBetter(metric: Metric, a: number, b: number): boolean {
-  return metric.better === 'lower' ? a < b : a > b;
+export interface Growth {
+  /** The apps, smallest first. */
+  apps: string[];
+  unit: Metric['unit'];
+  /** The frameworks measured on every app, with one value per app. */
+  rows: { name: string; values: number[] }[];
+  /** The frameworks left out because an app was not run on them. */
+  missing: string[];
 }
 
-/** idlip against the best of the others: ahead, even within the noise, or behind. */
-export function judge(metric: Metric, own: string): { verdict: Verdict; best: number } {
-  const mine = metric.values[own];
-  let best: number | undefined;
-  for (const [name, value] of Object.entries(metric.values)) {
-    if (name !== own && value !== null && (best === undefined || isBetter(metric, value, best))) {
-      best = value;
+/** The headline group as a chart: each framework's cost on each app, smallest app first. */
+export function readGrowth(data: Benchmarks): Growth {
+  let metrics: Metric[] = [];
+  for (const group of data.groups) {
+    if (group.name === data.headline) {
+      metrics = group.metrics;
     }
   }
-  if (mine === null || best === undefined) {
-    return { verdict: 'even', best: mine ?? 0 };
+  if (metrics.length < 2) {
+    throw new TypeError(
+      `benchmarks.json: the headline group "${data.headline}" needs two or more metrics`,
+    );
   }
-  const winner = isBetter(metric, mine, best) ? mine : best;
-  const spread = Math.abs(mine - best) / Math.max(Math.abs(mine), Math.abs(best), 1e-9);
-  if (mine === best || spread <= metric.noise) {
-    return { verdict: 'even', best: winner };
+  const apps: string[] = [];
+  for (const metric of metrics) {
+    apps.push(metric.label ?? metric.name);
   }
-  return { verdict: isBetter(metric, mine, best) ? 'ahead' : 'behind', best: winner };
-}
-
-function renderRow(metric: Metric, frameworks: readonly string[]): string {
-  const [own, ...others] = frameworks;
-  let cells = '';
-  for (const name of others) {
-    const value = metric.values[name];
-    cells +=
-      value === null
-        ? '<td class="not-run">not run</td>'
-        : `<td>${formatValue(value, metric.unit)}</td>`;
-  }
-  return `<tr><th scope="row">${escape(metric.name)}</th><td class="col-idlip is-best">${formatValue(metric.values[own] ?? 0, metric.unit)}</td>${cells}</tr>`;
-}
-
-/**
- * The metrics where idlip leads every framework that ran, by group. The landing page shows these;
- * the full results, losses included, are one link away.
- */
-export function pickLeads(data: Benchmarks): { name: string; metrics: Metric[] }[] {
-  const [own] = data.frameworks;
-  const groups: { name: string; metrics: Metric[] }[] = [];
-  for (const group of data.groups) {
-    const metrics: Metric[] = [];
-    for (const metric of group.metrics) {
-      if (judge(metric, own).verdict === 'ahead') {
-        metrics.push(metric);
+  const rows: Growth['rows'] = [];
+  const missing: string[] = [];
+  for (const name of data.frameworks) {
+    const values: number[] = [];
+    for (const metric of metrics) {
+      const value = metric.values[name];
+      if (typeof value === 'number') {
+        values.push(value);
       }
     }
-    if (metrics.length > 0) {
-      groups.push({ name: group.name, metrics });
+    if (values.length === metrics.length) {
+      rows.push({ name, values });
+    } else {
+      missing.push(name);
     }
   }
-  return groups;
+  return { apps, unit: metrics[0].unit, rows, missing };
 }
 
-/** The numbers where idlip leads, with a link to every result. */
-export function renderBenchmarks(data: Benchmarks, link: string): string {
-  const [own, ...others] = data.frameworks;
-  let head = `<th scope="col">Metric</th><th scope="col" class="col-idlip">${escape(own)}</th>`;
-  for (const name of others) {
-    head += `<th scope="col">${escape(name)}</th>`;
+/** One framework: a bar per app, scaled to the largest value in the chart, and the growth. */
+function renderGrowthRow(
+  row: Growth['rows'][number],
+  growth: Growth,
+  max: number,
+  own: boolean,
+): string {
+  let bars = '';
+  for (const [index, value] of row.values.entries()) {
+    const width = Math.max((value / max) * 100, 1).toFixed(1);
+    bars += `<li class="grow-bar grow-bar-${index}"><span class="grow-fill" style="width:${width}%"></span><span class="grow-value">${formatValue(value, growth.unit)}</span><span class="visually-hidden"> on ${escape(growth.apps[index])}</span></li>`;
   }
-  // Metric and idlip, then one column per other framework.
-  const columns = 2 + others.length;
-  let body = '';
-  for (const group of pickLeads(data)) {
-    body += `<tr class="bench-group"><th scope="rowgroup" colspan="${columns}">${escape(group.name)}</th></tr>`;
-    for (const metric of group.metrics) {
-      body += renderRow(metric, data.frameworks);
+  const first = row.values[0];
+  const last = row.values.at(-1) ?? first;
+  const delta = `+${formatValue(Math.max(last - first, 0), growth.unit)}`;
+  const mark = own ? ' is-own' : '';
+  return `<div class="grow-row${mark}" role="listitem"><p class="grow-name">${escape(row.name)}</p><ul class="grow-bars">${bars}</ul><p class="grow-delta"><span class="visually-hidden">Grows by </span>${delta}</p></div>`;
+}
+
+/** The startup chart: how much JavaScript each framework runs on load as the app grows. */
+export function renderBenchmarks(data: Benchmarks, link: string): string {
+  const growth = readGrowth(data);
+  let max = 0;
+  for (const row of growth.rows) {
+    for (const value of row.values) {
+      max = Math.max(max, value);
     }
   }
+  const [own] = data.frameworks;
+  let rows = '';
+  for (const row of growth.rows) {
+    rows += renderGrowthRow(row, growth, max, row.name === own);
+  }
+  let legend = '';
+  for (const [index, app] of growth.apps.entries()) {
+    legend += `<li class="grow-key grow-key-${index}">${escape(app)}</li>`;
+  }
+  const missing =
+    growth.missing.length > 0
+      ? ` ${escape(growth.missing.join(' and '))} ran only on the smaller app.`
+      : '';
   return `<section aria-labelledby="benchmarks">
-  <h2 class="row-title" id="benchmarks">Less JavaScript before the first click</h2>
-  <div class="tile bench-tile">
-    <div class="bench-scroll" tabindex="0" role="group" aria-label="Benchmark table">
-      <table class="bench">
-        <caption>Run on ${escape(data.date)}, ${escape(data.machine)}. Sizes are gzip.</caption>
-        <thead><tr>${head}</tr></thead>
-        <tbody>${body}</tbody>
-      </table>
-    </div>
-    <p class="tile-foot"><a href="${link}">All results and how they were measured</a></p>
+  <h2 class="row-title" id="benchmarks">Your app grows. Its startup doesn't.</h2>
+  <p class="row-lead">idlip runs no component code on load, so a bigger app adds almost nothing to what the page loads before it responds.</p>
+  <div class="tile grow-tile">
+    <ul class="grow-legend" aria-label="Apps">${legend}<li class="grow-key grow-key-delta">Growth</li></ul>
+    <div class="grow-chart" role="list" aria-label="JavaScript on load, gzip, per framework">${rows}</div>
+    <p class="tile-foot">JavaScript loaded before the first click, gzip. Run on ${escape(data.date)}, ${escape(data.machine)}.${missing} <a href="${link}">All results and how they were measured</a></p>
   </div>
 </section>`;
 }

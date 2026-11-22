@@ -18,7 +18,8 @@
             "Marko 6": 4.4,
             "Qwik 1": 22.9,
             "Qwik 2": 38.2
-          }
+          },
+          "label": "Todo list, 1 component"
         },
         {
           "name": "Dashboard: JS on load",
@@ -31,7 +32,8 @@
             "Marko 6": 10.5,
             "Qwik 1": null,
             "Qwik 2": null
-          }
+          },
+          "label": "Dashboard, 50 widgets"
         }
       ]
     },
@@ -154,5 +156,6 @@
         }
       ]
     }
-  ]
+  ],
+  "headline": "JS before the first click"
 }
