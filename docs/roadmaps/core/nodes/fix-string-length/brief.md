@@ -1,7 +1,7 @@
 ---
 id: fix-string-length
 title: Patch bindings that read the length of a string
-status: todo
+status: done
 priority: must
 type: fix
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-22
-spent:
+spent: 66000
 owns:
   - packages/idlip/test/client/patch/string-length*
 shared:
