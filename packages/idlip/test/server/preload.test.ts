@@ -37,6 +37,16 @@ describe('renderPreload', () => {
     );
   });
 
+  it('names the shared helpers module first whenever it names a chunk', () => {
+    const shared: ChunkUrls = { ...chunks, helpers: '/assets/_idlip-helpers.g.js' };
+    expect(renderPreload(shared, manifest, { max: 1 })).toBe(
+      '<link rel="modulepreload" href="/assets/_idlip-helpers.g.js">' +
+        '<link rel="modulepreload" href="/assets/toggle.a.js">',
+    );
+    // An event with no handler names nothing, not even the helpers.
+    expect(renderPreload(shared, manifest, { events: ['wheel'] })).toBe('');
+  });
+
   it('follows the events option', () => {
     const out = renderPreload(chunks, manifest, { events: ['input'] });
     expect(out).toContain('/assets/set-draft.c.js');
