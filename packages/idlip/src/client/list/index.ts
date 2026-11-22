@@ -278,7 +278,7 @@ export async function patchList(...args: Parameters<PatchList>): Promise<void> {
       placed.push(rows[olds[j]]);
       continue;
     }
-    const html = chunk?.render(getRowScope(context.next, next[j], j));
+    const html = chunk?.render(getRowScope(context.next, next[j], j), start.ownerDocument);
     const cloned = typeof html === 'object';
     const nodes = cloned
       ? [...html.childNodes]

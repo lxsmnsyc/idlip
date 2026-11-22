@@ -47,7 +47,7 @@ function setBranch$(start, branch, render, ns) {
 	while (start.nextSibling !== end) {
 		start.nextSibling?.remove();
 	};
-	const html = render(branch);
+	const html = render(branch, start.ownerDocument);
 	for (const node of typeof html === "string" ? parseHtml$(start.ownerDocument, html, ns) : [html]) {
 		parent.insertBefore(node, end);
 	};

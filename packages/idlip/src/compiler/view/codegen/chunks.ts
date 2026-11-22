@@ -13,7 +13,7 @@ import type { Frame, Report, ScopeName, Usage } from './expr.ts';
 import { HtmlBuilder, toExpression } from './html.ts';
 import type { ModuleSource } from './module.ts';
 import type { Binding, Group, ListInfo, Plan, TryInfo } from './plan.ts';
-import { buildClone, canClone, printClone } from './template.ts';
+import { buildClone, canClone, printClone, printTemplate } from './template.ts';
 import { getKey, getLocalName, quote } from './text.ts';
 
 export interface ChunkContext {
@@ -159,10 +159,10 @@ function emitCondition(
   const branches: string[][] = [];
   const expressions: string[] = [];
   for (const [index, nodes] of [node.then, node.else].entries()) {
-    if (canClone(nodes, node.namespace, context.plan)) {
+    if (canClone(nodes, node.namespace, context.component, context.plan)) {
       const cloned = buildClone(nodes, context.component, context.plan, branchEmitter);
       const name = `templateC${node.test.id}_${index}$`;
-      templates.push(`const ${name} = { h: ${quote(cloned.html)} };`);
+      templates.push(printTemplate(name, cloned.html, cloned));
       branches.push(printClone(name, cloned));
       continue;
     }
@@ -179,13 +179,15 @@ function emitCondition(
     expressions.length === 2
       ? `return branch === 0 ? ${expressions[0]} : ${expressions[1]};`
       : ['if (branch === 0) {', ...branches[0], '}', ...branches[1]].join('\n');
+  // `setBranch$` passes the document, which a branch that clones takes after the branch.
+  const head = templates.length === 0 ? 'branch' : 'branch, $doc';
   const renderFunction = [
     ...templates,
-    `function ${render}(${parameter === '' ? 'branch' : `branch, ${parameter}`}) {\n${body}\n}`,
+    `function ${render}(${parameter === '' ? head : `${head}, ${parameter}`}) {\n${body}\n}`,
   ].join('\n\n');
   mergeUsage(usage, branchUsage);
   // Only the scope the branches read goes to the render function.
-  const reference = scope === '' ? render : `(branch) => ${render}(branch, ${scope})`;
+  const reference = scope === '' ? render : `(${head}) => ${render}(${head}, ${scope})`;
   const namespace = node.namespace === 'html' ? '' : `, ${quote(node.namespace)}`;
   const call = `setBranch$(start, ${test} ? 0 : 1, ${reference}${namespace});`;
   return {
@@ -321,9 +323,9 @@ export function emitListChunk(info: ListInfo, context: ChunkContext): GroupChunk
   // A row of static markup clones a template that holds its row markers. Other rows render HTML.
   let body: string[];
   let template: string | undefined;
-  if (canClone(info.node.body, info.node.namespace, context.plan)) {
+  if (canClone(info.node.body, info.node.namespace, context.component, context.plan)) {
     const cloned = buildClone(info.node.body, context.component, context.plan, emitter);
-    template = `const template$ = { h: ${quote(`<!--i-->${cloned.html}<!--/i-->`)} };`;
+    template = printTemplate('template$', `<!--i-->${cloned.html}<!--/i-->`, cloned);
     body = printClone('template$', cloned);
   } else {
     const built = builder.build(info.node.body);
@@ -368,6 +370,10 @@ export function emitListChunk(info: ListInfo, context: ChunkContext): GroupChunk
   const comment = scoped
     ? "// `addChild` makes the child's model from `init`, records the slot and returns the child's\n// markup between its boundary comments.\n"
     : '';
+  // `patchList` passes the document, which a row that clones takes after the scope.
+  if (template !== undefined) {
+    parameter = `${parameter === '' ? '$scope' : parameter}, $doc`;
+  }
   sections.push(`${comment}export function render(${parameter}) {\n${lines.join('\n')}\n}`);
   if (info.node.key.kind === 'computed') {
     // The client pairs rows by this key, so it loads the chunk before it pairs them. The key

@@ -96,6 +96,57 @@ function toItem(expr: Expr, emitter: Emitter): Item {
   }
 }
 
+/** Tells whether an argument is fixed, as `toItem` decides, without printing it. */
+function isFixedExpr(expr: Expr): boolean {
+  switch (expr.kind) {
+    case 'literal':
+      return true;
+    case 'path':
+      return expr.root.kind === 'event';
+    case 'array':
+      for (const item of expr.items) {
+        if (!isFixedExpr(item)) {
+          return false;
+        }
+      }
+      return true;
+    case 'object':
+      for (const entry of expr.entries) {
+        if (!isFixedExpr(entry.value)) {
+          return false;
+        }
+      }
+      return true;
+    default:
+      return false;
+  }
+}
+
+/**
+ * Tells whether the message of an event reads nothing at render, so `getMessage` returns JSON.
+ * An event that writes no message, such as a `reset`, counts as fixed.
+ */
+export function isFixedMessage(component: Component, event: Event): boolean {
+  if (event.target.kind === 'prop') {
+    return false;
+  }
+  if (event.target.kind !== 'handler') {
+    return true;
+  }
+  const tag = event.target.name;
+  for (const handler of component.handlers) {
+    if (handler.name === tag && listHandlerProps(component, handler).length > 0) {
+      return false;
+    }
+  }
+  for (const arg of event.args) {
+    if (!isFixedExpr(arg)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 export interface Message {
   /** The `DomMessage` as JSON, when nothing in it is read at render. */
   json: string | undefined;

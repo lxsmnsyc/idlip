@@ -129,7 +129,7 @@ function renderRow(exports: Record<string, unknown>, scope: unknown): string {
   if (!isRender(render)) {
     throw new Error('The chunk has no render export');
   }
-  return printRow(Reflect.apply(render, undefined, [scope, undefined]));
+  return printRow(Reflect.apply(render, undefined, [scope, document]));
 }
 
 function collectEvents(nodes: Node[], events: Event[]): void {
@@ -605,8 +605,9 @@ describe('client chunks', () => {
     );
     expect(result.diagnostics.filter((item) => item.severity === 'error')).toEqual([]);
     const chunk = result.client.find((module) => module.chunk === 'binding=n');
-    expect(chunk?.code).toContain('function renderC0(branch, { model }) {');
-    expect(chunk?.code).toContain('(branch) => renderC0(branch, { model })');
+    // The first branch clones, so the render function takes the document after the branch.
+    expect(chunk?.code).toContain('function renderC0(branch, $doc, { model }) {');
+    expect(chunk?.code).toContain('(branch, $doc) => renderC0(branch, $doc, { model })');
     expect(chunk?.code).toContain('<!--t');
     // The branch reads `props.min` only in the test, so the chunk takes `props` for it.
     expect(chunk?.code).toMatch(/export function c0\(start, \{ model, props \}\)/);

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
 import { compile } from '../../../../src/compiler/index.ts';
+import { clone$ } from '../../../../src/core/helpers.ts';
 import { mount } from '../../../../src/testing/index.ts';
 
 const DISCLOSURE = `
@@ -31,7 +32,7 @@ function findChunk(source: string, prefix: string): string {
       return module.code;
     }
   }
-  throw new Error(`No ${prefix} chunk`);
+  throw new Error(`No ${prefix} chunk: ${JSON.stringify(result.diagnostics)}`);
 }
 
 describe('cloned templates', () => {
@@ -119,5 +120,92 @@ describe('cloned templates', () => {
         'binding=open',
       ),
     ).not.toContain('clone$');
+  });
+
+  // A row body in a list of `{ id, label }` rows. `show` reads by the state, so `show(view)`
+  // would be a dynamic hole outside a row.
+  function compileRows(row: string, parent = 'ul'): ReturnType<typeof compile> {
+    const source = `
+      import { For } from 'idlip';
+      function show(view: { mode: string; a: string; b: string }): string {
+        return view.mode === 'a' ? view.a : view.b;
+      }
+      export default function App() {
+        let rows = [{ id: 1, label: 'a' }];
+        let mode = 'a';
+        let a = 'x';
+        let b = 'y';
+        const view = { mode, a, b };
+        function touch() {
+          mode = 'b';
+          a = a + '!';
+          b = b + '!';
+          rows = [];
+        }
+        return (
+          <div>
+            <button on:click={touch}>touch</button>
+            <${parent}>
+              <For each={rows} key={(row) => row.id}>{(row) => ${row}}</For>
+            </${parent}>
+          </div>
+        );
+      }
+    `;
+    return compile(source, '/src/app.tsx');
+  }
+
+  function findRowChunk(row: string, parent = 'ul'): string {
+    for (const module of compileRows(row, parent).client) {
+      if (module.chunk.startsWith('list=')) {
+        return module.code;
+      }
+    }
+    throw new Error('No list chunk');
+  }
+
+  it.each([
+    ['a hole in a pre', '<li><pre>{row.label}</pre></li>', 'ul'],
+    ['a row inside svg', '<text>{row.label}</text>', 'svg'],
+    ['a write inside a template', '<li><template><b>{row.label}</b></template></li>', 'ul'],
+    ['static events only', '<li><a on:click={() => touch()}>static</a></li>', 'ul'],
+  ])('renders HTML for %s', (_name, row, parent) => {
+    expect(findRowChunk(row, parent)).not.toContain('clone$');
+  });
+
+  it.each([
+    ['a text hole directly in a table row', '<tr>{row.label}</tr>', 'tbody', 'html-nesting'],
+    ['a hole in a textarea', '<li><textarea>{row.label}</textarea></li>', 'ul', 'codegen-raw-text'],
+  ])('never sees %s: the compiler rejects it', (_name, row, parent, rule) => {
+    const rules: string[] = [];
+    for (const diagnostic of compileRows(row, parent).diagnostics) {
+      rules.push(diagnostic.rule);
+    }
+    expect(rules).toContain(rule);
+  });
+
+  it('throws when the parse does not find every mark, and clones per document', () => {
+    // The walk does not enter the content of a nested `<template>`.
+    const hidden = { h: '<li><template><b i-x="1"></b></template></li>', n: 1 };
+    expect(() => clone$(hidden, document)).toThrow(/1 marks and the parse found 0/);
+
+    const template = { h: '<li i-x="1"><!--x2--></li>', n: 2 };
+    const [fragment, item, text] = clone$(template, document);
+    expect(fragment.firstChild).toBe(item);
+    expect(text.nodeType).toBe(Node.TEXT_NODE);
+    expect(item instanceof Element && item.hasAttribute('i-x')).toBe(false);
+    const other = document.implementation.createHTMLDocument('');
+    const [, otherItem] = clone$(template, other);
+    expect(otherItem.ownerDocument).toBe(other);
+  });
+
+  it.each([
+    ['a static template next to a hole', '<li>{row.label}<template><b>x</b></template></li>'],
+    ['an svg element inside an HTML row', '<li><svg><text>{row.label}</text></svg></li>'],
+    ['a cell of a table row', '<tr><td>{row.label}</td></tr>'],
+    // Rows record no reads, so a dynamic hole in one keeps static paths (`plan.ts`).
+    ['a hole that is dynamic outside rows', '<li>{show(view)} {row.label}</li>'],
+  ])('clones %s', (_name, row) => {
+    expect(findRowChunk(row, row.startsWith('<tr') ? 'tbody' : 'ul')).toContain('clone$');
   });
 });

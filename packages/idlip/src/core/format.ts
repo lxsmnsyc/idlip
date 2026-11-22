@@ -280,10 +280,10 @@ export type BindingChunk = Readonly<Record<string, Binding>>;
 
 export interface ListChunk {
   /**
-   * Renders one row: its HTML without the row markers, or a fragment cloned from a template,
-   * with the row markers.
+   * Renders one row: its HTML without the row markers, or a fragment cloned from a template in
+   * `doc`, with the row markers.
    */
-  readonly render: (scope: Scope) => string | DocumentFragment;
+  readonly render: (scope: Scope, doc: Document) => string | DocumentFragment;
   /** The key of an item, for a list whose manifest entry has no `key` field. */
   readonly key?: (item: unknown) => unknown;
   readonly namespace?: 'svg' | 'mathml';

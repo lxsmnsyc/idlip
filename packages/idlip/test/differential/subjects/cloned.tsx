@@ -1,6 +1,7 @@
 // Rows and branches that render by a cloned template: holes next to static text, empty text,
 // class objects, boolean, URL and form attributes, event messages that read the row, a row in
-// a table, and a disclosure whose branches both clone.
+// a table, inline SVG, a static `<template>`, and a disclosure whose branches both clone. The
+// `<ol>` rows render HTML: a hole in a `pre` and a hole inside a `<template>`.
 // oxlint-disable typescript/no-confusing-void-expression, typescript/explicit-function-return-type, typescript/no-unnecessary-condition, prefer-const
 import { For } from 'idlip';
 import type { JSX } from 'idlip/jsx-runtime';
@@ -52,10 +53,28 @@ export default function Cloned(props: { items: Item[] }): JSX.Element {
               <span>
                 {item.n} of {item.label}!
               </span>
+              <svg viewBox="0 0 4 4">
+                <text>{item.label}</text>
+              </svg>
+              <template>
+                <b>static</b>
+              </template>
             </li>
           )}
         </For>
       </ul>
+      <ol>
+        <For each={items} key={(item) => item.id}>
+          {(item) => (
+            <li>
+              <pre>{item.label}</pre>
+              <template>
+                <i>{item.label}</i>
+              </template>
+            </li>
+          )}
+        </For>
+      </ol>
       <table>
         <tbody>
           <For each={items} key={(item) => item.id}>

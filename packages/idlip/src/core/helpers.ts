@@ -215,14 +215,15 @@ export function setOn$(el: Element, event: string, message: DomMessage): void {
 
 /**
  * When `branch` differs from the marker's, replaces the block's content with
- * `render(branch)`, HTML or a cloned fragment, and updates the marker. The hooks run children first: before the swap
- * for the blocks inside the old content and then the block, after it for the blocks inside
- * the new content and then the block. The loader forgets the nodes it found as the hooks run.
+ * `render(branch, doc)`, HTML or a cloned fragment, and updates the marker. The hooks run
+ * children first: before the swap for the blocks inside the old content and then the block,
+ * after it for the blocks inside the new content and then the block. The loader forgets the
+ * nodes it found as the hooks run.
  */
 export function setBranch$(
   start: Comment,
   branch: number,
-  render: (branch: number) => string | Node,
+  render: (branch: number, doc: Document) => string | Node,
   ns?: Namespace,
 ): void {
   const colon = start.data.indexOf(':');
@@ -238,7 +239,7 @@ export function setBranch$(
   while (start.nextSibling !== end) {
     start.nextSibling?.remove();
   }
-  const html = render(branch);
+  const html = render(branch, start.ownerDocument);
   for (const node of typeof html === 'string'
     ? parseHtml$(start.ownerDocument, html, ns)
     : [html]) {
@@ -252,33 +253,43 @@ export function setBranch$(
 }
 
 /** A cloned template of a chunk: its HTML, and once parsed, its content and the paths to its marks. */
+function isElement$(node: Node): node is Element {
+  return node.nodeType === 1;
+}
+
 export interface Template {
+  /** The HTML. */
   readonly h: string;
-  d?: Document;
-  c?: ParentNode;
-  p?: number[][];
+  /** The number of marks. */
+  readonly n: number;
+  /** The parsed content and the path of each mark, by document. */
+  m?: WeakMap<Document, { c: ParentNode; p: number[][] }>;
 }
 
 /**
- * Clones a template of static markup. Returns the fragment, then the node of each mark: an
- * element with `i-x="<n>"`, or a text node in place of `<!--x<n>-->`. The first call parses the
- * template and finds the marks where the parser put them.
+ * Clones a template of static markup in `doc`. Returns the fragment, then the node of each
+ * mark: an element with `i-x="<n>"`, or a text node in place of `<!--x<n>-->`. The first call
+ * in a document parses the template and finds the marks where the parser put them.
  */
-export function clone$(template: Template): Node[] {
-  if (template.d !== document) {
-    const root = parseHtml$(document, template.h)[0].parentNode!;
+export function clone$(template: Template, doc: Document): Node[] {
+  template.m ??= new WeakMap();
+  let parsed = template.m.get(doc);
+  if (parsed === undefined) {
+    const root = parseHtml$(doc, template.h)[0].parentNode!;
     const paths: number[][] = [];
-    const walker = document.createTreeWalker(root, 129);
+    let found = 0;
+    const walker = doc.createTreeWalker(root, 129);
     for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
-      const mark =
-        node instanceof Element ? node.getAttribute('i-x') : /^x(\d+)$/.exec(node.nodeValue!)?.[1];
+      const mark = isElement$(node)
+        ? node.getAttribute('i-x')
+        : /^x(\d+)$/.exec(node.nodeValue!)?.[1];
       if (mark === null || mark === undefined) {
         continue;
       }
-      if (node instanceof Element) {
+      if (isElement$(node)) {
         node.removeAttribute('i-x');
       } else {
-        const text = document.createTextNode(' ');
+        const text = doc.createTextNode(' ');
         node.parentNode!.replaceChild(text, node);
         walker.currentNode = text;
         node = text;
@@ -292,14 +303,17 @@ export function clone$(template: Template): Node[] {
         path.unshift(index);
       }
       paths[Number(mark) - 1] = path;
+      found++;
     }
-    template.c = root;
-    template.p = paths;
-    template.d = document;
+    if (found !== template.n) {
+      throw new Error(`idlip: a template has ${template.n} marks and the parse found ${found}`);
+    }
+    parsed = { c: root, p: paths };
+    template.m.set(doc, parsed);
   }
-  const fragment = document.importNode(template.c!, true);
+  const fragment = doc.importNode(parsed.c, true);
   const nodes: Node[] = [fragment];
-  for (const path of template.p!) {
+  for (const path of parsed.p) {
     let node: Node = fragment;
     for (const index of path) {
       node = node.firstChild!;
@@ -411,7 +425,8 @@ const HELPERS: Record<string, Helper | undefined> = {
   setAttr$: { source: setAttr$, uses: ['getText$', 'joinClass$'], client: [] },
   setOn$: { source: setOn$, uses: [], client: [] },
   track$: { source: track$, uses: [], client: [] },
-  clone$: { source: clone$, uses: [], client: ['parseHtml'] },
+  isElement$: { source: isElement$, uses: [], client: [] },
+  clone$: { source: clone$, uses: ['isElement$'], client: ['parseHtml'] },
   putAttr$: { source: putAttr$, uses: ['getText$', 'joinClass$'], client: [] },
   putText$: { source: putText$, uses: ['getText$'], client: [] },
   setBranch$: {

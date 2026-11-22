@@ -168,7 +168,7 @@ describe('compile() behavior', () => {
     ];
     for (const item of items) {
       const scope = { model: {}, props: {}, rows: [{ item, index: 0 }] };
-      expect(printRow(actual(scope, undefined))).toBe(printRow(expected(scope, undefined)));
+      expect(printRow(actual(scope, document))).toBe(printRow(expected(scope, document)));
     }
   });
 });

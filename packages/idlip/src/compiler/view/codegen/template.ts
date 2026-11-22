@@ -3,7 +3,7 @@
 // `core/helpers.ts`). The clone holds the same nodes the HTML would parse to, markers included,
 // so the patcher and the server render see no difference. Other bodies render HTML.
 import type { Component, Node } from '../analyze/index.ts';
-import { getMessage } from './events.ts';
+import { getMessage, isFixedMessage } from './events.ts';
 import type { Emitter } from './expr.ts';
 import type { Plan } from './plan.ts';
 import { escapeAttribute, escapeSingleQuoted, escapeText, quote } from './text.ts';
@@ -27,8 +27,21 @@ const VOID_TAGS = new Set([
 /** Elements whose text the parser reads as text, not markup: no comment can mark a hole. */
 const TEXT_TAGS = new Set(['script', 'style', 'textarea', 'title']);
 
-/** Parents where the parser moves text out of place, so a text hole there renders HTML. */
-const TABLE_TAGS = new Set(['table', 'thead', 'tbody', 'tfoot', 'tr', 'colgroup', 'select']);
+/**
+ * Parents where the parser changes text, so a text hole there renders HTML: it moves text out
+ * of a table or a select, and drops a newline that starts a `pre` or a `listing`.
+ */
+const TEXT_PARENT_TAGS = new Set([
+  'table',
+  'thead',
+  'tbody',
+  'tfoot',
+  'tr',
+  'colgroup',
+  'select',
+  'pre',
+  'listing',
+]);
 
 /** A body that renders by a clone. */
 export interface ClonedBody {
@@ -36,12 +49,15 @@ export interface ClonedBody {
   html: string;
   /** The statements that write the values, on `$n[<n>]`. */
   writes: string[];
+  /** The number of marks, which `clone$` checks it found. */
+  marks: number;
 }
 
 type Element = Extract<Node, { kind: 'element' }>;
 
-function isClonedElement(node: Element, plan: Plan): boolean {
-  if (node.html !== undefined) {
+function isClonedElement(node: Element, component: Component, plan: Plan): boolean {
+  // The walk of `clone$` does not enter the content of a nested `<template>`.
+  if (node.html !== undefined || (node.tag === 'template' && hasWrite(node, component))) {
     return false;
   }
   for (const attr of node.attrs) {
@@ -50,21 +66,23 @@ function isClonedElement(node: Element, plan: Plan): boolean {
     }
   }
   for (const child of node.children) {
-    if (TEXT_TAGS.has(node.tag) ? child.kind !== 'text' : !isCloned(child, node.tag, plan)) {
+    if (
+      TEXT_TAGS.has(node.tag) ? child.kind !== 'text' : !isCloned(child, node.tag, component, plan)
+    ) {
       return false;
     }
   }
   return true;
 }
 
-function isCloned(node: Node, parent: string, plan: Plan): boolean {
+function isCloned(node: Node, parent: string, component: Component, plan: Plan): boolean {
   switch (node.kind) {
     case 'text':
       return true;
     case 'text-hole':
-      return !plan.dynamic.has(node.hole.id) && !TABLE_TAGS.has(parent);
+      return !plan.dynamic.has(node.hole.id) && !TEXT_PARENT_TAGS.has(parent);
     case 'element':
-      return isClonedElement(node, plan);
+      return isClonedElement(node, component, plan);
     default:
       return false;
   }
@@ -177,8 +195,11 @@ class TemplateBuilder {
   }
 }
 
-/** Tells whether a node writes a value on a clone: a hole, a bound attribute, event or ref. */
-function hasWrite(node: Node): boolean {
+/**
+ * Tells whether a node writes a value on a clone: a hole, a bound attribute, a ref with a key
+ * or an event message that reads a value.
+ */
+function hasWrite(node: Node, component: Component): boolean {
   if (node.kind === 'text-hole') {
     return true;
   }
@@ -193,13 +214,13 @@ function hasWrite(node: Node): boolean {
   if (node.ref !== undefined && node.ref.kind !== 'name') {
     return true;
   }
-  if (node.events.length > 0) {
-    // An event message is static unless it reads a value, which only `getMessage` tells, so
-    // an element with events counts as one that writes.
-    return true;
+  for (const event of node.events) {
+    if (!isFixedMessage(component, event)) {
+      return true;
+    }
   }
   for (const child of node.children) {
-    if (hasWrite(child)) {
+    if (hasWrite(child, component)) {
       return true;
     }
   }
@@ -211,18 +232,24 @@ function hasWrite(node: Node): boolean {
  * elements, static text and text holes, and writes at least one value. A static body renders
  * HTML: its parse is short, and the copied `clone$` would cost more bytes than it saves. A
  * child, a list, a condition, `<Try>`, `<Subscribe>`, `<Head>`, a global listener, raw HTML, a
- * dynamic hole and a hole in a text element or a table render HTML.
+ * dynamic hole, a write inside a `<template>`, and a text hole in a text element, a table, a
+ * select or a `pre` render HTML.
  */
-export function canClone(nodes: readonly Node[], namespace: string, plan: Plan): boolean {
+export function canClone(
+  nodes: readonly Node[],
+  namespace: string,
+  component: Component,
+  plan: Plan,
+): boolean {
   if (nodes.length === 0 || namespace !== 'html') {
     return false;
   }
   let writes = false;
   for (const node of nodes) {
-    if (!isCloned(node, '', plan)) {
+    if (!isCloned(node, '', component, plan)) {
       return false;
     }
-    writes ||= hasWrite(node);
+    writes ||= hasWrite(node, component);
   }
   return writes;
 }
@@ -239,10 +266,18 @@ export function buildClone(
     builder.add(node);
   }
   emitter.usage.helpers.add('clone');
-  return { html: builder.html, writes: builder.writes };
+  return { html: builder.html, writes: builder.writes, marks: builder.marks };
 }
 
-/** Prints the statements of a render that clones `name` and returns the fragment. */
+/** Prints the module-level template `name` of a body, with `html` the body's HTML in full. */
+export function printTemplate(name: string, html: string, body: ClonedBody): string {
+  return `const ${name} = { h: ${quote(html)}, n: ${body.marks} };`;
+}
+
+/**
+ * Prints the statements of a render that clones `name` in the document `$doc` and returns the
+ * fragment.
+ */
 export function printClone(name: string, body: ClonedBody): string[] {
-  return [`const $n = clone$(${name});`, ...body.writes, 'return $n[0];'];
+  return [`const $n = clone$(${name}, $doc);`, ...body.writes, 'return $n[0];'];
 }
