@@ -19,11 +19,7 @@ export { compileHandlers, listHandlerProps, pickComponent } from './update/index
 export type { CompileHandlersResult } from './update/index.ts';
 export * from './view/analyze/index.ts';
 export { generate } from './view/codegen/index.ts';
-export type {
-  GenerateOptions,
-  GenerateResult,
-  GeneratedComponent,
-} from './view/codegen/index.ts';
+export type { GenerateOptions, GenerateResult, GeneratedComponent } from './view/codegen/index.ts';
 export { selectComponents } from './view/codegen/components.ts';
 export type { SelectOptions, Selected } from './view/codegen/components.ts';
 

@@ -277,14 +277,14 @@ export function generate(
         );
         continue;
       }
-      if (local !== undefined) {
-        used.module = local.module;
-        used.ref = `$${local.component.name}`;
-      } else {
+      if (local === undefined) {
         // A named import adds the component's name to the id of its file.
         const imported = imports.get(used.name)?.imported ?? 'default';
         const file = resolve(used.source, id);
         used.module = imported === 'default' ? file : `${file}#${imported}`;
+      } else {
+        used.module = local.module;
+        used.ref = `$${local.component.name}`;
       }
       used.view = getChunkId(used.module, 'view');
     }
@@ -586,7 +586,11 @@ function assembleServer(emitted: readonly Emitted[], moduleSource: ModuleSource)
     const name = selected.component.name;
     const record = `$${name}`;
     const parent = plan.uses.length > 0;
-    const children = plan.uses.map((used) => used.ref).join(', ');
+    const refs: string[] = [];
+    for (const used of plan.uses) {
+      refs.push(used.ref);
+    }
+    const children = refs.join(', ');
     const urls = `{\n${server.urls.join('\n')}\n}`;
     if (selected.main) {
       blocks.push(

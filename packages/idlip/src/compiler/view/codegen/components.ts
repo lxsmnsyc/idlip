@@ -152,7 +152,9 @@ function listLocalChildren(component: Component, names: ReadonlySet<string>): st
   const found: string[] = [];
   const seen = new Set<object>();
   const stack: unknown[] = [component.view];
-  for (let current = stack.pop(); current !== undefined; current = stack.pop()) {
+  // A field may hold `undefined`, so the loop runs on the stack's length.
+  while (stack.length > 0) {
+    const current = stack.pop();
     if (typeof current !== 'object' || current === null || seen.has(current)) {
       continue;
     }
@@ -161,18 +163,21 @@ function listLocalChildren(component: Component, names: ReadonlySet<string>): st
       stack.push(...(current as unknown[]));
       continue;
     }
-    const node = current as Record<string, unknown>;
-    const root = node.component as { kind?: unknown; name?: unknown } | undefined;
+    const root: unknown = Reflect.get(current, 'component');
+    const name: unknown =
+      typeof root === 'object' && root !== null && Reflect.get(root, 'kind') === 'module'
+        ? Reflect.get(root, 'name')
+        : undefined;
     if (
-      node.kind === 'child' &&
-      root?.kind === 'module' &&
-      typeof root.name === 'string' &&
-      names.has(root.name) &&
-      !found.includes(root.name)
+      Reflect.get(current, 'kind') === 'child' &&
+      typeof name === 'string' &&
+      names.has(name) &&
+      !found.includes(name)
     ) {
-      found.push(root.name);
+      found.push(name);
     }
-    stack.push(...Object.values(node));
+    const values: unknown[] = Object.values(current);
+    stack.push(...values);
   }
   return found;
 }
@@ -191,7 +196,12 @@ export function selectComponents(
 ): { selected: Selected[]; diagnostics: CompileDiagnostic[] } {
   const diagnostics: CompileDiagnostic[] = [];
   const report = (rule: string, message: string, node: AstNode): void => {
-    diagnostics.push({ rule, severity: 'error', message, span: { start: node.start, end: node.end } });
+    diagnostics.push({
+      rule,
+      severity: 'error',
+      message,
+      span: { start: node.start, end: node.end },
+    });
   };
   const byName = new Map<string, Component>();
   for (const component of ir.components) {
@@ -307,7 +317,9 @@ export function readImports(
         imported = 'default';
       } else if (specifier.type === 'ImportSpecifier') {
         imported =
-          specifier.imported.type === 'Literal' ? specifier.imported.value : specifier.imported.name;
+          specifier.imported.type === 'Literal'
+            ? specifier.imported.value
+            : specifier.imported.name;
       }
       imports.set(specifier.local.name, { source: statement.source.value, imported });
     }
