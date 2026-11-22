@@ -2023,3 +2023,63 @@ svg {
     scroll-behavior: auto !important;
   }
 }
+
+/* Search: the trigger in the header. The command bar has its own file, `src/search/palette.css`,
+   which loads with it the first time it opens. */
+
+.search-trigger {
+  display: flex;
+  flex: 0 1 17rem;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+  height: 3rem;
+  margin-inline-end: var(--gap);
+  padding: 0 0.6rem 0 1rem;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast),
+    transform var(--duration-fast) var(--ease);
+}
+
+.search-trigger:hover {
+  background: var(--surface-strong);
+}
+
+.search-trigger:active {
+  transform: scale(0.97);
+}
+
+.search-trigger-text {
+  flex: 1;
+  text-align: left;
+}
+
+.search-trigger kbd {
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+}
+
+@media (max-width: 48rem) {
+  .search-trigger {
+    flex: none;
+    justify-content: center;
+    width: 3rem;
+    margin-inline-end: 0.25rem;
+    padding: 0;
+  }
+
+  .search-trigger-text,
+  .search-trigger kbd {
+    display: none;
+  }
+}

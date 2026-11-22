@@ -12,6 +12,10 @@ import { isBenchmarks } from './landing/benchmarks.ts';
 import type { Benchmarks } from './landing/benchmarks.ts';
 import { renderLanding } from './landing/index.ts';
 import { renderPage } from './layout.ts';
+import { buildSearchIndex } from './search/index.ts';
+
+/** The file of the search index in the built site. */
+const SEARCH_INDEX = 'search-index.json';
 
 const DOCS = fileURLToPath(new URL('../docs/', import.meta.url));
 const TODO_SOURCE = fileURLToPath(
@@ -195,11 +199,18 @@ export function readDemo(file = DEMO_DATA): DemoData {
 
 /** Writes the pages into a folder. The Vite build has already put the assets and the demo there. */
 export function writeSite(outDir: string, base = '/'): string[] {
-  const files = renderSite(loadPages(DOCS, base), base, readDemo());
+  const pages = loadPages(DOCS, base);
+  const files = renderSite(pages, base, readDemo());
   for (const [name, html] of files) {
     const target = path.join(outDir, name);
     mkdirSync(path.dirname(target), { recursive: true });
     writeFileSync(target, html);
   }
+  // The command bar fetches the index the first time it opens. The entries follow the sidebar.
+  const ordered: Page[] = [];
+  for (const section of buildNav(pages)) {
+    ordered.push(...section.pages);
+  }
+  writeFileSync(path.join(outDir, SEARCH_INDEX), JSON.stringify(buildSearchIndex(ordered)));
   return [...files.keys()];
 }

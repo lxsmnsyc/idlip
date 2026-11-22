@@ -1,4 +1,5 @@
 import { createRenderer } from './markdown.ts';
+import SEARCH_ICONS from './search/icons.ts';
 import type { NavSection, Page } from './site.ts';
 
 export const REPOSITORY = 'https://github.com/lxsmnsyc/idlip';
@@ -57,7 +58,9 @@ export function renderHeader(base: string, start: string): string {
   return `<header class="site-header">
   <div class="header-inner">
     <a class="brand" href="${base}">idlip</a>
-    <div class="header-slot"></div>
+    <div class="header-slot">
+      <button class="search-trigger" type="button" aria-haspopup="dialog" aria-keyshortcuts="Control+K Meta+K /" aria-label="Search the documentation">${SEARCH_ICONS.search}<span class="search-trigger-text">Search</span><kbd>Ctrl K</kbd></button>
+    </div>
     <nav class="header-nav" aria-label="Site">
       ${links}
       <a class="icon-button" href="${REPOSITORY}" target="_blank" rel="noreferrer" aria-label="GitHub" title="GitHub">${ICON.github}</a>
