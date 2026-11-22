@@ -1,7 +1,7 @@
 ---
 id: website-search
 title: Add search to the website
-status: todo
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-22
-spent:
+spent: 280000
 owns:
   - website/src/search/**
   - website/test/search*
