@@ -1,7 +1,7 @@
 ---
 id: fix-for-prop-each
 title: Update row holes that read outer state when each is a prop
-status: todo
+status: done
 priority: should
 type: fix
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 87000
 owns:
   - packages/idlip/src/compiler/view/**
   - packages/idlip/test/compiler/view/**
