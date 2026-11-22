@@ -1,4 +1,5 @@
-// Emits the client chunks: binding groups and list item templates.
+// Emits the client chunks: binding groups, list rows, `<Try>` regions and child views. Every
+// body of a client chunk clones a template (`template.ts`).
 import { HELPERS_MODULE } from '../../../core/helpers.ts';
 import type { Component, Expr } from '../analyze/index.ts';
 import type { Module } from '../../../core/format.ts';
@@ -10,10 +11,9 @@ import { getMessage } from './events.ts';
 import { printTracked } from './dynamic.ts';
 import { Emitter, createUsage, mergeUsage } from './expr.ts';
 import type { Frame, Report, ScopeName, Usage } from './expr.ts';
-import { HtmlBuilder, toExpression } from './html.ts';
 import type { ModuleSource } from './module.ts';
 import type { Binding, Group, ListInfo, Plan, TryInfo } from './plan.ts';
-import { buildBody, canClone, createCloneContext } from './template.ts';
+import { buildBody, createCloneContext } from './template.ts';
 import { getKey, getLocalName, quote } from './text.ts';
 
 export interface ChunkContext {
@@ -153,46 +153,28 @@ function emitCondition(
   const branchUsage = createUsage();
   const branchEmitter = new Emitter('client', branchUsage, context.report);
   branchEmitter.frames = emitter.frames;
-  const builder = new HtmlBuilder(context.component, context.plan, branchEmitter);
   const clone = createCloneContext(context.component, context.plan, branchEmitter);
-  // A branch clones its templates, and an empty one is an empty fragment. A branch with raw
-  // HTML renders HTML.
-  let cloned = false;
+  // A branch clones its templates in the document `setBranch$` passes, and an empty one is an
+  // empty fragment.
   const branches: string[][] = [];
-  const expressions: string[] = [];
   for (const [index, nodes] of [node.then, node.else].entries()) {
     if (nodes.length === 0) {
       branches.push(['return $doc.createDocumentFragment();']);
-      cloned = true;
       continue;
     }
-    if (canClone(nodes, context.component, context.plan)) {
-      const body = buildBody(nodes, node.namespace, `templateC${node.test.id}_${index}$`, clone);
-      branches.push([...body.pre, `return ${body.expr};`]);
-      cloned = true;
-      continue;
-    }
-    const built = builder.build(nodes);
-    if (built.pre.length === 0) {
-      expressions.push(toExpression(built));
-    }
-    branches.push([...built.pre, `return ${toExpression({ pre: [], parts: built.parts })};`]);
+    const body = buildBody(nodes, node.namespace, `templateC${node.test.id}_${index}$`, clone);
+    branches.push([...body.pre, `return ${body.expr};`]);
   }
   const render = `renderC${node.test.id}`;
   const scope = printScope(branchUsage);
   const parameter = printScope(branchUsage, true);
-  const body =
-    expressions.length === 2
-      ? `return branch === 0 ? ${expressions[0]} : ${expressions[1]};`
-      : ['if (branch === 0) {', ...branches[0], '}', ...branches[1]].join('\n');
-  // `setBranch$` passes the document, which a branch that clones takes after the branch.
-  const head = cloned ? 'branch, $doc' : 'branch';
+  const body = ['if (branch === 0) {', ...branches[0], '}', ...branches[1]].join('\n');
+  const head = 'branch, $doc';
   const renderFunction = `function ${render}(${parameter === '' ? head : `${head}, ${parameter}`}) {\n${body}\n}`;
   mergeUsage(usage, branchUsage);
   // Only the scope the branches read goes to the render function.
   const reference = scope === '' ? render : `(${head}) => ${render}(${head}, ${scope})`;
-  const namespace = node.namespace === 'html' ? '' : `, ${quote(node.namespace)}`;
-  const call = `setBranch$(start, ${test} ? 0 : 1, ${reference}${namespace});`;
+  const call = `setBranch$(start, ${test} ? 0 : 1, ${reference});`;
   return {
     code: `export function ${binding.name}(${printParams('start', usage)}) {\n${call}\n}\n\n${renderFunction}`,
     usage,
@@ -335,27 +317,10 @@ export function emitListChunk(info: ListInfo, context: ChunkContext): GroupChunk
   const depth = info.frames.length;
   const frame: Frame = { item: info.node.item, index: info.node.index, row: undefined };
   emitter.frames = [...info.frames, frame];
-  const builder = new HtmlBuilder(context.component, context.plan, emitter);
-  // A row clones a template that holds its row markers. A row with raw HTML renders HTML.
-  let body: string[];
-  let cloned = false;
-  let blocks = false;
-  if (canClone(info.node.body, context.component, context.plan)) {
-    const clone = createCloneContext(context.component, context.plan, emitter);
-    const built = buildBody(
-      info.node.body,
-      info.node.namespace,
-      `templateL${info.id}$`,
-      clone,
-      true,
-    );
-    body = [...built.pre, `return ${built.expr};`];
-    cloned = true;
-    blocks = built.blocks;
-  } else {
-    const built = builder.build(info.node.body);
-    body = [...built.pre, `return ${toExpression({ pre: [], parts: built.parts })};`];
-  }
+  // A row clones a template that holds its row markers.
+  const clone = createCloneContext(context.component, context.plan, emitter);
+  const built = buildBody(info.node.body, info.node.namespace, `templateL${info.id}$`, clone, true);
+  const body = [...built.pre, `return ${built.expr};`];
   // The row's own item and index are read from the new row. A template that adds children
   // also reads the path of the scope, so it takes the whole scope.
   const scoped = usage.path;
@@ -392,16 +357,11 @@ export function emitListChunk(info: ListInfo, context: ChunkContext): GroupChunk
   }
   lines.push(...body);
   const sections: string[] = [];
-  let comment = '';
-  if (scoped) {
-    comment = cloned
-      ? "// `addChild` makes the child's model from `init`, records the slot and returns the child's\n// nodes, which go between the boundary comments of the template.\n"
-      : "// `addChild` makes the child's model from `init`, records the slot and returns the child's\n// markup between its boundary comments.\n";
-  }
-  // `patchList` passes the document, which a row that clones takes after the scope.
-  if (cloned) {
-    parameter = `${parameter === '' ? '$scope' : parameter}, $doc`;
-  }
+  const comment = scoped
+    ? "// `addChild` makes the child's model from `init`, records the slot and returns the child's\n// nodes, which go between the boundary comments of the template.\n"
+    : '';
+  // `patchList` passes the document after the scope.
+  parameter = `${parameter === '' ? '$scope' : parameter}, $doc`;
   sections.push(`${comment}export function render(${parameter}) {\n${lines.join('\n')}\n}`);
   if (info.node.key.kind === 'computed') {
     // The client pairs rows by this key, so it loads the chunk before it pairs them. The key
@@ -418,11 +378,8 @@ export function emitListChunk(info: ListInfo, context: ChunkContext): GroupChunk
     }
     sections.push(`export function key(${getLocalName(info.node.item)}) {\nreturn ${code};\n}`);
   }
-  if (info.node.namespace !== 'html') {
-    sections.push(`export const namespace = ${quote(info.node.namespace)};`);
-  }
-  // A cloned row that holds a block tells `patchList` to run the block hooks for it.
-  if (blocks) {
+  // A row that holds a block tells `patchList` to run the block hooks for it.
+  if (built.blocks) {
     sections.push('export const blocks = true;');
   }
   return {
@@ -432,9 +389,9 @@ export function emitListChunk(info: ListInfo, context: ChunkContext): GroupChunk
 }
 
 /**
- * Emits the chunk of a `<Try>` region. `render(error, scope, doc)` returns the catch view, with
- * `error` the message of what was thrown, a string: a cloned fragment, or HTML for a static
- * view. A catch view with `reset` also gets `region(scope, start)`: the whole region with its
+ * Emits the chunk of a `<Try>` region. `render(error, scope, doc)` returns the catch view, a
+ * cloned fragment, with `error` the message of what was thrown, a string. A catch view with
+ * `reset` also gets `region(scope, start)`: the whole region with its
  * markers, cloned in the document of `start`, for the reset. A region inside a `<For>` reads its
  * rows from the DOM around `start`, with `listPaths`, the `each` path of each list.
  */
@@ -448,24 +405,14 @@ export function emitTryChunk(
   emitter.frames = info.frames;
   const { component, plan } = context;
   const { node } = info;
-  let body: string[];
-  const cloned = canClone(node.catch, component, plan);
-  if (cloned) {
-    const clone = createCloneContext(component, plan, emitter);
-    clone.catching.push(info.id);
-    const built = buildBody(node.catch, node.namespace, `templateE${info.id}_1$`, clone);
-    body = [...built.pre, `return ${built.expr};`];
-  } else {
-    const builder = new HtmlBuilder(component, plan, emitter);
-    const built = builder.buildCatch(node, info.id);
-    body = [...built.pre, `return ${toExpression({ pre: [], parts: built.parts })};`];
-  }
+  const catchClone = createCloneContext(component, plan, emitter);
+  catchClone.catching.push(info.id);
+  const built = buildBody(node.catch, node.namespace, `templateE${info.id}_1$`, catchClone);
+  const body = [...built.pre, `return ${built.expr};`];
   const error = getLocalName(node.error);
-  // A view that clones takes the document after the scope.
+  // The view takes the document after the scope.
   let parameters = printParams(error, usage);
-  if (cloned) {
-    parameters += `${parameters === error ? ', $scope' : ''}, $doc`;
-  }
+  parameters += `${parameters === error ? ', $scope' : ''}, $doc`;
   const sections = [`export function render(${parameters}) {\n${body.join('\n')}\n}`];
   if (node.reset !== undefined) {
     const clone = createCloneContext(component, plan, emitter);
@@ -483,9 +430,6 @@ export function emitTryChunk(
     sections.push(
       `export function region(${params === '' ? '$scope' : params}, start) {\n${lines.join('\n')}\n}`,
     );
-  }
-  if (info.node.namespace !== 'html') {
-    sections.push(`export const namespace = ${quote(info.node.namespace)};`);
   }
   return {
     module: { chunk: `try=${info.id}`, code: assemble(usage, sections, context) },
@@ -639,18 +583,9 @@ export function emitViewChunk(context: ChunkContext): GroupChunk {
 
   // The whole view, with the server's names. A child it renders is added, as in a template.
   const emitter = new Emitter('server', usage, context.report);
-  const cloned = canClone(component.view, component, context.plan);
-  let body: string[];
-  if (cloned) {
-    const clone = createCloneContext(component, context.plan, emitter);
-    const built = buildBody(component.view, 'html', 'templateV$', clone);
-    body = [...built.pre, `return ${built.expr};`];
-  } else {
-    const builder = new HtmlBuilder(context.component, context.plan, emitter);
-    builder.target = 'client';
-    const built = builder.build(component.view);
-    body = [...built.pre, `return ${toExpression({ pre: [], parts: built.parts })};`];
-  }
+  const clone = createCloneContext(component, context.plan, emitter);
+  const built = buildBody(component.view, 'html', 'templateV$', clone);
+  const body = [...built.pre, `return ${built.expr};`];
   const lines: string[] = [];
   if (component.state.length > 0) {
     usage.scope.add('model');
@@ -662,11 +597,9 @@ export function emitViewChunk(context: ChunkContext): GroupChunk {
     lines.push(`const { ${names.join(', ')} } = model;`);
   }
   lines.push(...body);
-  // A view that clones takes the document after the scope.
+  // The view takes the document after the scope.
   let parameter = printScope(usage, true);
-  if (cloned) {
-    parameter = `${parameter === '' ? '$scope' : parameter}, $doc`;
-  }
+  parameter = `${parameter === '' ? '$scope' : parameter}, $doc`;
   const render = `// The whole view without the boundary markers, which the parent's template writes.\nexport function render(${parameter}) {\n${lines.join('\n')}\n}`;
   const chunk: Module = { chunk: 'view', code: assemble(usage, [init, render], context) };
   return { module: chunk, usage };

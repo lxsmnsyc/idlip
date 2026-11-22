@@ -31,7 +31,7 @@ The patcher the loader runs after each batch of messages. It compares the previo
 function patchList(...args: Parameters<PatchList>): Promise<void>;
 ```
 
-Patches the rows of a `<For>` from the previous list to the next one, by key. It moves, adds and removes rows, and patches the bindings of rows that stay. A new row comes from the list chunk's `render(scope, doc)`: the row's HTML, which `patchList` parses, or a fragment that the chunk cloned from a `<template>`, with the row markers, which it inserts as it is. A row of elements, text and holes clones; one with a child, a nested list or condition or raw HTML, or a row inside `<svg>`, renders HTML.
+Patches the rows of a `<For>` from the previous list to the next one, by key. It moves, adds and removes rows, and patches the bindings of rows that stay. A new row comes from the list chunk's `render(scope, doc)`: a fragment that the chunk cloned from a parsed template, with the row markers, which it inserts as it is. Every row clones, blocks and children inside it included. The browser parses no markup for a row, except the value of `html=`.
 
 ### `diffPaths`
 
@@ -52,7 +52,7 @@ Returns the paths whose values differ by reference. A `*` pairs items by index, 
 function parseHtml(doc: Document, html: string, ns?: 'svg' | 'mathml'): Node[];
 ```
 
-Parses HTML into nodes through the Trusted Types policy `idlip`. `ns` parses the markup inside an `<svg>` or `<math>` wrapper so it keeps its namespace. A page with `require-trusted-types-for 'script'` must allow the policy: `trusted-types idlip`.
+Parses HTML into nodes through the Trusted Types policy `idlip`. `ns` parses the markup inside an `<svg>` or `<math>` wrapper so it keeps its namespace. Chunks call it for two things: a template, once per document, and the value of `html=`. A page with `require-trusted-types-for 'script'` must allow the policy: `trusted-types idlip`.
 
 ## Blocks
 
@@ -95,10 +95,10 @@ Returns the blocks between `start` and `end`, children before parents.
 ### `addChild`
 
 ```ts
-function addChild(path: string, module: string, view: ViewChunk, props: Props): string;
+function addChild(path: string, module: string, view: ViewChunk, props: Props, doc: Document): Node;
 ```
 
-Makes a child component, records its slot as live and returns its markup between the boundary comments. A list chunk calls it when a row adds a child.
+Makes a child component, records its slot as live and returns its nodes, cloned in `doc` from the child's view. A chunk calls it when a row or a branch adds a child, and puts the nodes between the boundary comments of its template.
 
 ### `setProp`
 

@@ -2,7 +2,7 @@ import { DEV } from '../core/dev.ts';
 import type { Manifest, Model, Patch, Props, QueuedEvent, ViewChunk } from '../core/format.ts';
 import type { Child, Nesting, Root, Unit } from './loader/resume.ts';
 import { isComment } from './patch/guards.ts';
-import { onBlock, parseHtml } from './patch/index.ts';
+import { onBlock } from './patch/index.ts';
 
 /** A path that left the page keeps its generation, so the next `addChild` counts on. */
 type Entry = Child | { readonly kind: 'removed'; readonly gen: number };
@@ -96,37 +96,21 @@ function findBoundaries(top: Root): void {
 }
 
 /**
- * Makes a child and records its slot as live. With `doc`, returns the child's nodes for a
- * cloned body, whose template holds the boundary comments. Without it, returns the child's
- * markup between the boundary comments, for a body that renders HTML.
+ * Makes a child, records its slot as live and returns its nodes, cloned in `doc`. The template of
+ * the body holds the boundary comments around them.
  */
 export function addChild(
   path: string,
   module: string,
   view: ViewChunk,
   props: Props,
-  doc?: Document,
-): string | Node {
+  doc: Document,
+): Node {
   const top = active!;
   const table = getTable(top);
   const model = view.init(props);
   table.set(path, createChild(top, path, (table.get(path)?.gen ?? -1) + 1, module, model, props));
-  const owner = doc ?? top.page.root.ownerDocument!;
-  const rendered = view.render({ model, props, rows: [], path }, owner);
-  if (doc !== undefined) {
-    if (typeof rendered !== 'string') {
-      return rendered;
-    }
-    const fragment = doc.createDocumentFragment();
-    fragment.append(...parseHtml(doc, rendered));
-    return fragment;
-  }
-  if (typeof rendered === 'string') {
-    return `<!--n:${path}-->${rendered}<!--/n-->`;
-  }
-  const wrapper = owner.createElement('template');
-  wrapper.content.append(rendered);
-  return `<!--n:${path}-->${wrapper.innerHTML}<!--/n-->`;
+  return view.render({ model, props, rows: [], path }, doc);
 }
 
 /** Sets a prop of a live slot when its value differs, and marks the slot to patch. */

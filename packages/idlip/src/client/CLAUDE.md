@@ -11,6 +11,7 @@
 - Put a field or branch that one feature reads behind `...(HAS_X && { field })` or `if (HAS_X)`. Why: a plain field survives dead-code elimination, and a `Reflect.apply` of a union costs about 9 B a call over a typed call.
 - Put code that only one feature needs in its own module with one call site behind its flag. Why: an unreferenced module drops out of the bundle (`head.ts`, `nesting.ts`, `errors.ts`).
 - Reach `innerHTML` only through `parseHtml`. Why: it holds the one Trusted Types policy and the namespace wrapper.
+- Every render a chunk returns is a cloned node (rows, branches, child views, catch views, regions). Do not add an HTML-string path to `patchList`, `setBranch$`, `addChild` or `errors.ts`. Why: only `html=` content is parsed from a string, and each string path cost loader bytes (the todo loader went from 4073 to 4026 B when they went).
 - Learn the server's state with a script `import()` (`skew.ts` imports `build.js`), not a `fetch`. Why: a strict CSP such as `default-src 'none'` blocks `fetch`. Put a check that runs only after a failure in a served file and import it then, since the loader pays for every byte on every page.
 - A remount (`hot.ts`) replaces the root's `body` element, not its children. Why: `findNode` caches nodes by root.
 - Tests never wait a fixed time. Use `settled()` and `until` from `idlip/testing`. Why: tests under load failed twice on a fixed wait (`fix-flaky-tests`, `fix-flaky-tests-2`). The title update of `<Head>` is one tick after `settled()`.

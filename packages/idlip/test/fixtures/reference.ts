@@ -124,7 +124,7 @@ export interface ViewChunk {
   render: (
     scope: { model: Model; props: Props; rows: []; path: string },
     doc: Document,
-  ) => string | DocumentFragment;
+  ) => DocumentFragment;
 }
 
 /** The slots `addChild` recorded in the reference client. */
@@ -139,17 +139,11 @@ export function addChild(
   module: string,
   view: ViewChunk,
   props: Props,
-  doc?: Document,
-): string | Node {
+  doc: Document,
+): Node {
   const model = view.init(props);
   slots.set(path, { module, model, props });
-  const rendered = view.render({ model, props, rows: [], path }, doc ?? document);
-  if (doc !== undefined) {
-    return rendered;
-  }
-  const wrapper = document.createElement('template');
-  wrapper.content.append(rendered);
-  return `<!--n:${path}-->${typeof rendered === 'string' ? rendered : wrapper.innerHTML}<!--/n-->`;
+  return view.render({ model, props, rows: [], path }, doc);
 }
 
 function collectModules(

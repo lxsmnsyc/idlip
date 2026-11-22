@@ -20,7 +20,10 @@ function createPage(): Page {
     manifest,
     props: {},
     // oxlint-disable-next-line typescript/promise-function-async
-    load: () => Promise.resolve({ render: () => '<em>caught</em>' }),
+    load: () =>
+      Promise.resolve({
+        render: (_error: string, _scope: Scope, doc: Document) => doc.createElement('em'),
+      }),
   };
 }
 
@@ -42,13 +45,13 @@ describe('a child boundary', () => {
       '<!--e0:0--><!--n:a--><b>1</b><!--/n--><span id="after">2</span><!--/e-->';
     const node = document.querySelector('#after')!;
     expect(await failRegion(createPage(), node, new Error('x'), scope)).toBe(true);
-    expect(document.body.innerHTML).toBe('<!--e0:1--><em>caught</em><!--/e-->');
+    expect(document.body.innerHTML).toBe('<!--e0:1--><em></em><!--/e-->');
   });
 
   it('matches a region inside the child', async () => {
     document.body.innerHTML = '<!--n:a--><!--e0:0--><span id="inner">1</span><!--/e--><!--/n-->';
     const node = document.querySelector('#inner')!;
     expect(await failRegion(createPage(), node, new Error('x'), scope)).toBe(true);
-    expect(document.body.innerHTML).toBe('<!--n:a--><!--e0:1--><em>caught</em><!--/e--><!--/n-->');
+    expect(document.body.innerHTML).toBe('<!--n:a--><!--e0:1--><em></em><!--/e--><!--/n-->');
   });
 });

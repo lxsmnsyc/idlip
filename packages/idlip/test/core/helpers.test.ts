@@ -54,6 +54,15 @@ function getCopy(name: string): Callable {
   return copy;
 }
 
+/** A branch render as a chunk passes it: a fragment of the document, made here from HTML. */
+function toNodes(html: string): (branch: number, doc: Document) => Node {
+  return (_branch, doc) => {
+    const fragment = doc.createDocumentFragment();
+    fragment.append(...parseHtml(doc, html));
+    return fragment;
+  };
+}
+
 function find(root: unknown, name: string): unknown {
   return call(findNode, root, name);
 }
@@ -139,7 +148,7 @@ describe('chunk helpers', () => {
     );
     const root = document.createElement('div');
     root.innerHTML = '<!--c0:0--><p>a</p><!--c1:0-->x<!--/c--><!--/c-->';
-    call(getCopy('setBranch'), root.firstChild, 1, () => '<em>b</em>');
+    call(getCopy('setBranch'), root.firstChild, 1, toNodes('<em>b</em>'));
     expect(root.innerHTML).toBe('<!--c0:1--><em>b</em><!--/c-->');
     expect(events).toEqual(['remove c1:0', 'remove c0:0', 'add c0:1']);
   });
@@ -155,10 +164,10 @@ describe('chunk helpers', () => {
     // A block in a row: the index is kept.
     root.insertBefore(document.createComment('t9'), root.firstChild);
     const row = root.childNodes[4]?.nextSibling;
-    call(swap, row, 1, () => 'y');
+    call(swap, row, 1, toNodes('y'));
     expect(find(root, 't9')).toBeUndefined();
     // A top-level block: the index is rebuilt and sees the new marker.
-    call(swap, root.childNodes[1], 1, () => 'b');
+    call(swap, root.childNodes[1], 1, toNodes('b'));
     expect(find(root, 't9')).toBeDefined();
     expect(find(root, 't1')).toBe(marker);
   });

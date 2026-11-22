@@ -1,5 +1,5 @@
-// The render helpers (`text`, `attr`, `on`) and the DOM helpers (`setText`, `setAttr`, `setOn`,
-// `setBranch` and the rest) of compiled modules. Each has one source, here. The server imports
+// The render helpers of the server module (`text`, `attr`, `on`) and the DOM helpers of client
+// chunks (`setText`, `setAttr`, `setOn`, `setBranch`, `clone` and the rest). Each has one source, here. The server imports
 // the render helpers. A client chunk imports the ones it uses from `idlip/helpers`, one shared
 // module that `printHelpersModule` writes from the text of these functions. The Vite plugin
 // serves it, the bundler keeps the helpers the chunks use, and the loader starts loading it
@@ -216,16 +216,15 @@ export function setOn$(el: Element, event: string, message: DomMessage): void {
 
 /**
  * When `branch` differs from the marker's, replaces the block's content with
- * `render(branch, doc)`, HTML or a cloned fragment, and updates the marker. The hooks run
- * children first: before the swap for the blocks inside the old content and then the block,
- * after it for the blocks inside the new content and then the block. The loader forgets the
- * nodes it found as the hooks run.
+ * `render(branch, doc)`, a cloned fragment, and updates the marker. The hooks run children
+ * first: before the swap for the blocks inside the old content and then the block, after it for
+ * the blocks inside the new content and then the block. The loader forgets the nodes it found as
+ * the hooks run.
  */
 export function setBranch$(
   start: Comment,
   branch: number,
-  render: (branch: number, doc: Document) => string | Node,
-  ns?: Namespace,
+  render: (branch: number, doc: Document) => Node,
 ): void {
   const colon = start.data.indexOf(':');
   const end = findEnd$(start);
@@ -240,12 +239,7 @@ export function setBranch$(
   while (start.nextSibling !== end) {
     start.nextSibling?.remove();
   }
-  const html = render(branch, start.ownerDocument);
-  for (const node of typeof html === 'string'
-    ? parseHtml$(start.ownerDocument, html, ns)
-    : [html]) {
-    parent.insertBefore(node, end);
-  }
+  parent.insertBefore(render(branch, start.ownerDocument), end);
   start.data = `${start.data.slice(0, colon + 1)}${branch}`;
   for (const block of findInnerBlocks$(start, end)) {
     addBlock$(block);

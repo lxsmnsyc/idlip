@@ -150,6 +150,17 @@ export const SUBJECTS: readonly Subject[] = [
     },
   },
   {
+    // Raw HTML in cloned rows, a cloned branch and SVG rows: only the value is parsed.
+    name: 'raw-content',
+    source: read(import.meta.dirname, 'subjects/raw-content.tsx'),
+    props: {
+      rows: [
+        { id: 'a1', body: '<i>one</i> <u>1</u>', label: 'One' },
+        { id: 'a2', body: '', label: '<two>' },
+      ],
+    },
+  },
+  {
     name: 'nested-board',
     source: read(FIXTURES, 'nested/board/board.tsx'),
     props: {

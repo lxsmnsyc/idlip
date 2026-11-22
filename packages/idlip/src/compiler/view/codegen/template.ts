@@ -1,14 +1,16 @@
-// Cloned templates: a client body renders by cloning a parsed template and writing the values
-// on its marked nodes (`clone$` in `core/helpers.ts`). The clone holds the same nodes the HTML
-// would parse to, markers included, so the patcher and the server render see no difference. A
-// block inside a body (a condition or a list) is a marked comment in the template, and the
-// body's writes clone the block's own templates next to it. Other bodies render HTML.
+// Cloned templates: every client body renders by cloning a parsed template and writing the
+// values on its marked nodes (`clone$` in `core/helpers.ts`). The clone holds the same nodes the
+// HTML would parse to, markers included, so the patcher and the server render see no
+// difference. A block inside a body is a marked comment in the template, and the body's writes
+// clone the block's own templates next to it. The value of `html=` is the one string a client
+// chunk parses.
 import type { Component, Event, Hole, Node } from '../analyze/index.ts';
 import { printProps, printSlot } from './child.ts';
 import { printTracked } from './dynamic.ts';
 import { getMessage, isFixedMessage, printModifiers } from './events.ts';
 import type { Emitter } from './expr.ts';
 import type { Plan } from './plan.ts';
+import { getContentNamespace } from './raw.ts';
 import { escapeAttribute, escapeSingleQuoted, escapeText, getLocalName, quote } from './text.ts';
 
 const VOID_TAGS = new Set([
@@ -29,7 +31,9 @@ const VOID_TAGS = new Set([
 
 /**
  * HTML elements whose text the parser reads as text, not markup: no comment can mark a hole, so
- * a write sets the element's whole text. The compiler rejects a hole in a `script` or a `style`.
+ * a write sets the element's whole text. The compiler rejects a hole in a `script` or a `style`,
+ * and an element in any of them. In SVG and MathML a `title` or a `style` is an element like any
+ * other.
  */
 const TEXT_TAGS = new Set(['script', 'style', 'textarea', 'title']);
 
@@ -64,57 +68,6 @@ export interface BodyCode {
   expr: string;
   /** Whether the body holds a block that the block hooks must see once it is in the page. */
   blocks: boolean;
-}
-
-function isClonedElement(node: Element, component: Component, plan: Plan): boolean {
-  if (node.html !== undefined) {
-    return false;
-  }
-  // In SVG and MathML a `title` or a `style` is an element like any other.
-  const text = node.namespace === 'html' && TEXT_TAGS.has(node.tag);
-  for (const child of node.children) {
-    if (
-      text ? child.kind !== 'text' && child.kind !== 'text-hole' : !isCloned(child, component, plan)
-    ) {
-      return false;
-    }
-  }
-  return true;
-}
-
-function isClonedBody(nodes: readonly Node[], component: Component, plan: Plan): boolean {
-  for (const node of nodes) {
-    if (!isCloned(node, component, plan)) {
-      return false;
-    }
-  }
-  return true;
-}
-
-function isCloned(node: Node, component: Component, plan: Plan): boolean {
-  switch (node.kind) {
-    case 'text':
-    case 'text-hole':
-      // A table or a select would move text, but the template marks a hole with a comment,
-      // which the parser leaves in place, and the compiler rejects text inside a table.
-      return true;
-    case 'element':
-      return isClonedElement(node, component, plan);
-    case 'condition':
-      return isClonedBody(node.then, component, plan) && isClonedBody(node.else, component, plan);
-    case 'for':
-      return isClonedBody(node.body, component, plan);
-    case 'try':
-      return isClonedBody(node.body, component, plan) && isClonedBody(node.catch, component, plan);
-    case 'head':
-      return isClonedBody(node.children, component, plan);
-    case 'child':
-    case 'subscribe':
-    case 'global':
-      return true;
-    default:
-      return false;
-  }
 }
 
 class TemplateBuilder {
@@ -482,6 +435,18 @@ class TemplateBuilder {
     if (VOID_TAGS.has(node.tag)) {
       return;
     }
+    if (node.html !== undefined) {
+      // Raw HTML: the element clones, and its content is the parsed value, as the server wrote
+      // it in place.
+      emitter.at = node.html.span;
+      emitter.usage.loader.add('parseHtml');
+      const value = `(${emitter.expr(node.html.expr, 0)}) ?? ''`;
+      const namespace = getContentNamespace(node);
+      const ns = namespace === undefined ? '' : `, ${quote(namespace)}`;
+      write((target) => `${target}.append(...parseHtml($doc, ${value}${ns}));`);
+      this.html += `</${node.tag}>`;
+      return;
+    }
     const html = node.namespace === 'html';
     if (html && node.tag === 'template' && hasWrite(node, component)) {
       this.addContent(node.children, `templateT${node.span.start}$`, write);
@@ -588,21 +553,13 @@ function hasFreeMessage(events: readonly Event[], component: Component): boolean
 }
 
 /**
- * Tells whether a client body renders by a clone: it holds only elements, static text, text
- * holes, children, `<Subscribe>`, `<Head>`, global listeners, and conditions, lists and `<Try>`
- * regions whose bodies clone. A body in SVG or MathML parses its template in an `<svg>` or
- * `<math>` wrapper. A body with nothing to write clones its parsed template as it is. Raw HTML
- * renders HTML. A dynamic hole records its reads. A text hole in an HTML text element sets the
- * element's text, and the content of a `<template>` with a write clones from its own template.
- */
-export function canClone(nodes: readonly Node[], component: Component, plan: Plan): boolean {
-  return isClonedBody(nodes, component, plan);
-}
-
-/**
- * Builds the code of a body that `canClone` accepts: the module-level template `name` (added
- * to the emitter's usage) and the statements that clone it in `$doc` and write the values.
- * `row` wraps the template in the row markers.
+ * Builds the code of a body: the module-level template `name` (added to the emitter's usage) and
+ * the statements that clone it in `$doc` and write the values. `row` wraps the template in the
+ * row markers. A body in SVG or MathML parses its template in an `<svg>` or `<math>` wrapper. A
+ * body with nothing to write clones its parsed template as it is. A dynamic hole records its
+ * reads. A text hole in an HTML text element sets the element's text, and the content of a
+ * `<template>` with a write clones from its own template. Raw HTML is the one string the
+ * browser parses: its element clones, and the write appends the parsed value.
  */
 export function buildBody(
   nodes: readonly Node[],

@@ -242,8 +242,8 @@ export type Binding = NodeBinding | ListBinding | PropBinding;
 export interface ViewChunk {
   /** The initial model from the state initializers and the props. */
   readonly init: (props: Props) => Model;
-  /** The whole view, without the boundary markers: HTML, or a fragment cloned in `doc`. */
-  readonly render: (scope: Scope, doc: Document) => string | DocumentFragment;
+  /** The whole view without the boundary markers, cloned in `doc`. */
+  readonly render: (scope: Scope, doc: Document) => DocumentFragment;
 }
 
 /** A handler export: the next model, or the next model and a task. */
@@ -286,15 +286,11 @@ export type HandlerChunk = Readonly<Record<string, Update>>;
 export type BindingChunk = Readonly<Record<string, Binding>>;
 
 export interface ListChunk {
-  /**
-   * Renders one row: its HTML without the row markers, or a fragment cloned from a template in
-   * `doc`, with the row markers.
-   */
-  readonly render: (scope: Scope, doc: Document) => string | DocumentFragment;
+  /** Renders one row: a fragment cloned from a template in `doc`, with the row markers. */
+  readonly render: (scope: Scope, doc: Document) => DocumentFragment;
   /** The key of an item, for a list whose manifest entry has no `key` field. */
   readonly key?: (item: unknown) => unknown;
-  readonly namespace?: 'svg' | 'mathml';
-  /** Set when a cloned row holds a block, so the block hooks run once the row is in the page. */
+  /** Set when a row holds a block, so the block hooks run once the row is in the page. */
   readonly blocks?: true;
 }
 

@@ -142,6 +142,11 @@ describe.each(['counter', 'todo'])('compile() on the %s fixture', (name) => {
   });
 });
 
+/** The todo row as the server writes it, from the reference render helpers. */
+function renderServerRow(item: { id: string; text: string; done: boolean }): string {
+  return `<li${attr('class', { done: item.done })} i-a="4"><input type="checkbox"${attr('checked', item.done)}${on('click', ['toggle', [item.id]])} i-a="5 7"><!--t6-->${text(item.text)}<!--/t--></li>`;
+}
+
 describe('compile() behavior', () => {
   it.each(['counter', 'todo'])('renders the %s fixture page', (name) => {
     const result = compile(readFixture(name, `${name}.tsx`), readId(name));
@@ -149,27 +154,20 @@ describe('compile() behavior', () => {
     expect(runServer(result.server, readProps(name))).toBe(page.trimEnd());
   });
 
-  it('renders the same todo rows as the fixture list chunk', () => {
+  it('renders the todo rows the server writes, as the fixture list chunk does', () => {
     const result = compile(readFixture('todo', 'todo.tsx'), readId('todo'));
     const chunk = result.client.find((module) => module.chunk === 'list=3');
-    const actual = loadRender(chunk?.code ?? '', {
-      ...runtime,
-      attr$: attr,
-      on$: on,
-      text$: text,
-    });
-    const expected = loadRender(readFixture('todo', 'expected', 'client', 'list.3.js'), {
-      attr$: attr,
-      on$: on,
-      text$: text,
-    });
+    const actual = loadRender(chunk?.code ?? '', runtime);
+    const expected = loadRender(readFixture('todo', 'expected', 'client', 'list.3.js'), runtime);
     const items = [
       { id: 'a1', text: 'one & two', done: true },
       { id: 'a2', text: '<b>', done: false },
     ];
     for (const item of items) {
       const scope = { model: {}, props: {}, rows: [{ item, index: 0 }] };
-      expect(printRow(actual(scope, document))).toBe(printRow(expected(scope, document)));
+      const row = printRow(actual(scope, document));
+      expect(row).toBe(printRow(expected(scope, document)));
+      expect(row).toBe(printRow(renderServerRow(item)));
     }
   });
 });

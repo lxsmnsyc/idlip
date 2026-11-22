@@ -10,7 +10,7 @@ import { quote } from './text.ts';
 type ElementNode = Extract<Node, { kind: 'element' }>;
 
 /** The namespace the content of an element is parsed in, or `undefined` for HTML. */
-function getContentNamespace(node: ElementNode): string | undefined {
+export function getContentNamespace(node: ElementNode): string | undefined {
   // `foreignObject` is in the SVG namespace and its content is HTML.
   if (node.tag === 'foreignObject' || node.namespace === 'html') {
     return undefined;

@@ -12,7 +12,7 @@ import { failRegion } from '../errors.ts';
 import { HAS_CHILDREN, HAS_ERRORS, HAS_INNER_LISTS, HAS_KEY_FN } from '../features.ts';
 import { isComment, isElement } from '../patch/guards.ts';
 import { added } from '../patch/blocks.ts';
-import { addBlock, findInnerBlocks, parseHtml, readField, removeBlock } from '../patch/index.ts';
+import { addBlock, findInnerBlocks, readField, removeBlock } from '../patch/index.ts';
 
 interface Range {
   readonly start: Comment;
@@ -283,11 +283,10 @@ export async function patchList(...args: Parameters<PatchList>): Promise<void> {
       placed.push(rows[olds[j]]);
       continue;
     }
-    const html = chunk?.render(getRowScope(context.next, next[j], j), start.ownerDocument);
-    const cloned = typeof html === 'object';
-    const nodes = cloned
-      ? [...html.childNodes]
-      : parseHtml(start.ownerDocument, `<!--i-->${html}<!--/i-->`, chunk?.namespace);
+    // A row is a cloned fragment that holds its row markers.
+    const nodes = [
+      ...chunk!.render(getRowScope(context.next, next[j], j), start.ownerDocument).childNodes,
+    ];
     const first = nodes[0];
     const last = nodes[nodes.length - 1];
     if (!isComment(first) || !isComment(last)) {
@@ -295,9 +294,9 @@ export async function patchList(...args: Parameters<PatchList>): Promise<void> {
     }
     placed.push({ start: first, end: last });
     inserts[j] = nodes;
-    // The blocks of a row, found before it moves into the page. The chunk of a cloned row says
-    // whether it holds any.
-    blocks[j] = cloned && !chunk?.blocks ? [] : findInnerBlocks(first, last);
+    // The blocks of a row, found before it moves into the page. The chunk says whether its rows
+    // hold any.
+    blocks[j] = chunk!.blocks ? findInnerBlocks(first, last) : [];
   }
   let before: ChildNode = end;
   for (let j = next.length - 1; j >= 0; j--) {

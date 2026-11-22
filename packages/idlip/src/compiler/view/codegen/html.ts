@@ -1,4 +1,5 @@
-// Turns view nodes into JS that builds their markup: the server render and client templates.
+// Turns view nodes into JS that builds their markup: the server render. Client chunks clone
+// templates instead (`template.ts`).
 import type { Component, Node } from '../analyze/index.ts';
 import { addChildNode } from './child.ts';
 import { printTracked } from './dynamic.ts';
@@ -75,13 +76,6 @@ export class HtmlBuilder {
   /** Variable names in use for list rows. */
   accumulators: Set<string> = new Set();
 
-  /**
-   * Where the markup runs. A child is called as a module on the server, and added with
-   * `addChild` in a client template. The view chunk prints with the server's names and
-   * adds children as a template does.
-   */
-  target: 'server' | 'client';
-
   /** The ids of the `<Try>` regions whose catch view is being built, innermost last. */
   catching: number[] = [];
 
@@ -89,9 +83,7 @@ export class HtmlBuilder {
     readonly component: Component,
     readonly plan: Plan,
     readonly emitter: Emitter,
-  ) {
-    this.target = emitter.mode;
-  }
+  ) {}
 
   build(nodes: Node[], content: Content = 'html'): Built {
     const built = createBuilt();
@@ -221,8 +213,7 @@ export class HtmlBuilder {
         { kind: 'text', value: '<!--/e-->' },
       ]);
     // A body that throws after a `<Head>` or a child wrote its head output drops that output.
-    const marked =
-      this.target === 'server' && (this.plan.heads.size > 0 || this.plan.uses.length > 0);
+    const marked = this.plan.heads.size > 0 || this.plan.uses.length > 0;
     built.pre.push(
       `let ${variable};`,
       ...(marked ? [`const $mark${id} = context.headMark?.() ?? 0;`] : []),
@@ -248,9 +239,9 @@ export class HtmlBuilder {
   }
 
   /**
-   * Writes the marker block of a `<Head>`. A client template holds the elements in the marker,
-   * and the loader moves them to `<head>`. The server writes the elements through `context`
-   * instead, each with `i-head="<id>.<index>"`, and the marker stays empty.
+   * Writes the marker block of a `<Head>`. The server writes the elements through `context`,
+   * each with `i-head="<id>.<index>"`, and the marker stays empty. A client template holds the
+   * elements in the marker, and the loader moves them to `<head>` (`template.ts`).
    */
   addHead(node: HeadNode, built: Built): void {
     const id = this.plan.heads.get(node);
@@ -259,16 +250,6 @@ export class HtmlBuilder {
       if (child.kind === 'element') {
         elements.push(child);
       }
-    }
-    if (this.target === 'client') {
-      addText(built, `<!--c${id}:h--><template i-head=""`);
-      this.addAnchor(node, built);
-      addText(built, '>');
-      for (const element of elements) {
-        this.addElement(element, built);
-      }
-      addText(built, '</template><!--/c-->');
-      return;
     }
     const variable = `$head${id}`;
     built.pre.push(`const ${variable} = context.headId?.() ?? 0;`);

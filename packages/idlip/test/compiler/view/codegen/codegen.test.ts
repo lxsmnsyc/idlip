@@ -125,6 +125,11 @@ function runChunk(code: string, helpers: Record<string, unknown>): Record<string
 }
 
 /** Calls the `render` export of a list chunk. */
+/** The todo row as the server writes it, from the reference render helpers. */
+function renderServerRow(item: { id: string; text: string; done: boolean }): string {
+  return `<li${attr('class', { done: item.done })} i-a="4"><input type="checkbox"${attr('checked', item.done)}${on('click', ['toggle', [item.id]])} i-a="5 7"><!--t6-->${text(item.text)}<!--/t--></li>`;
+}
+
 function renderRow(exports: Record<string, unknown>, scope: unknown): string {
   const render = exports.render;
   if (!isRender(render)) {
@@ -240,27 +245,20 @@ describe.each(['counter', 'todo'])('fixture %s', (name) => {
 });
 
 describe('fixture todo list template', () => {
-  it('renders the same rows as the fixture chunk', () => {
+  it('renders the rows the server writes, as the fixture chunk does', () => {
     const { result } = generateFixture('todo');
     const chunk = result.client.find((module) => module.chunk === 'list=3');
-    const actual = runChunk(chunk?.code ?? '', {
-      ...runtime,
-      attr$: attr,
-      on$: on,
-      text$: text,
-    });
-    const expected = runChunk(readFixture('todo', 'expected', 'client', 'list.3.js'), {
-      attr$: attr,
-      on$: on,
-      text$: text,
-    });
+    const actual = runChunk(chunk?.code ?? '', runtime);
+    const expected = runChunk(readFixture('todo', 'expected', 'client', 'list.3.js'), runtime);
     const items = [
       { id: 'a1', text: 'one & two', done: true },
       { id: 'a2', text: '<b>', done: false },
     ];
     for (const item of items) {
       const scope = { model: {}, props: {}, rows: [{ item, index: 0 }] };
-      expect(renderRow(actual, scope)).toBe(renderRow(expected, scope));
+      const row = renderRow(actual, scope);
+      expect(row).toBe(renderRow(expected, scope));
+      expect(row).toBe(printRow(renderServerRow(item)));
     }
   });
 });
@@ -656,7 +654,7 @@ describe('client chunks', () => {
     `;
     const result = generateSource(source);
     const list = result.client.find((module) => module.chunk.startsWith('list='));
-    expect(list?.code).toContain("export const namespace = 'svg';");
+    expect(list?.code).toMatch(/const templateL\d+\$ = \{ h: '<!--i--><circle .*, s: 'svg' \};/);
   });
 
   it('nests lists: the inner list is a row binding of the outer list', () => {
