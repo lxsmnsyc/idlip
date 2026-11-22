@@ -1,7 +1,7 @@
 ---
 id: preimport-chunks
 title: Preload click chunks and import them before the click
-status: todo
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: [benchmark]
 fulfilled_by:
 gate: false
 added: 2026-11-22
-spent:
+spent: 680000
 owns:
   - benchmarks/prefetch/**
 shared:
