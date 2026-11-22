@@ -64,6 +64,25 @@ function listChildren(source: string, id: string): string[];
 
 Lists the import specifiers of the stateful children a module renders, such as `./counter.tsx`. The Vite plugin compiles each of those modules with `child: true`.
 
+### `listChildImports`
+
+```ts
+function listChildImports(source: string, id: string): ChildImport[];
+```
+
+Lists the stateful children that the components of a file render from other files, each once, such as `{ source: './widgets.tsx', imported: 'Counter' }`. The Vite plugin compiles each of those components as a child.
+
+### `ChildImport`
+
+```ts
+interface ChildImport {
+  source: string;
+  imported: string;
+}
+```
+
+A stateful child that a file renders from another file. `source` is the specifier, such as `./widgets.tsx`. `imported` is `default` or the name of a named component, such as `Counter`.
+
 ## Stages
 
 `compile` runs three stages on one analysis. Each stage is exported for tools that need one part.
@@ -135,6 +154,18 @@ interface GenerateResult {
 
 `server` is empty when a diagnostic is an error. `client` holds binding group chunks and list item template chunks, not handler chunks.
 
+### `GeneratedComponent`
+
+```ts
+interface GeneratedComponent {
+  name: string;
+  manifest: Manifest;
+  client: Module[];
+}
+```
+
+The manifest and view chunks of a component other than the file's first one, by its name in the source.
+
 ### `compileHandlers`
 
 ```ts
@@ -170,6 +201,62 @@ function pickComponent(ir: ModuleIR): Component | undefined;
 ```
 
 Returns the root component of a module: the first exported stateful one, else the first stateful one.
+
+### `selectComponents`
+
+```ts
+function selectComponents(
+  ir: ModuleIR,
+  source: string,
+  id: string,
+  options?: SelectOptions,
+): { selected: Selected[]; diagnostics: CompileDiagnostic[] };
+```
+
+Picks the components of a file that compile to their own manifest, chunks and render function: the default export, each named export, and every other component that one of them renders as a stateful child, in source order. A file with no exported component keeps the old rule: its first stateful component is the main one. The main component has the file's id; every other one adds `#<Name>`.
+
+### `Selected`
+
+```ts
+interface Selected {
+  component: Component;
+  module: string;
+  main: boolean;
+  exported: boolean;
+  child: boolean;
+}
+```
+
+One component that `selectComponents` picked. `module` is the file id for the main component and `<file>#<Name>` for the others. `main` marks the component the server module exports as `default`. `exported` is true when other files can import it. `child` is true when a module renders it as a child, so it gets a `view` chunk.
+
+### `SelectOptions`
+
+```ts
+interface SelectOptions {
+  child?: boolean;
+  children?: readonly string[];
+}
+```
+
+`child` is true when another module renders the main component as a child. `children` names the named components that other modules render as children.
+
+## Helpers
+
+### `HELPERS_MODULE`
+
+```ts
+const HELPERS_MODULE = 'idlip/helpers';
+```
+
+The specifier that chunks import the runtime helpers from. The Vite plugin resolves it to a virtual module.
+
+### `printHelpersModule`
+
+```ts
+function printHelpersModule(): string;
+```
+
+Returns the source of the `idlip/helpers` module: a copy of every helper, the loader exports they call as imports from `idlip/client`, and an export of each helper. It throws when a bundler renamed a function, since the copies call each other by name.
 
 ## Printing
 
