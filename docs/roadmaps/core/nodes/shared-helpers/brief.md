@@ -1,7 +1,7 @@
 ---
 id: shared-helpers
 title: Stop copying runtime helpers into every chunk
-status: todo
+status: done
 priority: should
 type: refactor
 story:
@@ -20,7 +20,7 @@ exclusive: [benchmark]
 fulfilled_by:
 gate: false
 added: 2026-11-22
-spent:
+spent: 871000
 owns:
   - packages/idlip/src/core/helpers.ts
   - packages/idlip/src/core/dynamic.ts
