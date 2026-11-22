@@ -346,6 +346,26 @@ function timings(samples) {
   return { cpu: summary(cpu), paint: summary(paint) };
 }
 
+// One timed click of an operation on a new page: `{ paint, cpu }` in ms.
+export async function measureOperation(browser, base, operation, { cpu = 1, watch } = {}) {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const page = await context.newPage();
+  watch?.(page);
+  try {
+    await page.goto(`${base}/?n=0`, { waitUntil: 'networkidle' });
+    await operation.setup(page);
+    await throttle(page, cpu);
+    const before = await snapshot(page);
+    const events = await trace(browser, page, async () => {
+      await page.click(operation.click);
+      await waitDone(page, operation.done, before);
+    });
+    return clickToPaint(events);
+  } finally {
+    await context.close();
+  }
+}
+
 // Runs each operation `runs` times, each on a new page.
 export async function measureRows(browser, base, { runs, cpu, idleMs }) {
   const errors = [];
@@ -358,24 +378,11 @@ export async function measureRows(browser, base, { runs, cpu, idleMs }) {
   for (const [key, operation] of Object.entries(OPERATIONS)) {
     const samples = [];
     for (let attempt = 0; attempt < runs; attempt++) {
-      const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
-      const page = await context.newPage();
-      watch(page);
       try {
-        await page.goto(`${base}/?n=0`, { waitUntil: 'networkidle' });
-        await operation.setup(page);
-        await throttle(page, cpu);
-        const before = await snapshot(page);
-        const events = await trace(browser, page, async () => {
-          await page.click(operation.click);
-          await waitDone(page, operation.done, before);
-        });
-        samples.push(clickToPaint(events));
+        samples.push(await measureOperation(browser, base, operation, { cpu, watch }));
       } catch (error) {
         failed.push(`${key}: ${error.message.split('\n')[0]}`);
         break;
-      } finally {
-        await context.close();
       }
     }
     if (samples.length) {
