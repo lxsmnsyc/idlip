@@ -1,10 +1,10 @@
 // The render helpers of the server module (`text`, `attr`, `on`) and the DOM helpers of client
-// chunks (`setText`, `setAttr`, `setOn`, `setBranch`, `clone` and the rest). Each has one source, here. The server imports
-// the render helpers. A client chunk imports the ones it uses from `idlip/helpers`, one shared
-// module that `printHelpersModule` writes from the text of these functions. The Vite plugin
-// serves it, the bundler keeps the helpers the chunks use, and the loader starts loading it
-// with the first chunk. The loader stays small, and a build ships each helper once. Rules for
-// the sources:
+// chunks (`setText`, `setAttr`, `setOn`, `setBranch`, `clone` and the rest). Each has one
+// source, here. The server imports the render helpers. A client chunk imports the ones it uses
+// from `idlip/helpers`, one shared module that `printHelpersModule` writes from the text of
+// these functions. The Vite plugin serves it, the bundler keeps the helpers the chunks use, and
+// the loader starts loading it with the first chunk. The loader stays small, and a build ships
+// each helper once. Rules for the sources:
 // - Every function is named with a `$` suffix, so a copy cannot clash with a name in the module.
 // - No comment inside a body, since the copy is the text of the function.
 // - A function calls only the functions of `HELPERS` and the forwarders, by their names.

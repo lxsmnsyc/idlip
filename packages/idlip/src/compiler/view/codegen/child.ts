@@ -55,9 +55,13 @@ export function addChildNode(builder: HtmlBuilder, node: ChildNode, built: Built
   const { emitter, plan } = builder;
   const root = node.component;
   const info = plan.children.get(node);
-  const used = plan.uses.find(
-    (item) => (root.kind === 'import' || root.kind === 'module') && item.name === root.name,
-  );
+  let used: (typeof plan.uses)[number] | undefined;
+  for (const item of plan.uses) {
+    if ((root.kind === 'import' || root.kind === 'module') && item.name === root.name) {
+      used = item;
+      break;
+    }
+  }
   if (info === undefined || used === undefined) {
     // `plan` reports a child that is neither an import nor a component of this file.
     return;
