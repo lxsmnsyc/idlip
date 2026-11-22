@@ -23,6 +23,16 @@ function hasKeyFunction({ manifest }: CompileResult): boolean {
   return false;
 }
 
+function hasInnerLists({ client }: CompileResult): boolean {
+  // A list's start marker in a chunk's markup: a branch, a region or a row renders the list.
+  for (const module of client) {
+    if (/<!--l\d/.test(module.code)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function hasChildren({ manifest, server }: CompileResult): boolean {
   // The child has a `view` chunk. A parent has `uses`, even when the child is not compiled as one.
   // A component other than the main one sets the `uses` of its record, `$Name.uses = [...]`.
@@ -45,6 +55,7 @@ const DETECTORS: Readonly<Record<string, Detector>> = {
   RETRY: ({ manifest }) => manifest.fallback !== undefined,
   DYNAMIC: ({ manifest }) => Object.hasOwn(manifest.groups, '$dynamic'),
   KEY_FN: hasKeyFunction,
+  INNER_LISTS: hasInnerLists,
 };
 
 /** Returns the flags that the compiled modules turn on. */

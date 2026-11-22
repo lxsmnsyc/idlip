@@ -13,7 +13,8 @@ import type {
 } from '../../core/format.ts';
 import { failRegion } from '../errors.ts';
 import { DYNAMIC_GROUP, getDynamic, isIdle } from '../dynamic.ts';
-import { HAS_CHILDREN, HAS_DYNAMIC, HAS_ERRORS } from '../features.ts';
+import { HAS_CHILDREN, HAS_DYNAMIC, HAS_ERRORS, HAS_INNER_LISTS } from '../features.ts';
+import { added } from './blocks.ts';
 import { diffPaths, getListKeys } from './diff.ts';
 import { isBinding, isComment, isRecord } from './guards.ts';
 import { findNode } from './nodes.ts';
@@ -137,6 +138,9 @@ export function createPatch(patchList: PatchList): Patch {
   return async (page, prev, next) => {
     const { manifest } = page;
     const plan = getPlan(manifest);
+    if (HAS_INNER_LISTS) {
+      added.clear();
+    }
     const selected = selectGroups(manifest, plan, prev, next);
     const changed = HAS_DYNAMIC ? getDynamic(page, prev, next, plan.keys) : [];
     if (HAS_DYNAMIC && changed.length > 0) {

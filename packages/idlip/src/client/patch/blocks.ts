@@ -1,3 +1,4 @@
+import { HAS_INNER_LISTS } from '../features.ts';
 import { isComment, matchMarker } from './guards.ts';
 
 type BlockHook = (start: Comment) => void;
@@ -14,8 +15,17 @@ export function onBlock(add: BlockHook, remove: BlockHook): void {
   removeHooks.push(remove);
 }
 
+/**
+ * The blocks added since the running patch started. A list among them was rendered from the
+ * new model, so the patch leaves it as it is.
+ */
+export const added: Set<Comment> = new Set();
+
 /** Calls the add hooks for a block whose markup is in the page. */
 export function addBlock(start: Comment): void {
+  if (HAS_INNER_LISTS) {
+    added.add(start);
+  }
   for (const hook of addHooks) {
     hook(start);
   }

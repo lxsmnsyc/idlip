@@ -130,6 +130,23 @@ describe('feature detection', () => {
     expect([...getFeatures([child])]).toContain('KEY_FN');
   });
 
+  it('turns INNER_LISTS on for a list inside a branch, and not for a list at the top', () => {
+    const view = (body: string): string => `
+      import { For } from 'idlip';
+      export default function App() {
+        let open = true;
+        let items = [{ id: 1 }];
+        function toggle() { open = !open; }
+        return <main><button on:click={toggle}>x</button>${body}</main>;
+      }
+    `;
+    const list = '<ul><For each={items} key={(t) => t.id}>{(t) => <li>{t.id}</li>}</For></ul>';
+    const top = compileSource(view(list), '/src/app.tsx');
+    const inner = compileSource(view(`{open ? ${list} : null}`), '/src/app.tsx');
+    expect([...getFeatures([top])]).not.toContain('INNER_LISTS');
+    expect([...getFeatures([inner])]).toContain('INNER_LISTS');
+  });
+
   it('turns CHILDREN on for a child module and for a module with children', () => {
     const todo = compileFixture('', '/src/todo.tsx');
     const child = { ...todo, manifest: { ...todo.manifest, view: { chunk: 'view' } } };

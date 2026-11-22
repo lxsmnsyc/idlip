@@ -9,8 +9,9 @@ import type {
   Scope,
 } from '../../core/format.ts';
 import { failRegion } from '../errors.ts';
-import { HAS_CHILDREN, HAS_ERRORS, HAS_KEY_FN } from '../features.ts';
+import { HAS_CHILDREN, HAS_ERRORS, HAS_INNER_LISTS, HAS_KEY_FN } from '../features.ts';
 import { isComment, isElement } from '../patch/guards.ts';
+import { added } from '../patch/blocks.ts';
 import { addBlock, findInnerBlocks, parseHtml, readField, removeBlock } from '../patch/index.ts';
 
 interface Range {
@@ -224,6 +225,10 @@ async function patchRow(
 export async function patchList(...args: Parameters<PatchList>): Promise<void> {
   const [start, prev, next, context] = args;
   const { list, page } = context;
+  // A branch that swapped earlier in this patch rendered the list from the new model.
+  if (HAS_INNER_LISTS && added.has(start)) {
+    return;
+  }
 
   // A computed key lives in the list chunk, so the chunk loads before the rows are paired.
   // Load the template before the DOM changes, so a failed load leaves the list as it was.
