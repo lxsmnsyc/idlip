@@ -14,10 +14,10 @@ Course change during the work: the orchestrator asked to drop the growing-widget
 
 `<main>` text outside code blocks, from `dist/client/index.html`:
 
-| | Before | After | Change |
-| --- | --- | --- | --- |
-| All text in `<main>` | 2,478 | 1,231 | -50.3% |
-| Visible at once (without the four static diagram panels) | 1,010 | 567 | -43.9% |
+|                                                          | Before | After | Change |
+| -------------------------------------------------------- | ------ | ----- | ------ |
+| All text in `<main>`                                     | 2,478  | 1,231 | -50.3% |
+| Visible at once (without the four static diagram panels) | 1,010  | 567   | -43.9% |
 
 A test fails if the total goes above 1,485.
 

@@ -1,7 +1,7 @@
 ---
 id: differential-children
 title: Generated model states for child components in the differential render test
-status: todo
+status: done
 priority: could
 type: test
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-22
-spent:
+spent: 163000
 owns:
   - packages/idlip/test/differential/**
 shared:
