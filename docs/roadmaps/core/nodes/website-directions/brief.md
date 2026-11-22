@@ -1,7 +1,7 @@
 ---
 id: website-directions
 title: Propose three visual directions for the website
-status: todo
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: true
 added: 2026-11-22
-spent:
+spent: 183000
 owns:
   - website/directions/**
 shared: []
