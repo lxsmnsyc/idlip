@@ -11,7 +11,7 @@ description: The loader that resumes server HTML, and the patch functions that c
 const loader = `<script type="module" src="/@id/idlip/client"></script>`;
 ```
 
-The Vite plugin uses `idlip/client` as the input of the client build, so a production page points at the built loader file. See [idlip/vite](./vite.md).
+In `vite dev` the plugin serves `/@id/idlip/client` as a module that imports `idlip/client`. A chunk that imports from the loader gets the same URL, so the page runs one copy of the loader. The Vite plugin uses `idlip/client` as the input of the client build, so a production page points at the built loader file. See [idlip/vite](./vite.md).
 
 The other exports are what binding, list and handler chunks import. Application code does not call them. The DOM and render helpers are copied into the chunks that use them, so a click loads no shared chunk.
 
@@ -31,7 +31,7 @@ The patcher the loader runs after each batch of messages. It compares the previo
 function patchList(...args: Parameters<PatchList>): Promise<void>;
 ```
 
-Patches the rows of a `<For>` from the previous list to the next one, by key. It moves, adds and removes rows, and patches the bindings of rows that stay.
+Patches the rows of a `<For>` from the previous list to the next one, by key. It moves, adds and removes rows, and patches the bindings of rows that stay. A new row comes from the list chunk's `render(scope, doc)`: the row's HTML, which `patchList` parses, or a fragment that the chunk cloned from a `<template>`, with the row markers, which it inserts as it is. A row of elements, text and holes clones; one with a child, a nested list or condition or raw HTML, or a row inside `<svg>`, renders HTML.
 
 ### `diffPaths`
 

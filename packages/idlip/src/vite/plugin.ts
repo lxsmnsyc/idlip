@@ -38,6 +38,13 @@ function toPosix(file: string): string {
  * folder, for a server build in another process.
  */
 const CHUNKS_FILE = '.idlip/chunks.json';
+/**
+ * The module a dev page's `<script src="/@id/idlip/client">` loads: a proxy that imports
+ * `idlip/client`. The import resolves to the URL that chunks import, so the loader runs once.
+ */
+const DEV_LOADER = '\0idlip:dev-loader';
+/** The URL of the loader that dev pages write. */
+const DEV_LOADER_URL = '/@id/idlip/client';
 /** The default `modules` globs. */
 const DEFAULT_MODULES = ['src/**/*.tsx'];
 /** The id of a child's view chunk, with the component's name for a named component. */
@@ -558,7 +565,14 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       defines = getDefines(getFeatures(results), options.skew !== false);
     },
 
+    resolveId(source) {
+      return source === DEV_LOADER ? DEV_LOADER : undefined;
+    },
+
     async load(id) {
+      if (id === DEV_LOADER) {
+        return { code: "import 'idlip/client';\n", moduleType: 'js' };
+      }
       const parsed = parseChunkId(id);
       if (parsed === undefined) {
         return undefined;
@@ -718,6 +732,14 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
     },
 
     configureServer(server) {
+      // The browser keys modules by URL. A page's `/@id/idlip/client` served as it is would be
+      // a second copy of the loader next to the URL that chunks import, so it gets the proxy.
+      server.middlewares.use((request, _response, next) => {
+        if (request.url === DEV_LOADER_URL) {
+          request.url = `/@id/__x00__${DEV_LOADER.slice(1)}`;
+        }
+        next();
+      });
       if (entry === undefined) {
         return;
       }

@@ -217,7 +217,7 @@ export async function render(): Promise<string> {
 The page needs three parts:
 
 - **`renderListener()`** returns an inline script for `<head>`. It catches events from the first moment and queues them.
-- **The loader**, `idlip/client`, is the one module script. In `vite dev` its URL is `/@id/idlip/client`.
+- **The loader**, `idlip/client`, is the one module script. In `vite dev` its URL is `/@id/idlip/client`, which the plugin serves as the same module that compiled chunks import, so the page runs one loader.
 - **The body** from `render()` of `idlip/server` holds the markup and a state script with the model.
 
 ## Run it
