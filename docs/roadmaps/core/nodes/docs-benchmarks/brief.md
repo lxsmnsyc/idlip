@@ -28,6 +28,9 @@ shared: []
 reserves: []
 provides: []
 depends_on:
+  - on: bench-scale
+    kind: hard
+    why: the page covers the scale scenario and the landing headline numbers
   - on: website-polish
     kind: hard
     why: website-polish creates website/src/benchmarks.json and the landing section that reads it
