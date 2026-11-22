@@ -1,0 +1,15 @@
+# Log: shared-helpers
+
+## 2026-11-22
+
+- Branch `node/shared-helpers` from `batch/core` 13a96a4. Load average at the start 102.
+- Baseline builds (todo, counters, bench todo, rows, dashboard) copied to the scratchpad before any change.
+- Option 1 (helpers in the loader) measured from the built files: the todo loader with the helpers module appended is 4681 B gzip against 4096 B. The todo app uses `setText$`, `setAttr$`, `setOn$`, `clone$`, `putAttr$`, `putText$`, so flags cannot drop them. Out.
+- Option 2, first try: a real package entry `idlip/helpers` (`src/helpers/index.ts`) built by tsdown. tsdown splits the code that the entries share into files of its own (`helpers-*.js`, `dom-*.js`, `client-*.js`). In the app build the bundler then moved the loader's DOM code (`dom-*.js`) into a third shared file, which the loader imports statically: one more request at page load. A side-effect import of the loader from the entry did not help (tsdown dropped it, then split `client-*.js`). Dropped.
+- Option 2, kept: a virtual module. The Vite plugin resolves `idlip/helpers` to `\0idlip-helpers` and loads `printHelpersModule()`: the same `toString()` copies as before, once, importing the forwarders from `idlip/client`. Chunks importing `idlip/client` already kept the loader's code in the loader file, so this keeps it too. The bundler keeps one file, `_idlip-helpers.<hash>.js`, with the helpers the app uses.
+- Loader: `getUpdate` loads `chunks.helpers` with the handler and binding chunks. The plugin writes the URL in the chunk map under `helpers`. +28 B gzip on the todo loader (4035 to 4063).
+- Duplicate view: the list chunk imported the view as a namespace (`import * as Row`). The namespace object is an export the view entry does not have, so with `preserveSignature: 'exports-only'` the bundler kept the code in a second file behind a re-exporting entry. `allow-extension` fixed it but then two views needed rolldown's `__exportAll` runtime, which went into a shared file. Importing `init` and `render` by name fixes it with `exports-only` unchanged. The new components build test fails with the namespace import (checked).
+- Tests that ran chunk code outside Vite: the loader harness wrote chunks to `node_modules/.idlip-loader-test`, where Node could not resolve `idlip/client`, so binding chunks never loaded and `getLoaded()` showed only the handler. With the helpers module served next to them they load, and four expectations now list the binding chunk too (it starts with the handler chunk, as `writes.test.ts` already expected for todo).
+- The todo `list.3.js` golden is the HTML-string version on purpose (the codegen test compares rows, not text). Kept its body, swapped the copies for an import.
+- e2e: a new test proves one round trip: every request of the first click starts before the first response. It fails with the loader's preload removed (checked).
+- Harness bytes (load-independent) for todos and dashboard, base and branch, in the outcome. Timing waits for load under 3.
