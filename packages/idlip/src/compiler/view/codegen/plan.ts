@@ -132,7 +132,21 @@ export interface Plan {
  * Elements whose text cannot hold the hole alone: the parser reads the text of the first four
  * as text, and drops a newline that starts the text of the last two.
  */
-const UNFILLED_TAGS = new Set(['script', 'style', 'textarea', 'title', 'pre', 'listing']);
+// Raw-text and template contents are not plain children, and `pre` drops a leading newline.
+const UNFILLED_TAGS = new Set([
+  'script',
+  'style',
+  'textarea',
+  'title',
+  'pre',
+  'listing',
+  'template',
+  'xmp',
+  'iframe',
+  'noembed',
+  'noframes',
+  'noscript',
+]);
 
 /** Returns the text hole that is the only child of an element, if the element can hold it alone. */
 export function getFilledHole(node: ElementNode): Hole | undefined {
