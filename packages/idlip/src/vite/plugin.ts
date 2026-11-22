@@ -277,7 +277,7 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
   /** The files that another module renders as a child, found on first use. */
   let children: Set<string> | undefined;
   /** Emitted chunk references of the client build, by chunk id. */
-  const emitted = new Map<string, string>();
+  const emitted = new Map<string, { id: string; reference: string }>();
   /** The chunk URL map of the client build in this process. */
   let built: ChunkUrls | undefined;
   /** The feature globals of the client build and their values, set once its modules compile. */
@@ -481,7 +481,10 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
             name: `${name}.${getChunkFile(chunk).slice(0, -'.js'.length)}`,
             preserveSignature: 'exports-only',
           });
-          emitted.set(getChunkId(result.manifest.module, chunk), reference);
+          emitted.set(getChunkId(result.manifest.module, chunk), {
+            id: getChunkId(file, chunk),
+            reference,
+          });
         }
       }
       // Every module is compiled before the loader is bundled, so the loader sees the defines.
@@ -534,10 +537,21 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       }
       const urls: Record<string, string> = {};
       const files = new Set<string>();
-      for (const [id, reference] of emitted) {
-        const file = this.getFileName(reference);
+      // Chunks match by the id of their module, since two modules of the same file name emit
+      // chunks of the same name.
+      const fileByModule = new Map<string, string>();
+      for (const item of Object.values(bundle)) {
+        if (item.type === 'chunk' && item.facadeModuleId !== null) {
+          fileByModule.set(item.facadeModuleId, item.fileName);
+        }
+      }
+      for (const [key, { id }] of emitted) {
+        const file = fileByModule.get(id);
+        if (file === undefined) {
+          return this.error(`The client build has no chunk for ${key}`);
+        }
         files.add(file);
-        urls[id] = `${base}${file}`;
+        urls[key] = `${base}${file}`;
       }
       checkChunkImports(this, bundle, files);
       if (options.skew !== false) {

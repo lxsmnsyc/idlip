@@ -1,4 +1,4 @@
-import { globSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { globSync, mkdirSync, readFileSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createBuilder } from 'vite';
@@ -82,17 +82,25 @@ describe('plain .tsx files', () => {
     }
   }, 60_000);
 
-  it('gives same-named files in different folders distinct chunks', async () => {
+  it('gives same-named files in different folders distinct chunk URLs and code', async () => {
     const root = createApp({
-      'src/a/todo.tsx': COUNTER,
-      'src/b/todo.tsx': COUNTER,
+      'src/a/todo.tsx': COUNTER.replace('count += 1', 'count += 111'),
+      'src/b/todo.tsx': COUNTER.replace('count += 1', 'count += 222'),
       'src/entry-server.ts':
-        "import A from './a/todo.tsx';\nexport function render() { return String(A); }\n",
+        "import A from './a/todo.tsx';\nimport B from './b/todo.tsx';\nexport function render() { return String(A) + String(B); }\n",
     });
     try {
       await build(root);
-      const names = globSync('dist/client/assets/todo.handler.inc*.js', { cwd: root });
-      expect(names).toHaveLength(2);
+      const urls: Record<string, string> = JSON.parse(
+        readFileSync(path.join(root, 'dist/.idlip/chunks.json'), 'utf8'),
+      );
+      const a = urls['/src/a/todo.tsx?idlip-handler=inc&lang.js'];
+      const b = urls['/src/b/todo.tsx?idlip-handler=inc&lang.js'];
+      expect(a).toBeDefined();
+      expect(b).toBeDefined();
+      expect(a).not.toBe(b);
+      expect(readFileSync(path.join(root, 'dist/client', a ?? ''), 'utf8')).toContain('111');
+      expect(readFileSync(path.join(root, 'dist/client', b ?? ''), 'utf8')).toContain('222');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
