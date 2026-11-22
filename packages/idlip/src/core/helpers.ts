@@ -259,8 +259,10 @@ export interface Template {
   readonly n: number;
   /** The namespace the HTML is parsed in, for a body inside `<svg>` or `<math>`. */
   readonly s?: Namespace;
-  /** The parsed content and the path of each mark, by document. */
-  m?: WeakMap<Document, { c: ParentNode; p: number[][] }>;
+  /** The parse for the first document that cloned it, the page's. */
+  k?: { d: Document; c: ParentNode; p: number[][] };
+  /** The parse for any other document, such as an iframe's. */
+  m?: WeakMap<Document, { d: Document; c: ParentNode; p: number[][] }>;
 }
 
 /**
@@ -270,8 +272,10 @@ export interface Template {
  * document parses the template and finds the marks where the parser put them.
  */
 export function clone$(template: Template, doc: Document): Node[] {
-  template.m ??= new WeakMap();
-  let parsed = template.m.get(doc);
+  let parsed = template.k;
+  if (parsed?.d !== doc) {
+    parsed = template.m?.get(doc);
+  }
   if (parsed === undefined) {
     const root = doc.createDocumentFragment();
     root.append(...parseHtml$(doc, template.h, template.s));
@@ -308,8 +312,12 @@ export function clone$(template: Template, doc: Document): Node[] {
     if (found !== template.n) {
       throw new Error(`idlip: a template has ${template.n} marks and the parse found ${found}`);
     }
-    parsed = { c: root, p: paths };
-    template.m.set(doc, parsed);
+    parsed = { d: doc, c: root, p: paths };
+    if (template.k === undefined) {
+      template.k = parsed;
+    } else {
+      (template.m ??= new WeakMap()).set(doc, parsed);
+    }
   }
   const fragment = doc.importNode(parsed.c, true);
   const nodes: Node[] = [fragment];

@@ -215,6 +215,9 @@ describe('cloned templates', () => {
     const other = document.implementation.createHTMLDocument('');
     const [, otherItem] = clone$(template, other);
     expect(otherItem.ownerDocument).toBe(other);
+    // Each document keeps its own parse for the next clone.
+    expect(clone$(template, other)[1].ownerDocument).toBe(other);
+    expect(clone$(template, document)[1].ownerDocument).toBe(document);
   });
 
   it('drops the newline a pre and a textarea drop, as a browser parses the server markup', () => {
