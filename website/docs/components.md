@@ -78,7 +78,7 @@ Each `let` is a field of one model value. Its initial value can read props, impo
 
 A lifecycle fits in one union:
 
-```tsx
+```tsx live
 import type { JSX } from 'idlip/jsx-runtime';
 
 type Save = { state: 'idle' } | { state: 'saving' } | { state: 'failed'; error: string };
@@ -176,7 +176,7 @@ A message is plain data: the handler name and its arguments, `{ t: 'toggle', p: 
 
 A component takes one parameter, `props`, or an object pattern of it:
 
-```tsx
+```tsx live
 export default function Greeting({ name }: { name: string }) {
   return <p>Hello, {name}</p>;
 }

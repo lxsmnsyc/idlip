@@ -9,7 +9,7 @@ description: The window and document elements take event attributes, so a compon
 
 ## Keys, pointer moves and visibility
 
-```tsx
+```tsx live
 import type { JSX } from 'idlip/jsx-runtime';
 
 export default function Canvas(): JSX.Element {

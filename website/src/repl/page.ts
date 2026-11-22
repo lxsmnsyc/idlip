@@ -10,6 +10,7 @@ const STYLES = fileURLToPath(new URL('../styles.css', import.meta.url));
 const DEMO_FRAME = fileURLToPath(new URL('../demo/frame.css', import.meta.url));
 const REPL_FRAME = fileURLToPath(new URL('frame.css', import.meta.url));
 const REPL_STYLES = fileURLToPath(new URL('repl.css', import.meta.url));
+const LIVE_FRAME = fileURLToPath(new URL('../live/frame.css', import.meta.url));
 
 /** The tokens of the site, between the markers in `styles.css`. */
 function readTokens(): string {
@@ -30,10 +31,14 @@ function minify(css: string, base: string): string {
     .trim();
 }
 
-/** The styles of the frame: the site tokens, the demo frame and the extra elements of the examples. */
-function readFrameStyles(base: string): string {
+/**
+ * The styles of the frame: the site tokens, the demo frame and the extra elements of the
+ * examples. `live` adds the styles of a live sample's frame.
+ */
+export function readFrameStyles(base: string, live = false): string {
+  const extra = live ? `\n${readFileSync(LIVE_FRAME, 'utf8')}` : '';
   return minify(
-    `${readTokens()}\n${readFileSync(DEMO_FRAME, 'utf8')}\n${readFileSync(REPL_FRAME, 'utf8')}`,
+    `${readTokens()}\n${readFileSync(DEMO_FRAME, 'utf8')}\n${readFileSync(REPL_FRAME, 'utf8')}${extra}`,
     base,
   );
 }

@@ -11,7 +11,7 @@ The `return` of a component is its view, written in TSX. A `{...}` in the view i
 
 A hole fills text, an attribute or a property:
 
-```tsx
+```tsx live
 import type { JSX } from 'idlip/jsx-runtime';
 
 function double(n: number): number {
@@ -40,6 +40,12 @@ export default function Profile(props: { url: string }): JSX.Element {
 }
 ```
 
+```json live props.json
+{
+  "url": "https://example.com/ada"
+}
+```
+
 A hole may hold:
 
 - **Values**: literals, template literals, arrays and object literals.
@@ -54,7 +60,7 @@ Anything else, such as `JSON.stringify(items)` or `window.innerWidth`, goes in a
 
 `class` takes a string or an object of booleans. `style` takes a string or an object of values:
 
-```tsx
+```tsx live
 import type { JSX } from 'idlip/jsx-runtime';
 
 export default function Panel(): JSX.Element {
@@ -77,7 +83,7 @@ export default function Panel(): JSX.Element {
 - **URL attributes** such as `href` and `src` drop a bound `javascript:` or `vbscript:` URL. A literal in the source is written as is.
 - **Raw HTML** goes in the `html` attribute, and only through `trusted(value)` from `idlip`. `trusted` marks the one place where you vouch for the markup. A bound `srcdoc` follows the same rule.
 
-```tsx
+```tsx live
 import { trusted } from 'idlip';
 import type { JSX } from 'idlip/jsx-runtime';
 
@@ -86,11 +92,17 @@ export default function Article(props: { body: string }): JSX.Element {
 }
 ```
 
+```json live props.json
+{
+  "body": "<p>An article with <em>markup</em>.</p>"
+}
+```
+
 ## Conditions
 
 Write a condition with `&&` or `? :`. A branch can be markup, text or `null`:
 
-```tsx
+```tsx live
 import type { JSX } from 'idlip/jsx-runtime';
 
 export default function Notice(): JSX.Element {
@@ -134,7 +146,7 @@ The counter and the todo app use all three forms:
 
 A `submit` is always prevented, so the page does not navigate. Read the fields by name from `e.currentTarget.elements`:
 
-```tsx
+```tsx live
 import type { JSX } from 'idlip/jsx-runtime';
 
 export default function Signup(): JSX.Element {
@@ -164,7 +176,7 @@ Four components from `idlip` mark blocks in the view. The compiler replaces them
 
 `<For>` renders a list. `each` is the array, and `key` is a callback of the item that returns a string or number, unique among the items: `key={(step) => step.id}`. The child is a function of the item and its index:
 
-```tsx
+```tsx live
 import { For } from 'idlip';
 import type { JSX } from 'idlip/jsx-runtime';
 
@@ -179,6 +191,25 @@ export default function Steps(props: { steps: { id: string; label: string }[] })
 }
 ```
 
+```json live props.json
+{
+  "steps": [
+    {
+      "id": "s1",
+      "label": "Install"
+    },
+    {
+      "id": "s2",
+      "label": "Write"
+    },
+    {
+      "id": "s3",
+      "label": "Ship"
+    }
+  ]
+}
+```
+
 A row moves with its key when the list changes. The key body is one expression that reads the item and nothing else. `key="id"` is the error `for-key`, which names the callback form.
 
 Only a key that is one field of the item, `step.id`, keeps keyed writes: a write set can name one row (`steps[id=selected].done`). A computed key moves the rows by key all the same. Computed keys are a nested field (`step.meta.id`), a template literal (`` `${step.kind}:${step.id}` ``) or another expression of the closed grammar. Their write sets treat the row as any row (`steps.*.done`), so a change to the list loads the list chunk and runs the row bindings of every row. That patches more than needed and never less. `.map()` in a view is the error `view-map`.
@@ -187,7 +218,7 @@ Only a key that is one field of the item, `step.id`, keeps keyed writes: a write
 
 `<Try>` shows `catch` when a hole inside it throws. `catch` gets the error and a `reset` function to try again:
 
-```tsx
+```tsx live
 import { Try } from 'idlip';
 import type { JSX } from 'idlip/jsx-runtime';
 
@@ -226,7 +257,7 @@ export default function Meter(): JSX.Element {
 
 `<Head>` puts elements in the document `<head>`. It holds elements and at most one `<title>`. A hole in a `<title>` must be its only content:
 
-```tsx
+```tsx live
 import { Head } from 'idlip';
 import type { JSX } from 'idlip/jsx-runtime';
 

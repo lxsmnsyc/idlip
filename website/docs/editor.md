@@ -56,7 +56,7 @@ Add a `typecheck` script and run it in CI next to the build:
 
 A component may declare its return type with `JSX.Element` from `idlip/jsx-runtime`. The type exists only for TypeScript, so import it with `import type`.
 
-```tsx
+```tsx live
 import type { JSX } from 'idlip/jsx-runtime';
 
 export default function Greeting(props: { name: string }): JSX.Element {
@@ -67,6 +67,12 @@ export default function Greeting(props: { name: string }): JSX.Element {
   }
 
   return <input value={name} on:input={(e) => rename(e.currentTarget.value)} />;
+}
+```
+
+```json live props.json
+{
+  "name": "Ada"
 }
 ```
 

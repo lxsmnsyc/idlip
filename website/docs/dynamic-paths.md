@@ -15,7 +15,7 @@ The compiler reads the hole and the helpers it calls:
 - **A helper whose body is one `return` of an expression** in the hole grammar is read through. `isDone(todo)` that returns `todo.done` reads `todo.done`, not all of `todo`.
 - **Any other helper**, such as one with a loop, reads the paths of its arguments. `countLeft(todos)` reads `todos`, so a write anywhere under `todos` patches it.
 
-```tsx
+```tsx live
 import type { JSX } from 'idlip/jsx-runtime';
 
 function plural(count: number, word: string): string {
@@ -51,7 +51,7 @@ export default function Cart(): JSX.Element {
 
 A helper can take an object built from several state fields, and read only some of them:
 
-```tsx
+```tsx live
 import type { JSX } from 'idlip/jsx-runtime';
 
 interface View {

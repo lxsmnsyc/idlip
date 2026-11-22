@@ -1419,10 +1419,16 @@ svg {
   overflow: hidden;
 }
 
-.tile-code .code-block {
-  max-height: 36rem;
+.tile-code .live {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
   margin: 0;
-  overflow: auto;
+  border-radius: inherit;
+}
+
+.tile-code .live-output {
+  flex: 1;
 }
 
 .chunks {
@@ -1975,32 +1981,411 @@ html:not(.js) .install-tabs {
   color: var(--on-accent);
 }
 
-/* "Open in REPL" on a code block that the sample check compiles. The REPL page has its own
-   styles in src/repl/repl.css, which only /repl/ carries. */
+/* Live samples: the code is an editor, and the output runs it in a frame of its own. Before the
+   script runs, the code shows as highlighted text. Without script, the output stays hidden. */
 
-.code-repl {
-  position: absolute;
-  top: 0.55rem;
-  inset-inline-end: 5.25rem;
-  padding: 0.3rem 0.9rem;
+.live {
+  margin: 1.5rem 0;
+  padding: 0.5rem;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.live-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  min-height: 2.5rem;
+}
+
+.live-files,
+.live-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.live-file,
+.live-tab {
+  min-height: 2rem;
+  padding: 0 0.85rem;
+  border: 0;
   border-radius: var(--radius);
+  background: none;
+  color: var(--muted);
+  font: 600 var(--text-xs) var(--font);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast),
+    color var(--duration-fast),
+    transform var(--duration-fast) var(--ease);
+}
+
+.live-file {
+  font-family: var(--mono);
+  font-weight: 400;
+}
+
+.live-file:hover,
+.live-tab:hover {
   background: var(--surface-strong);
   color: var(--text);
-  font: 600 var(--text-xs) / 1.5 var(--font);
-  text-decoration: none;
-  transition: transform var(--duration-fast) var(--ease);
 }
 
-.code-repl:hover {
-  transform: translateY(-1px);
+.live-file:active,
+.live-tab:active {
+  transform: scale(0.96);
 }
 
-.code-repl:active {
-  transform: scale(0.94);
+.live-file[aria-selected='true'],
+.live-tab[aria-selected='true'] {
+  background: var(--ink);
+  color: var(--on-ink);
 }
 
-.code-block.has-repl .code-lang {
-  inset-inline-end: 13.5rem;
+/* Before the script, the tab of a single file is only its name. */
+.live:not(.is-live) .live-file {
+  cursor: default;
+}
+
+.live-status {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  margin: 0 0 0 auto;
+  color: var(--muted);
+  font: 600 var(--text-xs) var(--font);
+}
+
+.live[data-status='blocked'] .live-status,
+.live[data-status='failed'] .live-status {
+  color: var(--danger);
+}
+
+.live-status svg {
+  width: 14px;
+  height: 14px;
+}
+
+.live-spinner {
+  width: 0.75rem;
+  height: 0.75rem;
+  border: 2px solid var(--surface-strong);
+  border-top-color: var(--text);
+  border-radius: 50%;
+  animation: live-spin 0.8s linear infinite;
+}
+
+@keyframes live-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+.live-bar .icon-button {
+  width: 2rem;
+  height: 2rem;
+  color: var(--muted);
+}
+
+.live-bar .icon-button:hover {
+  color: var(--text);
+}
+
+.live-bar .code-copy {
+  position: relative;
+  inset: auto;
+}
+
+.live-code {
+  position: relative;
+  margin-top: 0.5rem;
+  overflow: hidden;
+  border-radius: var(--radius-row);
+  background: var(--code-bg);
+}
+
+.live-code:has(.live-input:focus-visible) {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.live-layer {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 1rem 1.25rem 1.25rem;
+  border: 0;
+  font: 0.8rem / 1.75 var(--mono);
+  letter-spacing: 0;
+  tab-size: 2;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+/* The highlighted code sets the height of the editor, so the editor grows with the code. */
+.live-highlight {
+  overflow-x: auto;
+}
+
+.is-live .live-highlight {
+  width: max-content;
+  min-width: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* With script, only the first file shows until the editor takes over. */
+.js .live-highlight + .live-highlight {
+  display: none;
+}
+
+/* Without script, each file shows with its name above it. */
+html:not(.js) .live-highlight::before {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--muted);
+  content: attr(data-live-source);
+}
+
+html:not(.js) .live-files,
+html:not(.js) .live-output,
+html:not(.js) .live-bar .code-copy {
+  display: none;
+}
+
+.live-marks,
+.live-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.live-marks {
+  color: transparent;
+  pointer-events: none;
+}
+
+.live-marks .repl-mark {
+  background: none;
+  color: transparent;
+  text-decoration: underline wavy var(--danger) 1.5px;
+  text-underline-offset: 2px;
+}
+
+.live-marks .repl-mark.is-warning {
+  text-decoration-color: var(--syn-attr);
+}
+
+.live-input {
+  overflow: auto hidden;
+  resize: none;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--text);
+  outline: none;
+}
+
+.live-input::selection {
+  background: var(--accent-tint);
+  color: transparent;
+}
+
+.live-problems {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.live-problems[hidden] {
+  display: none;
+}
+
+.live-problem button {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 0;
+  border-radius: var(--radius-row);
+  background: var(--code-bg);
+  color: var(--text);
+  font: var(--text-sm) / 1.45 var(--font);
+  text-align: start;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast),
+    transform var(--duration-fast) var(--ease);
+}
+
+.live-problem button:hover {
+  background: var(--surface-strong);
+}
+
+.live-problem button:active {
+  transform: scale(0.98);
+}
+
+.live-problem svg {
+  flex: none;
+  margin-top: 0.05rem;
+  color: var(--danger);
+}
+
+.live-problem.is-warning svg {
+  color: var(--syn-attr);
+}
+
+.live-problem-place {
+  flex: none;
+  color: var(--muted);
+  font: var(--text-xs) / 1.9 var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.live-output {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-radius: var(--radius-row);
+  background: var(--bg-elevated);
+}
+
+.live-tabs {
+  padding: 0 0.5rem;
+}
+
+/* The result keeps its height while it loads and runs, so nothing below it moves. */
+.live-result {
+  min-height: 8rem;
+}
+
+.live-frame {
+  display: block;
+  width: 100%;
+  height: 8rem;
+  border: 0;
+  transition: opacity var(--duration);
+}
+
+.live-frame[hidden] {
+  display: none;
+}
+
+.live[data-status='loading'] .live-frame,
+.live[data-status='running'] .live-frame,
+.live[data-status='blocked'] .live-frame {
+  opacity: 0.45;
+}
+
+.live-error {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--danger);
+  font: var(--text-xs) / 1.6 var(--mono);
+  white-space: pre-wrap;
+}
+
+.live-error[hidden] {
+  display: none;
+}
+
+.live-error p {
+  margin: 0;
+}
+
+.live-compiled {
+  max-height: 30rem;
+  padding: 0.5rem;
+  overflow: auto;
+}
+
+.live-compiled-head {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  padding: 0.25rem 0.75rem;
+  color: var(--muted);
+  font: 600 var(--text-xs) var(--font);
+}
+
+.live-module summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  list-style: none;
+  cursor: pointer;
+  transition: background var(--duration-fast);
+}
+
+.live-module summary::-webkit-details-marker {
+  display: none;
+}
+
+.live-module summary:hover {
+  background: var(--surface);
+}
+
+.live-module summary svg {
+  color: var(--muted);
+  transition: transform var(--duration) var(--ease);
+}
+
+.live-module[open] summary svg {
+  transform: rotate(90deg);
+}
+
+.live-module-name {
+  font: var(--text-xs) var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.live-module-note {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.live-module-size {
+  margin-left: auto;
+  font: var(--text-xs) var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.live-module-code {
+  max-height: 20rem;
+  margin: 0.25rem 0 0.5rem;
+  padding: 0.75rem 1rem;
+  overflow: auto;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 0.75rem;
+  line-height: 1.6;
+}
+
+.live-empty {
+  margin: 0;
+  padding: 0.75rem;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+@media (pointer: coarse) {
+  .live-file,
+  .live-tab,
+  .live-bar .icon-button {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
 }
 
 /* The token classes of the @twinkleplop highlighter, mapped to the --syn-* tokens. */

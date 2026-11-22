@@ -2,8 +2,9 @@
 // the objections and the final call to action, in that order.
 import type { DemoData } from '../demo/data.ts';
 import { ICON, REPOSITORY, escape, renderFooter, renderHead, renderHeader } from '../layout.ts';
-import { createRenderer } from '../markdown.ts';
-import type { RenderEnv } from '../markdown.ts';
+import { renderLiveSample } from '../live/markup.ts';
+import { PROPS_FILE } from '../repl/files.ts';
+import type { ReplFile } from '../repl/files.ts';
 import type { Page } from '../site.ts';
 import { renderBenchmarks } from './benchmarks.ts';
 import type { Benchmarks, Sizes } from './benchmarks.ts';
@@ -13,8 +14,6 @@ import { renderHeroStage } from './hero.ts';
 import { renderInstall } from './install.ts';
 import { renderResume } from './resume.ts';
 import { SAMPLE_FILE, SAMPLE_SOURCE } from './sample.ts';
-
-const renderer = createRenderer();
 
 /**
  * The gzip -9 size of the loader with every optional feature flag of `vite/features.ts` on and
@@ -57,19 +56,22 @@ function renderHero(base: string, start: string, demo: DemoData): string {
 </section>`;
 }
 
+/** The files of the landing sample: the counter and the props it starts from. */
+const SAMPLE_FILES: ReplFile[] = [
+  { name: SAMPLE_FILE, source: SAMPLE_SOURCE },
+  { name: PROPS_FILE, source: '{\n  "start": 0\n}\n' },
+];
+
 /**
- * The smallest working code beside the chunks of the todo demo above. The container is
- * `.landing-sample`: a later live editor replaces its content and takes the source from
- * `SAMPLE_SOURCE`.
+ * The smallest working code beside the chunks of the todo demo above, as a live sample that runs
+ * and takes edits. It has no REPL button: the landing page sends no one to the REPL.
  */
 function renderSample(demo: DemoData): string {
-  const env: RenderEnv = { headings: [], lead: '', link: (href) => href };
-  const code = renderer.render(`\`\`\`tsx no-check\n${SAMPLE_SOURCE}\`\`\`\n`, env);
   const rest = demo.chunks.length - 2;
   return `<section aria-labelledby="sample-title">
   <h2 class="row-title" id="sample-title">The code <code>${escape(SAMPLE_FILE)}</code></h2>
   <div class="landing-sample sample">
-    <div class="tile tile-code">${code}</div>
+    <div class="tile tile-code">${renderLiveSample(SAMPLE_FILES)}</div>
     <div class="tile chunks-tile">
       <p class="chunks-title">What the todo demo loads</p>
       <ul class="chunks">

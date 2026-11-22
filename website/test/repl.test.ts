@@ -78,15 +78,16 @@ describe('share links', () => {
   it('collects the docs samples that the links name', () => {
     const samples = new Map<string, string>();
     const pages = loadPages(undefined, '/', samples);
-    expect(samples.size).toBeGreaterThan(40);
+    // Only the live samples of one file open by id. The others carry their files in the link.
+    expect(samples.size).toBeGreaterThan(20);
     let views = '';
     for (const page of pages) {
       if (page.file === 'views.md') {
         views = page.html;
       }
     }
-    expect(views).toContain('href="/repl/#sample=views-1"');
-    expect(samples.get('views-1')).toContain('export default function');
+    expect(views).toContain('href="/repl/#sample=views-2"');
+    expect(samples.get('views-2')).toContain('export default function');
   });
 });
 

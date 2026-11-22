@@ -84,8 +84,10 @@ describe('the landing page', () => {
 
   it('has the install tabs with a copy button in the hero and at the end', () => {
     expect(landing.match(/data-install/g)).toHaveLength(2);
-    expect(landing.match(/role="tablist"/g)).toHaveLength(2);
-    expect(landing.match(/role="tab"/g)).toHaveLength(2 * INSTALL_COMMANDS.length);
+    expect(landing.match(/role="tablist" aria-label="Package manager"/g)).toHaveLength(2);
+    expect(landing.match(/class="install-tab" type="button" role="tab"/g)).toHaveLength(
+      2 * INSTALL_COMMANDS.length,
+    );
     // The pnpm tab is active and its command is plain text.
     expect(landing.match(/aria-selected="true"[^>]*data-manager="pnpm"/g)).toHaveLength(2);
     expect(landing.match(/data-copy="pnpm add idlip"/g)).toHaveLength(2);
@@ -173,6 +175,16 @@ describe('the landing page', () => {
 
   it('shows the sample in one container and sends no one to the REPL', () => {
     expect(landing.match(/class="landing-sample /g)).toHaveLength(1);
+    // The sample is live: the counter and its props, with no REPL button.
+    const sample = landing.slice(landing.indexOf('class="landing-sample '));
+    const figure = sample.slice(0, sample.indexOf('</figure>'));
+    expect(figure).toContain('<figure class="live" data-live-sample');
+    expect(figure.match(/data-live-file="[^"]+"/g)).toEqual([
+      'data-live-file="counter.tsx"',
+      'data-live-file="props.json"',
+    ]);
+    expect(figure).not.toContain('data-live-repl');
+    expect(landing.match(/data-live-sample /g)).toHaveLength(1);
     expect(landing).toContain('Double:');
     expect(landing.slice(landing.indexOf('<main'))).not.toContain('/repl/');
     expect(landing).not.toContain('Open in REPL');

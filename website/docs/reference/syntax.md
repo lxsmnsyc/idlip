@@ -11,7 +11,7 @@ An idlip component is a TSX function in a `*.tsx` file. The source is plain Type
 
 A module has one default export, the root component. Other capitalized function declarations are components too. Lowercase function declarations and module-level `const` arrows are helpers or subscription sources. Imports and module-level constants have no model paths, so a hole that reads only them never patches.
 
-```tsx
+```tsx live
 import { For } from 'idlip';
 
 interface Todo {
@@ -57,6 +57,23 @@ export default function TodoApp(props: { initial: Todo[] }) {
 }
 ```
 
+```json live props.json
+{
+  "initial": [
+    {
+      "id": "t1",
+      "text": "Read the guide",
+      "done": true
+    },
+    {
+      "id": "t2",
+      "text": "Write a component",
+      "done": false
+    }
+  ]
+}
+```
+
 ## Component body
 
 The body holds `let` and `const` declarations, function declarations, type declarations and one final `return` (`body-statement`, `body-return`).
@@ -90,7 +107,7 @@ Spreads, closures, other globals and other methods are errors (`hole-spread`, `h
 - `<svg>` and `<math>` children keep their namespace. `<foreignObject>` returns its children to HTML.
 - The markup must parse as written. An element that the HTML parser would close, move or wrap is an error (`html-nesting`, `html-implied`), such as a `<div>` inside a `<p>` or a `<tr>` directly in a `<table>`.
 
-```tsx
+```tsx live
 export default function Status(props: { count: number }) {
   let count = props.count;
 
@@ -104,6 +121,12 @@ export default function Status(props: { count: number }) {
       {count > 0 && <button on:click={reset}>Reset</button>}
     </section>
   );
+}
+```
+
+```json live props.json
+{
+  "count": 3
 }
 ```
 
@@ -121,7 +144,7 @@ export default function Status(props: { count: number }) {
 
 `on:<event>` dispatches a message. Its value is a handler, or an arrow whose body is one handler call. Arguments are computed at render and stored in the page, except event reads such as `e.currentTarget.value`, which are read at dispatch.
 
-```tsx
+```tsx live
 export default function Editor() {
   let draft = '';
   let saved = '';
@@ -163,7 +186,7 @@ export default function Editor() {
 
 A handler may `await` a call. The handler is split at each `await`. The part before it runs on the click. The loader then runs the call and records its outcome. The part after it runs as a continuation, with the state at that moment.
 
-```tsx
+```tsx live
 import { Time } from 'idlip';
 
 export default function Saver() {

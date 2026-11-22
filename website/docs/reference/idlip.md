@@ -26,7 +26,7 @@ function For<T>(props: {
 
 Renders `children` once per item of `each`. `key` is a callback, `key={(item) => item.id}`, that returns a string or number unique among the items. A row patches by key, so a binding of `todos.*.done` touches only the rows whose `done` changed.
 
-```tsx
+```tsx live
 import { For } from 'idlip';
 
 export default function List(props: { items: { id: string; text: string }[] }) {
@@ -51,6 +51,25 @@ export default function List(props: { items: { id: string; text: string }[] }) {
 }
 ```
 
+```json live props.json
+{
+  "items": [
+    {
+      "id": "a",
+      "text": "Apples"
+    },
+    {
+      "id": "b",
+      "text": "Bread"
+    },
+    {
+      "id": "c",
+      "text": "Cherries"
+    }
+  ]
+}
+```
+
 `key` is one arrow with one plain parameter and an expression body that reads only the item: a field path, a template literal or another expression of the closed grammar, with no state, index or helper call (`for-key`). `key="id"` is the same error. A body that is one field of the item keeps keyed writes (`todos[id=selected]`). Any other body, including a nested field, moves rows by key through the list chunk and gives `*` write sets. The child is one arrow with an expression body, `(item, index?) => view` (`for-render`). The item may be an object pattern of plain fields.
 
 ### `Try`
@@ -64,7 +83,7 @@ function Try(props: {
 
 Shows `catch` when a binding inside `children` throws, on the server or in a patch. `catch` is an arrow with an expression body and the parameters `error` and, optionally, `reset` (`try-catch`). `reset` is a message target: `on:click={reset}` renders `children` again. The region fires an `idlip:error` event on the document with the error in `detail.error`.
 
-```tsx
+```tsx live
 import { Try } from 'idlip';
 
 function check(value: number): number {
@@ -98,6 +117,12 @@ export default function Gauge(props: { start: number }) {
 }
 ```
 
+```json live props.json
+{
+  "start": 5
+}
+```
+
 ### `Head`
 
 ```ts
@@ -106,7 +131,7 @@ function Head(props: { children: JSX.Element | readonly JSX.Element[] }): JSX.El
 
 Puts `children` in the document head. It holds elements only, with one `<title>` at most, and they take no events, `ref` or `html`. A `<title>` outside `<Head>` is the error `title-outside-head`. On the server, `renderPage` returns the head markup apart from the body.
 
-```tsx
+```tsx live
 import { Head } from 'idlip';
 
 export default function Page(props: { name: string }) {
@@ -128,6 +153,12 @@ export default function Page(props: { name: string }) {
 }
 ```
 
+```json live props.json
+{
+  "name": "Ada"
+}
+```
+
 ### `Subscribe`
 
 ```ts
@@ -142,7 +173,7 @@ Runs the source `to(input, signal)` while the block is on the page and dispatche
 
 When the block leaves the page, the signal aborts and the iterator's `return()` is called. The next value is pulled only after the previous one patched, so a slow page does not queue values.
 
-```tsx
+```tsx live
 import { Subscribe, timer } from 'idlip';
 
 export default function Clock() {
@@ -171,7 +202,7 @@ function trusted(html: string): TrustedHtml;
 
 Marks a string as safe to write as HTML, for `html={trusted(value)}`. It does not sanitize or escape anything: the call is the trust boundary, so pass only markup you wrote or cleaned. An element with `html` takes no children.
 
-```tsx
+```tsx live
 import { trusted } from 'idlip';
 
 export default function Note(props: { body: string }) {
@@ -187,6 +218,12 @@ export default function Note(props: { body: string }) {
       <button on:click={clear}>Clear</button>
     </article>
   );
+}
+```
+
+```json live props.json
+{
+  "body": "<p>A note.</p>"
 }
 ```
 
@@ -215,7 +252,7 @@ Calls on the elements of the page by the name of their `ref`. In a handler, `foc
 
 `await Dom.measure(ref)` gives the element's box as a plain `Rect`, so the message log can hold it. A ref that no element has gives a warning in the console, and `measure` resolves to `null`.
 
-```tsx
+```tsx live
 import { Dom, For } from 'idlip';
 
 export default function Search(props: { items: { id: string; text: string }[] }) {
@@ -248,6 +285,25 @@ export default function Search(props: { items: { id: string; text: string }[] })
       <button on:click={add}>Add</button>
     </main>
   );
+}
+```
+
+```json live props.json
+{
+  "items": [
+    {
+      "id": "a",
+      "text": "Apples"
+    },
+    {
+      "id": "b",
+      "text": "Bread"
+    },
+    {
+      "id": "c",
+      "text": "Cherries"
+    }
+  ]
 }
 ```
 
@@ -287,7 +343,7 @@ const Random: {
 
 `Random.id()` is `crypto.randomUUID()` and `Random.number()` is `Math.random()`.
 
-```tsx
+```tsx live
 import { For, Random } from 'idlip';
 
 interface Tag {
@@ -407,7 +463,7 @@ function media(query: string, signal: AbortSignal): AsyncGenerator<boolean, void
 
 Yields whether the media query matches: the current value first, then each change. A slow reader gets only the latest value.
 
-```tsx
+```tsx live
 import { Subscribe, media } from 'idlip';
 
 export default function Theme() {

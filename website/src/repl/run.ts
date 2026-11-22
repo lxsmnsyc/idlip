@@ -33,6 +33,7 @@ export type RunResult =
   | { kind: 'failed'; project: Project; message: string };
 
 interface Waiting {
+  request: ToWorker;
   resolve: (message: FromWorker) => void;
   reject: (error: Error) => void;
 }
@@ -41,9 +42,6 @@ let worker: Worker | undefined;
 let requests = 0;
 const waiting = new Map<number, Waiting>();
 let scope: Promise<string> | undefined;
-let page: string | undefined;
-let runs = 0;
-let blobs: string[] = [];
 
 /** Ends the worker and fails what waits on it. The next request starts a new one. */
 function stopWorker(message: string): void {
@@ -53,6 +51,25 @@ function stopWorker(message: string): void {
     item.reject(new Error(message));
   }
   waiting.clear();
+}
+
+/**
+ * Ends the worker because one request took too long. Only that request fails. The other
+ * requests, such as the render of another sample on the page, go to a new worker.
+ */
+function stopSlowRequest(id: number, message: string): void {
+  worker?.terminate();
+  worker = undefined;
+  const slow = waiting.get(id);
+  waiting.delete(id);
+  slow?.reject(new Error(message));
+  if (waiting.size > 0) {
+    const restarted = startWorker();
+    worker = restarted;
+    for (const item of waiting.values()) {
+      restarted.postMessage(item.request);
+    }
+  }
 }
 
 function isAnswer(value: unknown): value is FromWorker {
@@ -84,10 +101,11 @@ async function ask(request: ToWorker, limit?: number): Promise<FromWorker> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     if (limit !== undefined) {
       timer = setTimeout(() => {
-        stopWorker(`The render did not finish in ${limit / 1000} s.`);
+        stopSlowRequest(request.id, `The render did not finish in ${limit / 1000} s.`);
       }, limit);
     }
     waiting.set(request.id, {
+      request,
       resolve(answer) {
         clearTimeout(timer);
         resolve(answer);
@@ -136,18 +154,19 @@ async function startService(): Promise<string> {
   return folder;
 }
 
-function createBlobUrl(code: string): string {
-  const url = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
-  blobs.push(url);
-  return url;
-}
+/**
+ * Reports the height of the frame's body to the page whenever it changes, so a live sample can
+ * size its frame to the content. The body has no min height, so the report cannot grow the frame
+ * by itself.
+ */
+const HEIGHT_REPORT = `addEventListener('DOMContentLoaded',function(){new ResizeObserver(function(){parent.postMessage({idlipHeight:Math.ceil(document.body.getBoundingClientRect().height)},'*')}).observe(document.body)})`;
 
 /**
  * Reports the errors of the frame to the page: errors, rejections, `console.error` (the loader
  * logs a failed update there) and scripts that fail to load.
  */
 function writeBridge(run: number): string {
-  return `(function(){var s=function(m){parent.postMessage({idlipRepl:${run},message:String(m&&m.message||m)},'*')};addEventListener('error',function(e){s(e.target!==window&&e.target.src?'Could not load '+e.target.src:e.error||e.message)},true);addEventListener('unhandledrejection',function(e){s(e.reason)});var c=console.error;console.error=function(){c.apply(console,arguments);s(arguments[0])}})()`;
+  return `(function(){var s=function(m){parent.postMessage({idlipRepl:${run},message:String(m&&m.message||m)},'*')};addEventListener('error',function(e){s(e.target!==window&&e.target.src?'Could not load '+e.target.src:e.error||e.message)},true);addEventListener('unhandledrejection',function(e){s(e.reason)});var c=console.error;console.error=function(){c.apply(console,arguments);s(arguments[0])};${HEIGHT_REPORT}})()`;
 }
 
 function writeDocument(rendered: Rendered, css: string, runtime: string, run: number): string {
@@ -205,45 +224,64 @@ async function storeRun(
   await Promise.all(writes);
 }
 
-/**
- * Compiles the files. With `render`, and when they compile, renders them in the worker and
- * stores the run for the frame. `css` is the frame's stylesheet.
- */
-export async function runFiles(
+/** Runs the files of one editor. Each runner keeps its own run folder in the cache. */
+export type Runner = (
   files: readonly ReplFile[],
   css: string,
   render: boolean,
-): Promise<RunResult> {
-  const project = compileProject(files);
-  if (!render || !project.ok) {
-    return { kind: 'compiled', project };
-  }
-  try {
-    scope ??= startService().catch((error: unknown) => {
-      scope = undefined;
-      throw error;
-    });
-    const root = await scope;
-    page ??= crypto.randomUUID();
-    const own = `${root}${page}/`;
-    const run = ++runs;
-    const folder = `${own}${run}/`;
-    const runtime = new URL(runtimeUrl, location.href).href;
-    // The modules of the run before this one: its frame is gone.
-    for (const url of blobs) {
-      URL.revokeObjectURL(url);
+) => Promise<RunResult>;
+
+/**
+ * Creates a runner. Storing a run drops the older runs of the same runner only, so two live
+ * samples on one page keep each other's chunks.
+ */
+export function createRunner(): Runner {
+  const owner = crypto.randomUUID();
+  let runs = 0;
+  let blobs: string[] = [];
+
+  /**
+   * Compiles the files. With `render`, and when they compile, renders them in the worker and
+   * stores the run for the frame. `css` is the frame's stylesheet.
+   */
+  return async (files, css, render) => {
+    const project = compileProject(files);
+    if (!render || !project.ok) {
+      return { kind: 'compiled', project };
     }
-    blobs = [];
-    // The chunks read the loader through a blob module, which the panel does not list: an app
-    // build has no such file.
-    const chunks = listChunks(project, folder, createBlobUrl(writeFrameShim(project)));
-    const answer = await ask({ id: ++requests, project, chunks, folder }, RENDER_LIMIT);
-    if (answer.kind === 'failed') {
-      return { kind: 'failed', project, message: `The server render failed: ${answer.message}` };
+    try {
+      scope ??= startService().catch((error: unknown) => {
+        scope = undefined;
+        throw error;
+      });
+      const root = await scope;
+      const own = `${root}${owner}/`;
+      const run = ++runs;
+      const folder = `${own}${run}/`;
+      const runtime = new URL(runtimeUrl, location.href).href;
+      // The modules of the run before this one: its frame is gone.
+      for (const url of blobs) {
+        URL.revokeObjectURL(url);
+      }
+      blobs = [];
+      // The chunks read the loader through a blob module, which the panel does not list: an app
+      // build has no such file.
+      const shim = URL.createObjectURL(
+        new Blob([writeFrameShim(project)], { type: 'text/javascript' }),
+      );
+      blobs.push(shim);
+      const chunks = listChunks(project, folder, shim);
+      const answer = await ask({ id: ++requests, project, chunks, folder }, RENDER_LIMIT);
+      if (answer.kind === 'failed') {
+        return { kind: 'failed', project, message: `The server render failed: ${answer.message}` };
+      }
+      await storeRun(own, folder, writeDocument(answer.rendered, css, runtime, run), chunks);
+      return { kind: 'served', project, url: folder, chunks, rendered: answer.rendered };
+    } catch (error) {
+      return { kind: 'failed', project, message: getMessage(error) };
     }
-    await storeRun(own, folder, writeDocument(answer.rendered, css, runtime, run), chunks);
-    return { kind: 'served', project, url: folder, chunks, rendered: answer.rendered };
-  } catch (error) {
-    return { kind: 'failed', project, message: getMessage(error) };
-  }
+  };
 }
+
+/** The runner of the REPL page. */
+export const runFiles: Runner = createRunner();

@@ -11,7 +11,7 @@ Three things can fail on a page: a hole that throws while it renders, a handler 
 
 `<Try>` shows its `catch` view when a hole inside it throws, on the server or in a patch. The rest of the page keeps working:
 
-```tsx
+```tsx live
 import { Try } from 'idlip';
 import type { JSX } from 'idlip/jsx-runtime';
 

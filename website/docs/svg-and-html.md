@@ -9,7 +9,7 @@ description: Write SVG and MathML in a view, insert markup with trusted, and wha
 
 Write SVG in the view as you would in HTML. Holes, conditions and `<For>` rows inside `<svg>` work as elsewhere, and the browser gets SVG elements:
 
-```tsx
+```tsx live
 import { For } from 'idlip';
 import type { JSX } from 'idlip/jsx-runtime';
 
@@ -40,6 +40,28 @@ export default function Chart(props: { points: Point[] }): JSX.Element {
 }
 ```
 
+```json live props.json
+{
+  "points": [
+    {
+      "id": "p0",
+      "x": 0,
+      "y": 80
+    },
+    {
+      "id": "p1",
+      "x": 10,
+      "y": 40
+    },
+    {
+      "id": "p2",
+      "x": 20,
+      "y": 60
+    }
+  ]
+}
+```
+
 - **Namespaces.** Rows and branches inside `<svg>` are created as SVG. Children of `<foreignObject>` are HTML again. `<math>` works the same way for MathML.
 - **`<title>` inside `<svg>`** is the SVG title of the drawing. It is not the document title.
 - **Events** use `on:click` as on HTML elements. A plain `onclick` attribute is the error `attr-event`.
@@ -48,7 +70,7 @@ export default function Chart(props: { points: Point[] }): JSX.Element {
 
 The `html` attribute sets the content of an element from a string of markup. Its value must be a `trusted(...)` call, with `trusted` imported from `idlip`:
 
-```tsx
+```tsx live
 import { trusted } from 'idlip';
 import type { JSX } from 'idlip/jsx-runtime';
 
@@ -65,6 +87,12 @@ export default function Post(props: { body: string }): JSX.Element {
       <button on:click={clear}>Clear</button>
     </article>
   );
+}
+```
+
+```json live props.json
+{
+  "body": "<p>A post with <strong>bold</strong> text.</p>"
 }
 ```
 
@@ -95,7 +123,7 @@ A hole in a URL attribute is checked on the server and in the browser. The attri
 
 In development, the browser console warns each time a URL is dropped.
 
-```tsx
+```tsx live
 import type { JSX } from 'idlip/jsx-runtime';
 
 export default function Profile(props: { site: string }): JSX.Element {
@@ -111,6 +139,12 @@ export default function Profile(props: { site: string }): JSX.Element {
       <button on:click={reset}>Reset</button>
     </p>
   );
+}
+```
+
+```json live props.json
+{
+  "site": "https://example.com"
 }
 ```
 

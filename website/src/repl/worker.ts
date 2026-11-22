@@ -5,16 +5,8 @@
 import type { FromWorker, ToWorker } from './protocol.ts';
 import { renderProject } from './render.ts';
 
-let blobs: string[] = [];
-
 function post(message: FromWorker): void {
   postMessage(message);
-}
-
-function createBlobUrl(code: string): string {
-  const url = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
-  blobs.push(url);
-  return url;
 }
 
 function getMessage(error: unknown): string {
@@ -28,18 +20,28 @@ function isRequest(value: unknown): value is ToWorker {
 }
 
 async function answer(request: ToWorker): Promise<FromWorker> {
-  // The server modules of the render before this one are loaded already.
-  for (const url of blobs) {
-    URL.revokeObjectURL(url);
+  // Each request keeps its own module URLs. Renders of two live samples can run at once, so one
+  // render must not revoke the modules another is still loading.
+  const blobs: string[] = [];
+  function createBlobUrl(code: string): string {
+    const url = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
+    blobs.push(url);
+    return url;
   }
-  blobs = [];
-  const rendered = await renderProject(
-    request.project,
-    request.chunks,
-    request.folder,
-    createBlobUrl,
-  );
-  return { kind: 'rendered', id: request.id, rendered };
+  try {
+    const rendered = await renderProject(
+      request.project,
+      request.chunks,
+      request.folder,
+      createBlobUrl,
+    );
+    return { kind: 'rendered', id: request.id, rendered };
+  } finally {
+    // The render has loaded every module it imports, so the URLs can go.
+    for (const url of blobs) {
+      URL.revokeObjectURL(url);
+    }
+  }
 }
 
 addEventListener('message', (event: MessageEvent<unknown>) => {

@@ -31,7 +31,7 @@ export async function loadUser(id: string): Promise<User> {
 
 The component keeps the lifecycle in one union and sets it in the handler:
 
-```tsx
+```tsx live
 import type { JSX } from 'idlip/jsx-runtime';
 import { loadUser } from './api.ts';
 import type { User } from './api.ts';
@@ -76,7 +76,7 @@ A click on Open runs these steps:
 
 `Random` and `Time` from `idlip` give the values a handler must not compute itself, because a handler is pure. Await them like any task:
 
-```tsx
+```tsx live
 import { Random, Time } from 'idlip';
 import type { JSX } from 'idlip/jsx-runtime';
 

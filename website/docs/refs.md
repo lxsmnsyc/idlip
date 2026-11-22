@@ -9,7 +9,7 @@ A `ref` attribute names an element. A handler calls a `Dom` function with the na
 
 ## Focus, reset and measure
 
-```tsx
+```tsx live
 import { Dom, For } from 'idlip';
 import type { JSX } from 'idlip/jsx-runtime';
 
@@ -51,6 +51,21 @@ export default function Rows(props: { rows: Row[] }): JSX.Element {
       </ul>
     </main>
   );
+}
+```
+
+```json live props.json
+{
+  "rows": [
+    {
+      "id": "r1",
+      "text": "First row"
+    },
+    {
+      "id": "r2",
+      "text": "Second row"
+    }
+  ]
 }
 ```
 

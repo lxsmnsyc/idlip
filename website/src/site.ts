@@ -12,9 +12,11 @@ import { isBenchmarks } from './landing/benchmarks.ts';
 import type { Benchmarks } from './landing/benchmarks.ts';
 import { renderLanding } from './landing/index.ts';
 import { renderPage } from './layout.ts';
-import { getSampleLink } from './repl/files.ts';
-import { renderRepl } from './repl/page.ts';
-import { parseFence, wrapFragment } from './samples.ts';
+import { checkLiveSamples } from './live/check.ts';
+import type { PageSample } from './live/check.ts';
+import { encodeFiles, getSampleLink } from './repl/files.ts';
+import type { ReplFile } from './repl/files.ts';
+import { readFrameStyles, renderRepl } from './repl/page.ts';
 import { buildSearchIndex } from './search/index.ts';
 
 /** The file of the search index in the built site. */
@@ -60,43 +62,56 @@ export function pageUrl(file: string): string {
   return name.endsWith('/index') ? `docs/${name.slice(0, -'index'.length)}` : `docs/${name}/`;
 }
 
-/** The file the REPL reads the docs samples from, by the id in an "Open in REPL" link. */
+/** The file the REPL reads the docs samples from, by the id in a live sample's REPL link. */
 const REPL_SAMPLES = 'repl/samples.json';
 
+/** The stylesheet of the frames of live samples, fetched by the first sample that runs. */
+const LIVE_FRAME_CSS = 'live/frame.css';
+
 /**
- * Reads and renders every page under `docs`. `samples` gets the source of each code block that
- * `check:samples` compiles, by the id its "Open in REPL" link names, such as `views-3`.
+ * Reads and renders every page under `docs`. `samples` gets the source of each live sample of
+ * one file, by the id its REPL link names, such as `views-3`. `live` gets every live sample.
  */
-export function loadPages(folder = DOCS, base = '/', samples = new Map<string, string>()): Page[] {
-  // The id of a sample is its page and its place among the page's samples.
+export function loadPages(
+  folder = DOCS,
+  base = '/',
+  samples = new Map<string, string>(),
+  live: PageSample[] = [],
+): Page[] {
+  // The id of a sample is its page and its place among the page's live samples.
   let page = '';
+  let file = '';
   let count = 0;
-  function linkSample(info: string, code: string): string | undefined {
-    const { lang, flags } = parseFence(info);
-    if (lang !== 'tsx' || flags.has('no-check')) {
-      return undefined;
-    }
+  function linkSample(files: readonly ReplFile[]): string {
     count += 1;
+    live.push({ file, files: [...files] });
+    // A sample of one file opens by id and runs at once. A sample of several files travels in
+    // the link, so the REPL waits for the reader to choose Run.
+    if (files.length > 1) {
+      return `${base}repl/${encodeFiles(files)}`;
+    }
     const id = `${page}-${count}`;
-    samples.set(id, flags.has('fragment') ? wrapFragment(code) : code);
+    samples.set(id, files[0].source);
     return getSampleLink(base, id);
   }
-  const renderer = createRenderer({ sampleLink: linkSample });
+  const renderer = createRenderer({ liveLink: linkSample });
   const pages: Page[] = [];
-  for (const file of listMarkdown(folder)) {
-    page = file.slice(0, -'.md'.length).replaceAll('/', '-');
+  for (const name of listMarkdown(folder)) {
+    page = name.slice(0, -'.md'.length).replaceAll('/', '-');
+    file = `docs/${name}`;
     count = 0;
-    const { data, body } = splitFrontMatter(readFileSync(path.join(folder, file), 'utf8'), file);
+    const { data, body } = splitFrontMatter(readFileSync(path.join(folder, name), 'utf8'), name);
     const env: RenderEnv = {
       headings: [],
       lead: '',
-      link: (href) => resolveLink(href, file, base),
+      link: (href) => resolveLink(href, name, base),
+      file: `docs/${name}`,
     };
     const html = renderer.render(body, env);
     pages.push({
       ...data,
-      file,
-      url: pageUrl(file),
+      file: name,
+      url: pageUrl(name),
       html,
       headings: env.headings,
       description: data.description ?? env.lead,
@@ -205,7 +220,13 @@ export function readDemo(file = DEMO_DATA): DemoData {
 /** Writes the pages into a folder. The Vite build has already put the assets and the demo there. */
 export function writeSite(outDir: string, base = '/'): string[] {
   const samples = new Map<string, string>();
-  const pages = loadPages(DOCS, base, samples);
+  const live: PageSample[] = [];
+  const pages = loadPages(DOCS, base, samples, live);
+  // A live sample that does not compile fails the build, as it would fail in the page.
+  const problems = checkLiveSamples(live);
+  if (problems.length > 0) {
+    throw new Error(`Live samples with errors:\n${problems.join('\n')}`);
+  }
   const files = renderSite(pages, base, readDemo());
   for (const [name, html] of files) {
     const target = path.join(outDir, name);
@@ -219,5 +240,7 @@ export function writeSite(outDir: string, base = '/'): string[] {
   }
   writeFileSync(path.join(outDir, SEARCH_INDEX), JSON.stringify(buildSearchIndex(ordered)));
   writeFileSync(path.join(outDir, REPL_SAMPLES), JSON.stringify(Object.fromEntries(samples)));
+  mkdirSync(path.join(outDir, path.dirname(LIVE_FRAME_CSS)), { recursive: true });
+  writeFileSync(path.join(outDir, LIVE_FRAME_CSS), readFrameStyles(base, true));
   return [...files.keys()];
 }

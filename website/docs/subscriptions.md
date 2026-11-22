@@ -9,7 +9,7 @@ A subscription reads a stream of values, such as timer ticks or socket messages,
 
 ## A timer
 
-```tsx
+```tsx live
 import { Subscribe, timer } from 'idlip';
 import type { JSX } from 'idlip/jsx-runtime';
 
@@ -70,7 +70,7 @@ The test `packages/idlip/test/client/subs/subs.test.ts` runs a clock like this o
 
 A source is an async generator function of `(input, signal)`. A source with several parameters takes one input object. It must end its `await`s when the signal aborts. `until(signal, promise)` and `Time.sleep(ms, signal)` reject on abort:
 
-```tsx
+```tsx live
 import { Subscribe, Time, until } from 'idlip';
 import type { JSX } from 'idlip/jsx-runtime';
 

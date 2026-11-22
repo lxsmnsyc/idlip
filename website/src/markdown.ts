@@ -7,6 +7,9 @@ import twinkleplop from '@twinkleplop/markdown-it';
 import { language as tsx } from '@twinkleplop/tsx';
 import { language as typescript } from '@twinkleplop/typescript';
 import MarkdownIt from 'markdown-it';
+import { findLiveSamples } from './live/fence.ts';
+import { renderLiveSample } from './live/markup.ts';
+import type { ReplFile } from './repl/files.ts';
 
 export interface Heading {
   level: number;
@@ -21,10 +24,12 @@ export interface RenderEnv {
   lead: string;
   /** Turns a link target that ends in `.md` into a site path. */
   link: (href: string) => string;
+  /** The Markdown file, for the errors of live fences. */
+  file?: string;
 }
 
 // `tsx` and `ts` blocks use the stock grammars. A tag after the language (`no-check`, `fragment`)
-// only matters to the sample checker.
+// only matters to the sample checker. `live` makes the block a live sample (`src/live/fence.ts`).
 const LANGUAGES = {
   tsx: tsx(),
   ts: typescript(),
@@ -45,9 +50,12 @@ export function slugify(text: string): string {
 }
 
 export interface RendererOptions {
-  /** The address that opens a code block in the REPL, from its fence info and text, if it has one. */
-  sampleLink?: (info: string, code: string) => string | undefined;
+  /** The address that opens a live sample in the REPL, from its files. No REPL button without it. */
+  liveLink?: (files: readonly ReplFile[]) => string | undefined;
 }
+
+/** The token type that stands for the fences of one live sample. */
+const LIVE_TOKEN = 'live_sample';
 
 /** A Markdown renderer with highlighted code, anchored headings and site links. */
 export function createRenderer(settings: RendererOptions = {}): MarkdownIt {
@@ -66,10 +74,29 @@ export function createRenderer(settings: RendererOptions = {}): MarkdownIt {
     );
     const tag =
       language && language !== 'plain' ? `<span class="code-lang">${escape(language)}</span>` : '';
-    const link = settings.sampleLink?.(tokens[index].info, tokens[index].content);
-    const open =
-      link === undefined ? '' : `<a class="code-repl" href="${escape(link)}">Open in REPL</a>`;
-    return `<div class="code-block${open === '' ? '' : ' has-repl'}">${tag}${open}<button class="code-copy" type="button" aria-label="Copy the code">Copy</button>${pre}</div>\n`;
+    return `<div class="code-block">${tag}<button class="code-copy" type="button" aria-label="Copy the code">Copy</button>${pre}</div>\n`;
+  };
+
+  // The fences of a live sample become one token, which renders the editor and the output.
+  parser.core.ruler.after('block', 'live', (state) => {
+    // markdown-it types the env as any; `loadPages` and `renderLanding` always pass a RenderEnv.
+    // oxlint-disable-next-line typescript/no-unsafe-assignment
+    const env: RenderEnv = state.env;
+    const samples = findLiveSamples(state.tokens, env.file);
+    // From the end, so the indexes of the earlier samples stay right.
+    for (const sample of samples.toReversed()) {
+      const token = new state.Token(LIVE_TOKEN, '', 0);
+      token.block = true;
+      token.meta = sample.files;
+      token.map = state.tokens[sample.first].map;
+      state.tokens.splice(sample.first, sample.last - sample.first + 1, token);
+    }
+  });
+  parser.renderer.rules[LIVE_TOKEN] = (tokens, index) => {
+    // The meta of a live token is always the files `findLiveSamples` read.
+    // oxlint-disable-next-line typescript/no-unsafe-assignment
+    const files: ReplFile[] = tokens[index].meta;
+    return renderLiveSample(files, { repl: settings.liveLink?.(files) });
   };
   parser.renderer.rules.table_open = () =>
     '<div class="table-scroll" role="group" aria-label="Table" tabindex="0">\n<table>\n';

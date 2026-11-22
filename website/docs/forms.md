@@ -11,7 +11,7 @@ A form in idlip has two shapes. In the first, the model holds each field and upd
 
 An event arrow can pass a path on the event. On `on:submit`, `e.currentTarget` is the form, and `e.currentTarget.elements` holds its fields by `name`:
 
-```tsx
+```tsx live
 import { For } from 'idlip';
 import type { JSX } from 'idlip/jsx-runtime';
 
@@ -73,7 +73,7 @@ A form in a `<For>` row works the same way. Pass the row's key next to the field
 
 Keep the value in state when the view must follow the field as the user types, for example to turn a button on:
 
-```tsx
+```tsx live
 import type { JSX } from 'idlip/jsx-runtime';
 
 export default function Search(): JSX.Element {
@@ -98,7 +98,7 @@ Each keystroke is a message, so the first one loads the `setQuery` handler and t
 
 `Dom` from `idlip` acts on elements by the name of their `ref`. `Dom.reset` resets a form, or sets one field back to its default value. `Dom.focus` focuses an element:
 
-```tsx
+```tsx live
 import { Dom } from 'idlip';
 import type { JSX } from 'idlip/jsx-runtime';
 

@@ -91,7 +91,7 @@ With `jsxImportSource` set, `tsc` checks each handler call against its parameter
 
 `src/todo.tsx` is the component of `examples/todo`:
 
-```tsx
+```tsx live
 import { For } from 'idlip';
 import type { JSX } from 'idlip/jsx-runtime';
 
@@ -168,6 +168,23 @@ export default function TodoApp(props: { initial: Todo[] }): JSX.Element {
       </ul>
     </main>
   );
+}
+```
+
+```json live props.json
+{
+  "initial": [
+    {
+      "id": "t1",
+      "text": "Read the guide",
+      "done": true
+    },
+    {
+      "id": "t2",
+      "text": "Write a component",
+      "done": false
+    }
+  ]
 }
 ```
 

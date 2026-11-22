@@ -9,7 +9,7 @@ description: Set the title and meta tags from a component with Head, and write t
 
 ## A title and a meta tag
 
-```tsx
+```tsx live
 import { Head } from 'idlip';
 import type { JSX } from 'idlip/jsx-runtime';
 
@@ -49,7 +49,7 @@ A `<Head>` can sit anywhere in the view: in a condition, in a `<For>` row, in a 
 
 When more than one block has a title, the last one in page order wins:
 
-```tsx
+```tsx live
 import { Head } from 'idlip';
 import type { JSX } from 'idlip/jsx-runtime';
 
