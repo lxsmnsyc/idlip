@@ -12,3 +12,11 @@
 - `.live-frame { display: block }` beat the `hidden` attribute. Added `[hidden]` rules.
 - `components.md` and `nesting.md` belong to another worker. `components.md` got only fence info edits: 2 of its 4 samples are live. The other 2 (`Counter` with `start`, `Cart` with `price`) need a props file, so they stay static. `nesting.md` is unchanged.
 - oxfmt puts a blank line between adjacent fences. Blank lines make no Markdown tokens, so the files still group.
+
+## 2026-11-22, review fixes
+
+- Review: readers paid about 744 kB gzip and a service worker once a sample neared the viewport. Now the build writes a static frame per sample (`live/<page>-<n>/`), and the editor and compiler load on focus, key or edit.
+- A lazy iframe in Chromium did not navigate when the session set a new `src`: the frame kept the static page and the status stayed "Running". Setting `loading = 'eager'` first fixed it.
+- `WorkerLike` first copied the `addEventListener` overloads of `Worker`, which a fake worker could not implement without an unsafe cast. It is now a `listen(onMessage, onError)` hook, and `run.ts` adapts the real Worker.
+- TypeScript kept a `let` narrowed across an `await` in `loadCompiled`, so lint flagged the check after the fetch. A small getter reads it instead.
+- Measured with each URL counted once: 27.7 kB gzip of sample cost for a reader of `/docs/views/`, 740 kB more for an editor.
