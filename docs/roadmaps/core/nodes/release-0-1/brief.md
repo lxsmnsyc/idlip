@@ -26,6 +26,9 @@ shared: []
 reserves: []
 provides: []
 depends_on:
+  - on: fix-string-length
+    kind: hard
+    why: a binding on a string length must patch
   - on: cloned-templates-all
     kind: hard
     why: every block body except raw HTML clones before the first release
