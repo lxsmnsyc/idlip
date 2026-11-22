@@ -4,8 +4,10 @@
 // Usage: node rows-ab.mjs --dir base=<path> --dir branch=<path> [--runs 9] [--ops create1k,...]
 // [--metric paint|cpu]
 // A change is real when it is larger than the noise: 3 times the larger median absolute deviation.
+// Fix `--runs` before the run and keep the result, so the verdict does not depend on stopping.
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
+import { loadavg } from 'node:os';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { chromium } from 'playwright-core';
@@ -76,35 +78,50 @@ async function serve(root) {
   return { http, base: `http://127.0.0.1:${http.address().port}` };
 }
 
-// Start one server per side, then interleave the sides in every run of every operation.
-const sides = [];
-for (const entry of values.dir ?? []) {
-  const [name, root] = entry.split('=');
-  sides.push({ name, ...(await serve(root)) });
-}
-const browser = await chromium.launch({ ...findChrome(), headless: true });
-const runs = Number(values.runs);
-const results = {};
-for (const key of values.ops.split(',')) {
-  results[key] = {};
-  for (const side of sides) {
-    results[key][side.name] = [];
+function printLoad(when) {
+  const parts = [];
+  for (const value of loadavg()) {
+    parts.push(value.toFixed(2));
   }
-  for (let run = 0; run < runs + 1; run++) {
-    // Rotate the order so neither side always goes first. Run 0 is a warmup.
-    for (let index = 0; index < sides.length; index++) {
-      const side = sides[(index + run) % sides.length];
-      const sample = await measureOperation(browser, side.base, OPERATIONS[key]);
-      if (run > 0) {
-        results[key][side.name].push(sample[values.metric]);
+  console.log(`load average ${when}: ${parts.join(' ')}`);
+}
+
+// Start one server per side, then interleave the sides in every run of every operation. The
+// browser and the servers close on an error too.
+printLoad('at the start');
+const sides = [];
+const results = {};
+let browser;
+try {
+  for (const entry of values.dir ?? []) {
+    const [name, root] = entry.split('=');
+    sides.push({ name, ...(await serve(root)) });
+  }
+  browser = await chromium.launch({ ...findChrome(), headless: true });
+  const runs = Number(values.runs);
+  for (const key of values.ops.split(',')) {
+    results[key] = {};
+    for (const side of sides) {
+      results[key][side.name] = [];
+    }
+    for (let run = 0; run < runs + 1; run++) {
+      // Rotate the order so neither side always goes first. Run 0 is a warmup.
+      for (let index = 0; index < sides.length; index++) {
+        const side = sides[(index + run) % sides.length];
+        const sample = await measureOperation(browser, side.base, OPERATIONS[key]);
+        if (run > 0) {
+          results[key][side.name].push(sample[values.metric]);
+        }
       }
     }
   }
+} finally {
+  await browser?.close();
+  for (const side of sides) {
+    side.http.close();
+  }
 }
-await browser.close();
-for (const side of sides) {
-  side.http.close();
-}
+printLoad('at the end');
 
 // Print the medians, the deviation and the change against the baseline.
 for (const [key, bySide] of Object.entries(results)) {
