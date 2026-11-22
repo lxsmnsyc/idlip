@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { runInThisContext } from 'node:vm';
@@ -6,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { compile } from '../../../src/compiler/index.ts';
 import { getChunkFile } from '../../../src/core/format.ts';
 import { attr, createContext, on, text } from '../../fixtures/reference.ts';
+import { parseHtml, printRow } from '../../fixtures/rows.ts';
 
 // Compiled server modules import the render helpers from the package.
 vi.mock('idlip/server', async () => import('../../fixtures/reference.ts'));
@@ -149,7 +151,12 @@ describe('compile() behavior', () => {
   it('renders the same todo rows as the fixture list chunk', () => {
     const result = compile(readFixture('todo', 'todo.tsx'), readId('todo'));
     const chunk = result.client.find((module) => module.chunk === 'list=3');
-    const actual = loadRender(chunk?.code ?? '', { attr$: attr, on$: on, text$: text });
+    const actual = loadRender(chunk?.code ?? '', {
+      attr$: attr,
+      on$: on,
+      text$: text,
+      parseHtml$: parseHtml,
+    });
     const expected = loadRender(readFixture('todo', 'expected', 'client', 'list.3.js'), {
       attr,
       on,
@@ -161,7 +168,7 @@ describe('compile() behavior', () => {
     ];
     for (const item of items) {
       const scope = { model: {}, props: {}, rows: [{ item, index: 0 }] };
-      expect(actual(scope, undefined)).toBe(expected(scope, undefined));
+      expect(printRow(actual(scope, undefined))).toBe(printRow(expected(scope, undefined)));
     }
   });
 });

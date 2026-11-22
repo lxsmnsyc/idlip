@@ -70,7 +70,8 @@ async function buildFiles(name: string, compile?: CompileFn): Promise<Record<str
     const checked = createCheckedCompile(root).compile;
     const config = createConfig(root, { compile: compile ?? checked, client: LOADER });
     // The real loader, not the stub the fixture app aliases.
-    config.resolve = {};
+    // A chunk imports `idlip/client`, which is the loader itself here.
+    config.resolve = { alias: { 'idlip/client': LOADER } };
     const builder = await createBuilder(config);
     await builder.buildApp();
     const assets = path.join(root, 'dist/client/assets');

@@ -63,6 +63,18 @@ export const SUBJECTS: readonly Subject[] = [
     },
   },
   {
+    // Rows and branches that render by a cloned template.
+    name: 'cloned',
+    source: read(import.meta.dirname, 'subjects/cloned.tsx'),
+    props: {
+      items: [
+        { id: 'a1', label: 'One', url: '/one', done: false, n: 1 },
+        // oxlint-disable-next-line no-script-url
+        { id: 'a2', label: '', url: 'javascript:alert(1)', done: true, n: 0 },
+      ],
+    },
+  },
+  {
     name: 'nested-board',
     source: read(FIXTURES, 'nested/board/board.tsx'),
     props: {

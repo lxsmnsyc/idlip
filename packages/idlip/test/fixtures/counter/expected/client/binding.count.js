@@ -91,7 +91,8 @@ function setBranch$(start, branch, render, ns) {
   while (start.nextSibling !== end) {
     start.nextSibling?.remove();
   }
-  for (const node of parseHtml$(start.ownerDocument, render(branch), ns)) {
+  const html = render(branch);
+  for (const node of typeof html === 'string' ? parseHtml$(start.ownerDocument, html, ns) : [html]) {
     parent.insertBefore(node, end);
   }
   start.data = `${start.data.slice(0, colon + 1)}${branch}`;

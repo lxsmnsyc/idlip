@@ -279,8 +279,11 @@ export type HandlerChunk = Readonly<Record<string, Update>>;
 export type BindingChunk = Readonly<Record<string, Binding>>;
 
 export interface ListChunk {
-  /** Renders one row, without the row markers. */
-  readonly render: (scope: Scope) => string;
+  /**
+   * Renders one row: its HTML without the row markers, or a fragment cloned from a template,
+   * with the row markers.
+   */
+  readonly render: (scope: Scope) => string | DocumentFragment;
   /** The key of an item, for a list whose manifest entry has no `key` field. */
   readonly key?: (item: unknown) => unknown;
   readonly namespace?: 'svg' | 'mathml';

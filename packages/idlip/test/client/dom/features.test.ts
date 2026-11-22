@@ -39,7 +39,8 @@ async function buildLoader(name: string): Promise<string[]> {
       'export function render() { return ""; }\n',
     );
     const config = createConfig(root, { compile, client: LOADER });
-    config.resolve = {};
+    // A chunk imports `idlip/client`, which is the loader itself here.
+    config.resolve = { alias: { 'idlip/client': LOADER } };
     // Minified, as an app ships it, so the sizes are the loader's.
     config.build = { ...config.build, minify: true };
     const builder = await createBuilder(config);

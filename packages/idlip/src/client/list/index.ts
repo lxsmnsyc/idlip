@@ -272,17 +272,17 @@ export async function patchList(...args: Parameters<PatchList>): Promise<void> {
   const stay = getStayers(olds);
   const placed: Range[] = [];
   const inserts: (Node[] | undefined)[] = [];
+  const blocks: Comment[][] = [];
   for (let j = 0; j < next.length; j++) {
     if (olds[j] >= 0) {
       placed.push(rows[olds[j]]);
       continue;
     }
-    const scope = getRowScope(context.next, next[j], j);
-    const nodes = parseHtml(
-      start.ownerDocument,
-      `<!--i-->${chunk?.render(scope)}<!--/i-->`,
-      chunk?.namespace,
-    );
+    const html = chunk?.render(getRowScope(context.next, next[j], j));
+    const cloned = typeof html === 'object';
+    const nodes = cloned
+      ? [...html.childNodes]
+      : parseHtml(start.ownerDocument, `<!--i-->${html}<!--/i-->`, chunk?.namespace);
     const first = nodes[0];
     const last = nodes[nodes.length - 1];
     if (!isComment(first) || !isComment(last)) {
@@ -290,6 +290,8 @@ export async function patchList(...args: Parameters<PatchList>): Promise<void> {
     }
     placed.push({ start: first, end: last });
     inserts[j] = nodes;
+    // The blocks of a parsed row, found before it moves into the page. A cloned row holds none.
+    blocks[j] = cloned ? [] : findInnerBlocks(first, last);
   }
   let before: ChildNode = end;
   for (let j = next.length - 1; j >= 0; j--) {
@@ -297,7 +299,7 @@ export async function patchList(...args: Parameters<PatchList>): Promise<void> {
     const nodes = inserts[j];
     if (nodes !== undefined) {
       before.before(...nodes);
-      for (const block of findInnerBlocks(row.start, row.end)) {
+      for (const block of blocks[j]) {
         addBlock(block);
       }
     } else if (!stay.has(j)) {

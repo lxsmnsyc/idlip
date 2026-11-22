@@ -13,6 +13,7 @@ import type { Frame, Report, ScopeName, Usage } from './expr.ts';
 import { HtmlBuilder, toExpression } from './html.ts';
 import type { ModuleSource } from './module.ts';
 import type { Binding, Group, ListInfo, Plan, TryInfo } from './plan.ts';
+import { buildClone, canClone, printClone } from './template.ts';
 import { getKey, getLocalName, quote } from './text.ts';
 
 export interface ChunkContext {
@@ -153,25 +154,35 @@ function emitCondition(
   const branchEmitter = new Emitter('client', branchUsage, context.report);
   branchEmitter.frames = emitter.frames;
   const builder = new HtmlBuilder(context.component, context.plan, branchEmitter);
-  const thenBuilt = builder.build(node.then);
-  const elseBuilt = builder.build(node.else);
+  // A branch of static markup clones a template. Other branches render HTML.
+  const templates: string[] = [];
+  const branches: string[][] = [];
+  const expressions: string[] = [];
+  for (const [index, nodes] of [node.then, node.else].entries()) {
+    if (canClone(nodes, node.namespace, context.plan)) {
+      const cloned = buildClone(nodes, context.component, context.plan, branchEmitter);
+      const name = `templateC${node.test.id}_${index}$`;
+      templates.push(`const ${name} = { h: ${quote(cloned.html)} };`);
+      branches.push(printClone(name, cloned));
+      continue;
+    }
+    const built = builder.build(nodes);
+    if (built.pre.length === 0) {
+      expressions.push(toExpression(built));
+    }
+    branches.push([...built.pre, `return ${toExpression({ pre: [], parts: built.parts })};`]);
+  }
   const render = `renderC${node.test.id}`;
   const scope = printScope(branchUsage);
   const parameter = printScope(branchUsage, true);
-  let body: string;
-  if (thenBuilt.pre.length === 0 && elseBuilt.pre.length === 0) {
-    body = `return branch === 0 ? ${toExpression(thenBuilt)} : ${toExpression(elseBuilt)};`;
-  } else {
-    body = [
-      'if (branch === 0) {',
-      ...thenBuilt.pre,
-      `return ${toExpression({ pre: [], parts: thenBuilt.parts })};`,
-      '}',
-      ...elseBuilt.pre,
-      `return ${toExpression({ pre: [], parts: elseBuilt.parts })};`,
-    ].join('\n');
-  }
-  const renderFunction = `function ${render}(${parameter === '' ? 'branch' : `branch, ${parameter}`}) {\n${body}\n}`;
+  const body =
+    expressions.length === 2
+      ? `return branch === 0 ? ${expressions[0]} : ${expressions[1]};`
+      : ['if (branch === 0) {', ...branches[0], '}', ...branches[1]].join('\n');
+  const renderFunction = [
+    ...templates,
+    `function ${render}(${parameter === '' ? 'branch' : `branch, ${parameter}`}) {\n${body}\n}`,
+  ].join('\n\n');
   mergeUsage(usage, branchUsage);
   // Only the scope the branches read goes to the render function.
   const reference = scope === '' ? render : `(branch) => ${render}(branch, ${scope})`;
@@ -307,7 +318,17 @@ export function emitListChunk(info: ListInfo, context: ChunkContext): GroupChunk
   const frame: Frame = { item: info.node.item, index: info.node.index, row: undefined };
   emitter.frames = [...info.frames, frame];
   const builder = new HtmlBuilder(context.component, context.plan, emitter);
-  const built = builder.build(info.node.body);
+  // A row of static markup clones a template that holds its row markers. Other rows render HTML.
+  let body: string[];
+  let template: string | undefined;
+  if (canClone(info.node.body, info.node.namespace, context.plan)) {
+    const cloned = buildClone(info.node.body, context.component, context.plan, emitter);
+    template = `const template$ = { h: ${quote(`<!--i-->${cloned.html}<!--/i-->`)} };`;
+    body = printClone('template$', cloned);
+  } else {
+    const built = builder.build(info.node.body);
+    body = [...built.pre, `return ${toExpression({ pre: [], parts: built.parts })};`];
+  }
   // The row's own item and index are read from the new row. A template that adds children
   // also reads the path of the scope, so it takes the whole scope.
   const scoped = usage.path;
@@ -342,11 +363,12 @@ export function emitListChunk(info: ListInfo, context: ChunkContext): GroupChunk
   } else {
     parameter = printScope(usage);
   }
-  lines.push(...built.pre, `return ${toExpression({ pre: [], parts: built.parts })};`);
+  lines.push(...body);
+  const sections = template === undefined ? [] : [template];
   const comment = scoped
     ? "// `addChild` makes the child's model from `init`, records the slot and returns the child's\n// markup between its boundary comments.\n"
     : '';
-  const sections = [`${comment}export function render(${parameter}) {\n${lines.join('\n')}\n}`];
+  sections.push(`${comment}export function render(${parameter}) {\n${lines.join('\n')}\n}`);
   if (info.node.key.kind === 'computed') {
     // The client pairs rows by this key, so it loads the chunk before it pairs them. The key
     // reads only its item, which is the parameter.

@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { runInThisContext } from 'node:vm';
@@ -18,6 +19,7 @@ import type { GenerateResult } from '../../../../src/compiler/view/codegen/index
 import { getChunkFile } from '../../../../src/core/format.ts';
 import type { Model } from '../../../../src/core/format.ts';
 import { attr, createContext, on, text } from '../../../fixtures/reference.ts';
+import { parseHtml, printRow } from '../../../fixtures/rows.ts';
 
 const FIXTURES = join(import.meta.dirname, '..', '..', '..', 'fixtures');
 
@@ -127,7 +129,7 @@ function renderRow(exports: Record<string, unknown>, scope: unknown): string {
   if (!isRender(render)) {
     throw new Error('The chunk has no render export');
   }
-  return render(scope, undefined);
+  return printRow(Reflect.apply(render, undefined, [scope, undefined]));
 }
 
 function collectEvents(nodes: Node[], events: Event[]): void {
@@ -240,7 +242,12 @@ describe('fixture todo list template', () => {
   it('renders the same rows as the fixture chunk', () => {
     const { result } = generateFixture('todo');
     const chunk = result.client.find((module) => module.chunk === 'list=3');
-    const actual = runChunk(chunk?.code ?? '', { attr$: attr, on$: on, text$: text });
+    const actual = runChunk(chunk?.code ?? '', {
+      attr$: attr,
+      on$: on,
+      text$: text,
+      parseHtml$: parseHtml,
+    });
     const expected = runChunk(readFixture('todo', 'expected', 'client', 'list.3.js'), {
       attr,
       on,
@@ -613,7 +620,12 @@ describe('client chunks', () => {
     const list = result.client.find((module) => module.chunk.startsWith('list='));
     expect(list?.code).toContain('const index = rows[0].index;');
     expect(list?.code).toContain('const item = rows[0].item;');
-    const exports = runChunk(list?.code ?? '', { attr$: attr, on$: on, text$: text });
+    const exports = runChunk(list?.code ?? '', {
+      attr$: attr,
+      on$: on,
+      text$: text,
+      parseHtml$: parseHtml,
+    });
     const html = renderRow(exports, {
       model: { n: 3 },
       props: {},

@@ -215,14 +215,14 @@ export function setOn$(el: Element, event: string, message: DomMessage): void {
 
 /**
  * When `branch` differs from the marker's, replaces the block's content with
- * `render(branch)` and updates the marker. The hooks run children first: before the swap
+ * `render(branch)`, HTML or a cloned fragment, and updates the marker. The hooks run children first: before the swap
  * for the blocks inside the old content and then the block, after it for the blocks inside
  * the new content and then the block. The loader forgets the nodes it found as the hooks run.
  */
 export function setBranch$(
   start: Comment,
   branch: number,
-  render: (branch: number) => string,
+  render: (branch: number) => string | Node,
   ns?: Namespace,
 ): void {
   const colon = start.data.indexOf(':');
@@ -238,7 +238,10 @@ export function setBranch$(
   while (start.nextSibling !== end) {
     start.nextSibling?.remove();
   }
-  for (const node of parseHtml$(start.ownerDocument, render(branch), ns)) {
+  const html = render(branch);
+  for (const node of typeof html === 'string'
+    ? parseHtml$(start.ownerDocument, html, ns)
+    : [html]) {
     parent.insertBefore(node, end);
   }
   start.data = `${start.data.slice(0, colon + 1)}${branch}`;
@@ -246,6 +249,94 @@ export function setBranch$(
     addBlock$(block);
   }
   addBlock$(start);
+}
+
+/** A cloned template of a chunk: its HTML, and once parsed, its content and the paths to its marks. */
+export interface Template {
+  readonly h: string;
+  d?: Document;
+  c?: ParentNode;
+  p?: number[][];
+}
+
+/**
+ * Clones a template of static markup. Returns the fragment, then the node of each mark: an
+ * element with `i-x="<n>"`, or a text node in place of `<!--x<n>-->`. The first call parses the
+ * template and finds the marks where the parser put them.
+ */
+export function clone$(template: Template): Node[] {
+  if (template.d !== document) {
+    const root = parseHtml$(document, template.h)[0].parentNode!;
+    const paths: number[][] = [];
+    const walker = document.createTreeWalker(root, 129);
+    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+      const mark =
+        node instanceof Element ? node.getAttribute('i-x') : /^x(\d+)$/.exec(node.nodeValue!)?.[1];
+      if (mark === null || mark === undefined) {
+        continue;
+      }
+      if (node instanceof Element) {
+        node.removeAttribute('i-x');
+      } else {
+        const text = document.createTextNode(' ');
+        node.parentNode!.replaceChild(text, node);
+        walker.currentNode = text;
+        node = text;
+      }
+      const path: number[] = [];
+      for (let at = node; at !== root; at = at.parentNode!) {
+        let index = 0;
+        for (let before = at.previousSibling; before !== null; before = before.previousSibling) {
+          index++;
+        }
+        path.unshift(index);
+      }
+      paths[Number(mark) - 1] = path;
+    }
+    template.c = root;
+    template.p = paths;
+    template.d = document;
+  }
+  const fragment = document.importNode(template.c!, true);
+  const nodes: Node[] = [fragment];
+  for (const path of template.p!) {
+    let node: Node = fragment;
+    for (const index of path) {
+      node = node.firstChild!;
+      for (let step = 0; step < index; step++) {
+        node = node.nextSibling!;
+      }
+    }
+    nodes.push(node);
+  }
+  return nodes;
+}
+
+/** Writes an attribute on a cloned element, as `attr$` would have written it in the HTML. */
+export function putAttr$(el: Element, name: string, value: unknown): void {
+  if (value === false || value === null || value === undefined) {
+    return;
+  }
+  if (value === true) {
+    el.setAttribute(name, '');
+  } else if (name === 'class' && typeof value === 'object') {
+    const names = joinClass$(value);
+    if (names !== '') {
+      el.setAttribute(name, names);
+    }
+  } else {
+    el.setAttribute(name, getText$(value));
+  }
+}
+
+/** Writes the text of a cloned text node, or removes the node for an empty text, as the HTML has none. */
+export function putText$(node: Node, value: unknown): void {
+  const text = getText$(value);
+  if (text === '') {
+    node.parentNode!.removeChild(node);
+  } else {
+    node.nodeValue = text;
+  }
 }
 
 /** Reads the rows around a region from the DOM: `reset` has no binding scope. `paths` maps a list id to its `each` path. */
@@ -320,6 +411,9 @@ const HELPERS: Record<string, Helper | undefined> = {
   setAttr$: { source: setAttr$, uses: ['getText$', 'joinClass$'], client: [] },
   setOn$: { source: setOn$, uses: [], client: [] },
   track$: { source: track$, uses: [], client: [] },
+  clone$: { source: clone$, uses: [], client: ['parseHtml'] },
+  putAttr$: { source: putAttr$, uses: ['getText$', 'joinClass$'], client: [] },
+  putText$: { source: putText$, uses: ['getText$'], client: [] },
   setBranch$: {
     source: setBranch$,
     uses: ['findEnd$'],
