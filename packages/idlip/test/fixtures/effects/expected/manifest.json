@@ -1,5 +1,5 @@
 {
-  "module": "/src/effects.idlip.tsx",
+  "module": "/src/effects.tsx",
   "events": [
     "click",
     "input"

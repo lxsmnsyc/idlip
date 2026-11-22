@@ -43,7 +43,7 @@ const IDLE = Number(flags.idle);
 const GZIP = flags.gzip;
 
 // The write set of each handler: the binding groups whose paths it writes. `write-sets` will
-// compute this in the compiler; here it is written by hand from `src/app.idlip.tsx`.
+// compute this in the compiler; here it is written by hand from `src/app.tsx`.
 const WRITES = {
   increment: ['count'],
   toggle: ['todos.*.done'],

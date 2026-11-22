@@ -45,7 +45,7 @@ export default function Counter(props: {
 ```tsx
 import { For } from 'idlip';
 import type { JSX } from 'idlip/jsx-runtime';
-import Counter from './counter.idlip.tsx';
+import Counter from './counter.tsx';
 
 interface Item {
   id: string;
@@ -115,7 +115,7 @@ The state script holds one flat table of slots, each with the child's module, mo
 ```json
 {
   "0:a1": {
-    "module": "/src/counter.idlip.tsx",
+    "module": "/src/counter.tsx",
     "model": { "count": 0 },
     "props": { "label": "Apples", "onRemove": ["remove", ["a1"], "", ""] }
   }
@@ -145,4 +145,4 @@ The loader holds the nesting code behind a build flag. The plugin turns it on wh
 - **A dynamic hole inside a child** binds with its static paths. The read-tracking fallback of the root does not run in a child.
 - **A child's model is dropped when its block is removed.** When the block returns, the child starts again from its props. A condition that turns false and then true again does this.
 - **On a hot update**, a remounted child keeps its model. Its props come from the fresh render.
-- **A child is found only through another idlip module** that imports it and renders it in JSX. The plugin's `modules` option (default `src/**/*.idlip.tsx`) must match that parent.
+- **A child is found only through another idlip module** that imports it and renders it in JSX. The plugin's `modules` option (default `src/**/*.tsx`) must match that parent and the child. A child in a `.tsx` file that the option misses is a build error that names the option.

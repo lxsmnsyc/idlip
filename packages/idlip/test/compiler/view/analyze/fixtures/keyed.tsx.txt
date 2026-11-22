@@ -1,4 +1,4 @@
-// keyed.idlip.tsx
+// keyed.tsx
 import { For } from 'idlip';
 
 interface Todo {

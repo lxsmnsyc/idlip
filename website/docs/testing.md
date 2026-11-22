@@ -31,7 +31,7 @@ import { mount } from 'idlip/testing';
 import type { MountedPage } from 'idlip/testing';
 import { afterEach, expect, it } from 'vitest';
 
-const source = readFileSync(join(import.meta.dirname, 'todo.idlip.tsx'), 'utf8');
+const source = readFileSync(join(import.meta.dirname, 'todo.tsx'), 'utf8');
 const initial = [
   { id: 'a1', text: 'Write the format', done: true },
   { id: 'a2', text: 'Build the runtime', done: false },

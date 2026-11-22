@@ -1,4 +1,4 @@
-// events.idlip.tsx: the block body forms of view-ir v9
+// events.tsx: the block body forms of view-ir v9
 export default function Events() {
   let draft = '';
 

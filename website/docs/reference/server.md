@@ -5,11 +5,11 @@ section: Reference
 description: Render a compiled component to HTML, write the listener script and preload the chunks of the first click.
 ---
 
-`idlip/server` renders compiled components on the server. Import a `*.idlip.tsx` module through the Vite plugin, which gives the server build the compiled server module, then pass its default export to `render` or `renderPage`.
+`idlip/server` renders compiled components on the server. Import a `*.tsx` module through the Vite plugin, which gives the server build the compiled server module, then pass its default export to `render` or `renderPage`.
 
 ```ts
 import { renderListener, renderPage } from 'idlip/server';
-import TodoApp from './todo.idlip.tsx';
+import TodoApp from './todo.tsx';
 
 export async function renderTodo(nonce: string): Promise<string> {
   const page = await renderPage(TodoApp, { initial: [] }, { nonce });

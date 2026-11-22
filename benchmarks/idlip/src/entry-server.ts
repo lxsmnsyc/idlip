@@ -1,5 +1,5 @@
 import { render as renderComponent, renderListener } from 'idlip/server';
-import App from './app.idlip.tsx';
+import App from './app.tsx';
 
 export function todos(n: number) {
   return Array.from({ length: n }, (_, i) => ({

@@ -44,7 +44,7 @@ it('builds a source chunk that imports idlip without a shared chunk, and sizes t
   const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'idlip-subs-')));
   try {
     mkdirSync(path.join(root, 'src'));
-    writeFileSync(path.join(root, 'src/clock.idlip.tsx'), APP);
+    writeFileSync(path.join(root, 'src/clock.tsx'), APP);
     writeFileSync(
       path.join(root, 'src/entry-server.js'),
       'export function render() { return ""; }\n',

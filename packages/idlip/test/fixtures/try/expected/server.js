@@ -7,19 +7,19 @@ function check(value) {
   return value;
 }
 
-export const manifest = { module: '/src/board.idlip.tsx', events: ['click'], listens: { click: ['add', 'toggle'] }, handlers: { add: { chunk: 'handler=add', writes: ['items'], bindings: ['items.*.n'] }, toggle: { chunk: 'handler=toggle', writes: ['shown'], bindings: ['shown'] } }, fallback: { 0: 'try=0', 1: 'try=1', 2: 'try=2' }, groups: { 'items.*.n': { paths: ['items.*.n'], chunk: 'binding=items.*.n', bindings: ['t6'], covers: ['items'] }, items: { paths: ['items'], chunk: 'binding=items', bindings: ['l5'], covers: [] }, shown: { paths: ['shown'], chunk: 'binding=shown', bindings: ['c2'], covers: [] } }, lists: { 5: { key: 'id', path: 'items', chunk: 'list=5', bindings: ['t6'] } } };
+export const manifest = { module: '/src/board.tsx', events: ['click'], listens: { click: ['add', 'toggle'] }, handlers: { add: { chunk: 'handler=add', writes: ['items'], bindings: ['items.*.n'] }, toggle: { chunk: 'handler=toggle', writes: ['shown'], bindings: ['shown'] } }, fallback: { 0: 'try=0', 1: 'try=1', 2: 'try=2' }, groups: { 'items.*.n': { paths: ['items.*.n'], chunk: 'binding=items.*.n', bindings: ['t6'], covers: ['items'] }, items: { paths: ['items'], chunk: 'binding=items', bindings: ['l5'], covers: [] }, shown: { paths: ['shown'], chunk: 'binding=shown', bindings: ['c2'], covers: [] } }, lists: { 5: { key: 'id', path: 'items', chunk: 'list=5', bindings: ['t6'] } } };
 
 // `vite-plugin` replaces the URLs in a build.
 export const chunks = {
-'/src/board.idlip.tsx?idlip-handler=add&lang.js': '/src/board.idlip.tsx?idlip-handler=add&lang.js',
-'/src/board.idlip.tsx?idlip-handler=toggle&lang.js': '/src/board.idlip.tsx?idlip-handler=toggle&lang.js',
-'/src/board.idlip.tsx?idlip-binding=items.*.n&lang.js': '/src/board.idlip.tsx?idlip-binding=items.*.n&lang.js',
-'/src/board.idlip.tsx?idlip-binding=items&lang.js': '/src/board.idlip.tsx?idlip-binding=items&lang.js',
-'/src/board.idlip.tsx?idlip-binding=shown&lang.js': '/src/board.idlip.tsx?idlip-binding=shown&lang.js',
-'/src/board.idlip.tsx?idlip-list=5&lang.js': '/src/board.idlip.tsx?idlip-list=5&lang.js',
-'/src/board.idlip.tsx?idlip-try=0&lang.js': '/src/board.idlip.tsx?idlip-try=0&lang.js',
-'/src/board.idlip.tsx?idlip-try=1&lang.js': '/src/board.idlip.tsx?idlip-try=1&lang.js',
-'/src/board.idlip.tsx?idlip-try=2&lang.js': '/src/board.idlip.tsx?idlip-try=2&lang.js',
+'/src/board.tsx?idlip-handler=add&lang.js': '/src/board.tsx?idlip-handler=add&lang.js',
+'/src/board.tsx?idlip-handler=toggle&lang.js': '/src/board.tsx?idlip-handler=toggle&lang.js',
+'/src/board.tsx?idlip-binding=items.*.n&lang.js': '/src/board.tsx?idlip-binding=items.*.n&lang.js',
+'/src/board.tsx?idlip-binding=items&lang.js': '/src/board.tsx?idlip-binding=items&lang.js',
+'/src/board.tsx?idlip-binding=shown&lang.js': '/src/board.tsx?idlip-binding=shown&lang.js',
+'/src/board.tsx?idlip-list=5&lang.js': '/src/board.tsx?idlip-list=5&lang.js',
+'/src/board.tsx?idlip-try=0&lang.js': '/src/board.tsx?idlip-try=0&lang.js',
+'/src/board.tsx?idlip-try=1&lang.js': '/src/board.tsx?idlip-try=1&lang.js',
+'/src/board.tsx?idlip-try=2&lang.js': '/src/board.tsx?idlip-try=2&lang.js',
 };
 
 export default function Board(props, context, model) {

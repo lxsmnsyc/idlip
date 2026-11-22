@@ -1,5 +1,5 @@
 /**
- * The compiler that turns `*.idlip.tsx` files into view IR, chunks and the manifest.
+ * The compiler that turns `*.tsx` files into view IR, chunks and the manifest.
  */
 import type { CompileDiagnostic, CompileResult } from '../core/format.ts';
 import { compileHandlers, pickComponent } from './update/index.ts';
@@ -19,7 +19,7 @@ export type CompileOptions = GenerateOptions;
 
 /**
  * Lists the specifiers of the stateful children a module renders, such as
- * `../counter/counter.idlip.tsx`. The Vite plugin compiles each of those modules as a child.
+ * `../counter/counter.tsx`. The Vite plugin compiles each of those modules as a child.
  */
 export function listChildren(source: string, id: string): string[] {
   const ir = analyze(id, source);
@@ -45,8 +45,8 @@ function hasDiagnostic(list: readonly CompileDiagnostic[], diagnostic: CompileDi
 }
 
 /**
- * Compiles one `*.idlip.tsx` file. `id` is the root-relative Vite id, such as
- * `/src/todo.idlip.tsx`. With an error diagnostic, `server` is empty, `client` is `[]` and the
+ * Compiles one `*.tsx` file. `id` is the root-relative Vite id, such as
+ * `/src/todo.tsx`. With an error diagnostic, `server` is empty, `client` is `[]` and the
  * manifest is empty, whichever part found the error. `options.child` is true for a module that
  * another module renders as a child, and `options.resolve` names the module of a specifier.
  */

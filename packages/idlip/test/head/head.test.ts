@@ -91,13 +91,13 @@ it('rejects a title outside Head and allows one in svg', () => {
   const bad = compile(
     `import type { JSX } from 'idlip/jsx-runtime';
 export default function P(): JSX.Element { return <main><title>x</title></main>; }`,
-    '/src/b.idlip.tsx',
+    '/src/b.tsx',
   );
   expect(bad.diagnostics.some((item) => item.rule === 'title-outside-head')).toBe(true);
   const ok = compile(
     `import type { JSX } from 'idlip/jsx-runtime';
 export default function P(): JSX.Element { return <main><svg><title>x</title></svg></main>; }`,
-    '/src/o.idlip.tsx',
+    '/src/o.tsx',
   );
   expect(ok.diagnostics.filter((item) => item.severity === 'error')).toEqual([]);
 });
@@ -106,7 +106,7 @@ it('compiles a module without Head with no head output', () => {
   const compiled = compile(
     `import type { JSX } from 'idlip/jsx-runtime';
 export default function P(): JSX.Element { return <main>hi</main>; }`,
-    '/src/n.idlip.tsx',
+    '/src/n.tsx',
   );
   expect(compiled.server).not.toContain('head');
   expect(compiled.manifest.head).toBeUndefined();

@@ -192,7 +192,7 @@ Rows and dashboard (the run above). Ratios are idlip over brumate 0.8.1 and over
 | Dashboard first click after idle, 150 ms RTT           | 219 ms                         | 56, 47                                  | 3.9x, 4.7x                                      | One round trip for 3 chunks.                                                                                                                                                                                                                                                                                                                                                                                                         |
 | Dashboard first click cold, 150 ms RTT                 | 216 ms                         | Marko 50 (brumate 480 is behind idlip)  | 4.3x against Marko                              | Same.                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Dashboard client JS in dist                            | 364 files, 197.4 kB / 123.0 kB | 162.8 / 39.5, 66.7 / 10.5               | +21% raw and 3.1x gzip; 3.0x raw and 11.7x gzip | Measured. About 7 chunks per widget (run, cycle, 3 bindings, list, view) from the compiler's chunk split; each small file gzips alone and the module-level `summarize` and `listEntries` helpers are copied into each chunk that uses them.                                                                                                                                                                                          |
-| Dashboard SSR HTML                                     | 108.8 kB / 9.1 kB              | 33.6 / 6.0, 27.5 / 5.4                  | 3.2x, 4.0x raw; +52%, +69% gzip                 | Measured. Markup is 35.7 kB, close to the others. The state script is 75.8 kB: the chunk URL map 37.5 kB (every chunk of every child module, keyed by its full module id such as `/src/widgets/Widget00.idlip.tsx?idlip-handler=run&lang.js`), the child manifests (`modules`) 32.5 kB, `slots` 5.5 kB. `mergeState` and `collectModules` in `src/server/render.ts` put them all in.                                                 |
+| Dashboard SSR HTML                                     | 108.8 kB / 9.1 kB              | 33.6 / 6.0, 27.5 / 5.4                  | 3.2x, 4.0x raw; +52%, +69% gzip                 | Measured. Markup is 35.7 kB, close to the others. The state script is 75.8 kB: the chunk URL map 37.5 kB (every chunk of every child module, keyed by its full module id such as `/src/widgets/Widget00.tsx?idlip-handler=run&lang.js`), the child manifests (`modules`) 32.5 kB, `slots` 5.5 kB. `mergeState` and `collectModules` in `src/server/render.ts` put them all in.                                                       |
 | Dashboard SSR renders/s                                | 953 [1,382]                    | 2,367 [4,588], 3,976 [6,359]            | 2.5x, 4.2x [3.3x, 4.6x]                         | Profiled (Node, 500 renders, 1.04 ms a render). `mergeState` 14% self time (object spreads of the chunk maps), seroval parse and serialize of that state about 50% (`parsePlainObject` 11%, `createIndexForValue` 11%, `parseProperties` 7%, `serializeProperties` 7%, `serializeString` 6%). A smaller state script would cut both.                                                                                                 |
 
 Not losses in rows and dashboard: the JS heap (idlip is the smallest), the main thread while the server page loads, SSR rate at 1,000 rows (20% behind brumate at 5 rounds, ahead at 11 rounds, ahead of Marko in both), SSR HTML of 1,000 rows in gzip, JS before `load` and total JS after 3 widgets (idlip loads the least).
@@ -229,13 +229,13 @@ The table of [js-framework-benchmark](https://krausest.github.io/js-framework-be
 
 [`harness/rows.mjs`](./harness/rows.mjs) makes the rows and the new lists, and every app imports it, so the apps differ only in how they render and update. The page server reads the number of rows from `?n=`, and defaults to 0.
 
-The idlip page is `idlip/rows/src/app.idlip.tsx`, with `<For each={rows} key="id">`. Every operation is expressible, swap included. Its handlers call the list operations of `rows.mjs`, and the idlip Vite plugin rejects a handler chunk that imports a chunk the loader does not import, so the loader is `idlip/rows/src/loader.ts`: it imports `idlip/client` and re-exports the operations (0.9 kB, loaded at start).
+The idlip page is `idlip/rows/src/app.tsx`, with `<For each={rows} key="id">`. Every operation is expressible, swap included. Its handlers call the list operations of `rows.mjs`, and the idlip Vite plugin rejects a handler chunk that imports a chunk the loader does not import, so the loader is `idlip/rows/src/loader.ts`: it imports `idlip/client` and re-exports the operations (0.9 kB, loaded at start).
 
 ### Dashboard
 
 A heading, a row of 4 widgets and 46 more stacked below, each 480 px tall, so only the first row is in the 1280×720 viewport. Each widget is its own component with a list of 6 numbers, a mode and an output line as state, a summary computed from the list, a button that runs a pipeline of 4 list steps and formats the result, and a "Mode" button. [`harness/dashboard.mjs`](./harness/dashboard.mjs) generates the 50 widgets of every framework from a seeded generator, so they run the same handler code, and runs that code in Node to know what each click must show. The generated files are not checked in: each `build:dashboard` script writes them into `dashboard/src/widgets` (`dashboard/src/tags` for Marko).
 
-The idlip widgets are `*.idlip.tsx` modules: `let` for the state, `const` for the summary, function declarations for the two handlers. Two things differ from the other apps, because of the view grammar:
+The idlip widgets are `*.tsx` modules: `let` for the state, `const` for the summary, function declarations for the two handlers. Two things differ from the other apps, because of the view grammar:
 
 - `<For>` keys by a field, so the list of numbers renders from a derived list of `{ index, value }` entries.
 - A view hole has no spread (`Math.max(...items)` fails with `hole-spread`), so the summary is a module-level helper, which the compiler copies into the chunks that use it.
@@ -258,15 +258,15 @@ The harness records the load average before and after each size. Timings need a 
 
 ## Folders
 
-| Folder         | Framework                                                                                                 |
-| -------------- | --------------------------------------------------------------------------------------------------------- |
-| `idlip/`       | The local `packages/idlip` (`workspace:*`), the page in `src/app.idlip.tsx`, and `rows/` and `dashboard/` |
-| `brumate/`     | `brumate` 0.8.1 from npm (exact version in its `package.json`)                                            |
-| `brumate-0.3/` | `brumate` 0.3.0 from npm, the lazy-loading design that idlip shares                                       |
-| `qwik1/`       | `@builder.io/qwik` 1.20.2 with Vite 7.3.7                                                                 |
-| `qwik2/`       | `@qwik.dev/core` 2.0.0-rc.3 with Vite 8.3.4                                                               |
-| `marko/`       | `marko` 6.4.6 and `@marko/vite` 6.1.13, Vite 8                                                            |
-| `harness/`     | The scripts, with `playwright-core` 1.64.1                                                                |
+| Folder         | Framework                                                                                           |
+| -------------- | --------------------------------------------------------------------------------------------------- |
+| `idlip/`       | The local `packages/idlip` (`workspace:*`), the page in `src/app.tsx`, and `rows/` and `dashboard/` |
+| `brumate/`     | `brumate` 0.8.1 from npm (exact version in its `package.json`)                                      |
+| `brumate-0.3/` | `brumate` 0.3.0 from npm, the lazy-loading design that idlip shares                                 |
+| `qwik1/`       | `@builder.io/qwik` 1.20.2 with Vite 7.3.7                                                           |
+| `qwik2/`       | `@qwik.dev/core` 2.0.0-rc.3 with Vite 8.3.4                                                         |
+| `marko/`       | `marko` 6.4.6 and `@marko/vite` 6.1.13, Vite 8                                                      |
+| `harness/`     | The scripts, with `playwright-core` 1.64.1                                                          |
 
 `brumate/` is a copy of brumate's own benchmark app (`src/`, `rows/`, `dashboard/` and `vite.config.ts`) with the npm package pinned in place of `workspace:*`. To update it, change the version in `package.json` and in the `label` of `adapter.js`, then run `pnpm install`. `marko/rows` and `marko/dashboard` are copies from the same place. The harness files `client.mjs`, `rows.mjs`, `dashboard.mjs` and `profile-rows.mjs` come from brumate's harness; `dashboard.mjs` adds the idlip writer.
 

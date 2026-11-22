@@ -15,7 +15,7 @@ import * as compiler from '../compiler/index.ts';
 import type { CompileOptions } from '../compiler/index.ts';
 import type { ChunkUrls, Compile, CompileDiagnostic, CompileResult } from '../core/format.ts';
 import { getChunkFile, getChunkId } from '../core/format.ts';
-import { findDroppedFeatures, getDefines, getFeatures, replaceFeatures } from './features.ts';
+import { getDefines, getFeatures, replaceFeatures } from './features.ts';
 import { HOT_EVENT, classifyEdit } from './hot.ts';
 import {
   BUILDS_FILE,
@@ -28,19 +28,21 @@ import {
 } from './skew.ts';
 import { isChunkUrls, listChunks, parseChunkId, replaceChunkUrls } from './chunks.ts';
 
-const MODULE_FILE = /\.idlip\.tsx$/;
+const MODULE_FILE = /\.tsx$/;
 /**
  * The chunk URL map of the client build, under `build.outDir` and outside the served client
  * folder, for a server build in another process.
  */
 const CHUNKS_FILE = '.idlip/chunks.json';
+/** The default `modules` globs. */
+const DEFAULT_MODULES = ['src/**/*.tsx'];
 /** The end of the id of a child's view chunk. */
 const VIEW_SUFFIX = '?idlip-view&lang.js';
 /** The id of a list chunk, whose item template renders a child with its view. */
 const LIST_CHUNK = /\?idlip-list=[^&]*&lang\.js$/;
 
 export interface IdlipOptions {
-  /** Globs of the idlip modules, relative to the root. Default: `src/**\/*.idlip.tsx`. */
+  /** Globs of the idlip modules, relative to the root. Default: `src/**\/*.tsx`. */
   modules?: string | readonly string[];
   /**
    * The server entry `vite dev` renders pages with, such as `/src/entry-server.ts`. It
@@ -256,7 +258,7 @@ async function servePage(
 }
 
 /**
- * `idlip/vite`: compiles `*.idlip.tsx` modules, emits one client chunk per handler,
+ * `idlip/vite`: compiles the `.tsx` modules, emits one client chunk per handler,
  * binding group and list, gives the server module the chunk URLs, and serves
  * server-rendered pages in `vite dev`.
  */
@@ -321,6 +323,13 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
         if (id === undefined || !MODULE_FILE.test(id)) {
           continue;
         }
+        // A `.tsx` file the globs miss is plain TSX, so it cannot be a component of idlip.
+        if (!isModule(id)) {
+          return context.error(
+            `${importer} renders a component from ${getModuleId(id)}, which the idlip plugin does not compile. ` +
+              `Add the file to the \`modules\` option of idlip(), for example \`modules: ['src/**/*.tsx']\`.`,
+          );
+        }
         found.add(id);
         resolved.set(`${importer}\0${specifier}`, getModuleId(id));
       }
@@ -349,15 +358,27 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
     return result;
   }
 
+  /** The files the `modules` globs match, found on first use and again after a `.tsx` change. */
+  let moduleFiles: string[] | undefined;
+
   function findModules(): string[] {
+    if (moduleFiles !== undefined) {
+      return moduleFiles;
+    }
     const files: string[] = [];
-    for (const name of globSync(patterns ?? ['src/**/*.idlip.tsx'], {
+    for (const name of globSync(patterns ?? DEFAULT_MODULES, {
       cwd: root,
       exclude: ['**/node_modules/**'],
     })) {
       files.push(path.resolve(root, name));
     }
-    return files.toSorted();
+    moduleFiles = files.toSorted();
+    return moduleFiles;
+  }
+
+  /** Whether the `modules` globs match the file, so the plugin compiles it. */
+  function isModule(file: string): boolean {
+    return MODULE_FILE.test(file) && findModules().includes(file);
   }
 
   function readBuilt(): ChunkUrls {
@@ -438,6 +459,7 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
     },
 
     async buildStart() {
+      moduleFiles = undefined;
       // No module imports a chunk, since the loader takes chunk URLs from the
       // page. So each chunk is an entry of its own.
       if (isServe || this.environment.name !== 'client') {
@@ -451,7 +473,7 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       for (const file of findModules()) {
         const result = compileFile(this, file);
         results.push(result);
-        const name = path.basename(file, '.idlip.tsx');
+        const name = path.basename(file, '.tsx');
         for (const chunk of listChunks(result.manifest)) {
           const reference = this.emitFile({
             type: 'chunk',
@@ -485,6 +507,10 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
     transform: {
       filter: { id: MODULE_FILE },
       async handler(code, id) {
+        // A `.tsx` file outside the `modules` globs is left to Vite.
+        if (!isModule(id)) {
+          return undefined;
+        }
         // The client never imports a module: the loader takes chunk URLs from
         // the page. Anywhere else the module is its compiled server module.
         if (this.environment.config.consumer === 'client') {
@@ -494,15 +520,6 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
         }
         await findChildren(this);
         const result = compileFile(this, id, code);
-        // A module outside the `modules` globs was not counted, so the client build may have
-        // dropped the loader code it needs.
-        if (defines !== undefined) {
-          for (const name of findDroppedFeatures(result, defines)) {
-            this.error(
-              `${getModuleId(id)} uses ${name}, which the client build dropped because no module of \`modules\` uses it. Add the module to \`modules\`.`,
-            );
-          }
-        }
         const urls = getChunkUrls(result);
         return {
           code: urls === undefined ? result.server : replaceChunkUrls(result.server, urls),
@@ -553,12 +570,16 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
 
     watchChange(file) {
       if (MODULE_FILE.test(file)) {
+        moduleFiles = undefined;
         children = undefined;
       }
     },
 
     async hotUpdate({ file, modules, timestamp, read }) {
-      if (!MODULE_FILE.test(file)) {
+      if (MODULE_FILE.test(file)) {
+        moduleFiles = undefined;
+      }
+      if (!isModule(file)) {
         return undefined;
       }
       // The edit may add or drop a child import, in any environment.

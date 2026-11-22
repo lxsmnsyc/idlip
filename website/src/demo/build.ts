@@ -192,8 +192,8 @@ export async function buildDemo(outDir: string, base: string): Promise<DemoData>
   const token = /on:click='([^']*)'/.exec(row)?.[1] ?? '';
   const message: unknown = JSON.parse(token);
   const handlerName = Array.isArray(message) && typeof message[0] === 'string' ? message[0] : '';
-  const source = readFileSync(path.join(EXAMPLE, 'src/todo.idlip.tsx'), 'utf8');
-  const { manifest } = compile(source, '/src/todo.idlip.tsx');
+  const source = readFileSync(path.join(EXAMPLE, 'src/todo.tsx'), 'utf8');
+  const { manifest } = compile(source, '/src/todo.tsx');
   if (!Object.hasOwn(manifest.handlers, handlerName)) {
     throw new Error(`The manifest has no handler ${handlerName}`);
   }

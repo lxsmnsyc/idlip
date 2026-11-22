@@ -1,5 +1,5 @@
 /**
- * `idlip/testing`: `mount` renders a `.idlip.tsx` source on the server, resumes it in the
+ * `idlip/testing`: `mount` renders a `.tsx` source on the server, resumes it in the
  * DOM of the test (happy-dom or any global `document`), and serves chunks from memory. A
  * test clicks and types as a user does and waits until chunks and patches settle.
  */
@@ -32,7 +32,7 @@ export interface MountOptions {
    * hidden dependency. Default `true`.
    */
   check?: boolean;
-  /** The Vite id of the module, which names its chunks. Default `/src/app.idlip.tsx`. */
+  /** The Vite id of the module, which names its chunks. Default `/src/app.tsx`. */
   id?: string;
   /** Written on the state script. */
   nonce?: string;
@@ -122,7 +122,7 @@ function runScript(script: string): void {
 }
 
 /**
- * Compiles a `.idlip.tsx` source, renders it on the server with `props`, and resumes it in
+ * Compiles a `.tsx` source, renders it on the server with `props`, and resumes it in
  * the document. The document must exist already: use the `happy-dom` test environment.
  */
 export async function mount(
@@ -130,7 +130,7 @@ export async function mount(
   props: Record<string, unknown>,
   options: MountOptions = {},
 ): Promise<MountedPage> {
-  const { check = true, id = '/src/app.idlip.tsx', nonce, expectCaught = false } = options;
+  const { check = true, id = '/src/app.tsx', nonce, expectCaught = false } = options;
   const key = `$idlipTesting${mounts++}`;
   const compiled = compile(source, id);
   const messages: string[] = [];

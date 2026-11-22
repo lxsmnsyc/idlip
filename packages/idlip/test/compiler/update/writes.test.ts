@@ -8,16 +8,13 @@ import { listWrites, meetsPath } from '../../../src/compiler/update/writes.ts';
 const HEAD = `import type { JSX } from 'idlip/jsx-runtime';\n`;
 
 function getWrites(source: string): Record<string, string[] | undefined> {
-  const ir = analyze('/src/test.idlip.tsx', source);
+  const ir = analyze('/src/test.tsx', source);
   const component = pickComponent(ir)!;
-  return Object.fromEntries(listWrites('/src/test.idlip.tsx', source, component));
+  return Object.fromEntries(listWrites('/src/test.tsx', source, component));
 }
 
 describe('todo fixture', () => {
-  const source = readFileSync(
-    join(import.meta.dirname, '../../fixtures/todo/todo.idlip.tsx'),
-    'utf8',
-  );
+  const source = readFileSync(join(import.meta.dirname, '../../fixtures/todo/todo.tsx'), 'utf8');
   const writes = getWrites(source);
 
   it('gives the field of a single assignment', () => {

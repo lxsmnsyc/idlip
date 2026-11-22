@@ -7,7 +7,7 @@ import { parseHtml } from '../../src/client/patch/dom.ts';
 import { mount } from '../../src/testing/index.ts';
 import type { MountedPage } from '../../src/testing/index.ts';
 
-const SOURCE = readFileSync(join(import.meta.dirname, '../fixtures/svg/svg.idlip.tsx'), 'utf8');
+const SOURCE = readFileSync(join(import.meta.dirname, '../fixtures/svg/svg.tsx'), 'utf8');
 const SVG = 'http://www.w3.org/2000/svg';
 const HTML = 'http://www.w3.org/1999/xhtml';
 
@@ -48,10 +48,10 @@ describe('svg namespaces', () => {
 
 describe('a <Try> catch view', () => {
   it('exports the svg namespace of its chunk inside svg, and none in html', () => {
-    const inSvg = readFileSync(join(import.meta.dirname, '../fixtures/svg/try.idlip.tsx'), 'utf8');
+    const inSvg = readFileSync(join(import.meta.dirname, '../fixtures/svg/try.tsx'), 'utf8');
     const inHtml = inSvg.replace('<svg>', '<div>').replace('</svg>', '</div>');
     const find = (source: string): string => {
-      const chunks = compile(source, '/src/try.idlip.tsx').client;
+      const chunks = compile(source, '/src/try.tsx').client;
       return chunks.find((chunk) => chunk.chunk.startsWith('try='))?.code ?? '';
     };
     expect(find(inSvg)).toContain("export const namespace = 'svg';");
@@ -61,7 +61,7 @@ describe('a <Try> catch view', () => {
 
 describe('mathml namespaces', () => {
   it('exports the namespace of a list inside math, and of one inside svg', () => {
-    const result = compile(SOURCE, '/src/shapes.idlip.tsx');
+    const result = compile(SOURCE, '/src/shapes.tsx');
     const lists = result.client.filter((chunk) => chunk.chunk.startsWith('list='));
     const namespaces: string[] = [];
     for (const chunk of lists) {

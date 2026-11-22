@@ -1,4 +1,4 @@
-file dynamic.idlip.tsx
+file dynamic.tsx
 
 component Badge (stateless)
   props: props

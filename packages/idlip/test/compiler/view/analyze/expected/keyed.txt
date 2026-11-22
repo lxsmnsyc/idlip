@@ -1,4 +1,4 @@
-file keyed.idlip.tsx
+file keyed.tsx
 
 component Keyed (stateful, exported)
   props: props

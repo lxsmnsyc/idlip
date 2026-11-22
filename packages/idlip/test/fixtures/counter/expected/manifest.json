@@ -1,5 +1,5 @@
 {
-  "module": "/src/counter.idlip.tsx",
+  "module": "/src/counter.tsx",
   "events": [
     "click"
   ],

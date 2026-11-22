@@ -1,4 +1,4 @@
-file impure.idlip.tsx
+file impure.tsx
 
 component Impure (stateful, exported)
   props: props

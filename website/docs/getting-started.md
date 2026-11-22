@@ -44,7 +44,7 @@ The project holds four files:
 | --------------------- | --------------------------------------------------- |
 | `vite.config.ts`      | The `idlip/vite` plugin.                            |
 | `tsconfig.json`       | TSX settings with `idlip` as the JSX import source. |
-| `src/todo.idlip.tsx`  | The todo component.                                 |
+| `src/todo.tsx`        | The todo component.                                 |
 | `src/entry-server.ts` | `render()`, which returns the page HTML.            |
 
 ## Configure Vite
@@ -60,7 +60,7 @@ export default defineConfig({
 });
 ```
 
-The plugin compiles every `src/**/*.idlip.tsx` file. In `vite dev` it answers each HTML request with the string that `render(url)` of the entry returns.
+The plugin compiles every `src/**/*.tsx` file as an idlip module, so a component file is a plain `.tsx` file with no special extension. Keep helpers and entry files as `.ts`. A `.tsx` file outside `src` stays plain TSX until you add its folder to the plugin's `modules` option. In `vite dev` it answers each HTML request with the string that `render(url)` of the entry returns.
 
 ## Configure TypeScript
 
@@ -89,7 +89,7 @@ With `jsxImportSource` set, `tsc` checks each handler call against its parameter
 
 ## Write the component
 
-`src/todo.idlip.tsx` is the component of `examples/todo`:
+`src/todo.tsx` is the component of `examples/todo`:
 
 ```tsx
 import { For } from 'idlip';
@@ -179,7 +179,7 @@ The three `let` lines are the state, `left` is derived from it, the four functio
 
 ```ts
 import { render as renderComponent, renderListener } from 'idlip/server';
-import TodoApp from './todo.idlip.tsx';
+import TodoApp from './todo.tsx';
 
 const initial = [
   { id: 'a1', text: 'Read the guide', done: true },

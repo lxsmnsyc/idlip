@@ -2,10 +2,10 @@
 title: idlip/compiler
 order: 103
 section: Reference
-description: Compile a *.idlip.tsx file into a server module, client chunks and a manifest, and read its view IR.
+description: Compile a *.tsx file into a server module, client chunks and a manifest, and read its view IR.
 ---
 
-`idlip/compiler` turns one `*.idlip.tsx` file into a server module, client chunks and a manifest. The Vite plugin calls it for you. Call it yourself to check sources in a script or a test, as the docs site does with every `tsx` sample.
+`idlip/compiler` turns one `*.tsx` file into a server module, client chunks and a manifest. The Vite plugin calls it for you. Call it yourself to check sources in a script or a test, as the docs site does with every `tsx` sample.
 
 ```ts
 import { compile } from 'idlip/compiler';
@@ -20,7 +20,7 @@ export default function Counter() {
 }
 `;
 
-const result = compile(source, '/src/counter.idlip.tsx');
+const result = compile(source, '/src/counter.tsx');
 for (const diagnostic of result.diagnostics) {
   console.log(`${diagnostic.severity} ${diagnostic.rule}: ${diagnostic.message}`);
 }
@@ -39,7 +39,7 @@ The rule ids of the diagnostics are listed on the [syntax page](./syntax.md#diag
 function compile(source: string, id: string, options?: CompileOptions): CompileResult;
 ```
 
-Compiles one `*.idlip.tsx` file. `id` is the root-relative Vite id, such as `/src/todo.idlip.tsx`; it names the chunks. The result has:
+Compiles one `*.tsx` file. `id` is the root-relative Vite id, such as `/src/todo.tsx`; it names the chunks. The result has:
 
 - `server`: the server module's code.
 - `client`: the client modules, each `{ chunk, code }`, with a chunk name such as `handler=toggle` or `binding=todos.*.done`.
@@ -62,7 +62,7 @@ What `compile` takes besides the source and id: `child` and `resolve`, as in `Ge
 function listChildren(source: string, id: string): string[];
 ```
 
-Lists the import specifiers of the stateful children a module renders, such as `./counter.idlip.tsx`. The Vite plugin compiles each of those modules with `child: true`.
+Lists the import specifiers of the stateful children a module renders, such as `./counter.tsx`. The Vite plugin compiles each of those modules with `child: true`.
 
 ## Stages
 
@@ -74,7 +74,7 @@ Lists the import specifiers of the stateful children a module renders, such as `
 function analyze(file: string, source: string, options?: AnalyzeOptions): ModuleIR;
 ```
 
-Reads one `*.idlip.tsx` file into the view IR: its components, with state, derived values, handlers, view nodes and holes, and the diagnostics of the analysis.
+Reads one `*.tsx` file into the view IR: its components, with state, derived values, handlers, view nodes and holes, and the diagnostics of the analysis.
 
 ### `AnalyzeOptions`
 
@@ -84,7 +84,7 @@ interface AnalyzeOptions {
 }
 ```
 
-`readImport` reads the module an import specifier names, relative to the importing file. The analysis calls it for components imported from `.idlip.tsx` files, to tell a stateless component, which it inlines, from a stateful one, which becomes a child block. Without it, or when it returns `undefined`, an imported component is a child block.
+`readImport` reads the module an import specifier names, relative to the importing file. The analysis calls it for components imported from `.tsx` files, to tell a stateless component, which it inlines, from a stateful one, which becomes a child block. Without it, or when it returns `undefined`, an imported component is a child block.
 
 ### `ImportedModule`
 

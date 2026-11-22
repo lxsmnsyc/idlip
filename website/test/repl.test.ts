@@ -49,7 +49,7 @@ describe('share links', () => {
   it('round-trips the files, with text outside ASCII', () => {
     const files = [
       {
-        name: 'a.idlip.tsx',
+        name: 'a.tsx',
         source: 'export default function A() {\n  return <p>héllo ✓</p>;\n}\n',
       },
       { name: 'props.json', source: '{"x": 1}' },
@@ -61,7 +61,7 @@ describe('share links', () => {
     expect(decodeFiles('#files=%%%')).toBeUndefined();
     expect(decodeFiles('#other')).toBeUndefined();
     expect(decodeFiles(encodeFiles([]))).toBeUndefined();
-    const twice = { name: 'a.idlip.tsx', source: '' };
+    const twice = { name: 'a.tsx', source: '' };
     expect(decodeFiles(encodeFiles([twice, twice]))).toBeUndefined();
     expect(readHash('#files=%%%')).toEqual({ kind: 'none' });
   });
@@ -71,7 +71,7 @@ describe('share links', () => {
     const link = getSampleLink('/base/', 'views-3');
     expect(link).toBe('/base/repl/#sample=views-3');
     expect(readHash(link.slice(link.indexOf('#')))).toEqual({ kind: 'sample', id: 'views-3' });
-    const files = [{ name: 'a.idlip.tsx', source: 'x' }];
+    const files = [{ name: 'a.tsx', source: 'x' }];
     expect(readHash(encodeFiles(files))).toEqual({ kind: 'files', files });
   });
 
@@ -94,12 +94,12 @@ describe('problems', () => {
   it('shows a syntax error with its position', () => {
     const project = compileProject([
       {
-        name: 'a.idlip.tsx',
+        name: 'a.tsx',
         source: 'export default function A() {\n  let x = ;\n  return <p>{x}</p>;\n}\n',
       },
     ]);
     expect(project.ok).toBe(false);
-    expect(project.problems[0]).toMatchObject({ file: 'a.idlip.tsx', severity: 'error', line: 2 });
+    expect(project.problems[0]).toMatchObject({ file: 'a.tsx', severity: 'error', line: 2 });
   });
 
   it('reports a child that is not a file', () => {
@@ -107,7 +107,7 @@ describe('problems', () => {
     expect(nesting.id).toBe('nesting');
     const project = compileProject([nesting.files[0]]);
     expect(project.ok).toBe(false);
-    expect(project.problems[0]).toMatchObject({ file: 'board.idlip.tsx', rule: 'repl-import' });
+    expect(project.problems[0]).toMatchObject({ file: 'board.tsx', rule: 'repl-import' });
   });
 
   it('reports broken props', () => {

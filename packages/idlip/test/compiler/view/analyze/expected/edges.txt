@@ -1,4 +1,4 @@
-file edges.idlip.tsx
+file edges.tsx
 
 component Edges (stateful, exported)
   props: props

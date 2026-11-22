@@ -87,6 +87,6 @@ describe('getChunkFile with keyed segments', () => {
   it('gives a file name and a module id without reserved characters', () => {
     const chunk = 'binding=selected,todos[id=selected].text';
     expect(getChunkFile(chunk)).toMatch(/^[\w.()~+-]+$/);
-    expect(getChunkId('/src/todo.idlip.tsx', chunk)).not.toMatch(/\s|#/);
+    expect(getChunkId('/src/todo.tsx', chunk)).not.toMatch(/\s|#/);
   });
 });

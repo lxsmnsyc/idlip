@@ -2,10 +2,10 @@
 title: Editor setup
 order: 90
 section: Tools
-description: The tsconfig settings that type-check *.idlip.tsx files, and where idlip's own diagnostics appear.
+description: The tsconfig settings that type-check *.tsx files, and where idlip's own diagnostics appear.
 ---
 
-A `*.idlip.tsx` file is plain TSX. Any editor with TypeScript support reads it, with no plugin: VS Code uses its built-in TypeScript, and other editors use the TypeScript language server. idlip has no editor extension and no TypeScript plugin yet.
+A `*.tsx` file is plain TSX. Any editor with TypeScript support reads it, with no plugin: VS Code uses its built-in TypeScript, and other editors use the TypeScript language server. idlip has no editor extension and no TypeScript plugin yet.
 
 There are two kinds of check:
 
@@ -37,7 +37,7 @@ Set `jsx` to `preserve` and `jsxImportSource` to `idlip`, so TypeScript reads th
 
 - `jsx: "preserve"` keeps TypeScript from turning JSX into calls. The Vite plugin compiles every view.
 - `jsxImportSource: "idlip"` points TypeScript at `idlip/jsx-runtime` for `JSX.Element` and the element types, such as `on:click` props and `class` records.
-- `allowImportingTsExtensions` lets a server entry or a parent component import `./todo.idlip.tsx` by its full name, as the Vite plugin expects.
+- `allowImportingTsExtensions` lets a server entry or a parent component import `./todo.tsx` by its full name, as the Vite plugin expects.
 - `moduleResolution: "bundler"` reads the subpaths of `idlip` (`idlip/server`, `idlip/vite` and the others) from its `exports`.
 
 Add a `typecheck` script and run it in CI next to the build:
@@ -74,11 +74,11 @@ Event arrows are typed by element: in `on:input` on an `<input>`, `e.currentTarg
 
 ## idlip diagnostics
 
-The Vite plugin compiles each module when Vite loads it. Each diagnostic is printed as `<module id>:<line>:<column> <rule>: <message>`, such as `/src/todo.idlip.tsx:12:3 let-unassigned: ...`. A warning is logged and the build goes on. An error fails the load of the module, so `vite build` stops and `vite dev` reports it in the terminal.
+The Vite plugin compiles each module when Vite loads it. Each diagnostic is printed as `<module id>:<line>:<column> <rule>: <message>`, such as `/src/todo.tsx:12:3 let-unassigned: ...`. A warning is logged and the build goes on. An error fails the load of the module, so `vite build` stops and `vite dev` reports it in the terminal.
 
 To check every module without a build, call `compile` from `idlip/compiler` in a script and print its diagnostics. See [idlip/compiler](./reference/compiler.md#compile).
 
 ## VS Code
 
 - Open the project folder, so VS Code finds `tsconfig.json`.
-- `.idlip.tsx` files use the TypeScript React language mode, which is the default for `.tsx`. No file association is needed.
+- `.tsx` files use the TypeScript React language mode, which is the default for `.tsx`. No file association is needed.

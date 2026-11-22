@@ -134,7 +134,7 @@ export function compileProject(files: readonly ReplFile[]): Project {
           file,
           'error',
           'repl-file',
-          `The REPL runs *.idlip.tsx files and ${PROPS_FILE}. Rename ${file.name}.`,
+          `The REPL runs *.tsx files and ${PROPS_FILE}. Rename ${file.name}.`,
         ),
       );
     }
@@ -144,7 +144,7 @@ export function compileProject(files: readonly ReplFile[]): Project {
       file: files[0]?.name ?? '',
       severity: 'error',
       rule: 'repl-entry',
-      message: 'The first file is the page, so it must be a *.idlip.tsx file.',
+      message: 'The first file is the page, so it must be a *.tsx file.',
       start: 0,
       end: 0,
       line: 1,

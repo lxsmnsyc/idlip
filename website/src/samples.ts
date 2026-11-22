@@ -55,7 +55,7 @@ export function checkMarkdown(markdown: string, file: string): SampleProblem[] {
   const problems: SampleProblem[] = [];
   for (const sample of extractSamples(markdown)) {
     try {
-      const result = compile(sample.source, '/sample.idlip.tsx');
+      const result = compile(sample.source, '/sample.tsx');
       for (const diagnostic of result.diagnostics) {
         problems.push({
           file,

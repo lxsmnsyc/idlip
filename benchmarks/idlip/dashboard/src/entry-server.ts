@@ -1,5 +1,5 @@
 import { render as renderComponent, renderListener } from 'idlip/server';
-import Dashboard from './widgets/Dashboard.idlip.tsx';
+import Dashboard from './widgets/Dashboard.tsx';
 
 /**
  * Renders the dashboard page. `loader` is the URL of the built loader module.

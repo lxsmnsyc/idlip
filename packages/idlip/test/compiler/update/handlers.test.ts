@@ -8,12 +8,12 @@ import { compileHandlers } from '../../../src/compiler/update/index.ts';
 const FIXTURES = join(import.meta.dirname, '..', '..', 'fixtures');
 
 function readFixture(name: string): string {
-  return readFileSync(join(FIXTURES, name, `${name}.idlip.tsx`), 'utf8');
+  return readFileSync(join(FIXTURES, name, `${name}.tsx`), 'utf8');
 }
 
 /** Compiles a source and returns the code of each chunk by name. */
 function compile(source: string): { code: Record<string, string>; rules: string[] } {
-  const result = compileHandlers('/src/test.idlip.tsx', source);
+  const result = compileHandlers('/src/test.tsx', source);
   const code: Record<string, string> = {};
   for (const module of result.client) {
     code[module.chunk] = module.code;
@@ -28,7 +28,7 @@ function compile(source: string): { code: Record<string, string>; rules: string[
 describe('golden fixtures', () => {
   for (const name of ['counter', 'todo']) {
     it(`emits the expected handler chunks of ${name}`, () => {
-      const result = compileHandlers(`/src/${name}.idlip.tsx`, readFixture(name));
+      const result = compileHandlers(`/src/${name}.tsx`, readFixture(name));
       expect(result.diagnostics).toEqual([]);
       const dir = join(FIXTURES, name, 'expected', 'client');
       const expected: string[] = [];
@@ -276,11 +276,11 @@ export default function Finder(props: { list: string[] }): JSX.Element {
   });
 
   it('reports a props path the IR does not list instead of appending it', () => {
-    const ir = analyze('/src/test.idlip.tsx', source);
+    const ir = analyze('/src/test.tsx', source);
     for (const entry of ir.components[0].handlers[0].free) {
       entry.paths = [];
     }
-    const result = compileHandlers('/src/test.idlip.tsx', source, ir);
+    const result = compileHandlers('/src/test.tsx', source, ir);
     expect(result.client).toEqual([]);
     const rules: string[] = [];
     for (const diagnostic of result.diagnostics) {

@@ -49,10 +49,10 @@ export function readChunkUrls(file: string): ChunkUrls {
 
 /**
  * Stands in for `compile()` until `compile-integration` lands: returns the golden
- * fixture output for a module named after a fixture, such as `/src/todo.idlip.tsx`.
+ * fixture output for a module named after a fixture, such as `/src/todo.tsx`.
  */
 export function compileFixture(_source: string, id: string): CompileResult {
-  const name = path.basename(id, '.idlip.tsx');
+  const name = path.basename(id, '.tsx');
   const expected = path.join(FIXTURES, name, 'expected');
   const manifest = readJson(path.join(expected, 'manifest.json'));
   if (!isManifest(manifest) || manifest.module !== id) {
@@ -94,10 +94,7 @@ export function createApp(): string {
   mkdirSync(path.join(root, 'src'));
   const props: Record<string, unknown> = {};
   for (const name of ['counter', 'todo']) {
-    copyFileSync(
-      path.join(FIXTURES, name, `${name}.idlip.tsx`),
-      path.join(root, 'src', `${name}.idlip.tsx`),
-    );
+    copyFileSync(path.join(FIXTURES, name, `${name}.tsx`), path.join(root, 'src', `${name}.tsx`));
     props[name] = readField(readJson(path.join(FIXTURES, name, 'input.json')), 'props');
   }
   // A loader that imports nothing from `idlip/client`, which the plugin rejects.
@@ -106,8 +103,8 @@ export function createApp(): string {
   writeFileSync(
     path.join(root, 'src/entry-server.js'),
     `import { createContext } from ${JSON.stringify(REFERENCE)};
-import Counter from './counter.idlip.tsx';
-import TodoApp from './todo.idlip.tsx';
+import Counter from './counter.tsx';
+import TodoApp from './todo.tsx';
 
 const props = ${JSON.stringify(props)};
 

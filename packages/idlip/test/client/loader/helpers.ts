@@ -118,7 +118,7 @@ export function setup(fixture: string, options: Options = {}): Harness {
   const script = state
     .replace('</script>', '')
     .replaceAll(
-      /("[^"]*\.idlip\.tsx\?idlip-([^&"]+)&lang\.js"):"[^"]*"/g,
+      /("[^"]*\.tsx\?idlip-([^&"]+)&lang\.js"):"[^"]*"/g,
       (_all, key: string, chunk: string) => {
         writeChunk(chunk);
         return `${key}:${JSON.stringify(`/@fs${join(dir, `${getChunkFile(chunk)}.mjs`)}`)}`;

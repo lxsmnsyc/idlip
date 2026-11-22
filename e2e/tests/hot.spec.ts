@@ -3,7 +3,7 @@ import path from 'node:path';
 import { expect, test } from '@playwright/test';
 
 // `vite dev` of a copy of examples/todo (`fixture/hot-app.ts`), which the test edits.
-const file = path.resolve(import.meta.dirname, '../.hot/todo/src/todo.idlip.tsx');
+const file = path.resolve(import.meta.dirname, '../.hot/todo/src/todo.tsx');
 
 function edit(from: string, to: string): void {
   const source = readFileSync(file, 'utf8');

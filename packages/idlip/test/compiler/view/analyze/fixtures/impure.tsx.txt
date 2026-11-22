@@ -1,4 +1,4 @@
-// impure.idlip.tsx: impure globals in holes (view-ir v8).
+// impure.tsx: impure globals in holes (view-ir v8).
 function roll() {
   return Math.floor(Math.random() * 6) + 1;
 }

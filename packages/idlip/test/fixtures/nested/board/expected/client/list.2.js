@@ -1,5 +1,5 @@
 import { addChild } from 'idlip/client';
-import * as Counter from '/src/counter.idlip.tsx?idlip-view&lang.js';
+import * as Counter from '/src/counter.tsx?idlip-view&lang.js';
 
 function encode$(part) {
 	return encodeURIComponent(part).replaceAll("-", "%2D");
@@ -18,5 +18,5 @@ function slot$(path, site, ...keys) {
 export function render(scope) {
 const c = scope.rows[0].item;
 const path = scope.path ?? '';
-return addChild(slot$(path, 1, c.id), '/src/counter.idlip.tsx', Counter, { label: c.label, onRemove: ['remove', [c.id], '', path] });
+return addChild(slot$(path, 1, c.id), '/src/counter.tsx', Counter, { label: c.label, onRemove: ['remove', [c.id], '', path] });
 }

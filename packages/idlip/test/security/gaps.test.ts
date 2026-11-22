@@ -7,7 +7,7 @@ import { compile } from '../../src/compiler/index.ts';
 import { mount } from '../../src/testing/index.ts';
 import type { MountedPage } from '../../src/testing/index.ts';
 
-const SOURCE = readFileSync(join(import.meta.dirname, 'gaps.idlip.tsx'), 'utf8');
+const SOURCE = readFileSync(join(import.meta.dirname, 'gaps.tsx'), 'utf8');
 const EVIL = 'javascript:alert(1)';
 const HTML_DATA = 'data:text/html,<script>alert(1)</script>';
 const IMAGE_DATA = 'data:image/png;base64,AAAA';
@@ -41,7 +41,7 @@ function wrap(view: string): string {
 
 function getErrors(view: string): string[] {
   const rules: string[] = [];
-  for (const item of compile(wrap(view), '/src/app.idlip.tsx').diagnostics) {
+  for (const item of compile(wrap(view), '/src/app.tsx').diagnostics) {
     if (item.severity === 'error') {
       rules.push(item.rule);
     }

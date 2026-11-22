@@ -1,4 +1,4 @@
-// The functions that `effects.idlip.tsx` awaits. The fixture compiles and renders without them.
+// The functions that `effects.tsx` awaits. The fixture compiles and renders without them.
 
 export interface SavedTodo {
   id: string;

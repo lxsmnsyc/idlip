@@ -160,11 +160,11 @@ By default the page loads the document and the loader, and the first click waits
 
 ```ts
 import { renderListener, renderPreload } from 'idlip/server';
-import * as compiled from './todo.idlip.tsx';
+import * as compiled from './todo.tsx';
 
 type PreloadArgs = Parameters<typeof renderPreload>;
 
-// The server build of a *.idlip.tsx module exports `chunks` and `manifest`, but its type
+// The server build of a *.tsx module exports `chunks` and `manifest`, but its type
 // has only the default export.
 const chunks = Reflect.get(compiled, 'chunks') as PreloadArgs[0];
 const manifest = Reflect.get(compiled, 'manifest') as PreloadArgs[1];
@@ -186,7 +186,7 @@ See [idlip/server](./reference/server.md#renderpreload) for the options.
 
 ## The dev server
 
-`vite` with the plugin's `entry` option renders pages through the server entry. When you save a `*.idlip.tsx` file, the page updates and keeps its model:
+`vite` with the plugin's `entry` option renders pages through the server entry. When you save a `*.tsx` file, the page updates and keeps its model:
 
 - **A handler or binding edit swaps chunks.** The next time the loader needs a changed chunk, it imports the new one. The page and its model stay as they are.
 - **A markup edit remounts.** The loader waits for pending events and keeps the model of each component. It fetches the page again and patches it to the kept models. Child components keep their models, and their props come from the new render. Subscriptions start again.

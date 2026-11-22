@@ -5,7 +5,7 @@ section: Guide
 description: A module is a function component. let is state, const is derived, function declarations are handlers and return is the view.
 ---
 
-An idlip module is a `*.idlip.tsx` file whose default export is a function component. The compiler reads the body and never runs it. Each declaration form has one meaning:
+An idlip module is a `*.tsx` file whose default export is a function component. The compiler reads the body and never runs it. Each declaration form has one meaning:
 
 | Source             | Meaning                                                      |
 | ------------------ | ------------------------------------------------------------ |

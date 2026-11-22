@@ -19,7 +19,7 @@ function readManifest(): Manifest {
 }
 
 const manifest = readManifest();
-const base = '/src/todo.idlip.tsx?idlip-';
+const base = '/src/todo.tsx?idlip-';
 const chunks: ChunkUrls = Object.fromEntries([
   [`${base}handler=toggle&lang.js`, '/assets/toggle.a.js'],
   [`${base}handler=add&lang.js`, '/assets/add.b.js'],
@@ -74,7 +74,7 @@ describe('renderPreload', () => {
 
   it('reads the manifests of child modules and keeps the event order under the cap', () => {
     const child: Manifest = {
-      module: '/src/child.idlip.tsx',
+      module: '/src/child.tsx',
       events: ['input'],
       listens: { input: ['edit'] },
       handlers: { edit: { chunk: 'handler=edit' } },
@@ -83,7 +83,7 @@ describe('renderPreload', () => {
     };
     const all: ChunkUrls = {
       ...chunks,
-      '/src/child.idlip.tsx?idlip-handler=edit&lang.js': '/assets/edit.g.js',
+      '/src/child.tsx?idlip-handler=edit&lang.js': '/assets/edit.g.js',
     };
     expect(renderPreload(all, [manifest, child], { events: ['input', 'click'], max: 2 })).toBe(
       '<link rel="modulepreload" href="/assets/set-draft.c.js">' +

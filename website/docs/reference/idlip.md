@@ -5,7 +5,7 @@ section: Reference
 description: The block components, raw HTML, refs, impure values and the stock subscription sources that a component imports.
 ---
 
-`idlip` is what a `*.idlip.tsx` module imports. The block components exist only as types: the compiler replaces each use, so calling one throws. The other exports run in the browser or are copied into the chunks that use them.
+`idlip` is what a `*.tsx` module imports. The block components exist only as types: the compiler replaces each use, so calling one throws. The other exports run in the browser or are copied into the chunks that use them.
 
 ```tsx no-check
 import { For, Try, Head, Subscribe, trusted, Dom, Random, Time, until } from 'idlip';

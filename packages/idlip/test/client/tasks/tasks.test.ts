@@ -9,7 +9,7 @@ import { getChunkFile, getChunkId } from '../../../src/core/format.ts';
 import type { Boot, Patch } from '../../../src/core/format.ts';
 
 const CHUNKS = join(import.meta.dirname, '../../../node_modules/.idlip-loader-test');
-const MODULE = '/m.idlip.tsx';
+const MODULE = '/m.tsx';
 
 interface Globals {
   $idlip?: Boot;

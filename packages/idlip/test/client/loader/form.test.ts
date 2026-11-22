@@ -6,10 +6,7 @@ import { compile } from '../../../src/compiler/index.ts';
 import { mount } from '../../../src/testing/index.ts';
 import type { MountedPage } from '../../../src/testing/index.ts';
 
-const SOURCE = readFileSync(
-  join(import.meta.dirname, '../../fixtures/form/form.idlip.tsx'),
-  'utf8',
-);
+const SOURCE = readFileSync(join(import.meta.dirname, '../../fixtures/form/form.tsx'), 'utf8');
 
 let page: MountedPage | undefined;
 
@@ -20,7 +17,7 @@ afterEach(() => {
 
 describe('form fields in an event arrow', () => {
   it('writes the field paths into the message and the prevent modifier', () => {
-    const { server } = compile(SOURCE, '/src/app.idlip.tsx');
+    const { server } = compile(SOURCE, '/src/app.tsx');
     expect(server).toContain('["$event","currentTarget","elements","draft","value"]');
     expect(server).toContain('["$event","currentTarget","elements","amount","valueAsNumber"]');
     expect(server).toContain('"prevent"');
@@ -72,7 +69,7 @@ export default function Form(props: { onSend: () => void }): JSX.Element {
   return <form on:submit={props.onSend}><button>Go</button></form>;
 }
 `;
-    const { diagnostics } = compile(forwarded, '/src/app.idlip.tsx');
+    const { diagnostics } = compile(forwarded, '/src/app.tsx');
     expect(diagnostics.filter((item) => item.severity === 'error')).toEqual([]);
   });
 
@@ -81,7 +78,7 @@ export default function Form(props: { onSend: () => void }): JSX.Element {
       'let notes',
       "const name = 'draft';\n  let notes",
     );
-    const { diagnostics } = compile(bad, '/src/app.idlip.tsx');
+    const { diagnostics } = compile(bad, '/src/app.tsx');
     expect(diagnostics.map((item) => item.rule)).toContain('event-computed-key');
   });
 });

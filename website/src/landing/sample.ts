@@ -1,7 +1,7 @@
 // The code of the landing sample. It is the one place the source comes from, so a live editor can
 // take it over later. A test compiles it and checks it against the counter of the REPL.
 
-export const SAMPLE_FILE = 'counter.idlip.tsx';
+export const SAMPLE_FILE = 'counter.tsx';
 
 export const SAMPLE_SOURCE = `import type { JSX } from 'idlip/jsx-runtime';
 

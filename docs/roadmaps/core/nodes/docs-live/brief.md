@@ -59,7 +59,7 @@ Today a runnable docs sample shows an "Open in REPL" link (`website/src/markdown
 
 Read `/Users/alexis/Documents/GitHub/brumate/website/src/components/LiveSample.brm`, `src/live/run.ts` and the `brm live` handling in `plugins/markdown.ts`. Brumate's model:
 
-- A fence such as ```` ```brm live ```` (several adjacent `live` fences are the files of one sample) renders as a live sample instead of a static block.
+- A fence such as ` ```brm live ` (several adjacent `live` fences are the files of one sample) renders as a live sample instead of a static block.
 - An editor in place: a textarea over a highlighted backdrop, file tabs when there are several files.
 - It runs when it scrolls into view, and runs again 400 ms after typing stops. Only the latest run writes its result.
 - Result and Compiled tabs, a running state, an error panel and compiler warnings.

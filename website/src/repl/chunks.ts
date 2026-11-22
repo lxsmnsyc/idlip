@@ -13,7 +13,7 @@ export interface ServedChunk {
   code: string;
 }
 
-/** The file of a relative specifier, such as `./counter.idlip.tsx`, by name. */
+/** The file of a relative specifier, such as `./counter.tsx`, by name. */
 export function resolveName(specifier: string): string | undefined {
   return /^\.\/([^/]+)$/.exec(specifier)?.[1];
 }
@@ -22,9 +22,9 @@ function getChunkId(id: string, chunk: string): string {
   return `${id}?idlip-${chunk}&lang.js`;
 }
 
-/** The file name of a chunk: `counter.idlip.tsx` and `binding=items.*.id` give `counter.binding.items._.id.js`. */
+/** The file name of a chunk: `counter.tsx` and `binding=items.*.id` give `counter.binding.items._.id.js`. */
 function getChunkPath(file: string, chunk: string): string {
-  const stem = file.slice(0, -'.idlip.tsx'.length);
+  const stem = file.slice(0, -'.tsx'.length);
   const name = chunk.replace('=', '.').replaceAll(/[^\w.-]/g, '_');
   return `${stem}.${name}.js`;
 }

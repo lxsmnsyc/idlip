@@ -1,13 +1,13 @@
 import { attr, on, text } from 'idlip/server';
 
-export const manifest = { module: '/src/counter.idlip.tsx', events: ['click'], listens: {click: ['add', 'increment', 'reset']}, handlers: { increment: { chunk: 'handler=increment', writes: ['count'], bindings: ['count'] }, add: { chunk: 'handler=add', writes: ['count'], bindings: ['count'] }, reset: { chunk: 'handler=reset', writes: ['count'], bindings: ['count'] } }, groups: { count: { paths: ['count'], chunk: 'binding=count', bindings: ['a0', 't1', 'c2'], covers: [] } }, lists: {} };
+export const manifest = { module: '/src/counter.tsx', events: ['click'], listens: {click: ['add', 'increment', 'reset']}, handlers: { increment: { chunk: 'handler=increment', writes: ['count'], bindings: ['count'] }, add: { chunk: 'handler=add', writes: ['count'], bindings: ['count'] }, reset: { chunk: 'handler=reset', writes: ['count'], bindings: ['count'] } }, groups: { count: { paths: ['count'], chunk: 'binding=count', bindings: ['a0', 't1', 'c2'], covers: [] } }, lists: {} };
 
 // `vite-plugin` replaces the URLs in a build.
 export const chunks = {
-  '/src/counter.idlip.tsx?idlip-handler=increment&lang.js': '/src/counter.idlip.tsx?idlip-handler=increment&lang.js',
-  '/src/counter.idlip.tsx?idlip-handler=add&lang.js': '/src/counter.idlip.tsx?idlip-handler=add&lang.js',
-  '/src/counter.idlip.tsx?idlip-handler=reset&lang.js': '/src/counter.idlip.tsx?idlip-handler=reset&lang.js',
-  '/src/counter.idlip.tsx?idlip-binding=count&lang.js': '/src/counter.idlip.tsx?idlip-binding=count&lang.js',
+  '/src/counter.tsx?idlip-handler=increment&lang.js': '/src/counter.tsx?idlip-handler=increment&lang.js',
+  '/src/counter.tsx?idlip-handler=add&lang.js': '/src/counter.tsx?idlip-handler=add&lang.js',
+  '/src/counter.tsx?idlip-handler=reset&lang.js': '/src/counter.tsx?idlip-handler=reset&lang.js',
+  '/src/counter.tsx?idlip-binding=count&lang.js': '/src/counter.tsx?idlip-binding=count&lang.js',
 };
 
 export default function Counter(props, context, model) {

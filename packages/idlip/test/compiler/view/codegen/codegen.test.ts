@@ -150,8 +150,8 @@ function generateFixture(name: string): { result: GenerateResult; input: Input }
   return { result: generate(analyze(input.source, source), source, input.id), input };
 }
 
-function generateSource(source: string, id = '/src/test.idlip.tsx'): GenerateResult {
-  return generate(analyze('test.idlip.tsx', source), source, id);
+function generateSource(source: string, id = '/src/test.tsx'): GenerateResult {
+  return generate(analyze('test.tsx', source), source, id);
 }
 
 const NESTED = `
@@ -274,7 +274,7 @@ describe('events', () => {
         return <button on:click={bump}>{n}</button>;
       }
     `;
-    const ir = analyze('test.idlip.tsx', source);
+    const ir = analyze('test.tsx', source);
     const events: Event[] = [];
     collectEvents(ir.components[0].view, events);
     events[0].mode = 'latest';
@@ -285,7 +285,7 @@ describe('events', () => {
       { kind: 'capture' },
       { kind: 'key', filter: 'Ctrl+s' },
     ];
-    const result = generate(ir, source, '/src/test.idlip.tsx');
+    const result = generate(ir, source, '/src/test.tsx');
     expect(result.server).toContain(
       `on:click='["bump",[],"prevent stop once capture key:Ctrl+s latest"]'`,
     );
@@ -329,7 +329,7 @@ describe('events', () => {
     `;
     const result = generateSource(source);
     expect(result.diagnostics).toEqual([]);
-    const handlers = compileHandlers('test.idlip.tsx', source);
+    const handlers = compileHandlers('test.tsx', source);
     const chunk = handlers.client.find((module) => module.chunk === 'handler=top');
     const names = /\[([^\]]*)\]\) \{/.exec(chunk?.code ?? '')?.[1] ?? '';
     const params = names.split(', ');
@@ -796,9 +796,9 @@ describe('manifest', () => {
         return <button on:click={save}>{n}</button>;
       }
     `;
-    const ir: ModuleIR = analyze('test.idlip.tsx', source);
+    const ir: ModuleIR = analyze('test.tsx', source);
     const component: Component = ir.components[0];
-    const result = generate(ir, source, '/src/test.idlip.tsx');
+    const result = generate(ir, source, '/src/test.tsx');
     for (const segment of component.handlers[0].segments) {
       // A continuation lives in the chunk of its handler.
       expect(result.manifest.handlers[segment.tag]).toEqual({

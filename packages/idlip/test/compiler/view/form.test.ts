@@ -17,7 +17,7 @@ export default function Form(): JSX.Element {
   );
 }
 `;
-  const { server, diagnostics } = compile(source, '/src/app.idlip.tsx');
+  const { server, diagnostics } = compile(source, '/src/app.tsx');
   const failed = diagnostics.filter((item) => item.severity === 'error');
   return failed.length > 0 ? failed.map((item) => item.rule).join(',') : server;
 }

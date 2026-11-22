@@ -19,7 +19,7 @@ import {
 } from './app.ts';
 
 const FIXTURES = path.resolve(import.meta.dirname, '../fixtures');
-const MODULES = ['/src/counter.idlip.tsx', '/src/todo.idlip.tsx'];
+const MODULES = ['/src/counter.tsx', '/src/todo.tsx'];
 
 function listExports(code: string): string[] {
   const names: string[] = [];
@@ -43,20 +43,20 @@ function listImports(code: string): string[] {
 
 describe('chunk ids', () => {
   it('splits an id into the file and the chunk name', () => {
-    expect(parseChunkId('/a/src/todo.idlip.tsx?idlip-binding=todos.*.done&lang.js')).toEqual({
-      file: '/a/src/todo.idlip.tsx',
+    expect(parseChunkId('/a/src/todo.tsx?idlip-binding=todos.*.done&lang.js')).toEqual({
+      file: '/a/src/todo.tsx',
       chunk: 'binding=todos.*.done',
     });
-    expect(parseChunkId('/src/todo.idlip.tsx?idlip-binding=todos.%2A.done&lang.js')?.chunk).toBe(
+    expect(parseChunkId('/src/todo.tsx?idlip-binding=todos.%2A.done&lang.js')?.chunk).toBe(
       'binding=todos.*.done',
     );
-    expect(parseChunkId('/src/todo.idlip.tsx?idlip-list=3&lang.js')?.chunk).toBe('list=3');
-    expect(parseChunkId('/src/todo.idlip.tsx')).toBeUndefined();
-    expect(parseChunkId('/src/todo.idlip.tsx?idlip-handler=toggle&lang.tsx')).toBeUndefined();
+    expect(parseChunkId('/src/todo.tsx?idlip-list=3&lang.js')?.chunk).toBe('list=3');
+    expect(parseChunkId('/src/todo.tsx')).toBeUndefined();
+    expect(parseChunkId('/src/todo.tsx?idlip-handler=toggle&lang.tsx')).toBeUndefined();
   });
 
   it('lists every chunk of the todo manifest once', () => {
-    const { manifest } = compileFixture('', '/src/todo.idlip.tsx');
+    const { manifest } = compileFixture('', '/src/todo.tsx');
     expect(listChunks(manifest)).toEqual([
       'handler=setDraft',
       'handler=clear',
@@ -72,26 +72,24 @@ describe('chunk ids', () => {
   });
 
   it('names the view chunk of a child', () => {
-    const id = '/src/counter.idlip.tsx?idlip-view&lang.js';
-    expect(parseChunkId(id)).toEqual({ file: '/src/counter.idlip.tsx', chunk: 'view' });
-    const { manifest } = compileFixture('', '/src/counter.idlip.tsx');
+    const id = '/src/counter.tsx?idlip-view&lang.js';
+    expect(parseChunkId(id)).toEqual({ file: '/src/counter.tsx', chunk: 'view' });
+    const { manifest } = compileFixture('', '/src/counter.tsx');
     expect(listChunks({ ...manifest, view: { chunk: 'view' } })).toContain('view');
   });
 
   it('lists the children a module renders', () => {
-    const source = `import Counter from './counter.idlip.tsx';
+    const source = `import Counter from './counter.tsx';
 export default function Board() {
   return <main><Counter label="a" /></main>;
 }`;
-    expect(listChildren(source, '/src/board.idlip.tsx')).toEqual(['./counter.idlip.tsx']);
-    expect(
-      listChildren('export default function A() { return <p />; }', '/src/a.idlip.tsx'),
-    ).toEqual([]);
+    expect(listChildren(source, '/src/board.tsx')).toEqual(['./counter.tsx']);
+    expect(listChildren('export default function A() { return <p />; }', '/src/a.tsx')).toEqual([]);
   });
 
   it('replaces the chunk URLs of a server module', async () => {
-    const { server } = compileFixture('', '/src/counter.idlip.tsx');
-    const urls = { '/src/counter.idlip.tsx?idlip-handler=add&lang.js': '/assets/add.js' };
+    const { server } = compileFixture('', '/src/counter.tsx');
+    const urls = { '/src/counter.tsx?idlip-handler=add&lang.js': '/assets/add.js' };
     const code = replaceChunkUrls(server, urls);
     const url = `data:text/javascript,${encodeURIComponent(code.replace(/^import .*$/m, ''))}`;
     const module: unknown = await import(/* @vite-ignore */ url);
@@ -131,7 +129,7 @@ describe('vite build', () => {
     const expected: string[] = [];
     for (const module of MODULES) {
       const result = compileFixture('', module);
-      const name = path.basename(module, '.idlip.tsx');
+      const name = path.basename(module, '.tsx');
       for (const chunk of listChunks(result.manifest)) {
         const id = getChunkId(module, chunk);
         expected.push(id);
@@ -185,11 +183,11 @@ describe('vite build', () => {
       typeof render === 'function' ? Reflect.apply(render, undefined, ['/']) : '';
     expect(page).toBeTypeOf('string');
     for (const [id, url] of Object.entries(urls)) {
-      if (id.startsWith('/src/todo.idlip.tsx')) {
+      if (id.startsWith('/src/todo.tsx')) {
         expect(page).toContain(`${JSON.stringify(id)}:${JSON.stringify(url)}`);
       }
     }
-    expect(page).not.toContain('/src/counter.idlip.tsx');
+    expect(page).not.toContain('/src/counter.tsx');
   });
 });
 
@@ -213,9 +211,7 @@ describe('vite build errors', () => {
     }
     try {
       const builder = await createBuilder(createConfig(root, { compile: compileWithError }));
-      await expect(builder.buildApp()).rejects.toThrow(
-        /\.idlip\.tsx:1:1 html-nesting: bad nesting/,
-      );
+      await expect(builder.buildApp()).rejects.toThrow(/\.tsx:1:1 html-nesting: bad nesting/);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -311,7 +307,7 @@ describe('vite dev', () => {
     const expected = readFileSync(path.join(FIXTURES, 'todo/expected/page.html'), 'utf8').trim();
     expect(html).toContain(expected);
     // The checked compiler throws when it gets anything but the source on disk.
-    expect(calls).toContain('/src/todo.idlip.tsx');
+    expect(calls).toContain('/src/todo.tsx');
   });
 
   it('serves server-rendered HTML for the counter', async () => {
@@ -322,13 +318,13 @@ describe('vite dev', () => {
   });
 
   it('serves each chunk at its id', async () => {
-    const id = getChunkId('/src/todo.idlip.tsx', 'binding=todos.*.done');
+    const id = getChunkId('/src/todo.tsx', 'binding=todos.*.done');
     const response = await fetch(`${origin}${id}`);
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toContain('javascript');
     const code = await response.text();
     expect(code).toContain('export function a5');
-    const missing = await fetch(`${origin}/src/todo.idlip.tsx?idlip-handler=nope&lang.js`);
+    const missing = await fetch(`${origin}/src/todo.tsx?idlip-handler=nope&lang.js`);
     expect(missing.ok).toBe(false);
   });
 
@@ -337,9 +333,9 @@ describe('vite dev', () => {
       throw new Error('The dev server did not start');
     }
     const client = server.environments.client;
-    const id = getChunkId('/src/todo.idlip.tsx', 'handler=toggle');
+    const id = getChunkId('/src/todo.tsx', 'handler=toggle');
     await client.transformRequest(id);
-    const file = path.join(root, 'src/todo.idlip.tsx');
+    const file = path.join(root, 'src/todo.tsx');
     const modules = [...(client.moduleGraph.getModulesByFile(file) ?? [])];
     expect(modules.length).toBeGreaterThan(0);
     const send = vi.spyOn(client.hot, 'send').mockImplementation(() => {});

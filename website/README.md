@@ -28,7 +28,7 @@ description: Optional. The first paragraph is used without it.
 
 ## Code blocks
 
-- `tsx`: compiled by `check:samples` with `compile()` from `idlip/compiler` as `sample.idlip.tsx`.
+- `tsx`: compiled by `check:samples` with `compile()` from `idlip/compiler` as `sample.tsx`.
 - `tsx fragment`: only the view, wrapped in `export default function Sample() { return (...) }` with `For`, `Try`, `Head` and `Subscribe` imported.
 - `tsx no-check`: highlighted, not compiled. Use it for partial code, config and code that is not a module.
 - `ts`, `css`, `bash`, `json`: highlighted only.

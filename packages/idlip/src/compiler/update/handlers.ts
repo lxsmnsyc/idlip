@@ -986,7 +986,7 @@ function emitImports(scope: Scope, used: ReadonlySet<string>): string[] {
 }
 
 /**
- * Compiles the handlers of a `*.idlip.tsx` file into client modules, one per handler.
+ * Compiles the handlers of a `*.tsx` file into client modules, one per handler.
  * `ir` is the analysis of the same source. Without it the source is analyzed here.
  */
 export function compileHandlers(

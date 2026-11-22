@@ -36,7 +36,7 @@ function find(name: string, chunks: readonly { chunk: string; code: string }[]):
 }
 
 it('emits a marker block, a source chunk per source and a restart binding', () => {
-  const result = compile(SOURCE, '/src/clock.idlip.tsx');
+  const result = compile(SOURCE, '/src/clock.tsx');
   expect(result.diagnostics.filter((item) => item.severity === 'error')).toEqual([]);
   expect(result.manifest.sources).toEqual(['every', 'timer']);
   expect(listChunks(result.manifest)).toContain('source=every');
@@ -64,10 +64,10 @@ it('emits a marker block, a source chunk per source and a restart binding', () =
 });
 
 it('turns the loader flag on only for a view with a source', () => {
-  const withSource = compile(SOURCE, '/src/clock.idlip.tsx');
+  const withSource = compile(SOURCE, '/src/clock.tsx');
   const without = compile(
     'export default function App() { let n = 0; function inc() { n = n + 1; } return <button on:click={inc}>{n}</button>; }',
-    '/src/app.idlip.tsx',
+    '/src/app.tsx',
   );
   expect(getDefines(getFeatures([withSource])).get('__IDLIP_HAS_SUBS__')).toBe('true');
   expect(getDefines(getFeatures([without])).get('__IDLIP_HAS_SUBS__')).toBe('false');

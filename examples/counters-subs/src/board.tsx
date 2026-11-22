@@ -2,7 +2,7 @@
 // oxlint-disable typescript/no-confusing-void-expression, typescript/explicit-function-return-type
 import { For } from 'idlip';
 import type { JSX } from 'idlip/jsx-runtime';
-import Counter from './counter.idlip.tsx';
+import Counter from './counter.tsx';
 
 interface Item {
   id: string;

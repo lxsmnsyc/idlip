@@ -85,7 +85,7 @@ ${header}
       <div class="repl-file-tabs" role="tablist" aria-label="Files" data-repl-files></div>
       <button class="repl-undo" type="button" data-repl-undo hidden></button>
       <form class="repl-add" data-repl-add>
-        <input name="name" aria-label="New file name" placeholder="name.idlip.tsx" pattern="[\\w.\\-]+" required>
+        <input name="name" aria-label="New file name" placeholder="name.tsx" pattern="[\\w.\\-]+" required>
         <button class="icon-button" type="submit" aria-label="Add the file" title="Add the file">${REPL_ICON.plus}</button>
       </form>
     </div>

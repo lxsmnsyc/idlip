@@ -94,7 +94,7 @@ Page order is the order in which the server renders the blocks. A `<Head>` in a 
 
 ```ts
 import { renderListener, renderPage } from 'idlip/server';
-import Inbox from './inbox.idlip.tsx';
+import Inbox from './inbox.tsx';
 
 export async function render(loader: string): Promise<string> {
   const page = await renderPage(Inbox, {});

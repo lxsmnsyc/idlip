@@ -4,7 +4,7 @@ import { failRegion } from '../../../src/client/errors.ts';
 import type { Manifest, Page, Scope } from '../../../src/core/format.ts';
 
 const manifest: Manifest = {
-  module: '/src/child.idlip.tsx',
+  module: '/src/child.tsx',
   events: [],
   handlers: {},
   groups: {},

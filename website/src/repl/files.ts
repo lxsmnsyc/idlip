@@ -4,7 +4,7 @@
 // the link. The site build writes the sample links, so this file runs in Node and in the browser.
 
 export interface ReplFile {
-  /** A file name with no folder, such as `counter.idlip.tsx` or `props.json`. */
+  /** A file name with no folder, such as `counter.tsx` or `props.json`. */
   name: string;
   source: string;
 }
@@ -24,9 +24,9 @@ export type ReplHash =
   | { kind: 'sample'; id: string }
   | { kind: 'files'; files: ReplFile[] };
 
-/** A file name the REPL takes: letters, digits, `.`, `-` and `_`, ending in `.idlip.tsx`. */
+/** A file name the REPL takes: letters, digits, `.`, `-` and `_`, ending in `.tsx`. */
 export function isModuleName(name: string): boolean {
-  return /^[\w-]+(?:\.[\w-]+)*\.idlip\.tsx$/.test(name);
+  return /^[\w-]+(?:\.[\w-]+)*\.tsx$/.test(name);
 }
 
 function encodeBase64Url(text: string): string {
@@ -122,7 +122,7 @@ export function getSampleLink(base: string, id: string): string {
 /** The files of a docs sample: the sample as the page, and empty props. */
 export function getSampleFiles(source: string): ReplFile[] {
   return [
-    { name: 'app.idlip.tsx', source },
+    { name: 'app.tsx', source },
     { name: PROPS_FILE, source: '{}\n' },
   ];
 }

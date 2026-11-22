@@ -54,7 +54,7 @@ export default function Rows(props: { rows: Row[] }): JSX.Element {
 }
 ```
 
-The test `packages/idlip/test/client/dom/dom.test.ts` runs these calls on `packages/idlip/test/fixtures/refs/refs.idlip.tsx`.
+The test `packages/idlip/test/client/dom/dom.test.ts` runs these calls on `packages/idlip/test/fixtures/refs/refs.tsx`.
 
 ## Ref names
 

@@ -1,5 +1,5 @@
 {
-  "module": "/src/todo.idlip.tsx",
+  "module": "/src/todo.tsx",
   "events": [
     "click",
     "input",

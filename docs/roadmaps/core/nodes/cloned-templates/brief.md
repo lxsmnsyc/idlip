@@ -50,6 +50,7 @@ depends_on:
 A branch that appears after a click (`{open && <section>...}`) and a new `<For>` row are rendered in the browser from an HTML string: the binding or list chunk builds the string with the model values, and the client parses it (`parseHtml` in `src/client/patch/dom.ts`, one `<template>` + `innerHTML` per row), then walks the result for markers (`findInnerBlocks`, `collectBlocks`). Profiles from `bench-rows` and `perf-list-create`: `parseHtml` is 6.3 to 8.1 ms of 12.9 to 16.5 ms script when creating 1,000 rows. Rows benchmark: create 1,000 rows 35.4 ms vs brumate 0.8.1 22.1 and Marko 6 21.0; append 2.0x and 2.2x behind. `perf-list-create` tried one parse for all rows and found the gain within noise (the native parser dominates).
 
 Brumate had the same design and moved away from it. Read first:
+
 - brumate commit `4b5e93a3` ("the browser clones a template for the body of an #if or a #for") in `/Users/alexis/Documents/GitHub/brumate`: `git show 4b5e93a3`, especially `packages/brumate/src/codegen/template.ts` and the `runtime/client.ts` changes. Its result: create 1,000 rows 8.0 to 5.3 ms of script, replace 15.1 to 11.4 ms.
 - `/Users/alexis/Documents/GitHub/brumate/docs/performance.md`, "Client updates" and "Templates".
 

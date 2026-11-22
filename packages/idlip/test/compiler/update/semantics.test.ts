@@ -5,7 +5,7 @@ const HEAD = `import type { JSX } from 'idlip/jsx-runtime';\n`;
 
 /** Compiles a source and returns the code of each chunk by name. */
 function compile(source: string): { code: Record<string, string>; rules: string[] } {
-  const result = compileHandlers('/src/test.idlip.tsx', source);
+  const result = compileHandlers('/src/test.tsx', source);
   const code: Record<string, string> = {};
   for (const module of result.client) {
     code[module.chunk] = module.code;

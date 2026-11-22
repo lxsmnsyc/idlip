@@ -29,7 +29,7 @@ function call(exports: Exports, name: string, ...args: unknown[]): unknown {
 
 /** Compiles a source and returns the code of each chunk by name, and the rules reported. */
 function build(source: string): { code: Record<string, string>; rules: string[] } {
-  const result = compileHandlers('/src/test.idlip.tsx', source);
+  const result = compileHandlers('/src/test.tsx', source);
   const code: Record<string, string> = {};
   for (const module of result.client) {
     code[module.chunk] = module.code;
@@ -45,8 +45,8 @@ const ok = (value: unknown): unknown => ({ ok: true, value });
 const fail = (error: unknown): unknown => ({ ok: false, error });
 
 describe('effects fixture', () => {
-  const source = readFileSync(join(FIXTURE, 'effects.idlip.tsx'), 'utf8');
-  const result = compile(source, '/src/effects.idlip.tsx');
+  const source = readFileSync(join(FIXTURE, 'effects.tsx'), 'utf8');
+  const result = compile(source, '/src/effects.tsx');
 
   it('reports no diagnostics', () => {
     expect(result.diagnostics).toEqual([]);

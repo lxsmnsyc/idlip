@@ -32,7 +32,7 @@ describe('counter', () => {
     const [page, prev, next] = harness.patch.mock.calls[0];
     expect(prev).toEqual({ count: 4 });
     expect(next).toEqual({ count: 5 });
-    expect(page.manifest.module).toBe('/src/counter.idlip.tsx');
+    expect(page.manifest.module).toBe('/src/counter.tsx');
     expect(page.root).toBe(document.body);
   });
 

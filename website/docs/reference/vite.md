@@ -2,10 +2,10 @@
 title: idlip/vite
 order: 104
 section: Reference
-description: The Vite plugin that compiles *.idlip.tsx modules, emits their chunks and serves pages in vite dev.
+description: The Vite plugin that compiles *.tsx modules, emits their chunks and serves pages in vite dev.
 ---
 
-`idlip/vite` is the build integration. It compiles `*.idlip.tsx` modules, emits one client chunk per handler, binding group and list, gives the server module the chunk URLs, and serves server-rendered pages in `vite dev`.
+`idlip/vite` is the build integration. It compiles `*.tsx` modules, emits one client chunk per handler, binding group and list, gives the server module the chunk URLs, and serves server-rendered pages in `vite dev`.
 
 ```ts
 import { idlip } from 'idlip/vite';
@@ -42,7 +42,7 @@ interface IdlipOptions {
 
 | Option    | Default                       | Meaning                                                                                                                                                                                                      |
 | --------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `modules` | `src/**/*.idlip.tsx`          | Globs of the idlip modules, relative to the root.                                                                                                                                                            |
+| `modules` | `src/**/*.tsx`                | Globs of the idlip modules, relative to the root. A `.tsx` file that no glob matches is left to Vite as plain TSX. Rendering a component from such a file is a build error that names this option.           |
 | `entry`   | none                          | The server entry that `vite dev` renders pages with, such as `/src/entry-server.ts`. It exports `render(url)`, which returns the page HTML. It is also the input of the ssr build when the config sets none. |
 | `client`  | `idlip/client`                | The input of the client build: the loader. Every module an idlip chunk imports must be in its static graph.                                                                                                  |
 | `compile` | `compile` of `idlip/compiler` | The compiler to run.                                                                                                                                                                                         |

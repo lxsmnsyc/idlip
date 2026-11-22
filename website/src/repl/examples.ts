@@ -1,8 +1,8 @@
 // The examples of the REPL. The todo and the nesting examples are the apps in `examples/`, so
 // they stay the code the e2e tests run.
-import board from '../../../examples/counters/src/board.idlip.tsx?raw';
-import counter from '../../../examples/counters/src/counter.idlip.tsx?raw';
-import todo from '../../../examples/todo/src/todo.idlip.tsx?raw';
+import board from '../../../examples/counters/src/board.tsx?raw';
+import counter from '../../../examples/counters/src/counter.tsx?raw';
+import todo from '../../../examples/todo/src/todo.tsx?raw';
 import { PROPS_FILE } from './files.ts';
 import type { ReplFile } from './files.ts';
 
@@ -165,13 +165,13 @@ export const EXAMPLES: readonly Example[] = [
   {
     id: 'counter',
     label: 'Counter',
-    files: [{ name: 'counter.idlip.tsx', source: COUNTER }, writeProps({ start: 0 })],
+    files: [{ name: 'counter.tsx', source: COUNTER }, writeProps({ start: 0 })],
   },
   {
     id: 'todo',
     label: 'Todo',
     files: [
-      { name: 'todo.idlip.tsx', source: dropLeadingComments(todo) },
+      { name: 'todo.tsx', source: dropLeadingComments(todo) },
       writeProps({
         initial: [
           { id: 't1', text: 'Write the view', done: true },
@@ -183,24 +183,24 @@ export const EXAMPLES: readonly Example[] = [
   {
     id: 'form',
     label: 'Form',
-    files: [{ name: 'guests.idlip.tsx', source: FORM }, writeProps({})],
+    files: [{ name: 'guests.tsx', source: FORM }, writeProps({})],
   },
   {
     id: 'subscription',
     label: 'Subscription',
-    files: [{ name: 'ticker.idlip.tsx', source: SUBSCRIPTION }, writeProps({})],
+    files: [{ name: 'ticker.tsx', source: SUBSCRIPTION }, writeProps({})],
   },
   {
     id: 'effect',
     label: 'Effect',
-    files: [{ name: 'notes.idlip.tsx', source: EFFECT }, writeProps({})],
+    files: [{ name: 'notes.tsx', source: EFFECT }, writeProps({})],
   },
   {
     id: 'nesting',
     label: 'Nesting',
     files: [
-      { name: 'board.idlip.tsx', source: dropLeadingComments(board) },
-      { name: 'counter.idlip.tsx', source: dropLeadingComments(counter) },
+      { name: 'board.tsx', source: dropLeadingComments(board) },
+      { name: 'counter.tsx', source: dropLeadingComments(counter) },
       writeProps({
         items: [
           { id: 'a1', label: 'Apples', start: 0 },

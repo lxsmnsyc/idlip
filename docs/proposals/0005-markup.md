@@ -16,7 +16,7 @@ This proposal defines the `.idlip` file: a plain TypeScript module whose compone
 - **`#for` needs `by`.** Keys are fields of the item, as in `<For key="id">`. There is no index key and no `#else` on `#for` in this version.
 - **`#switch` takes no discriminant.** Each `#case` holds a condition and the first true one renders, as in brumate. The lowering is a chain of conditions, so TypeScript narrows in each case.
 - **The compiler lowers to TSX and runs `analyze()` unchanged.** Errors from the analyzer map back to `.idlip` positions with a segment table.
-- **File suffix `.idlip`.** Files named `*.idlip.tsx` keep working: they are TSX with no markup grammar. A module imports another by `./chart.idlip`.
+- **File suffix `.idlip`.** Files named `*.tsx` keep working: they are TSX with no markup grammar. A module imports another by `./chart.idlip`.
 
 ## Example
 

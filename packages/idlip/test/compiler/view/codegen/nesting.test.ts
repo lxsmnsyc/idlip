@@ -15,7 +15,7 @@ const NESTED = join(import.meta.dirname, '..', '..', '..', 'fixtures', 'nested')
 
 /** The fixture sources import the child as a sibling, and the ids say it is in `/src`. */
 const RESOLVED: Record<string, string> = {
-  '../counter/counter.idlip.tsx': '/src/counter.idlip.tsx',
+  '../counter/counter.tsx': '/src/counter.tsx',
 };
 
 function readFixture(name: string, ...parts: string[]): string {
@@ -51,7 +51,7 @@ interface Compiled extends GenerateResult {
 /** Compiles as `compile()` does, with the options that `vite-plugin` passes for a child. */
 function compileFixture(name: string, child: boolean): Compiled {
   const id = readId(name);
-  const source = readFixture(name, `${name}.idlip.tsx`);
+  const source = readFixture(name, `${name}.tsx`);
   const ir = analyze(id, source);
   const handlers = compileHandlers(id, source, ir);
   const view = generate(ir, source, id, {
@@ -255,7 +255,7 @@ describe('nested behavior', () => {
       results.push(calls.map((args) => [...args]));
     }
     expect(results[0]).toEqual(results[1]);
-    expect(results[0][0].slice(0, 2)).toEqual(['1:a%2F1', '/src/counter.idlip.tsx']);
+    expect(results[0][0].slice(0, 2)).toEqual(['1:a%2F1', '/src/counter.tsx']);
     expect(results[0][1][0]).toBe('3/1:a%2F1');
     expect(results[0][1][3]).toEqual({ label: 'One', onRemove: ['remove', ['a/1'], '', '3'] });
   });

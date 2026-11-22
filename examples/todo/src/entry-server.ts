@@ -1,5 +1,5 @@
 import { render as renderComponent, renderListener } from 'idlip/server';
-import TodoApp from './todo.idlip.tsx';
+import TodoApp from './todo.tsx';
 
 interface Todo {
   id: string;

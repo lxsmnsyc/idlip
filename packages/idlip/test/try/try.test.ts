@@ -9,9 +9,9 @@ import { mount } from '../../src/testing/index.ts';
 import type { MountedPage } from '../../src/testing/index.ts';
 
 const FIXTURES = join(import.meta.dirname, '../fixtures');
-const BOARD = readFileSync(join(FIXTURES, 'try/board.idlip.tsx'), 'utf8');
+const BOARD = readFileSync(join(FIXTURES, 'try/board.tsx'), 'utf8');
 const EXPECTED = join(FIXTURES, 'try/expected');
-const ID = '/src/board.idlip.tsx';
+const ID = '/src/board.tsx';
 
 let page: MountedPage | undefined;
 
@@ -123,7 +123,7 @@ describe('compile', () => {
   it('writes no fallback and no region marker for a module without <Try>', () => {
     const result = compile(
       'export default function App() { let n = 0; function inc() { n = n + 1; } return <button on:click={inc}>{n}</button>; }',
-      '/src/app.idlip.tsx',
+      '/src/app.tsx',
     );
     expect(result.manifest.fallback).toBeUndefined();
     expect(result.server).not.toContain('<!--e');

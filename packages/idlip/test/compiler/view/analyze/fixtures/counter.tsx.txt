@@ -1,4 +1,4 @@
-// counter.idlip.tsx
+// counter.tsx
 export default function Counter(props: { start: number }) {
   let count = props.start;
 

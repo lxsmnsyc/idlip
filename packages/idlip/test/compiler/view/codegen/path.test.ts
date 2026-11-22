@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { resolveSpecifier } from '../../../../src/compiler/view/codegen/path.ts';
 
 // Paths built from the segments that change the result: empty, `.`, `..`, dot names and names.
-const segment = fc.constantFrom('', '.', '..', '.h', 'src', 'a.idlip.tsx', 'b');
+const segment = fc.constantFrom('', '.', '..', '.h', 'src', 'a.tsx', 'b');
 const path = fc
   .tuple(fc.boolean(), fc.array(segment, { maxLength: 6 }), fc.boolean())
   .map(([rooted, parts, trailing]) => {
@@ -29,13 +29,11 @@ describe('resolveSpecifier', () => {
   });
 
   it('resolves a sibling and a parent file', () => {
-    expect(resolveSpecifier('./counter.idlip.tsx', '/src/board.idlip.tsx')).toBe(
-      '/src/counter.idlip.tsx',
-    );
-    expect(resolveSpecifier('../a.idlip.tsx', '/src/b/c.idlip.tsx')).toBe('/src/a.idlip.tsx');
+    expect(resolveSpecifier('./counter.tsx', '/src/board.tsx')).toBe('/src/counter.tsx');
+    expect(resolveSpecifier('../a.tsx', '/src/b/c.tsx')).toBe('/src/a.tsx');
   });
 
   it('keeps a bare specifier', () => {
-    expect(resolveSpecifier('idlip', '/src/a.idlip.tsx')).toBe('idlip');
+    expect(resolveSpecifier('idlip', '/src/a.tsx')).toBe('idlip');
   });
 });

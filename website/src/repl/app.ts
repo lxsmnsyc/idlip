@@ -678,7 +678,7 @@ export function startRepl(root: HTMLElement, watch: typeof watchFrame): void {
     const name = addInput.value.trim();
     let problem = '';
     if (!isModuleName(name) && name !== PROPS_FILE) {
-      problem = `Name it like part.idlip.tsx, or ${PROPS_FILE}`;
+      problem = `Name it like part.tsx, or ${PROPS_FILE}`;
     } else if (findFile(files, name) !== undefined) {
       problem = `${name} is a file already`;
     }

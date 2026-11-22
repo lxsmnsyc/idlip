@@ -5,7 +5,7 @@ section: Reference
 description: Mount a component in a test, click and type as a user does, and wait until chunks and patches settle.
 ---
 
-`idlip/testing` runs a component the way a page does, in the DOM of a test. `mount` compiles a `*.idlip.tsx` source, renders it on the server, resumes it in the document and serves its chunks from memory. Use it with the `happy-dom` environment of Vitest, or any global `document`.
+`idlip/testing` runs a component the way a page does, in the DOM of a test. `mount` compiles a `*.tsx` source, renders it on the server, resumes it in the document and serves its chunks from memory. Use it with the `happy-dom` environment of Vitest, or any global `document`.
 
 ```ts
 // @vitest-environment happy-dom
@@ -14,8 +14,8 @@ import { join } from 'node:path';
 import { mount } from 'idlip/testing';
 import { expect, it } from 'vitest';
 
-// counter.idlip.tsx: `let count = 0`, `increment()` adds one, the button shows `count`.
-const source = readFileSync(join(import.meta.dirname, 'counter.idlip.tsx'), 'utf8');
+// counter.tsx: `let count = 0`, `increment()` adds one, the button shows `count`.
+const source = readFileSync(join(import.meta.dirname, 'counter.tsx'), 'utf8');
 
 it('counts clicks', async () => {
   const page = await mount(source, {});
@@ -54,12 +54,12 @@ interface MountOptions {
 }
 ```
 
-| Option         | Default              | Meaning                                                                                                                                                                                               |
-| -------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `check`        | `true`               | After each settled step, renders the view on the server from the new model and fails when the patched DOM differs. A mismatch is a stale binding, for example from a helper with a hidden dependency. |
-| `id`           | `/src/app.idlip.tsx` | The Vite id of the module, which names its chunks.                                                                                                                                                    |
-| `nonce`        | none                 | Written on the state script.                                                                                                                                                                          |
-| `expectCaught` | `false`              | Lets a `<Try>` catch errors. By default `settled` rethrows an error that a region caught, so a test does not pass over a swapped region by mistake. Set it in a test that expects the catch view.     |
+| Option         | Default        | Meaning                                                                                                                                                                                               |
+| -------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `check`        | `true`         | After each settled step, renders the view on the server from the new model and fails when the patched DOM differs. A mismatch is a stale binding, for example from a helper with a hidden dependency. |
+| `id`           | `/src/app.tsx` | The Vite id of the module, which names its chunks.                                                                                                                                                    |
+| `nonce`        | none           | Written on the state script.                                                                                                                                                                          |
+| `expectCaught` | `false`        | Lets a `<Try>` catch errors. By default `settled` rethrows an error that a region caught, so a test does not pass over a swapped region by mistake. Set it in a test that expects the catch view.     |
 
 ### `MountedPage`
 

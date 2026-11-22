@@ -59,20 +59,6 @@ export function getDefines(on: ReadonlySet<string>, skew = true): Map<string, st
   return defines;
 }
 
-/** Returns the flags a module needs that the defines turn off. */
-export function findDroppedFeatures(
-  result: CompileResult,
-  defines: ReadonlyMap<string, string>,
-): string[] {
-  const dropped: string[] = [];
-  for (const name of getFeatures([result])) {
-    if (defines.get(`__IDLIP_HAS_${name}__`) === 'false') {
-      dropped.push(`HAS_${name}`);
-    }
-  }
-  return dropped;
-}
-
 /** Replaces the feature globals in a module, or returns undefined when it names none. */
 export function replaceFeatures(
   code: string,

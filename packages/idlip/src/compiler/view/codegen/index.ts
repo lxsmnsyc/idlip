@@ -183,7 +183,7 @@ function getListPath(info: ListInfo, child: boolean): string | undefined {
   return undefined;
 }
 
-/** Generates the server module, the client chunks and the manifest of one `*.idlip.tsx` file. */
+/** Generates the server module, the client chunks and the manifest of one `*.tsx` file. */
 export function generate(
   ir: ModuleIR,
   source: string,

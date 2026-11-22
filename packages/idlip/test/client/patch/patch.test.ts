@@ -14,7 +14,7 @@ import manifestJson from '../../fixtures/todo/expected/manifest.json' with { typ
 vi.mock('idlip/client', async () => import('../../../src/client/patch/dom.ts'));
 
 const FIXTURE = join(import.meta.dirname, '../../fixtures/todo/expected');
-const MODULE = '/src/todo.idlip.tsx';
+const MODULE = '/src/todo.tsx';
 
 const todos = [
   { id: 'a1', text: 'Write the format', done: true },

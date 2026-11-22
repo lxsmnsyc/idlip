@@ -38,7 +38,7 @@ export type Props = Readonly<Record<string, unknown>>;
 
 /** What the compiler knows about one module, and what the page carries for it. */
 export interface Manifest {
-  /** The root-relative Vite id given to `compile`, such as `/src/todo.idlip.tsx`. */
+  /** The root-relative Vite id given to `compile`, such as `/src/todo.tsx`. */
   readonly module: string;
   /** Event types the view listens to, sorted. */
   readonly events: readonly string[];
@@ -379,7 +379,7 @@ export function getChunkFile(chunk: string): string {
 }
 
 /**
- * Returns the Vite module id of a chunk: `/src/todo.idlip.tsx?idlip-handler=toggle&lang.js`.
+ * Returns the Vite module id of a chunk: `/src/todo.tsx?idlip-handler=toggle&lang.js`.
  */
 export function getChunkId(module: string, chunk: string): string {
   return `${module}?idlip-${chunk}&lang.js`;

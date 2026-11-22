@@ -101,7 +101,7 @@ function readId(name: string): string {
 }
 
 describe.each(['counter', 'todo'])('compile() on the %s fixture', (name) => {
-  const source = readFixture(name, `${name}.idlip.tsx`);
+  const source = readFixture(name, `${name}.tsx`);
   const result = compile(source, readId(name));
 
   it('reports no diagnostics', () => {
@@ -141,13 +141,13 @@ describe.each(['counter', 'todo'])('compile() on the %s fixture', (name) => {
 
 describe('compile() behavior', () => {
   it.each(['counter', 'todo'])('renders the %s fixture page', (name) => {
-    const result = compile(readFixture(name, `${name}.idlip.tsx`), readId(name));
+    const result = compile(readFixture(name, `${name}.tsx`), readId(name));
     const page = readFixture(name, 'expected', 'page.html');
     expect(runServer(result.server, readProps(name))).toBe(page.trimEnd());
   });
 
   it('renders the same todo rows as the fixture list chunk', () => {
-    const result = compile(readFixture('todo', 'todo.idlip.tsx'), readId('todo'));
+    const result = compile(readFixture('todo', 'todo.tsx'), readId('todo'));
     const chunk = result.client.find((module) => module.chunk === 'list=3');
     const actual = loadRender(chunk?.code ?? '', { attr$: attr, on$: on, text$: text });
     const expected = loadRender(readFixture('todo', 'expected', 'client', 'list.3.js'), {
@@ -169,7 +169,7 @@ describe('compile() behavior', () => {
 describe('compile() diagnostics', () => {
   it('returns no output and a positioned error', () => {
     const source = 'export default function A(props) {\n  return <div {...props} />;\n}\n';
-    const result = compile(source, '/src/a.idlip.tsx');
+    const result = compile(source, '/src/a.tsx');
     const errors = result.diagnostics.filter((item) => item.severity === 'error');
     expect(errors.length).toBeGreaterThan(0);
     expect(result.server).toBe('');

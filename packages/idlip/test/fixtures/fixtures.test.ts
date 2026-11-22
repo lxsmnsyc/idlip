@@ -28,14 +28,14 @@ vi.mock('idlip/client', async () => {
 // A parent imports its child's server module by the source's specifier. The compiler's output
 // resolves it to the child's server module, which here is the expected file. The parent's
 // template chunk imports the child's view chunk by id.
-vi.mock('./nested/counter/counter.idlip.tsx', async () => {
+vi.mock('./nested/counter/counter.tsx', async () => {
   const server = await vi.importActual<Record<string, unknown>>(
     './nested/counter/expected/server.js',
   );
   // A module with no children has no `uses` export, and a mock throws on a missing export.
   return { uses: [], ...server };
 });
-vi.mock('/src/counter.idlip.tsx?idlip-view&lang.js', async () =>
+vi.mock('/src/counter.tsx?idlip-view&lang.js', async () =>
   vi.importActual<Record<string, unknown>>('./nested/counter/expected/client/view.js'),
 );
 
@@ -514,7 +514,7 @@ describe('nested components', () => {
     expect(Object.keys(slots).toSorted()).toEqual(opened.toSorted());
     expect(opened).toEqual(['0', '1:a1', '1:a2']);
     for (const entry of Object.values(slots)) {
-      expect(entry).toMatchObject({ module: '/src/counter.idlip.tsx' });
+      expect(entry).toMatchObject({ module: '/src/counter.tsx' });
     }
     await window.happyDOM.close();
   });
@@ -524,7 +524,7 @@ describe('nested components', () => {
     expect(events).toBe('click');
     expect(boardManifest.events).toEqual([]);
     expect(state.modules).toEqual({
-      '/src/counter.idlip.tsx': toClientManifest(readManifest('nested/counter')),
+      '/src/counter.tsx': toClientManifest(readManifest('nested/counter')),
     });
   });
 

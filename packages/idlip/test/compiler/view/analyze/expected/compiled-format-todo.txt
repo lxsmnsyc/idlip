@@ -1,4 +1,4 @@
-file todo.idlip.tsx
+file todo.tsx
 
 component TodoApp (stateful, exported)
   props: props

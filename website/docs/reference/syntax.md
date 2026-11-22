@@ -2,10 +2,10 @@
 title: Component syntax
 order: 107
 section: Reference
-description: What a *.idlip.tsx module may hold, the closed hole grammar, event props, block components and every diagnostic rule id.
+description: What a *.tsx module may hold, the closed hole grammar, event props, block components and every diagnostic rule id.
 ---
 
-An idlip component is a TSX function in a `*.idlip.tsx` file. The source is plain TypeScript, so `tsc` checks it with the types of `idlip/jsx-runtime`. The compiler accepts a closed subset of it and reports anything else as a diagnostic with a rule id, listed [at the end of this page](#diagnostics).
+An idlip component is a TSX function in a `*.tsx` file. The source is plain TypeScript, so `tsc` checks it with the types of `idlip/jsx-runtime`. The compiler accepts a closed subset of it and reports anything else as a diagnostic with a rule id, listed [at the end of this page](#diagnostics).
 
 ## Modules
 
@@ -196,11 +196,11 @@ export default function Saver() {
 
 A component used in JSX is inlined when it is stateless: no `let` and no handler. Its props bind to the caller's expressions, and `props.children` places the caller's children.
 
-A stateful component is a child with its own model slot. It must be the default export of its own `*.idlip.tsx` file, imported by that name. Its `onX` props are message props: the parent passes `() => handler(args)`, and the child dispatches it with `on:click={props.onRemove}`.
+A stateful component is a child with its own model slot. It must be the default export of its own `*.tsx` file, imported by that name. Its `onX` props are message props: the parent passes `() => handler(args)`, and the child dispatches it with `on:click={props.onRemove}`.
 
 ```tsx
 import { For } from 'idlip';
-import Counter from './counter.idlip.tsx';
+import Counter from './counter.tsx';
 
 interface Item {
   id: string;

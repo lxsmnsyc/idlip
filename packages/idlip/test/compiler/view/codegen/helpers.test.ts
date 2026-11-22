@@ -48,7 +48,7 @@ function readClientImports(code: string): string[] {
 }
 
 function generateFixture(name: string): GenerateResult {
-  const file = `${name}.idlip.tsx`;
+  const file = `${name}.tsx`;
   const source = readFileSync(join(FIXTURES, name, file), 'utf8');
   return generate(analyze(file, source), source, `/src/${file}`);
 }
@@ -74,7 +74,7 @@ describe('chunk imports', () => {
     const results = [
       generateFixture('counter'),
       generateFixture('todo'),
-      generate(analyze('branch.idlip.tsx', BRANCH), BRANCH, '/src/branch.idlip.tsx'),
+      generate(analyze('branch.tsx', BRANCH), BRANCH, '/src/branch.tsx'),
     ];
     const missing: string[] = [];
     for (const result of results) {
@@ -92,7 +92,7 @@ describe('chunk imports', () => {
 
 describe('reserved names', () => {
   function run(source: string): GenerateResult {
-    return generate(analyze('clash.idlip.tsx', source), source, '/src/clash.idlip.tsx');
+    return generate(analyze('clash.tsx', source), source, '/src/clash.tsx');
   }
 
   it('reports a module-level function named like a generated helper', () => {

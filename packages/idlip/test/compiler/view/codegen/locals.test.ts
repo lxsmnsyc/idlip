@@ -12,7 +12,7 @@ function isRender(value: unknown): value is Render {
 
 /** Compiles a module and renders its server code with the reference helpers. */
 function renderModule(source: string): string {
-  const result = generate(analyze('test.idlip.tsx', source), source, '/src/test.idlip.tsx');
+  const result = generate(analyze('test.tsx', source), source, '/src/test.tsx');
   const body = result.server
     .replaceAll(/^import .*$/gm, '')
     .replace('export default function', 'function')

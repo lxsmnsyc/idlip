@@ -1,4 +1,4 @@
-// todo.idlip.tsx
+// todo.tsx
 import { For, Random } from 'idlip';
 import { saveTodos } from './api';
 

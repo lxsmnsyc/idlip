@@ -1,6 +1,6 @@
 import { render as renderComponent, renderListener } from 'idlip/server';
 import { build } from '../../../harness/rows.mjs';
-import App from './app.idlip.tsx';
+import App from './app.tsx';
 
 /**
  * Renders the rows page with `n` rows. `loader` is the URL of the built loader module.

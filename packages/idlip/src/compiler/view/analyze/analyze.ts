@@ -1,4 +1,4 @@
-// Reads the function components of a `*.idlip.tsx` file with oxc-parser into the view IR:
+// Reads the function components of a `*.tsx` file with oxc-parser into the view IR:
 // state fields, derived values, handlers, the view tree, the path set per hole and diagnostics.
 import { parseSync } from 'oxc-parser';
 import type {
@@ -242,7 +242,7 @@ export interface ImportedModule {
 export interface AnalyzeOptions {
   /**
    * Reads the module an import specifier names, relative to the importing file. The analysis
-   * calls it for components imported from `.idlip.tsx` files, to tell a stateless component,
+   * calls it for components imported from `.tsx` files, to tell a stateless component,
    * which it inlines, from a stateful one, which becomes a child block. Without it, or when it
    * returns `undefined`, an imported component is a child block.
    */
@@ -1587,7 +1587,7 @@ class Analyzer {
   }
 
   /**
-   * Reads the declaration of a component imported from an `.idlip.tsx` file through
+   * Reads the declaration of a component imported from a `.tsx` file through
    * `options.readImport`. Returns `undefined` when there is no reader or it cannot read the file.
    */
   findImportedComponent(
@@ -1599,7 +1599,7 @@ class Analyzer {
     if (imported === undefined || read === undefined) {
       return undefined;
     }
-    if (imported.imported === '*' || !/\.idlip(\.tsx)?$/.test(imported.source)) {
+    if (imported.imported === '*' || !imported.source.endsWith('.tsx')) {
       return undefined;
     }
     const importer = this.foreign?.file ?? this.file;
@@ -1625,16 +1625,16 @@ class Analyzer {
     return { fn, module: foreign };
   }
 
-  /** An imported component must come from an `.idlip.tsx` file. */
+  /** An imported component must come from a `.tsx` file. */
   checkImportedComponent(root: Root, node: AstNode): void {
     if (root.kind !== 'import') {
       return;
     }
-    if (!/\.idlip(\.tsx)?$/.test(root.source)) {
+    if (!root.source.endsWith('.tsx')) {
       this.report(
         'component-import',
         'error',
-        `${root.name} comes from ${root.source}, which is not an .idlip.tsx component`,
+        `${root.name} comes from ${root.source}, which is not a .tsx file`,
         node,
       );
     }
@@ -3873,7 +3873,7 @@ function readComponents(analyzer: Analyzer, program: Program): Component[] {
   return components;
 }
 
-/** Reads one `*.idlip.tsx` file into the view IR. */
+/** Reads one `*.tsx` file into the view IR. */
 export function analyze(file: string, source: string, options: AnalyzeOptions = {}): ModuleIR {
   const parsed = parseSync(file, source, { lang: 'tsx' });
   let analyzer = new Analyzer(file, source, parsed.program, options);

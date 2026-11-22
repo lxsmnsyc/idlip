@@ -33,6 +33,7 @@ depends_on: []
 The user: "I feel like you'll learn a lot from brumate." idlip repeated at least one design brumate already moved away from (HTML strings for client-rendered blocks, see `cloned-templates`). Find the others before they cost a benchmark round each.
 
 Read-only research. Sources in `/Users/alexis/Documents/GitHub/brumate`:
+
 - `docs/performance.md`, `docs/decisions.md`, `docs/architecture.md`, `docs/compiler.md`.
 - `git log` for `perf`, `fix`, and revert commits; the benchmark README.
 - Its client runtime (`packages/brumate/src/runtime/`), list and block code, loader.

@@ -226,7 +226,7 @@ describe('the landing page', () => {
 
 describe('the landing sample', () => {
   it('compiles with no diagnostics', () => {
-    const result = compile(SAMPLE_SOURCE, '/sample.idlip.tsx');
+    const result = compile(SAMPLE_SOURCE, '/sample.tsx');
     expect(result.diagnostics).toEqual([]);
   });
 

@@ -116,7 +116,7 @@ export default function Card(): JSX.Element {
 `;
 
 it('records the head output of a child component through the shared context', async () => {
-  const compiled = compile(CHILD, '/src/card.idlip.tsx', { child: true });
+  const compiled = compile(CHILD, '/src/card.tsx', { child: true });
   expect(compiled.manifest.head).toBe(true);
   const code = compiled.server.replace(
     /^import .* from 'idlip\/server';/m,
