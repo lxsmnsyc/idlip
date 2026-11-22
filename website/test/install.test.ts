@@ -16,16 +16,17 @@ type Listener = (event: unknown) => void;
 
 interface FakePage {
   listeners: Record<string, Listener>;
-  panel: { textContent: string; attrs: Record<string, string> };
+  panel: { id: string; textContent: string; attrs: Record<string, string> };
   copy: { dataset: { copy: string } };
   tabs: FakeTab[];
   store: Record<string, string>;
 }
 
 /** One tab group and the document around it, enough for `install.ts`. */
-function makePage(saved: string | undefined): FakePage {
+function makePage(saved: string | undefined, blocked: boolean): FakePage {
   const listeners: Record<string, Listener> = {};
   const panel = {
+    id: 'install-hero-panel',
     textContent: '',
     attrs: {} as Record<string, string>,
     setAttribute(name: string, value: string) {
@@ -63,8 +64,16 @@ function makePage(saved: string | undefined): FakePage {
   };
   const store: Record<string, string> = saved === undefined ? {} : { 'package-manager': saved };
   vi.stubGlobal('localStorage', {
-    getItem: (key: string) => store[key] ?? null,
-    setItem: (key: string, value: string) => {
+    getItem: (key: string): string | null => {
+      if (blocked) {
+        throw new Error('Storage is blocked');
+      }
+      return store[key] ?? null;
+    },
+    setItem: (key: string, value: string): void => {
+      if (blocked) {
+        throw new Error('Storage is blocked');
+      }
       store[key] = value;
     },
   });
@@ -78,8 +87,8 @@ function makePage(saved: string | undefined): FakePage {
   return { listeners, panel, copy, tabs, store };
 }
 
-async function load(saved?: string): Promise<FakePage> {
-  const page = makePage(saved);
+async function load(saved?: string, blocked = false): Promise<FakePage> {
+  const page = makePage(saved, blocked);
   vi.resetModules();
   await import('../src/client/install.ts');
   return page;
@@ -93,6 +102,9 @@ describe('the install tabs markup', () => {
     expect(html).toContain('aria-selected="true" tabindex="0" data-manager="pnpm"');
     expect(html).toContain('aria-selected="false" tabindex="-1" data-manager="npm"');
     expect(html).toContain('>pnpm add idlip</code>');
+    // Each tab controls the one panel, which a keyboard user can reach.
+    expect(html.match(/aria-controls="install-hero-panel"/g)).toHaveLength(4);
+    expect(html).toContain('id="install-hero-panel" role="tabpanel" tabindex="0"');
     expect(html).toContain('data-copy="pnpm add idlip"');
   });
 
@@ -131,11 +143,37 @@ describe('the install tabs script', () => {
     expect(page.copy.dataset.copy).toBe('npm install idlip');
     press('ArrowLeft', 0);
     expect(page.copy.dataset.copy).toBe('bun add idlip');
-    press('Home', 2);
-    expect(page.copy.dataset.copy).toBe('pnpm add idlip');
-    press('End', 0);
-    expect(page.copy.dataset.copy).toBe('bun add idlip');
     expect(press('a', 0).preventDefault).not.toHaveBeenCalled();
+  });
+
+  it('jumps to the first tab on Home and the last on End', async () => {
+    const page = await load();
+    const event = { target: page.tabs[2], key: 'Home', preventDefault: vi.fn() };
+    page.listeners.keydown(event);
+    expect(page.copy.dataset.copy).toBe('pnpm add idlip');
+    expect(page.tabs[0].focused).toBe(true);
+    page.listeners.keydown({ target: page.tabs[0], key: 'End', preventDefault: vi.fn() });
+    expect(page.copy.dataset.copy).toBe('bun add idlip');
+    expect(page.tabs[3].focused).toBe(true);
+    expect(page.tabs[3].attrs['aria-selected']).toBe('true');
+  });
+
+  it('keeps aria-controls and aria-labelledby in step with the panel', async () => {
+    const page = await load();
+    page.listeners.click({ target: page.tabs[2] });
+    for (const tab of page.tabs) {
+      expect(tab.attrs['aria-controls']).toBe('install-hero-panel');
+    }
+    expect(page.panel.attrs['aria-labelledby']).toBe('install-hero-yarn');
+  });
+
+  it('still switches when storage is blocked', async () => {
+    const page = await load(undefined, true);
+    expect(() => {
+      page.listeners.click({ target: page.tabs[3] });
+    }).not.toThrow();
+    expect(page.panel.textContent).toBe('bun add idlip');
+    expect(page.store).toEqual({});
   });
 
   it('restores the choice of an earlier visit', async () => {

@@ -89,7 +89,7 @@ function renderSample(demo: DemoData): string {
 const FACTS: { term: string; text: string }[] = [
   { term: 'License', text: 'MIT' },
   { term: 'Version', text: '0.x, not on npm before 0.1' },
-  { term: 'Runtime', text: 'Node 22, Vite 7' },
+  { term: 'Runtime', text: 'Node 22+, Vite 7+' },
   { term: 'Language', text: 'TypeScript, TSX' },
 ];
 

@@ -3,9 +3,16 @@
 // click any checkbox. The first click loads the chunks, every later one is served from the cache.
 // With reduced motion, or without this script, the picture stays at its end state.
 //
-// The picture is at one of two phases. The stylesheet draws both from `--clicked` on the stage.
+// The picture is at one of three phases. The stylesheet draws them from `--clicked` on the stage.
+// The picture is a model: no request is made.
 
-type Phase = { kind: 'rest' } | { kind: 'loaded' };
+type Phase =
+  // Nothing loaded yet, and the picture will click by itself.
+  | { kind: 'rest' }
+  // Nothing loaded yet, and the visitor has a hand on it, so it never clicks by itself.
+  | { kind: 'hands-on' }
+  // The chunks are loaded. Later clicks are served from the cache.
+  | { kind: 'loaded' };
 
 /** How long the picture rests before the first click, in milliseconds. */
 const REST_MS = 1600;
@@ -36,6 +43,14 @@ function start(stage: HTMLElement): void {
     }
   }
 
+  /** Says what happened in the live line, for screen readers. */
+  function announce(key: 'first' | 'later'): void {
+    const live = stage.querySelector<HTMLElement>('[data-hero-live]');
+    if (live) {
+      live.textContent = live.dataset[key] ?? '';
+    }
+  }
+
   /** Shows "cached" on the loaded chunks for a moment: the click fetched nothing. */
   function showCached(): void {
     clearTimeout(hitTimer);
@@ -51,19 +66,21 @@ function start(stage: HTMLElement): void {
 
   function handleToggle(input: HTMLInputElement): void {
     showToggle(input);
-    if (phase.kind === 'rest') {
+    if (phase.kind === 'loaded') {
+      showCached();
+      announce('later');
+    } else {
       phase = { kind: 'loaded' };
       clearTimeout(restTimer);
       stage.style.setProperty('--clicked', '1');
-    } else {
-      showCached();
+      announce('first');
     }
   }
 
   /** The click the picture makes by itself, on the row the server marked. */
   function clickByItself(): void {
     const input = stage.querySelector<HTMLInputElement>('[data-flip] input');
-    if (input) {
+    if (phase.kind === 'rest' && input) {
       input.checked = !input.checked;
       handleToggle(input);
     }
@@ -77,9 +94,20 @@ function start(stage: HTMLElement): void {
     }
   }
 
+  /** A hand on the picture, from a pointer or the keyboard, ends the click by itself for good. */
+  function takeHands(): void {
+    if (phase.kind === 'rest') {
+      phase = { kind: 'hands-on' };
+      clearTimeout(restTimer);
+    }
+  }
+
   for (const input of inputs) {
     input.disabled = false;
   }
+  stage.addEventListener('focusin', takeHands);
+  stage.addEventListener('pointerenter', takeHands);
+  stage.addEventListener('pointerdown', takeHands);
   stage.addEventListener('change', (event) => {
     if (event.target instanceof HTMLInputElement) {
       handleToggle(event.target);

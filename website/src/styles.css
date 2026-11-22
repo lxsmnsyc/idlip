@@ -1537,9 +1537,9 @@ html:not(.js) .install-tabs {
   font: 600 var(--text-sm) var(--font);
   cursor: pointer;
   transition:
-    background var(--duration-fast),
-    color var(--duration-fast),
-    transform var(--duration-fast) var(--ease);
+    background var(--duration),
+    color var(--duration),
+    transform var(--duration) var(--ease);
 }
 
 .install-tab:hover {
@@ -1598,6 +1598,13 @@ html:not(.js) .install-tabs {
    below the media query draws the end state, which is also the still frame without the script
    and with reduced motion. */
 
+/* Registered, so the fallback animation below can move it. */
+@property --clicked {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 1;
+}
+
 .hero-stage {
   --clicked: 1;
   display: grid;
@@ -1609,13 +1616,23 @@ html:not(.js) .install-tabs {
   background: color-mix(in srgb, var(--on-ink) 10%, transparent);
 }
 
+/* The rest state, until the script sets `data-live`. If the script never runs, the animation
+   settles on the end state after 3.5 seconds, so the picture is not stuck at rest. The flip row
+   is done when `--clicked` and `--rest` differ. */
 @media (prefers-reduced-motion: no-preference) {
   .js .hero-stage:not([data-live]) {
     --clicked: 0;
+    animation: hero-settle 1ms 3.5s forwards;
   }
 
   .js .hero-stage:not([data-live]) .hero-row[data-flip] {
-    --done: var(--rest) !important;
+    --done: calc(var(--rest) + var(--clicked) - 2 * var(--rest) * var(--clicked)) !important;
+  }
+}
+
+@keyframes hero-settle {
+  to {
+    --clicked: 1;
   }
 }
 
@@ -1695,8 +1712,8 @@ html:not(.js) .install-tabs {
   background: var(--surface);
   cursor: pointer;
   transition:
-    background var(--duration-fast),
-    transform var(--duration-fast) var(--ease);
+    background var(--duration),
+    transform var(--duration) var(--ease);
 }
 
 .hero-row:hover {
@@ -1832,13 +1849,32 @@ html:not(.js) .install-tabs {
   opacity: 0;
   transform: translateY(0.3rem);
   transition:
-    opacity var(--duration-fast),
-    transform var(--duration-fast) var(--ease);
+    opacity var(--duration),
+    transform var(--duration) var(--ease);
 }
 
 .hero-hit.is-hit {
   opacity: 1;
   transform: none;
+}
+
+.hero-caption {
+  margin: 0;
+  color: var(--on-ink-muted);
+  font-size: var(--text-xs);
+}
+
+/* On touch, the tabs and the copy button reach 44px. */
+@media (pointer: coarse) {
+  .install-tab {
+    min-height: 2.75rem;
+    padding-inline: 1.1rem;
+  }
+
+  .install .code-copy {
+    min-width: 4.5rem;
+    min-height: 2.75rem;
+  }
 }
 
 /* Facts before you start. */

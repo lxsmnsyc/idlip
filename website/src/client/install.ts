@@ -32,13 +32,16 @@ function selectManager(manager: string): void {
     if (active === undefined) {
       continue;
     }
+    const panel = group.querySelector('.install-command');
     for (const tab of tabs) {
       const on = tab === active;
       tab.setAttribute('aria-selected', String(on));
       tab.tabIndex = on ? 0 : -1;
+      if (panel?.id) {
+        tab.setAttribute('aria-controls', panel.id);
+      }
     }
     const command = active.dataset.command ?? '';
-    const panel = group.querySelector('.install-command');
     if (panel) {
       panel.textContent = command;
       panel.setAttribute('aria-labelledby', active.id);

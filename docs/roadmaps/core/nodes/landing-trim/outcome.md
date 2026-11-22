@@ -16,8 +16,8 @@ Course change during the work: the orchestrator asked to drop the growing-widget
 
 | | Before | After | Change |
 | --- | --- | --- | --- |
-| All text in `<main>` | 2,478 | 1,218 | -50.8% |
-| Visible at once (without the four static diagram panels) | 1,010 | 554 | -45.1% |
+| All text in `<main>` | 2,478 | 1,231 | -50.3% |
+| Visible at once (without the four static diagram panels) | 1,010 | 567 | -43.9% |
 
 A test fails if the total goes above 1,485.
 
@@ -41,10 +41,20 @@ A test fails if the total goes above 1,485.
 - No layout shift: the stage box is the same size in every state (checked at 1440 and 390 px).
 - Without a flash: the end state is the CSS default. Only with the `js` class and motion allowed, CSS draws the rest state until the script sets `data-live`.
 
+## Review fixes
+
+- The picture never clicks by itself once the visitor focuses it or touches it (`focusin`, `pointerenter`, `pointerdown`). Phases are `rest`, `hands-on` and `loaded`.
+- The "cached" tag is `aria-hidden`. One polite live line says "Loaded todo.handler.toggle.js and todo.binding.todos._.done.js, 624 B." on the first load and "Already loaded." after. A caption says the picture is a model of the demo build and nothing is fetched. The loader chip says "with the page".
+- Under `pointer: coarse` the install tabs, the copy button and the todo rows are 44 px (measured).
+- Install tabs: `aria-controls` on each tab, an id and `tabindex="0"` on the panel, kept in step in `selectManager`.
+- If the hero module never loads, a CSS animation settles the picture on its end state after 3.5 s (checked with scripts blocked).
+- Hero and tab transitions are 220 ms (no 120 ms ones). Copy buttons announce "Copied" or "Failed to copy" in a polite live region and their accessible name follows the visible text. Facts row says "Node 22+, Vite 7+".
+- New tests: hero phases with fake timers (auto-click delay, cancel on focus, pointer enter and pointer down, first load, cached on later clicks, off-screen pause, reduced motion), tabs with blocked storage, Home and End, and aria-controls. The test that sliced the stylesheet by index is now a regex.
+
 ## Verify
 
 - `pnpm --filter idlip build` and `pnpm --filter website build` pass.
-- `pnpm --filter website test`: 77 tests in 7 files, pass. New: `hero.test.ts`, `install.test.ts`, and updated `landing.test.ts`.
+- `pnpm --filter website test`: 87 tests in 7 files, pass. New: `hero.test.ts`, `install.test.ts`, and updated `landing.test.ts`.
 - `pnpm --filter website check:samples`: 47 samples, 0 problems.
 - `pnpm --filter website typecheck` passes.
 - `pnpm lint` reports no error or warning in `website/` (warnings remain in `packages/idlip`, not touched).
@@ -61,6 +71,9 @@ Playwright, Chromium, preview on port 48780 (stopped after).
 
 ## Not done or open
 
-- The static diagram panels for reduced motion still repeat the stage four times, which is most of the 1,218 words.
+- The static diagram panels for reduced motion still repeat the stage four times, which is most of the 1,231 words.
 - The package is not on npm before 0.1, so the install tabs name a command that fails until then. The facts row says so.
+- `visible` stays a plain variable beside the phase union in `client/hero.ts`. Folding it in would add a phase per visibility with no gain.
+- If the hero module loads after 3.5 s the picture jumps from the settled end state to rest.
+- The picture cancels its click by itself on any pointer enter, so a visitor who only moves the mouse over it sees the rest state until they click.
 - The hero picture has two todos, because the demo has two. A third todo in the demo would show more of "later clicks load nothing".

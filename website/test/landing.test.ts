@@ -202,7 +202,9 @@ describe('the landing page', () => {
 
   it('says the hydration lane is a model and announces steps in one live element', () => {
     expect(landing).toContain('class="resume-note"');
-    expect(landing.match(/aria-live="polite"/g)).toHaveLength(1);
+    // One for the diagram steps and one for the hero picture.
+    expect(landing.match(/aria-live="polite"/g)).toHaveLength(2);
+    expect(landing.match(/data-says-live/g)).toHaveLength(1);
   });
 
   it('charts the headline group: one row per framework run on every app', () => {

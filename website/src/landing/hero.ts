@@ -41,9 +41,12 @@ function renderRow(todo: DemoData['todos'][number], index: number, flip: number)
   return `<label class="hero-row"${attrs}><input class="visually-hidden" type="checkbox"${done ? ' checked' : ''} disabled><span class="hero-box">${ICON.check}</span><span class="hero-text">${escape(todo.text)}</span>${pointer}</label>`;
 }
 
+/** A chip of a file. The loader loads with the page. A click loads the others. */
 function renderChip(name: string, gzip: number, load: boolean): string {
-  const hit = load ? '<i class="hero-hit">cached</i>' : '';
-  return `<li class="hero-chip${load ? ' hero-chip-load' : ''}"><code>${escape(name)}</code><span>${formatBytes(gzip)}</span>${hit}</li>`;
+  // The "cached" mark is for the eye. The live line says it for screen readers.
+  const hit = load ? '<i class="hero-hit" aria-hidden="true">cached</i>' : '';
+  const note = load ? '' : ', with the page';
+  return `<li class="hero-chip${load ? ' hero-chip-load' : ''}"><code>${escape(name)}</code><span>${formatBytes(gzip)}${note}</span>${hit}</li>`;
 }
 
 /** The picture: a meter of component code loaded, the app, and the chunks that arrived. */
@@ -56,7 +59,9 @@ export function renderHeroStage(demo: DemoData): string {
   const loaded = demo.handler.gzip + demo.binding.gzip;
   const before = countLeft(demo.todos, flip, false);
   const after = countLeft(demo.todos, flip, true);
+  const first = `Loaded ${demo.handler.name} and ${demo.binding.name}, ${formatBytes(loaded)}.`;
   return `<figure class="hero-stage" data-hero aria-label="The todo demo, with the code each click loads">
+  <p class="visually-hidden" role="status" aria-live="polite" data-hero-live data-first="${escape(first)}" data-later="Already loaded."></p>
   <div class="hero-meter">
     <p class="hero-meter-title">Component code loaded</p>
     <p class="hero-meter-value hero-stack"><span class="hero-rest" aria-hidden="true">0 B</span><span class="hero-now">${formatBytes(loaded)}</span></p>
@@ -70,5 +75,6 @@ export function renderHeroStage(demo: DemoData): string {
     ${renderChip(demo.handler.name, demo.handler.gzip, true)}
     ${renderChip(demo.binding.name, demo.binding.gzip, true)}
   </ul>
+  <figcaption class="hero-caption">A model of the todo demo build. Nothing is fetched.</figcaption>
 </figure>`;
 }
