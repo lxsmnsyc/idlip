@@ -3,8 +3,9 @@
 // would parse to, markers included, so the patcher and the server render see no difference. A
 // block inside a body (a condition or a list) is a marked comment in the template, and the
 // body's writes clone the block's own templates next to it. Other bodies render HTML.
-import type { Component, Event, Node } from '../analyze/index.ts';
+import type { Component, Event, Hole, Node } from '../analyze/index.ts';
 import { printProps, printSlot } from './child.ts';
+import { printTracked } from './dynamic.ts';
 import { getMessage, isFixedMessage, printModifiers } from './events.ts';
 import type { Emitter } from './expr.ts';
 import type { Plan } from './plan.ts';
@@ -69,18 +70,11 @@ function isClonedElement(node: Element, component: Component, plan: Plan): boole
   if (node.html !== undefined) {
     return false;
   }
-  for (const attr of node.attrs) {
-    if (attr.value.kind !== 'static' && plan.dynamic.has(attr.value.hole.id)) {
-      return false;
-    }
-  }
   // In SVG and MathML a `title` or a `style` is an element like any other.
   const text = node.namespace === 'html' && TEXT_TAGS.has(node.tag);
   for (const child of node.children) {
     if (
-      text
-        ? child.kind !== 'text' && (child.kind !== 'text-hole' || plan.dynamic.has(child.hole.id))
-        : !isCloned(child, component, plan)
+      text ? child.kind !== 'text' && child.kind !== 'text-hole' : !isCloned(child, component, plan)
     ) {
       return false;
     }
@@ -100,11 +94,10 @@ function isClonedBody(nodes: readonly Node[], component: Component, plan: Plan):
 function isCloned(node: Node, component: Component, plan: Plan): boolean {
   switch (node.kind) {
     case 'text':
-      return true;
     case 'text-hole':
       // A table or a select would move text, but the template marks a hole with a comment,
       // which the parser leaves in place, and the compiler rejects text inside a table.
-      return !plan.dynamic.has(node.hole.id);
+      return true;
     case 'element':
       return isClonedElement(node, component, plan);
     case 'condition':
@@ -141,15 +134,27 @@ class TemplateBuilder {
     return this.marks;
   }
 
+  /**
+   * Prints the value of a hole. A dynamic hole records what it reads, as in the server render,
+   * under the binding name `name`.
+   */
+  printHole(hole: Hole, name: string, min: number): string {
+    const { component, emitter, plan } = this.context;
+    emitter.at = hole.span;
+    return plan.dynamic.has(hole.id)
+      ? printTracked(emitter, component, hole, name)
+      : emitter.expr(hole.expr, min);
+  }
+
   add(node: Node): void {
     const { emitter } = this.context;
     if (node.kind === 'text') {
       this.html += escapeText(node.value);
     } else if (node.kind === 'text-hole') {
-      emitter.at = node.hole.span;
       emitter.usage.helpers.add('putText');
       const mark = this.addMark();
-      this.writes.push(`putText$(${this.variable}[${mark}], ${emitter.expr(node.hole.expr, 1)});`);
+      const value = this.printHole(node.hole, `t${node.hole.id}`, 1);
+      this.writes.push(`putText$(${this.variable}[${mark}], ${value});`);
       const placeholder = `<!--x${mark}-->`;
       const id = node.hole.id;
       this.html += this.context.plan.bound.has(id)
@@ -453,9 +458,9 @@ class TemplateBuilder {
             : ` ${attr.name}="${escapeAttribute(attr.value.value)}"`;
         continue;
       }
-      emitter.at = attr.value.hole.span;
       emitter.usage.helpers.add('putAttr');
-      let value = emitter.expr(attr.value.hole.expr, 1);
+      const { hole } = attr.value;
+      let value = this.printHole(hole, `a${hole.id}`, 1);
       if (attr.url !== undefined) {
         emitter.usage.helpers.add('safeUrl');
         value = `safeUrl$(${value}, ${quote(attr.name)}${attr.url === 'embed' ? ', true' : ''})`;
@@ -514,9 +519,8 @@ class TemplateBuilder {
       if (child.kind === 'text') {
         parts.push(quote(child.value));
       } else if (child.kind === 'text-hole') {
-        emitter.at = child.hole.span;
         emitter.usage.helpers.add('getText');
-        parts.push(`getText$(${emitter.expr(child.hole.expr, 0)})`);
+        parts.push(`getText$(${this.printHole(child.hole, `t${child.hole.id}`, 0)})`);
       }
     }
     return parts.length === 0 ? "''" : parts.join(' + ');
@@ -588,9 +592,9 @@ function hasFreeMessage(events: readonly Event[], component: Component): boolean
  * text, text holes, children, `<Subscribe>`, `<Head>`, global listeners, and conditions, lists
  * and `<Try>` regions whose bodies clone, and writes at least one value. A body in SVG or MathML
  * parses its template in an `<svg>` or `<math>` wrapper. A static body renders HTML: its parse
- * is short. Raw HTML and a dynamic hole render HTML. A text hole in an HTML text element sets
- * the element's text, and the content of a `<template>` with a write clones from its own
- * template.
+ * is short. Raw HTML renders HTML. A dynamic hole records its reads. A text hole in an HTML
+ * text element sets the element's text, and the content of a `<template>` with a write clones
+ * from its own template.
  */
 export function canClone(nodes: readonly Node[], component: Component, plan: Plan): boolean {
   if (nodes.length === 0 || !isClonedBody(nodes, component, plan)) {

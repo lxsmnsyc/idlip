@@ -1,6 +1,10 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
 import { compile } from '../../../../src/compiler/index.ts';
+import { analyze } from '../../../../src/compiler/view/analyze/index.ts';
+import { Emitter, createUsage } from '../../../../src/compiler/view/codegen/expr.ts';
+import { planBindings } from '../../../../src/compiler/view/codegen/plan.ts';
+import { buildBody, createCloneContext } from '../../../../src/compiler/view/codegen/template.ts';
 import { clone$ } from '../../../../src/core/helpers.ts';
 import { mount } from '../../../../src/testing/index.ts';
 
@@ -291,6 +295,37 @@ describe('cloned templates', () => {
       page.stop();
       document.title = '';
     }
+  });
+
+  it('records the reads of a dynamic hole in a cloned body', () => {
+    // The plan makes a hole dynamic only at the top of a root view, which renders on the server.
+    // A plan that marks the holes of a branch dynamic shows what a cloned body writes for one.
+    const ir = analyze('/src/app.tsx', DISCLOSURE);
+    const component = ir.components[0];
+    const plan = planBindings(component, () => {});
+    const branch = component.view[0].kind === 'element' ? component.view[0].children[1] : undefined;
+    if (branch?.kind !== 'condition') {
+      throw new Error('No branch');
+    }
+    for (const hole of component.holes) {
+      plan.dynamic.add(hole.id);
+    }
+    const usage = createUsage();
+    const emitter = new Emitter('client', usage, () => {});
+    const body = buildBody(
+      branch.then,
+      'html',
+      'templateC0_0$',
+      createCloneContext(component, plan, emitter),
+    );
+    const code = body.pre.join('\n');
+    expect(code).toMatch(
+      /putAttr\$\(\$n\[1\], 'class', track\$\(dynamic, 'a\d+', model, \(model\) => /,
+    );
+    expect(code).toMatch(
+      /putText\$\(\$n\[2\], track\$\(dynamic, 't\d+', model, \(model\) => model\.title\)\);/,
+    );
+    expect([...usage.scope].toSorted()).toEqual(['dynamic', 'model']);
   });
 
   it('clones the content of a template with a write from its own template', () => {

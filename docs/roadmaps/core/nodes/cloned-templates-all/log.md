@@ -72,3 +72,9 @@ The `nested-blocks` subject failed on the base, with the HTML path: a click that
 - Differential subject `block-kinds`: `<Subscribe>` with input and key in a row, `<Try>` in a row (kept rows that recover keep the catch view: the accepted divergence `caught-region-stays` now lists this subject too) and in a branch with a reset, a global listener that reads the state, a `<template>` with holes. A `<Head>` binding reads `document.head`, which the model-pair harness leaves out (with HTML too), so `template.test.ts` mounts a branch with a cloned `<Head>` and checks the title and the meta.
 - Goldens of the `try` fixture rewritten (`UPDATE_TRY=1`).
 - Sizes: todo loader 4073 B, helpers 969 B (no change; the `errors.ts` change is behind `HAS_ERRORS`).
+
+## Step 7: dynamic holes
+
+- `plan.ts` makes a hole dynamic only at the top of a root view (no rows, no blocks, not a child: "Rows, blocks and children render from templates that record no reads"), and that part renders on the server only. So no client body holds one today. The template writer no longer refuses one: a dynamic text, attribute or text-element hole prints through `printTracked` (`track$(dynamic, 't<id>', model, (model) => ...)`), as `HtmlBuilder` did, and the scope takes `dynamic` and `model`.
+- No differential subject can reach it, so `template.test.ts` builds a branch from a plan whose holes are all marked dynamic and checks the writes and the scope.
+- Sizes: no loader or helpers code change.
