@@ -1,7 +1,7 @@
 ---
 id: differential-render-test
 title: Compare the server render and the browser render of every fixture
-status: todo
+status: done
 priority: must
 type: test
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-22
-spent:
+spent: 476000
 owns:
   - packages/idlip/test/differential/**
 shared:
