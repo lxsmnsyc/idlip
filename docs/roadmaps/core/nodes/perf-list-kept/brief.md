@@ -33,6 +33,9 @@ shared:
 reserves: []
 provides: []
 depends_on:
+  - on: cloned-templates
+    kind: hard
+    why: rewrites the list code this node tunes
   - on: perf-list-create
     kind: hard
     why: changes the same patchList code right after it
@@ -59,3 +62,7 @@ Select, swap, remove, update every 10th and clear stop doing work on every kept 
 ## Notes for the worker
 
 - Use the perf-pass skill.
+
+## Updates 2026-11-22
+
+- Run after `cloned-templates` (the list code changes under you). Read brumate's `docs/performance.md` "What the costs were" first: a longest increasing subsequence for moves, no re-run of updates on freshly rendered rows, no loader rescan after insert. Check each against `src/client/list/index.ts`.

@@ -26,6 +26,12 @@ shared: []
 reserves: []
 provides: []
 depends_on:
+  - on: brumate-lessons
+    kind: hard
+    why: its findings may add work before the first release
+  - on: cloned-templates
+    kind: hard
+    why: client rendering of new blocks changes before the first release
   - on: short-chunk-names
     kind: hard
     why: the chunk naming changes before the first release
