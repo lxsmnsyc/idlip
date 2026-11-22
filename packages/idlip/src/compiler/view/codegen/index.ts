@@ -1,6 +1,5 @@
 // Emits the server render module, the binding and list chunks and the manifest from the view IR,
 // as `contracts/compiled-format.md` fixes them. Handler chunks come from `compile-update`.
-import { posix } from 'node:path';
 import { getChunkId } from '../../../core/format.ts';
 import type {
   BindingGroup,
@@ -26,6 +25,7 @@ import { DYNAMIC_GROUP, DYNAMIC_STORE } from './dynamic.ts';
 import { Emitter, createUsage, mergeUsage } from './expr.ts';
 import { HtmlBuilder, toExpression } from './html.ts';
 import { ModuleSource } from './module.ts';
+import { resolveSpecifier } from './path.ts';
 import { getTaskChunk, isBuiltinTask } from '../../update/tasks.ts';
 import { emitSourceChunk } from './subscribe.ts';
 import { getStatePaths, planBindings, planGroups } from './plan.ts';
@@ -49,10 +49,6 @@ export interface GenerateOptions {
    * a relative specifier is resolved against the id of the importer.
    */
   resolve?: (specifier: string, importer: string) => string;
-}
-
-function resolveSpecifier(specifier: string, importer: string): string {
-  return specifier.startsWith('.') ? posix.join(posix.dirname(importer), specifier) : specifier;
 }
 
 /** The manifest of a module that a parent renders: `view` is in compiled-format v10. */

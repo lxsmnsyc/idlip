@@ -12,6 +12,9 @@ import { isBenchmarks } from './landing/benchmarks.ts';
 import type { Benchmarks } from './landing/benchmarks.ts';
 import { renderLanding } from './landing/index.ts';
 import { renderPage } from './layout.ts';
+import { getSampleLink } from './repl/files.ts';
+import { renderRepl } from './repl/page.ts';
+import { parseFence, wrapFragment } from './samples.ts';
 import { buildSearchIndex } from './search/index.ts';
 
 /** The file of the search index in the built site. */
@@ -70,11 +73,32 @@ export function pageUrl(file: string): string {
   return name.endsWith('/index') ? `docs/${name.slice(0, -'index'.length)}` : `docs/${name}/`;
 }
 
-/** Reads and renders every page under `docs`. */
-export function loadPages(folder = DOCS, base = '/'): Page[] {
-  const renderer = createRenderer();
+/** The file the REPL reads the docs samples from, by the id in an "Open in REPL" link. */
+const REPL_SAMPLES = 'repl/samples.json';
+
+/**
+ * Reads and renders every page under `docs`. `samples` gets the source of each code block that
+ * `check:samples` compiles, by the id its "Open in REPL" link names, such as `views-3`.
+ */
+export function loadPages(folder = DOCS, base = '/', samples = new Map<string, string>()): Page[] {
+  // The id of a sample is its page and its place among the page's samples.
+  let page = '';
+  let count = 0;
+  function linkSample(info: string, code: string): string | undefined {
+    const { lang, flags } = parseFence(info);
+    if (lang !== 'tsx' || flags.has('no-check')) {
+      return undefined;
+    }
+    count += 1;
+    const id = `${page}-${count}`;
+    samples.set(id, flags.has('fragment') ? wrapFragment(code) : code);
+    return getSampleLink(base, id);
+  }
+  const renderer = createRenderer({ sampleLink: linkSample });
   const pages: Page[] = [];
   for (const file of listMarkdown(folder)) {
+    page = file.slice(0, -'.md'.length).replaceAll('/', '-');
+    count = 0;
     const { data, body } = splitFrontMatter(readFileSync(path.join(folder, file), 'utf8'), file);
     const env: RenderEnv = {
       headings: [],
@@ -145,6 +169,7 @@ export function renderSite(
   if (demo === undefined) {
     return files;
   }
+  files.set('repl/index.html', renderRepl({ base, start: flat[0]?.url ?? 'docs/' }));
   let example = '';
   try {
     example = dropLeadingComments(readFileSync(TODO_SOURCE, 'utf8'));
@@ -199,7 +224,8 @@ export function readDemo(file = DEMO_DATA): DemoData {
 
 /** Writes the pages into a folder. The Vite build has already put the assets and the demo there. */
 export function writeSite(outDir: string, base = '/'): string[] {
-  const pages = loadPages(DOCS, base);
+  const samples = new Map<string, string>();
+  const pages = loadPages(DOCS, base, samples);
   const files = renderSite(pages, base, readDemo());
   for (const [name, html] of files) {
     const target = path.join(outDir, name);
@@ -212,5 +238,6 @@ export function writeSite(outDir: string, base = '/'): string[] {
     ordered.push(...section.pages);
   }
   writeFileSync(path.join(outDir, SEARCH_INDEX), JSON.stringify(buildSearchIndex(ordered)));
+  writeFileSync(path.join(outDir, REPL_SAMPLES), JSON.stringify(Object.fromEntries(samples)));
   return [...files.keys()];
 }

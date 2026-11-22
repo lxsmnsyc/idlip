@@ -40,8 +40,13 @@ export function slugify(text: string): string {
     .replaceAll(/\s+/g, '-');
 }
 
+export interface RendererOptions {
+  /** The address that opens a code block in the REPL, from its fence info and text, if it has one. */
+  sampleLink?: (info: string, code: string) => string | undefined;
+}
+
 /** A Markdown renderer with highlighted code, anchored headings and site links. */
-export function createRenderer(): MarkdownIt {
+export function createRenderer(settings: RendererOptions = {}): MarkdownIt {
   const parser = new MarkdownIt({ html: false, linkify: false });
   parser.use(twinkleplop, { languages: LANGUAGES, on_unknown_language: 'plain' });
   const escape = parser.utils.escapeHtml;
@@ -57,7 +62,10 @@ export function createRenderer(): MarkdownIt {
     );
     const tag =
       language && language !== 'plain' ? `<span class="code-lang">${escape(language)}</span>` : '';
-    return `<div class="code-block">${tag}<button class="code-copy" type="button" aria-label="Copy the code">Copy</button>${pre}</div>\n`;
+    const link = settings.sampleLink?.(tokens[index].info, tokens[index].content);
+    const open =
+      link === undefined ? '' : `<a class="code-repl" href="${escape(link)}">Open in REPL</a>`;
+    return `<div class="code-block${open === '' ? '' : ' has-repl'}">${tag}${open}<button class="code-copy" type="button" aria-label="Copy the code">Copy</button>${pre}</div>\n`;
   };
   parser.renderer.rules.table_open = () =>
     '<div class="table-scroll" role="group" aria-label="Table" tabindex="0">\n<table>\n';

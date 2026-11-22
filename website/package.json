@@ -13,6 +13,7 @@
     "check:reference": "node scripts/reference/check-exports.ts"
   },
   "dependencies": {
+    "@oxc-parser/binding-wasm32-wasi": "0.159.0",
     "idlip": "workspace:*"
   },
   "devDependencies": {

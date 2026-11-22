@@ -1545,6 +1545,34 @@ svg {
   color: var(--on-accent);
 }
 
+/* "Open in REPL" on a code block that the sample check compiles. The REPL page has its own
+   styles in src/repl/repl.css, which only /repl/ carries. */
+
+.code-repl {
+  position: absolute;
+  top: 0.55rem;
+  inset-inline-end: 5.25rem;
+  padding: 0.3rem 0.9rem;
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+  color: var(--text);
+  font: 600 var(--text-xs) / 1.5 var(--font);
+  text-decoration: none;
+  transition: transform var(--duration-fast) var(--ease);
+}
+
+.code-repl:hover {
+  transform: translateY(-1px);
+}
+
+.code-repl:active {
+  transform: scale(0.94);
+}
+
+.code-block.has-repl .code-lang {
+  inset-inline-end: 13.5rem;
+}
+
 /* The token classes of the @twinkleplop highlighter, mapped to the --syn-* tokens. */
 
 .tok.keyword,

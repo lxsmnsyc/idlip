@@ -11,13 +11,13 @@ const ENTITIES: Record<string, string> = {
   '&#39;': "'",
 };
 
-/** The text of an HTML fragment: no code blocks (inline code stays), no tags, no copy buttons or language labels, one space between words. */
+/** The text of an HTML fragment: no code blocks (inline code stays), no tags, no copy buttons, language labels or REPL links, one space between words. */
 export function htmlToText(html: string): string {
   return html
     .replaceAll(/<pre\b[\s\S]*?<\/pre>/g, ' ')
     .replaceAll(/<button\b[^>]*>[\s\S]*?<\/button>/g, ' ')
     .replaceAll(/<span class="code-lang">[\s\S]*?<\/span>/g, ' ')
-    .replaceAll(/<a class="anchor"[^>]*>[\s\S]*?<\/a>/g, ' ')
+    .replaceAll(/<a class="(?:anchor|code-repl)"[^>]*>[\s\S]*?<\/a>/g, ' ')
     .replaceAll(/<\/(?:p|li|pre|tr|td|th|h[1-6]|div|ul|ol|table)>|<br\s*\/?>/g, ' ')
     .replaceAll(/<[^>]*>/g, '')
     .replaceAll(/&(?:amp|lt|gt|quot|#39);/g, (entity) => ENTITIES[entity] ?? entity)

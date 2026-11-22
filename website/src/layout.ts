@@ -45,15 +45,20 @@ export const HEADER_LINKS: {
   wide?: boolean;
 }[] = [
   { label: 'Docs', href: (base, start) => `${base}${start}` },
+  { label: 'REPL', href: (base) => `${base}repl/` },
   { label: 'Benchmarks', href: (base) => `${base}#benchmarks`, wide: true },
 ];
 
-/** The header, the same on every page. `.header-slot` is empty until `website-search` fills it. */
-export function renderHeader(base: string, start: string): string {
+/**
+ * The header, the same on every page. `.header-slot` is empty until `website-search` fills it.
+ * `current` is the label of the link to the page shown.
+ */
+export function renderHeader(base: string, start: string, current?: string): string {
   let links = '';
   for (const link of HEADER_LINKS) {
     const wide = link.wide === true ? ' class="nav-wide"' : '';
-    links += `<a${wide} href="${link.href(base, start)}">${escape(link.label)}</a>`;
+    const here = link.label === current ? ' aria-current="page"' : '';
+    links += `<a${wide} href="${link.href(base, start)}"${here}>${escape(link.label)}</a>`;
   }
   return `<header class="site-header">
   <div class="header-inner">
