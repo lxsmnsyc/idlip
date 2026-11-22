@@ -75,7 +75,7 @@ describe('the landing page', () => {
 
   it('keeps the scale claim and its conditions on the chart', () => {
     expect(landing).toContain('>JavaScript before the page is ready, by app size</h2>');
-    expect(landing).toContain('From 10 widgets to 1,000 widgets, idlip loads 4.7 kB');
+    expect(landing).toContain('From 10 widgets to 1,000 widgets, idlip loads 4.8 kB');
     expect(landing).toContain('loaded before the <code>load</code> event');
     expect(landing).toContain('A loader is 3.9 kB to 7.3 kB');
     expect(landing).toContain('991 B listener inline in the HTML');

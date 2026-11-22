@@ -33,9 +33,9 @@ The page loads the document and the loader, and nothing else. The state is not d
 
 | Request                        | Raw     | gzip -9 |
 | ------------------------------ | ------- | ------- |
-| `GET /` (document)             | 4787 B  | 2089 B  |
-| `GET /assets/loader.<hash>.js` | 10001 B | 3986 B  |
-| Total                          | 14788 B | 6075 B  |
+| `GET /` (document)             | 4787 B  | 2090 B  |
+| `GET /assets/loader.<hash>.js` | 9779 B  | 3936 B  |
+| Total                          | 14566 B | 6026 B  |
 
 The e2e test records every request from the navigation on, and fails if any other request appears. Moving the pointer and focusing an element are not handled events and load nothing.
 
@@ -59,8 +59,8 @@ The click makes three requests:
 | ------------------------------------------------- | ------ | ------- |
 | `GET /assets/todo.handler.toggle.<hash>.js`       | 118 B  | 119 B   |
 | `GET /assets/_idlip-helpers.<hash>.js`            | 1962 B | 967 B   |
-| `GET /assets/todo.binding.todos._.done.<hash>.js` | 342 B  | 236 B   |
-| Total                                             | 2422 B | 1322 B  |
+| `GET /assets/todo.binding.todos._.done.<hash>.js` | 342 B  | 235 B   |
+| Total                                             | 2422 B | 1321 B  |
 
 A built chunk file is named `<module>.<kind>.<name>.<hash>.js`, and a `_` segment stands for `*` in the path. `_idlip-helpers.<hash>.js` holds the DOM and render helpers every chunk of the build imports. It loads once, with the first chunks. The bindings of `todos.*.text`, `todos.*.id` and `draft`, the list chunk and the other three handlers stay on the server.
 

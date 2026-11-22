@@ -1,5 +1,5 @@
 {
-  "date": "2026-11-22",
+  "date": "2026-11-23",
   "machine": "Apple M2, 8 cores, 8 GB, Node 26.12.1, Chrome 158",
   "source": "benchmarks/README.md",
   "frameworks": ["idlip", "brumate 0.8.1", "Marko 6", "Qwik 1", "Qwik 2"],
@@ -13,7 +13,7 @@
           "better": "lower",
           "noise": 0,
           "values": {
-            "idlip": 4.7,
+            "idlip": 4.8,
             "brumate 0.8.1": 15.9,
             "Marko 6": 5.9,
             "Qwik 1": null,
@@ -27,7 +27,7 @@
           "better": "lower",
           "noise": 0,
           "values": {
-            "idlip": 4.7,
+            "idlip": 4.8,
             "brumate 0.8.1": 23.8,
             "Marko 6": 10.8,
             "Qwik 1": null,
@@ -41,7 +41,7 @@
           "better": "lower",
           "noise": 0,
           "values": {
-            "idlip": 4.7,
+            "idlip": 4.8,
             "brumate 0.8.1": 52.6,
             "Marko 6": 28.1,
             "Qwik 1": null,
@@ -55,7 +55,7 @@
           "better": "lower",
           "noise": 0,
           "values": {
-            "idlip": 4.7,
+            "idlip": 4.8,
             "brumate 0.8.1": 201.5,
             "Marko 6": 117.8,
             "Qwik 1": null,
@@ -74,7 +74,7 @@
           "better": "lower",
           "noise": 0,
           "values": {
-            "idlip": 4.7,
+            "idlip": 4.8,
             "brumate 0.8.1": 15.9,
             "Marko 6": 5.9,
             "Qwik 1": null,
@@ -88,7 +88,7 @@
           "better": "lower",
           "noise": 0,
           "values": {
-            "idlip": 4.7,
+            "idlip": 4.8,
             "brumate 0.8.1": 23.8,
             "Marko 6": 10.8,
             "Qwik 1": null,
@@ -102,7 +102,7 @@
           "better": "lower",
           "noise": 0,
           "values": {
-            "idlip": 4.7,
+            "idlip": 4.8,
             "brumate 0.8.1": 52.6,
             "Marko 6": 28.1,
             "Qwik 1": null,
@@ -116,7 +116,7 @@
           "better": "lower",
           "noise": 0,
           "values": {
-            "idlip": 4.7,
+            "idlip": 4.8,
             "brumate 0.8.1": 201.5,
             "Marko 6": 117.8,
             "Qwik 1": null,
@@ -135,7 +135,7 @@
           "better": "lower",
           "noise": 0,
           "values": {
-            "idlip": 8.1,
+            "idlip": 8.2,
             "brumate 0.8.1": 17.8,
             "Marko 6": 7.6,
             "Qwik 1": null,
@@ -149,7 +149,7 @@
           "better": "lower",
           "noise": 0,
           "values": {
-            "idlip": 13.2,
+            "idlip": 13.3,
             "brumate 0.8.1": 30.0,
             "Marko 6": 16.3,
             "Qwik 1": null,
@@ -163,7 +163,7 @@
           "better": "lower",
           "noise": 0,
           "values": {
-            "idlip": 30.6,
+            "idlip": 30.7,
             "brumate 0.8.1": 74.9,
             "Marko 6": 47.1,
             "Qwik 1": null,
@@ -177,7 +177,7 @@
           "better": "lower",
           "noise": 0,
           "values": {
-            "idlip": 116.7,
+            "idlip": 116.4,
             "brumate 0.8.1": 305.3,
             "Marko 6": 205.8,
             "Qwik 1": null,
@@ -196,11 +196,11 @@
           "better": "lower",
           "noise": 0.2,
           "values": {
-            "idlip": 2.7,
-            "brumate 0.8.1": 5.0,
-            "Marko 6": 7.4,
+            "idlip": 2.3,
+            "brumate 0.8.1": 5.2,
+            "Marko 6": 8.2,
             "Qwik 1": null,
-            "Qwik 2": 2.6
+            "Qwik 2": 2.5
           },
           "label": "10 widgets"
         },
@@ -210,11 +210,11 @@
           "better": "lower",
           "noise": 0.2,
           "values": {
-            "idlip": 2.5,
-            "brumate 0.8.1": 6.6,
-            "Marko 6": 15.3,
+            "idlip": 3.2,
+            "brumate 0.8.1": 6.3,
+            "Marko 6": 15.2,
             "Qwik 1": null,
-            "Qwik 2": 2.6
+            "Qwik 2": 2.8
           },
           "label": "50 widgets"
         },
@@ -224,11 +224,11 @@
           "better": "lower",
           "noise": 0.2,
           "values": {
-            "idlip": 3.1,
-            "brumate 0.8.1": 9.1,
-            "Marko 6": 34.8,
+            "idlip": 2.7,
+            "brumate 0.8.1": 9.0,
+            "Marko 6": 34.7,
             "Qwik 1": null,
-            "Qwik 2": 3.2
+            "Qwik 2": 3.7
           },
           "label": "200 widgets"
         },
@@ -238,11 +238,11 @@
           "better": "lower",
           "noise": 0.2,
           "values": {
-            "idlip": 2.7,
+            "idlip": 3.0,
             "brumate 0.8.1": 17.6,
-            "Marko 6": 124.5,
+            "Marko 6": 124.1,
             "Qwik 1": null,
-            "Qwik 2": 5.1
+            "Qwik 2": 5.5
           },
           "label": "1,000 widgets"
         }
@@ -252,13 +252,13 @@
       "name": "JS before the first click",
       "metrics": [
         {
-          "name": "Todos: JS on load and 3 s idle",
+          "name": "Todos: JS on load, idlip with preload links and 3 s idle",
           "unit": "kB",
           "better": "lower",
           "noise": 0,
           "values": {
-            "idlip": 3.8,
-            "brumate 0.8.1": 13.9,
+            "idlip": 5.4,
+            "brumate 0.8.1": 15.1,
             "Marko 6": 4.4,
             "Qwik 1": 22.9,
             "Qwik 2": 38.2
@@ -266,12 +266,12 @@
           "label": "Todo list, 1 component"
         },
         {
-          "name": "Dashboard: JS on load",
+          "name": "Dashboard: JS on load, idlip with preload links",
           "unit": "kB",
           "better": "lower",
           "noise": 0,
           "values": {
-            "idlip": 4.6,
+            "idlip": 10.2,
             "brumate 0.8.1": 23.3,
             "Marko 6": 10.5,
             "Qwik 1": null,
@@ -285,12 +285,12 @@
       "name": "The first click",
       "metrics": [
         {
-          "name": "First todo toggle: JS fetched",
+          "name": "First todo toggle: JS fetched, idlip with preload links",
           "unit": "B",
           "better": "lower",
           "noise": 0,
           "values": {
-            "idlip": 613,
+            "idlip": 0,
             "brumate 0.8.1": 0,
             "Marko 6": 0,
             "Qwik 1": 0,
@@ -298,16 +298,16 @@
           }
         },
         {
-          "name": "First counter click, cold, 150 ms RTT",
+          "name": "First counter click, cold, 150 ms RTT, idlip with preload links",
           "unit": "ms",
           "better": "lower",
           "noise": 0.2,
           "values": {
-            "idlip": 226,
+            "idlip": 56,
             "brumate 0.8.1": 108,
-            "Marko 6": 50,
-            "Qwik 1": 240,
-            "Qwik 2": 491
+            "Marko 6": 54,
+            "Qwik 1": 250,
+            "Qwik 2": 500
           }
         }
       ]
@@ -321,11 +321,11 @@
           "better": "higher",
           "noise": 0.2,
           "values": {
-            "idlip": 36047,
-            "brumate 0.8.1": 81464,
-            "Marko 6": 77944,
-            "Qwik 1": 10757,
-            "Qwik 2": 6184
+            "idlip": 135135,
+            "brumate 0.8.1": 113233,
+            "Marko 6": 141196,
+            "Qwik 1": 16178,
+            "Qwik 2": 9497
           }
         },
         {
@@ -334,11 +334,11 @@
           "better": "higher",
           "noise": 0.2,
           "values": {
-            "idlip": 7501,
-            "brumate 0.8.1": 9034,
-            "Marko 6": 5892,
-            "Qwik 1": 1864,
-            "Qwik 2": 1140
+            "idlip": 11125,
+            "brumate 0.8.1": 11971,
+            "Marko 6": 8031,
+            "Qwik 1": 2662,
+            "Qwik 2": 1808
           }
         }
       ]
@@ -352,9 +352,9 @@
           "better": "lower",
           "noise": 0.2,
           "values": {
-            "idlip": 35.4,
-            "brumate 0.8.1": 22.1,
-            "Marko 6": 21.0,
+            "idlip": 27.9,
+            "brumate 0.8.1": 32.7,
+            "Marko 6": 32.4,
             "Qwik 1": null,
             "Qwik 2": null
           }
@@ -365,9 +365,9 @@
           "better": "lower",
           "noise": 0.2,
           "values": {
-            "idlip": 13.5,
-            "brumate 0.8.1": 10.5,
-            "Marko 6": 9.0,
+            "idlip": 11.5,
+            "brumate 0.8.1": 12.3,
+            "Marko 6": 11.3,
             "Qwik 1": null,
             "Qwik 2": null
           }
@@ -378,9 +378,9 @@
           "better": "lower",
           "noise": 0.2,
           "values": {
-            "idlip": 9.7,
-            "brumate 0.8.1": 5.6,
-            "Marko 6": 4.4,
+            "idlip": 8.5,
+            "brumate 0.8.1": 6.5,
+            "Marko 6": 6.5,
             "Qwik 1": null,
             "Qwik 2": null
           }
