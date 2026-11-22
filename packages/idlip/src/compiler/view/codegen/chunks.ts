@@ -347,6 +347,21 @@ export function emitListChunk(info: ListInfo, context: ChunkContext): GroupChunk
     ? "// `addChild` makes the child's model from `init`, records the slot and returns the child's\n// markup between its boundary comments.\n"
     : '';
   const sections = [`${comment}export function render(${parameter}) {\n${lines.join('\n')}\n}`];
+  if (info.node.key.kind === 'computed') {
+    // The client pairs rows by this key, so it loads the chunk before it pairs them. The key
+    // reads only its item, which is the parameter.
+    const keyUsage = createUsage();
+    const keyEmitter = new Emitter('client', keyUsage, context.report);
+    keyEmitter.frames = [frame];
+    const code = keyEmitter.expr(info.node.key.expr, 0);
+    for (const name of keyUsage.helpers) {
+      usage.helpers.add(name);
+    }
+    for (const name of keyUsage.modules) {
+      usage.modules.add(name);
+    }
+    sections.push(`export function key(${getLocalName(info.node.item)}) {\nreturn ${code};\n}`);
+  }
   if (info.node.namespace !== 'html') {
     sections.push(`export const namespace = ${quote(info.node.namespace)};`);
   }

@@ -483,7 +483,7 @@ ${indent(reads(w.cycle, '$1'), '    ')}
       <h3>${w.title}</h3>
       <p class="summary">{summary}</p>
       <ul>
-        <For each={entries} key="index">
+        <For each={entries} key={(entry) => entry.index}>
           {(entry) => <li>{entry.value}</li>}
         </For>
       </ul>

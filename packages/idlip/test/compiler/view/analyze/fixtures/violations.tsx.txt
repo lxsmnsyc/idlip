@@ -150,9 +150,9 @@ export default function Broken({ size = 1 }: { size?: number }) {
       {/* jsx-namespace-tag */}
       <svg:rect />
       {/* for-each */}
-      <For key="id">{(item) => <li>{item}</li>}</For>
+      <For key={(item) => item.id}>{(item) => <li>{item}</li>}</For>
       {/* for-param */}
-      <For each={items} key="id">
+      <For each={items} key={(item) => item.id}>
         {([first]) => <li>{first}</li>}
       </For>
       {/* global-children */}
@@ -194,7 +194,7 @@ export default function Broken({ size = 1 }: { size?: number }) {
       {/* for-key */}
       <For each={items}>{(item) => <li>{item}</li>}</For>
       {/* for-render */}
-      <For each={items} key="id">
+      <For each={items} key={(item) => item.id}>
         {items}
       </For>
       {/* ref-form */}
@@ -252,13 +252,13 @@ export default function Broken({ size = 1 }: { size?: number }) {
         body
       </Try>
       {/* for-render: a block-bodied render arrow */}
-      <For each={items} key="id">
+      <For each={items} key={(item) => item.id}>
         {(item) => {
           return <li>{item}</li>;
         }}
       </For>
       {/* for-param: the index is not a plain name */}
-      <For each={items} key="id">
+      <For each={items} key={(item) => item.id}>
         {(item, [index]) => <li>{item}</li>}
       </For>
       {/* attr-reserved: the i- prefix belongs to the compiled format */}
@@ -327,7 +327,7 @@ export default function Broken({ size = 1 }: { size?: number }) {
       {/* html-nesting: text in a table part through a For */}
       <table>
         <tbody>
-          <For each={items} key="id">
+          <For each={items} key={(item) => item.id}>
             {(item) => item}
           </For>
         </tbody>

@@ -298,6 +298,16 @@ type AttrValue = { kind: 'static'; value: string | true } | { kind: 'hole'; hole
 type Ref = { kind: 'name'; name: string } | { kind: 'tuple'; name: string; key: Expr };
 ```
 
+### `ForKey`
+
+A `for` node holds `key: ForKey`, from `key={(item) => ...}`:
+
+```ts
+type ForKey = { kind: 'field'; field: string } | { kind: 'computed'; expr: Expr };
+```
+
+A `field` key is a path of one field of the item. A `computed` key is any other expression that reads the item and globals only. The manifest names a `field` key. The list chunk exports `key(item)` for a `computed` one.
+
 ### `Slot`
 
 ```ts

@@ -14,6 +14,15 @@ function hasKeyedPath({ manifest }: CompileResult): boolean {
   return false;
 }
 
+function hasKeyFunction({ manifest }: CompileResult): boolean {
+  for (const list of Object.values(manifest.lists)) {
+    if (list.key === undefined) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function hasChildren({ manifest, server }: CompileResult): boolean {
   // The child has a `view` chunk. A parent has `uses`, even when the child is not compiled as one.
   // A component other than the main one sets the `uses` of its record, `$Name.uses = [...]`.
@@ -35,6 +44,7 @@ const DETECTORS: Readonly<Record<string, Detector>> = {
   // `deploy-skew` turns this on for apps without `<Try>` too.
   RETRY: ({ manifest }) => manifest.fallback !== undefined,
   DYNAMIC: ({ manifest }) => Object.hasOwn(manifest.groups, '$dynamic'),
+  KEY_FN: hasKeyFunction,
 };
 
 /** Returns the flags that the compiled modules turn on. */

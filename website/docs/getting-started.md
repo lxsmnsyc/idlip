@@ -157,7 +157,7 @@ export default function TodoApp(props: { initial: Todo[] }): JSX.Element {
       </form>
       <p>{left} left</p>
       <ul>
-        <For each={todos} key="id">
+        <For each={todos} key={(t) => t.id}>
           {(t) => (
             <li class={{ done: t.done }}>
               <input type="checkbox" checked={t.done} on:click={() => toggle(t.id)} />

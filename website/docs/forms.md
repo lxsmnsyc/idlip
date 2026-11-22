@@ -48,7 +48,7 @@ export default function Guests(): JSX.Element {
         <button>Add</button>
       </form>
       <ul>
-        <For each={guests} key="id">
+        <For each={guests} key={(guest) => guest.id}>
           {(guest) => (
             <li>
               {guest.name}: {guest.seats} {guest.vegan ? '(vegan)' : ''}

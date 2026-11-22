@@ -29,7 +29,7 @@ export default function Chart(props: { points: Point[] }): JSX.Element {
   return (
     <svg viewBox="0 0 100 100" width="200" on:click={add}>
       <title>Points</title>
-      <For each={points} key="id">
+      <For each={points} key={(point) => point.id}>
         {(point) => <circle cx={point.x} cy={point.y} r="2" />}
       </For>
       <foreignObject x="0" y="0" width="100" height="20">

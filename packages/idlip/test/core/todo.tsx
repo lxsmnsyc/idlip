@@ -65,7 +65,7 @@ export default function TodoApp(props: { initial: Todo[] }): JSX.Element {
         Save
       </button>
       <p>{left} left</p>
-      <For each={todos} key="id">
+      <For each={todos} key={(t) => t.id}>
         {(t) => (
           <li class={{ done: t.done }}>
             <input type="checkbox" checked={t.done} on:click={() => toggle(t.id)} />
@@ -89,7 +89,7 @@ export function Cases(): JSX.Element {
       {/* @ts-expect-error the prop `initial` is missing */}
       <TodoApp />
       {/* @ts-expect-error `nope` is not a field of Todo */}
-      <For each={todos} key="nope">
+      <For each={todos} key={(t) => t.nope}>
         {(t) => <li>{t.text}</li>}
       </For>
       {/* @ts-expect-error currentTarget is a button, which has no `checked` */}

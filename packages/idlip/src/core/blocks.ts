@@ -7,12 +7,14 @@ function failBlock(name: string): never {
 }
 
 /**
- * Renders `children` once per item of `each`. `key` names a field that is unique among the items.
- * The compiler replaces it, so calling it throws.
+ * Renders `children` once per item of `each`. `key` returns a string or number that is unique
+ * among the items: `key={(todo) => todo.id}`. The body is one expression that reads the item. A
+ * field path keeps keyed writes (`todos[id=...]`). Any other expression moves rows by key all the
+ * same, with coarser write sets. The compiler replaces it, so calling it throws.
  */
 export function For<T>(_props: {
   each: readonly T[];
-  key: keyof T & string;
+  key: (item: T) => string | number;
   children: (item: T, index: number) => JSX.Element;
 }): JSX.Element {
   return failBlock('For');

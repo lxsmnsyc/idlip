@@ -158,14 +158,14 @@ export default function Board(props: { columns: Column[] }) {
           </p>
         )}
       >
-        <For each={columns} key="id">
+        <For each={columns} key={(column) => column.id}>
           {(column, index) => (
             <section>
               <h2>
                 {index + 1}. {column.name}
               </h2>
               <ul>
-                <For each={column.cards} key="id">
+                <For each={column.cards} key={(card) => card.id}>
                   {(card) =>
                     isVisible(card, filter) && <CardRow card={card} onPick={() => pick(card.id)} />
                   }
@@ -176,7 +176,7 @@ export default function Board(props: { columns: Column[] }) {
           )}
         </For>
       </Try>
-      <For each={columns[0].cards} key="id">
+      <For each={columns[0].cards} key={(item) => item.id}>
         {({ id, author }) => (
           <div ref={['card', id]} class={selected === id ? styles.selected : undefined}>
             <Avatar name={author.name} />

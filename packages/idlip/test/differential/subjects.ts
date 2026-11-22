@@ -51,6 +51,18 @@ export const SUBJECTS: readonly Subject[] = [
     props: { title: 'Hello' },
   },
   {
+    // Keys that are a template literal and a nested field, so rows move through the list
+    // chunk's `key` and the write sets are `*`.
+    name: 'computed-key',
+    source: read(import.meta.dirname, 'subjects/computed-key.tsx'),
+    props: {
+      entries: [
+        { kind: 'a', id: 1, label: 'One', done: false, meta: { id: 'm1' } },
+        { kind: 'b', id: 1, label: 'Two', done: true, meta: { id: 'm2' } },
+      ],
+    },
+  },
+  {
     name: 'nested-board',
     source: read(FIXTURES, 'nested/board/board.tsx'),
     props: {

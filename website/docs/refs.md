@@ -45,7 +45,7 @@ export default function Rows(props: { rows: Row[] }): JSX.Element {
       <button on:click={measure}>Measure</button>
       <p>{width}</p>
       <ul>
-        <For each={rows} key="id">
+        <For each={rows} key={(row) => row.id}>
           {(row) => <li ref={['row', row.id]}>{row.text}</li>}
         </For>
       </ul>
@@ -59,7 +59,7 @@ The test `packages/idlip/test/client/dom/dom.test.ts` runs these calls on `packa
 ## Ref names
 
 - A ref name is a string literal: `ref="search"`.
-- Inside `<For>`, a ref is a tuple of a literal and the row's key: `ref={['row', row.id]}`, where `id` is the `key` of the `<For>`. Any other second item is the error `ref-key`, because only the key is unique among the rows.
+- Inside `<For>`, a ref is a tuple of a literal and the row's key: `ref={['row', row.id]}`, where `id` is the field that the `key` callback of the `<For>` returns. A `<For>` with a computed key allows no ref tuple. Any other second item is the error `ref-key`, because only the key is unique among the rows.
 - A handler passes the same name: `Dom.focus('search')`, `Dom.focus(['row', id])`.
 
 ## The Dom calls

@@ -24,7 +24,7 @@ export default function Shapes(props: { first: string }): JSX.Element {
       <button on:click={() => toggle()}>toggle</button>
       <button on:click={() => addTerm()}>term</button>
       <svg viewBox="0 0 10 10">
-        <For each={dots} key="id">
+        <For each={dots} key={(d) => d.id}>
           {(d) => <circle r={d.r} />}
         </For>
         {shown && <rect width="2" height="2" />}
@@ -34,7 +34,7 @@ export default function Shapes(props: { first: string }): JSX.Element {
       </svg>
       <math>
         <mrow>
-          <For each={terms} key="id">
+          <For each={terms} key={(t) => t.id}>
             {(t) => <mi>{t.name}</mi>}
           </For>
         </mrow>

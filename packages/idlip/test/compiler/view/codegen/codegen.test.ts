@@ -164,10 +164,10 @@ const NESTED = `
         }
         return (
           <main on:click={pick}>
-            <For each={columns} key="id">
+            <For each={columns} key={(column) => column.id}>
               {(column) => (
                 <section>
-                  <For each={column.cards} key="id">
+                  <For each={column.cards} key={(card) => card.id}>
                     {(card) => <p class={selected === card.id}>c</p>}
                   </For>
                 </section>
@@ -584,7 +584,7 @@ describe('client chunks', () => {
         <main>
           {n > props.min ? <b class={{ big: n > 5 }}>{n}</b> : <i>low</i>}
           <ul>
-            {n > 0 && <For each={items} key="id">{(item, index) => <li>{index}: {item} {n}</li>}</For>}
+            {n > 0 && <For each={items} key={(item) => item.id}>{(item, index) => <li>{index}: {item} {n}</li>}</For>}
           </ul>
           <button on:click={bump}>+</button>
         </main>
@@ -593,7 +593,9 @@ describe('client chunks', () => {
   `;
 
   it('renders a condition branch with its own bindings and the scope it reads', () => {
-    const result = generateSource(SOURCE.replace(' key="id"', ' key="item"'));
+    const result = generateSource(
+      SOURCE.replace(' key={(item) => item.id}', ' key={(item) => item.item}'),
+    );
     expect(result.diagnostics.filter((item) => item.severity === 'error')).toEqual([]);
     const chunk = result.client.find((module) => module.chunk === 'binding=n');
     expect(chunk?.code).toContain('function renderC0(branch, { model }) {');
@@ -605,7 +607,9 @@ describe('client chunks', () => {
   });
 
   it('declares the loop variables a template reads and renders rows', () => {
-    const result = generateSource(SOURCE.replace(' key="id"', ' key="item"'));
+    const result = generateSource(
+      SOURCE.replace(' key={(item) => item.id}', ' key={(item) => item.item}'),
+    );
     const list = result.client.find((module) => module.chunk.startsWith('list='));
     expect(list?.code).toContain('const index = rows[0].index;');
     expect(list?.code).toContain('const item = rows[0].item;');
@@ -630,7 +634,7 @@ describe('client chunks', () => {
         }
         return (
           <svg>
-            <For each={xs} key="x">{(x) => <circle r={x} />}</For>
+            <For each={xs} key={(x) => x.x}>{(x) => <circle r={x} />}</For>
             <text on:click={add}>+</text>
           </svg>
         );
@@ -651,10 +655,10 @@ describe('client chunks', () => {
         }
         return (
           <main on:click={add}>
-            <For each={columns} key="id">
+            <For each={columns} key={(column) => column.id}>
               {(column) => (
                 <section>
-                  <For each={column.cards} key="id">{(card) => <p>{card.title}</p>}</For>
+                  <For each={column.cards} key={(card) => card.id}>{(card) => <p>{card.title}</p>}</For>
                 </section>
               )}
             </For>
@@ -688,7 +692,7 @@ describe('client chunks', () => {
         }
         return (
           <ul on:click={pick}>
-            <For each={todos} key="id">{(t) => <li class={selected === t.id}>x</li>}</For>
+            <For each={todos} key={(t) => t.id}>{(t) => <li class={selected === t.id}>x</li>}</For>
           </ul>
         );
       }
@@ -736,8 +740,8 @@ describe('client chunks', () => {
         }
         return (
           <div on:click={pick}>
-            <For each={xs} key="id">{(x) => <i class={selected}>x</i>}</For>
-            <For each={ys} key="id">{(y) => <b class={selected}>y</b>}</For>
+            <For each={xs} key={(x) => x.id}>{(x) => <i class={selected}>x</i>}</For>
+            <For each={ys} key={(y) => y.id}>{(y) => <b class={selected}>y</b>}</For>
           </div>
         );
       }

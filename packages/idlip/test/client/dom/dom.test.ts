@@ -53,7 +53,7 @@ export default function Refs(props: { start: string }): JSX.Element {
       <button on:click={() => add()}>add</button>
       <p>{size}</p>
       <ul>
-        <For each={items} key="id">
+        <For each={items} key={(r) => r.id}>
           {(r) => <li ref={['row', r.id]}>{r.text}</li>}
         </For>
       </ul>

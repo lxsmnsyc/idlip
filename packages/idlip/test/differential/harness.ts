@@ -36,7 +36,7 @@ export interface Opened {
   /** The model of the server render from the props alone. */
   readonly initial: Model;
   /** The paths of the lists with their key fields, from the manifest. */
-  readonly keys: ReadonlyMap<string, string>;
+  readonly keys: ReadonlyMap<string, string | undefined>;
   /** The server render of a model, or undefined when the render throws. */
   render: (model: Model) => string | undefined;
   /**
@@ -75,7 +75,7 @@ export async function open(subject: Subject): Promise<Opened> {
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion
   const server = (await importCode(bindImports(compiled.server, key))) as ServerModule;
 
-  const urls = new Map<string, string>();
+  const urls = new Map<string, string | undefined>();
   for (const chunk of compiled.client) {
     urls.set(
       getChunkId(compiled.manifest.module, chunk.chunk),
@@ -105,7 +105,7 @@ export async function open(subject: Subject): Promise<Opened> {
     throw new Error(`${subject.name} does not render on the server`);
   }
 
-  const keys = new Map<string, string>();
+  const keys = new Map<string, string | undefined>();
   for (const list of Object.values(compiled.manifest.lists)) {
     if (list.path !== undefined) {
       keys.set(list.path, list.key);

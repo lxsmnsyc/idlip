@@ -23,7 +23,7 @@ export default function Keyed(props: { initial: Todo[]; notes: Todo[] }) {
       <p>{todos.find((t) => selected === t.id)?.done}</p>
       <p>{notes.find((n) => n.id === other).text}</p>
       <p>{todos.find((t) => t.text === selected).done}</p>
-      <For each={todos} key="id">
+      <For each={todos} key={(t) => t.id}>
         {(t) => <li on:click={() => select(t.id)}>{t.text}</li>}
       </For>
     </main>

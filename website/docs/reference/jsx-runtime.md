@@ -26,7 +26,7 @@ namespace JSX {
     children: unknown;
   }
   interface IntrinsicAttributes {
-    key?: string | number;
+    key?: string | number | ((item: never) => string | number);
   }
   interface IntrinsicElements {
     /* HTML, SVG and MathML elements, <window> and <document> */
@@ -35,6 +35,8 @@ namespace JSX {
 ```
 
 The namespace TypeScript reads for JSX. `JSX.Element` is what a component returns. It exists only as a type.
+
+`key` also accepts a callback, which only `<For>` takes as its `key` (its own type gives the item).
 
 `IntrinsicElements` types every element:
 

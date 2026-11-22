@@ -50,7 +50,7 @@ export default function Dashboard(props: { items: Item[] }): JSX.Element {
       <h1 on:click={rename}>{title}</h1>
       <Counter start={1} />
       <ul>
-        <For each={props.items} key="id">
+        <For each={props.items} key={(item) => item.id}>
           {(item) => <Row label={item.label} />}
         </For>
       </ul>

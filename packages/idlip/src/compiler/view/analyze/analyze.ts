@@ -30,6 +30,7 @@ import type {
   Event,
   EventModifier,
   Expr,
+  ForKey,
   FreeKind,
   Handler,
   HandlerPart,
@@ -1852,15 +1853,16 @@ class Analyzer {
             row !== undefined &&
             !key.root.index &&
             key.root.name === row.item &&
+            row.key.kind === 'field' &&
             key.segments.length === 1 &&
-            key.segments[0] === row.key
+            key.segments[0] === row.key.field
           ) {
             return { kind: 'tuple', name: first.value, key };
           }
           this.report(
             'ref-key',
             'error',
-            `The key of a ref must be the key of the enclosing <For>, the field ${row?.key ?? ''} of its item`,
+            `The key of a ref must be the key of the enclosing <For>, a field of its item${row?.key.kind === 'field' ? `: ${row.key.field}` : ' (this <For> has a computed key, so refs in its rows cannot use it)'}`,
             attribute,
           );
           return undefined;
@@ -2086,13 +2088,6 @@ class Analyzer {
       this.reportError('for-each', '<For> needs each', node.openingElement);
       return [];
     }
-    if (keyNode?.type !== 'Literal' || typeof keyNode.value !== 'string') {
-      this.reportError(
-        'for-key',
-        '<For> needs key="field", a string literal naming a field of the item',
-        node.openingElement,
-      );
-    }
     const each = this.createHole(eachNode, scope);
     const children = collectNonBlank(node.children);
     const render =
@@ -2123,9 +2118,6 @@ class Analyzer {
         base = own[0];
       }
     }
-    if (base !== undefined && keyNode?.type === 'Literal' && typeof keyNode.value === 'string') {
-      this.listKeys.set(printPath({ root: base.root, segments: base.segments }), keyNode.value);
-    }
     const inner = createScope(scope);
     const itemParam = render.params[0];
     const indexParam = render.params.at(1);
@@ -2139,6 +2131,11 @@ class Analyzer {
       fallback: eachPaths,
     });
     const itemExpr: Expr = { kind: 'path', root: itemRoot, segments: [], optional: false };
+    const key = this.lowerForKey(keyNode, itemRoot, scope, node);
+    // Only a field key lets a write set keep a keyed segment. A computed key gives `*`.
+    if (base !== undefined && key.kind === 'field') {
+      this.listKeys.set(printPath({ root: base.root, segments: base.segments }), key.field);
+    }
     if (itemParam.type === 'Identifier') {
       inner.names.set(itemName, { kind: 'expr', expr: itemExpr });
     } else if (itemParam.type === 'ObjectPattern') {
@@ -2180,22 +2177,77 @@ class Analyzer {
     const body = this.lowerBranch(render.body, inner, {
       ...context,
       loopDepth: context.loopDepth + 1,
-      rowKey: {
-        item: itemName,
-        key: keyNode?.type === 'Literal' && typeof keyNode.value === 'string' ? keyNode.value : '',
-      },
+      rowKey: { item: itemName, key },
     });
     return [
       {
         kind: 'for',
         each,
-        key: keyNode?.type === 'Literal' && typeof keyNode.value === 'string' ? keyNode.value : '',
+        key,
         item: itemName,
         index: indexName,
         namespace: context.namespace,
         body,
       },
     ];
+  }
+
+  /**
+   * Lowers `key={(item) => expression}` of a `<For>`. The body reads the item and globals only,
+   * so the server and the list chunk can both evaluate it. A path of one field of the item is a
+   * `field` key.
+   */
+  lowerForKey(
+    keyNode: AttrExpression | undefined,
+    itemRoot: Root,
+    scope: Scope,
+    node: JSXElement,
+  ): ForKey {
+    const failed: ForKey = { kind: 'field', field: '' };
+    if (
+      keyNode?.type !== 'ArrowFunctionExpression' ||
+      keyNode.params.length !== 1 ||
+      keyNode.params[0].type !== 'Identifier' ||
+      keyNode.body.type === 'BlockStatement'
+    ) {
+      const old =
+        keyNode?.type === 'Literal' && typeof keyNode.value === 'string'
+          ? ` key="${keyNode.value}" is gone: write key={(item) => item.${keyNode.value}}`
+          : '';
+      this.reportError(
+        'for-key',
+        `<For> takes key as a callback of the item, key={(item) => item.id}, with an expression body${old}`,
+        keyNode ?? node.openingElement,
+      );
+      return failed;
+    }
+    const inner = createScope(scope);
+    inner.names.set(keyNode.params[0].name, {
+      kind: 'expr',
+      expr: { kind: 'path', root: itemRoot, segments: [], optional: false },
+    });
+    const errors = this.diagnostics.length;
+    const expr = this.lower(keyNode.body, inner);
+    if (this.diagnostics.length > errors) {
+      return failed;
+    }
+    if (!readsOnlyItem(expr, itemRoot)) {
+      this.reportError(
+        'for-key',
+        'The <For> key reads the item and nothing else: no state, props, index or helper call',
+        keyNode.body,
+      );
+      return failed;
+    }
+    if (
+      expr.kind === 'path' &&
+      expr.root === itemRoot &&
+      expr.segments.length === 1 &&
+      typeof expr.segments[0] === 'string'
+    ) {
+      return { kind: 'field', field: expr.segments[0] };
+    }
+    return { kind: 'computed', expr };
   }
 
   /** A stateful child component: a child block with its own model slot. */
@@ -3186,7 +3238,7 @@ interface ViewContext {
   inHead: boolean;
   loopDepth: number;
   /** The innermost `<For>`: its item name and `key` field. */
-  rowKey?: { item: string; key: string };
+  rowKey?: { item: string; key: ForKey };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -3548,6 +3600,43 @@ function collectNonBlank(children: AstNode[]): AstNode[] {
     }
   }
   return out;
+}
+
+/** Tells whether an expression reads the loop item and globals only, and no path computes a segment. */
+function readsOnlyItem(expr: Expr, item: Root): boolean {
+  switch (expr.kind) {
+    case 'literal':
+      return true;
+    case 'path':
+      for (const segment of expr.segments) {
+        if (typeof segment !== 'string') {
+          return false;
+        }
+      }
+      return expr.root === item || expr.root.kind === 'global';
+    case 'unary':
+      return readsOnlyItem(expr.arg, item);
+    case 'binary':
+    case 'logical':
+      return readsOnlyItem(expr.left, item) && readsOnlyItem(expr.right, item);
+    case 'conditional':
+      return (
+        readsOnlyItem(expr.test, item) &&
+        readsOnlyItem(expr.then, item) &&
+        readsOnlyItem(expr.else, item)
+      );
+    case 'template':
+      return expr.exprs.every((one) => readsOnlyItem(one, item));
+    case 'method':
+      return (
+        readsOnlyItem(expr.receiver, item) && expr.args.every((one) => readsOnlyItem(one, item))
+      );
+    case 'property':
+      return readsOnlyItem(expr.receiver, item);
+    default:
+      // Objects, arrays and calls.
+      return false;
+  }
 }
 
 function hasComputedSegment(segments: Segment[]): boolean {

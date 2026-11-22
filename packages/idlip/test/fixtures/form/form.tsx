@@ -41,7 +41,7 @@ export default function Form(): JSX.Element {
       <p>{count}</p>
       <p>{agreed}</p>
       <ul>
-        <For each={rows} key="id">
+        <For each={rows} key={(r) => r.id}>
           {(r) => (
             <li>
               <form

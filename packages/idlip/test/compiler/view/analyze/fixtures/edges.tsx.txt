@@ -40,10 +40,10 @@ export default function Edges(props: { items: Item[] }) {
       <p>{chosen?.name}</p>
       <p>{name(index > 0 ? items[0] : items[1])}</p>
       <p>{name(list[index])}</p>
-      <For each={visible(items, query)} key="id">
+      <For each={visible(items, query)} key={(item) => item.id}>
         {(item) => <button on:click={() => select(item.id)}>{item.name}</button>}
       </For>
-      <For each={list} key="id">
+      <For each={list} key={(item) => item.id}>
         {(item) => <span>{item.name}</span>}
       </For>
     </main>

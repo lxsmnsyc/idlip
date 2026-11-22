@@ -19,12 +19,12 @@ import { timer, socket, eventSource, media } from 'idlip';
 ```ts
 function For<T>(props: {
   each: readonly T[];
-  key: keyof T & string;
+  key: (item: T) => string | number;
   children: (item: T, index: number) => JSX.Element;
 }): JSX.Element;
 ```
 
-Renders `children` once per item of `each`. `key` names a field that is unique among the items. A row patches by key, so a binding of `todos.*.done` touches only the rows whose `done` changed.
+Renders `children` once per item of `each`. `key` is a callback, `key={(item) => item.id}`, that returns a string or number unique among the items. A row patches by key, so a binding of `todos.*.done` touches only the rows whose `done` changed.
 
 ```tsx
 import { For } from 'idlip';
@@ -38,7 +38,7 @@ export default function List(props: { items: { id: string; text: string }[] }) {
 
   return (
     <ul>
-      <For each={items} key="id">
+      <For each={items} key={(item) => item.id}>
         {(item) => (
           <li>
             {item.text}
@@ -51,7 +51,7 @@ export default function List(props: { items: { id: string; text: string }[] }) {
 }
 ```
 
-`key` is a string literal (`for-key`). The child is one arrow with an expression body, `(item, index?) => view` (`for-render`). The item may be an object pattern of plain fields.
+`key` is one arrow with one plain parameter and an expression body that reads only the item: a field path, a template literal or another expression of the closed grammar, with no state, index or helper call (`for-key`). `key="id"` is the same error. A body that is one field of the item keeps keyed writes (`todos[id=selected]`). Any other body, including a nested field, moves rows by key through the list chunk and gives `*` write sets. The child is one arrow with an expression body, `(item, index?) => view` (`for-render`). The item may be an object pattern of plain fields.
 
 ### `Try`
 
@@ -241,7 +241,7 @@ export default function Search(props: { items: { id: string; text: string }[] })
       <button on:click={measure}>Measure</button>
       <output>{width}</output>
       <ul>
-        <For each={items} key="id">
+        <For each={items} key={(item) => item.id}>
           {(item) => <input ref={['row', item.id]} value={item.text} />}
         </For>
       </ul>
@@ -257,7 +257,7 @@ export default function Search(props: { items: { id: string; text: string }[] })
 type RefName = string | readonly [string, string | number];
 ```
 
-A ref name. A string names one element. Inside a `<For>`, a tuple names the element of one row: `ref={['row', t.id]}`, where the second item is the `key` field of the innermost `<For>` (`ref-key`).
+A ref name. A string names one element. Inside a `<For>`, a tuple names the element of one row: `ref={['row', t.id]}`, where the second item is the `key` field of the innermost `<For>`, whose key must be one field (`ref-key`).
 
 ### `Rect`
 
@@ -307,7 +307,7 @@ export default function Tags() {
     <main>
       <button on:click={add}>Add</button>
       <ul>
-        <For each={tags} key="id">
+        <For each={tags} key={(tag) => tag.id}>
           {(tag) => <li>{tag.label}</li>}
         </For>
       </ul>

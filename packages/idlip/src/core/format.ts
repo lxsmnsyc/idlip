@@ -98,8 +98,11 @@ export interface BindingGroup {
 }
 
 export interface ListEntry {
-  /** The `key` prop of the `<For>`. */
-  readonly key: string;
+  /**
+   * The field of the item that `key={(item) => item.field}` reads. Absent for a computed key,
+   * which the list chunk evaluates with its `key` export.
+   */
+  readonly key?: string;
   /**
    * The path of `each` when it is a path, such as `todos` or `columns.*.cards`.
    * `diffPaths` also pairs the `*` items under it by `key`. Absent when `each` is a helper call.
@@ -278,6 +281,8 @@ export type BindingChunk = Readonly<Record<string, Binding>>;
 export interface ListChunk {
   /** Renders one row, without the row markers. */
   readonly render: (scope: Scope) => string;
+  /** The key of an item, for a list whose manifest entry has no `key` field. */
+  readonly key?: (item: unknown) => unknown;
   readonly namespace?: 'svg' | 'mathml';
 }
 
@@ -304,7 +309,8 @@ export type Patch = (page: Page, prev: Model, next: Model) => Promise<void>;
 
 /**
  * Owned by `patch-bindings`. Returns the paths whose values differ by reference.
- * `keys` maps a list path (`ListEntry.path`) to its key field. A `*` path under such a list
+ * `keys` maps a list path (`ListEntry.path`) to its key field, or to `undefined` for a computed
+ * key, under which any change of the list counts as a change of its `*` paths. A `*` path under such a list
  * changes when it differs by key or by index: by key for row bindings after a reorder, by
  * index for holes outside rows such as `todos[selected].done`.
  */
@@ -312,7 +318,7 @@ export type DiffPaths = (
   prev: Model,
   next: Model,
   paths: readonly string[],
-  keys: Readonly<Record<string, string>>,
+  keys: Readonly<Record<string, string | undefined>>,
 ) => Set<string>;
 
 export interface ListContext {

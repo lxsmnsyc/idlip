@@ -5,7 +5,7 @@
 - A flag name must not appear in other code or in a string. Why: the plugin replaces the text.
 - A chunk may import from `idlip/client` only what the loader already holds. Why: a chunk import that is not in the loader costs a third request on the first click.
 - Tasks run through `runTask(host, task)` in `tasks/run.ts`. Do not add another path for an awaited call. Why: `apply` and the settle order depend on one.
-- Flag-on cost, gzip -9 over the todo loader: `HAS_TASKS` +274 B, `HAS_KEYED` +124 B, `HAS_REFS` +550 B, `HAS_CHILDREN` +650 B, `HAS_SUBS` +937 B, `HAS_HEAD` +307 B, `HAS_ERRORS` with `HAS_RETRY` +606 B (`HAS_RETRY` alone +16 B), `HAS_SKEW` +60 B (plugin option, default on), `HAS_DYNAMIC` +122 B. Why: a change that grows one of them shows up against this list. Update the line when you move a number.
+- Flag-on cost, gzip -9 over the todo loader: `HAS_TASKS` +274 B, `HAS_KEYED` +124 B, `HAS_REFS` +550 B, `HAS_CHILDREN` +650 B, `HAS_SUBS` +937 B, `HAS_HEAD` +307 B, `HAS_ERRORS` with `HAS_RETRY` +606 B (`HAS_RETRY` alone +16 B), `HAS_SKEW` +60 B (plugin option, default on), `HAS_DYNAMIC` +122 B, `HAS_KEY_FN` +24 B. Why: a change that grows one of them shows up against this list. Update the line when you move a number.
 - Put a field or branch that one feature reads behind `...(HAS_X && { field })` or `if (HAS_X)`. Why: a plain field survives dead-code elimination, and a `Reflect.apply` of a union costs about 9 B a call over a typed call.
 - Put code that only one feature needs in its own module with one call site behind its flag. Why: an unreferenced module drops out of the bundle (`head.ts`, `nesting.ts`, `errors.ts`).
 - Reach `innerHTML` only through `parseHtml`. Why: it holds the one Trusted Types policy and the namespace wrapper.

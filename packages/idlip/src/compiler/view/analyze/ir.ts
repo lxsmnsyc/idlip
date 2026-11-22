@@ -110,6 +110,13 @@ export interface Hole {
   span: Span;
 }
 
+/**
+ * The key of a `<For>` row, from `key={(item) => ...}`. A `field` is a field of the item
+ * (`item.id`) and the manifest names it. A `computed` key is any other expression of the item
+ * in the closed grammar; the list chunk evaluates it.
+ */
+export type ForKey = { kind: 'field'; field: string } | { kind: 'computed'; expr: Expr };
+
 /** What an event prop dispatches. */
 export type Target =
   | { kind: 'handler'; name: string }
@@ -173,7 +180,7 @@ export type Node =
   | {
       kind: 'for';
       each: Hole;
-      key: string;
+      key: ForKey;
       item: string;
       index: string | undefined;
       namespace: Namespace;

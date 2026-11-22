@@ -160,7 +160,7 @@ function buildManifest(
     }
     const path = getListPath(info, child);
     lists[String(info.id)] = {
-      key: info.node.key,
+      ...(info.node.key.kind === 'field' ? { key: info.node.key.field } : {}),
       ...(path === undefined ? {} : { path }),
       chunk: `list=${info.id}`,
       bindings,

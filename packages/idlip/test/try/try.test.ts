@@ -133,7 +133,7 @@ describe('compile', () => {
   it('rejects a block in the catch view', () => {
     const source = BOARD.replace(
       'catch={(error) => <em>{error}</em>}',
-      'catch={(error) => <ul><For each={items} key="id">{(item) => <li>{item.n}</li>}</For></ul>}',
+      'catch={(error) => <ul><For each={items} key={(item) => item.id}>{(item) => <li>{item.n}</li>}</For></ul>}',
     );
     expect(getErrors(source)).toContain('try-catch-node');
   });

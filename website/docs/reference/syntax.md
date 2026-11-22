@@ -43,7 +43,7 @@ export default function TodoApp(props: { initial: Todo[] }) {
     <main>
       <p>{left} left</p>
       <ul>
-        <For each={todos} key="id">
+        <For each={todos} key={(t) => t.id}>
           {(t) => (
             <li class={{ done: t.done }}>
               <input type="checkbox" checked={t.done} on:click={() => toggle(t.id)} />
@@ -78,7 +78,7 @@ A hole is an expression in the view: a text child or an attribute value. The com
 - Template literals, and object and array literals.
 - Calls to module helpers and imported functions with plain arguments, and to `String`, `Number`, `Boolean` and `Math.*`.
 - The methods `trim`, `toUpperCase`, `toLowerCase`, `slice`, `includes`, `startsWith`, `endsWith`, `indexOf`, `join`, `at`, `padStart`, `padEnd`, `toFixed`, and `.length` on any value.
-- A keyed lookup `list.find((t) => t.id === selected)` on a state or props list. Under a `<For>` keyed by `id`, it reads `todos[id=selected]`, so it patches only when that item changes.
+- A keyed lookup `list.find((t) => t.id === selected)` on a state or props list. Under a `<For>` with `key={(t) => t.id}`, it reads `todos[id=selected]`, so it patches only when that item changes.
 
 Spreads, closures, other globals and other methods are errors (`hole-spread`, `hole-closure`, `hole-global`, `hole-method`). Impure globals (`Math.random`, `Date.now`, `performance.now`, `crypto.randomUUID`) are allowed in holes only, and give the warning `hole-impure` when the hole also reads paths, since the value is computed again at each patch.
 
@@ -110,7 +110,7 @@ export default function Status(props: { count: number }) {
 ## Attributes
 
 - `class` takes a string or a record of booleans: `class={{ done: t.done }}`.
-- `ref="name"` names an element for `Dom`. In a `<For>`, `ref={['row', t.id]}` names the element of one row, with the innermost `<For>`'s `key` field (`ref-key`).
+- `ref="name"` names an element for `Dom`. In a `<For>`, `ref={['row', t.id]}` names the element of one row, with the innermost `<For>`'s key field (`ref-key`; a computed key has no field to name).
 - `html={trusted(value)}` writes raw HTML. The element takes no children (`html-trusted`, `html-children`).
 - `key` on a child component names its model slot.
 - A bound URL attribute (`href`, `src`, `action` and the like) drops `javascript:` and `vbscript:` URLs. Embedding attributes also drop `data:` URLs other than raster images.
@@ -216,7 +216,7 @@ export default function Board(props: { items: Item[] }) {
 
   return (
     <main>
-      <For each={items} key="id">
+      <For each={items} key={(c) => c.id}>
         {(c) => <Counter label={c.label} start={0} onRemove={() => remove(c.id)} />}
       </For>
     </main>

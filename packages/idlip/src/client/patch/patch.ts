@@ -21,7 +21,7 @@ import { findNode } from './nodes.ts';
 interface Plan {
   /** The paths of every group. */
   readonly paths: readonly string[];
-  readonly keys: Readonly<Record<string, string>>;
+  readonly keys: Readonly<Record<string, string | undefined>>;
   /** The export names of bindings inside rows. */
   readonly rowNames: ReadonlySet<string>;
 }

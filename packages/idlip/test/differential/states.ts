@@ -52,7 +52,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 interface Context {
   readonly random: Random;
   /** Key field by list path, with `*` for each list level. */
-  readonly keys: ReadonlyMap<string, string>;
+  readonly keys: ReadonlyMap<string, string | undefined>;
   fresh: number;
 }
 
@@ -145,7 +145,7 @@ function mutateList(context: Context, list: readonly unknown[], path: string): u
 /** Returns a model that differs from `model` in a random way. */
 export function mutateModel(
   random: Random,
-  keys: ReadonlyMap<string, string>,
+  keys: ReadonlyMap<string, string | undefined>,
   model: Model,
 ): Model {
   const context: Context = { random, keys, fresh: 0 };

@@ -43,7 +43,7 @@ export default function Parent(props: { items: Item[] }): JSX.Element {
       <button on:click={toggle}>toggle</button>
       <button on:click={rename}>rename</button>
       {spare ? <Counter label="Spare" onRemove={toggle} /> : <p>no spare</p>}
-      <For each={items} key="id">
+      <For each={items} key={(item) => item.id}>
         {(item) => <Counter label={item.label} onRemove={() => remove(item.id)} />}
       </For>
     </section>

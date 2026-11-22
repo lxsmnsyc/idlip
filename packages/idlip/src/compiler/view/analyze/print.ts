@@ -189,7 +189,7 @@ function printNodes(nodes: Node[], indent: string, out: string[]): void {
       }
       case 'for':
         out.push(
-          `${indent}for #${node.each.id} key=${node.key} item=${node.item}${node.index ? ` index=${node.index}` : ''}`,
+          `${indent}for #${node.each.id} key=${node.key.kind === 'field' ? node.key.field : `{${printExpr(node.key.expr)}}`} item=${node.item}${node.index ? ` index=${node.index}` : ''}`,
         );
         printNodes(node.body, `${indent}  `, out);
         break;

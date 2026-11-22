@@ -80,7 +80,7 @@ export default function Guests(): JSX.Element {
         <button>Add</button>
       </form>
       <ul>
-        <For each={guests} key="id">
+        <For each={guests} key={(guest) => guest.id}>
           {(guest) => (
             <li>
               {guest.name}: {guest.seats}
@@ -148,7 +148,7 @@ export default function Notes(): JSX.Element {
       <button on:click={add}>Add a note</button>
       <p>{notes.length} notes</p>
       <ul>
-        <For each={notes} key="id">
+        <For each={notes} key={(note) => note.id}>
           {(note) => (
             <li>
               {note.id} at {note.at}

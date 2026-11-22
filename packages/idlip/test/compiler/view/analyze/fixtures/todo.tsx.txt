@@ -56,7 +56,7 @@ export default function TodoApp(props: { initial: Todo[] }) {
         Save
       </button>
       <p>{left} left</p>
-      <For each={todos} key="id">
+      <For each={todos} key={(t) => t.id}>
         {(t) => (
           <li class={{ done: t.done }}>
             <input type="checkbox" checked={t.done} on:click={() => toggle(t.id)} />

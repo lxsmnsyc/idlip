@@ -162,7 +162,7 @@ Four components from `idlip` mark blocks in the view. The compiler replaces them
 
 ### For
 
-`<For>` renders a list. `each` is the array, and `key` names a field that is unique among the items. The child is a function of the item and its index:
+`<For>` renders a list. `each` is the array, and `key` is a callback of the item that returns a string or number, unique among the items: `key={(step) => step.id}`. The child is a function of the item and its index:
 
 ```tsx
 import { For } from 'idlip';
@@ -171,7 +171,7 @@ import type { JSX } from 'idlip/jsx-runtime';
 export default function Steps(props: { steps: { id: string; label: string }[] }): JSX.Element {
   return (
     <ol>
-      <For each={props.steps} key="id">
+      <For each={props.steps} key={(step) => step.id}>
         {(step, index) => <li data-index={index}>{step.label}</li>}
       </For>
     </ol>
@@ -179,7 +179,9 @@ export default function Steps(props: { steps: { id: string; label: string }[] })
 }
 ```
 
-A row moves with its key when the list changes. `.map()` in a view is the error `view-map`.
+A row moves with its key when the list changes. The key body is one expression that reads the item and nothing else: a field (`step.id`, `step.meta.id`), a template literal (`` `${step.kind}:${step.id}` ``) or another expression of the closed grammar. `key="id"` is the error `for-key`, which names the callback form.
+
+A key that is one field of the item, such as `step.id`, keeps keyed writes: a write set can name one row (`steps[id=selected].done`). Any other key still moves the rows by key. Its write sets treat the row as any row (`steps.*.done`), which patches more rows than needed and never fewer, and the list loads its row chunk on each change to read the keys. `.map()` in a view is the error `view-map`.
 
 ### Try
 

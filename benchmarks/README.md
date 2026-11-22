@@ -229,7 +229,7 @@ The table of [js-framework-benchmark](https://krausest.github.io/js-framework-be
 
 [`harness/rows.mjs`](./harness/rows.mjs) makes the rows and the new lists, and every app imports it, so the apps differ only in how they render and update. The page server reads the number of rows from `?n=`, and defaults to 0.
 
-The idlip page is `idlip/rows/src/app.tsx`, with `<For each={rows} key="id">`. Every operation is expressible, swap included. Its handlers call the list operations of `rows.mjs`, and the idlip Vite plugin rejects a handler chunk that imports a chunk the loader does not import, so the loader is `idlip/rows/src/loader.ts`: it imports `idlip/client` and re-exports the operations (0.9 kB, loaded at start).
+The idlip page is `idlip/rows/src/app.tsx`, with `<For each={rows} key={(item) => item.id}>`. Every operation is expressible, swap included. Its handlers call the list operations of `rows.mjs`, and the idlip Vite plugin rejects a handler chunk that imports a chunk the loader does not import, so the loader is `idlip/rows/src/loader.ts`: it imports `idlip/client` and re-exports the operations (0.9 kB, loaded at start).
 
 ### Dashboard
 

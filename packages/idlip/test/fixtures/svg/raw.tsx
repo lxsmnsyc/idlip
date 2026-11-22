@@ -20,7 +20,7 @@ export default function Raw(props: { note: string }): JSX.Element {
       <button on:click={() => addRow()}>row</button>
       <div html={trusted(note)} />
       <ul>
-        <For each={rows} key="id">
+        <For each={rows} key={(r) => r.id}>
           {(r) => <li html={trusted(r.body)} />}
         </For>
       </ul>

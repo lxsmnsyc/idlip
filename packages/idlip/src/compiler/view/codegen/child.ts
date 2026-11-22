@@ -15,7 +15,11 @@ export function printSlot(emitter: Emitter, plan: Plan, node: ChildNode, path: s
   const info = plan.children.get(node);
   const args = [path, String(info?.site ?? 0)];
   for (const loop of info?.loops ?? []) {
-    args.push(`${emitter.printLoop(loop.item, false)}${getAccessor(loop.key, false)}`);
+    args.push(
+      loop.key.kind === 'field'
+        ? `${emitter.printLoop(loop.item, false)}${getAccessor(loop.key.field, false)}`
+        : emitter.expr(loop.key.expr, 1),
+    );
   }
   if (node.slot.kind === 'key') {
     emitter.at = node.slot.hole.span;

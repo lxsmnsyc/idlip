@@ -1,12 +1,13 @@
 import type { Manifest, Model } from '../../core/format.ts';
-import { HAS_KEYED } from '../features.ts';
+import { HAS_KEYED, HAS_KEY_FN } from '../features.ts';
 import { isRecord } from './guards.ts';
 
 /** Splits at the dots outside brackets, and reads `todos[id=selected]`. */
 const SPLIT = /\.(?![^[]*\])/;
 const KEYED = /^(\w+)\[(\w+)=([^\]]*)\]$/;
 
-type Keys = Readonly<Record<string, string>>;
+/** A list path to its key field. `undefined` marks a computed key that the diff cannot read. */
+type Keys = Readonly<Record<string, string | undefined>>;
 
 /** The models being compared, for the sources of keyed segments. */
 interface Roots {
@@ -97,10 +98,12 @@ function checkChanged(
   const itemPath = prefix === '' ? '*' : `${prefix}.*`;
   // Under a keyed list the path changes when it differs by key or by index. By key covers
   // row bindings after a reorder. By index covers holes such as `todos[selected].done`.
-  if (
-    Object.hasOwn(keys, prefix) &&
-    checkKeyed(prev, next, keys[prefix], segments, at + 1, itemPath, keys, roots)
-  ) {
+  const key = keys[prefix];
+  if (HAS_KEY_FN && Object.hasOwn(keys, prefix) && key === undefined) {
+    // Rows move by a computed key, so no item pairing is safe: the list changed.
+    return true;
+  }
+  if (key !== undefined && checkKeyed(prev, next, key, segments, at + 1, itemPath, keys, roots)) {
     return true;
   }
   const before = isRecord(prev) ? prev : {};
@@ -123,9 +126,10 @@ function checkChanged(
 }
 
 /** Returns the key field of each keyed `<For>`, by its list path. */
-export function getListKeys(manifest: Manifest): Record<string, string> {
-  const keys: Record<string, string> = {};
+export function getListKeys(manifest: Manifest): Record<string, string | undefined> {
+  const keys: Record<string, string | undefined> = {};
   for (const list of Object.values(manifest.lists)) {
+    // A list with a computed key stays in the map with no field.
     if (list.path !== undefined) {
       keys[list.path] = list.key;
     }

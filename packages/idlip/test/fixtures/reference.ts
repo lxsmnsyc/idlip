@@ -263,7 +263,7 @@ function checkChanged(
   next: unknown,
   segments: readonly string[],
   prefix: string,
-  keys: Readonly<Record<string, string>>,
+  keys: Readonly<Record<string, string | undefined>>,
 ): boolean {
   if (prev === next) {
     return false;
@@ -281,6 +281,10 @@ function checkChanged(
   // bindings after a reorder. By index covers holes outside rows, such as `todos[selected].done`.
   if (Object.hasOwn(keys, prefix)) {
     const key = keys[prefix];
+    if (key === undefined) {
+      // A computed key: no item pairing is safe, so any change of the list counts.
+      return true;
+    }
     const before = listKeyed(prev, key);
     for (const [id, item] of listKeyed(next, key)) {
       if (before.has(id) && checkChanged(before.get(id), item, rest, itemPath, keys)) {
@@ -309,7 +313,7 @@ export function diffPaths(
   prev: Model,
   next: Model,
   paths: readonly string[],
-  keys: Readonly<Record<string, string>>,
+  keys: Readonly<Record<string, string | undefined>>,
 ): Set<string> {
   const changed = new Set<string>();
   for (const path of paths) {
@@ -333,7 +337,7 @@ function hasChanged(paths: readonly string[], changed: ReadonlySet<string>): boo
  * Returns the binding chunks a patch loads: changed groups in manifest order, minus covered ones.
  */
 export function selectChunks(manifest: Manifest, prev: Model, next: Model): string[] {
-  const keys: Record<string, string> = {};
+  const keys: Record<string, string | undefined> = {};
   for (const list of Object.values(manifest.lists)) {
     if (list.path !== undefined) {
       keys[list.path] = list.key;

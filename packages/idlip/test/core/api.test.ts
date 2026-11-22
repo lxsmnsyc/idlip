@@ -11,7 +11,7 @@ import type { Todo } from './todo.tsx';
 
 describe('block components', () => {
   it('throw when called, since the compiler replaces them', () => {
-    const props = { each: [], key: 'id', children: () => undefined };
+    const props = { each: [], key: () => 'id', children: () => undefined };
     expect(() => {
       Reflect.apply(For, undefined, [props]);
     }).toThrow('<For>');
@@ -26,9 +26,9 @@ describe('block components', () => {
     }).toThrow('<Subscribe>');
   });
 
-  it('types `key` as a field of the item', () => {
+  it('types `key` as a callback of the item', () => {
     type Props = Parameters<typeof For<Todo>>[0];
-    expectTypeOf<Props['key']>().toEqualTypeOf<'id' | 'text' | 'done'>();
+    expectTypeOf<Props['key']>().toEqualTypeOf<(item: Todo) => string | number>();
     expectTypeOf<Props['each']>().toEqualTypeOf<readonly Todo[]>();
   });
 });

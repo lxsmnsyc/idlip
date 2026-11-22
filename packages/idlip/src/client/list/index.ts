@@ -9,7 +9,7 @@ import type {
   Scope,
 } from '../../core/format.ts';
 import { failRegion } from '../errors.ts';
-import { HAS_CHILDREN, HAS_ERRORS } from '../features.ts';
+import { HAS_CHILDREN, HAS_ERRORS, HAS_KEY_FN } from '../features.ts';
 import { isComment, isElement } from '../patch/guards.ts';
 import { addBlock, findInnerBlocks, parseHtml, readField, removeBlock } from '../patch/index.ts';
 
@@ -225,16 +225,27 @@ export async function patchList(...args: Parameters<PatchList>): Promise<void> {
   const [start, prev, next, context] = args;
   const { list, page } = context;
 
+  // A computed key lives in the list chunk, so the chunk loads before the rows are paired.
+  // Load the template before the DOM changes, so a failed load leaves the list as it was.
+  let chunk: ListChunk | undefined;
+  const { key } = list;
+  if (HAS_KEY_FN && key === undefined) {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+    chunk = (await page.load(page.manifest.module, list.chunk)) as ListChunk;
+  }
+  const readKey = (item: unknown): unknown =>
+    HAS_KEY_FN && key === undefined ? chunk?.key?.(item) : readField(item, key ?? '');
+
   // Pair the new items with the old rows by key. The DOM holds the old rows in order.
   // A key that is new or repeated counts as an insert.
   const oldIndexes = new Map<unknown, number>();
   for (let i = 0; i < prev.length; i++) {
-    oldIndexes.set(readField(prev[i], list.key), i);
+    oldIndexes.set(readKey(prev[i]), i);
   }
   const olds: number[] = [];
   const used = new Set<number>();
   for (const item of next) {
-    const old = oldIndexes.get(readField(item, list.key));
+    const old = oldIndexes.get(readKey(item));
     if (old === undefined || used.has(old)) {
       olds.push(-1);
     } else {
@@ -243,9 +254,7 @@ export async function patchList(...args: Parameters<PatchList>): Promise<void> {
     }
   }
 
-  // Load the template before the DOM changes, so a failed load leaves the list as it was.
-  let chunk: ListChunk | undefined;
-  if (used.size < next.length) {
+  if (chunk === undefined && used.size < next.length) {
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion
     chunk = (await page.load(page.manifest.module, list.chunk)) as ListChunk;
   }

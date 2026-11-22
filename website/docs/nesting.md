@@ -65,7 +65,7 @@ export default function Board(props: { items: Item[] }): JSX.Element {
   return (
     <main>
       <p>{total} counters</p>
-      <For each={items} key="id">
+      <For each={items} key={(c) => c.id}>
         {(c) => <Counter label={c.label} start={c.start} onRemove={() => remove(c.id)} />}
       </For>
     </main>
@@ -181,7 +181,7 @@ export default function Dashboard(props: { items: Item[] }): JSX.Element {
     <main>
       <Counter start={1} />
       <ul>
-        <For each={props.items} key="id">
+        <For each={props.items} key={(item) => item.id}>
           {(item) => <Row label={item.label} />}
         </For>
       </ul>

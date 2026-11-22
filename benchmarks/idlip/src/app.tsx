@@ -63,7 +63,7 @@ export default function App(props: { initial: Todo[] }): JSX.Element {
         <button>Add</button>
       </form>
       <ul>
-        <For each={todos} key="id">
+        <For each={todos} key={(t) => t.id}>
           {(t) => (
             <li class={{ done: t.done }}>
               <button class="todo" on:click={() => toggle(t.id)}>

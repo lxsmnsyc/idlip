@@ -59,7 +59,7 @@ export default function App(props: { initial: Row[] }): JSX.Element {
       </div>
       <table class="table">
         <tbody>
-          <For each={rows} key="id">
+          <For each={rows} key={(row) => row.id}>
             {(row) => (
               <tr class={selected === row.id ? 'danger' : ''}>
                 <td class="col-md-1">{row.id}</td>

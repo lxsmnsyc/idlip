@@ -41,7 +41,7 @@ describe('generated locals', () => {
         let rows = [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }];
         return (
           <ul>
-            <For each={rows} key="id">{(row) => <li>{row.label}</li>}</For>
+            <For each={rows} key={(row) => row.id}>{(row) => <li>{row.label}</li>}</For>
           </ul>
         );
       }

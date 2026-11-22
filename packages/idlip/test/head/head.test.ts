@@ -128,7 +128,7 @@ export default function Page(): JSX.Element {
     <main>
       <button id="add" on:click={add}>Add</button>
       <button id="drop" on:click={drop}>Drop</button>
-      <For each={names} key="id">
+      <For each={names} key={(row) => row.id}>
         {(row) => (
           <p>
             {row.id}

@@ -45,13 +45,13 @@ export default function Rich(props: { title: string }): JSX.Element {
       <button on:click={() => rename('<b>')}>rename</button>
       <input value={title} disabled={!open} />
       <ul>
-        <For each={groups} key="id">
+        <For each={groups} key={(g) => g.id}>
           {(g) => (
             <li class={{ hot: g.hot }} title={g.name}>
               {g.hot ? <b>{g.name}</b> : g.name}
               <div html={trusted(g.note)} />
               <ol>
-                <For each={g.tags} key="id">
+                <For each={g.tags} key={(t) => t.id}>
                   {(t) => <li>{t.label}</li>}
                 </For>
               </ol>
@@ -63,7 +63,7 @@ export default function Rich(props: { title: string }): JSX.Element {
         </For>
       </ul>
       <svg viewBox="0 0 10 10">
-        <For each={dots} key="id">
+        <For each={dots} key={(d) => d.id}>
           {(d) => <circle r={d.r} />}
         </For>
         {open && <rect width="2" height="2" />}

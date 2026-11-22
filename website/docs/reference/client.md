@@ -44,7 +44,7 @@ function diffPaths(
 ): Set<string>;
 ```
 
-Returns the paths whose values differ by reference. A `*` pairs items by index, and under a keyed list also by key. A keyed segment such as `todos[id=selected]` compares the item found by key on each side.
+Returns the paths whose values differ by reference. A `*` pairs items by index, and under a keyed list also by key. Under a list with a computed key, any change of the list counts as a change of its `*` paths. A keyed segment such as `todos[id=selected]` compares the item found by key on each side.
 
 ### `parseHtml`
 

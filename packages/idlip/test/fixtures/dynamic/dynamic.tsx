@@ -57,7 +57,7 @@ export default function Board(props: { initial: Todo[] }): JSX.Element {
       <button on:click={() => setFilter('open')}>Open</button>
       <button on:click={() => setNote('hi')}>Note</button>
       <ul>
-        <For each={todos} key="id">
+        <For each={todos} key={(t) => t.id}>
           {(t) => (
             <li>
               <input type="checkbox" checked={t.done} on:click={() => toggle(t.id)} />

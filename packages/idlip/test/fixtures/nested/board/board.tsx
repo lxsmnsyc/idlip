@@ -24,7 +24,7 @@ export default function Board(props: { items: Item[] }): JSX.Element {
     <section>
       <p>{items.length} counters</p>
       <Counter label="Spare" onRemove={clearAll} />
-      <For each={items} key="id">
+      <For each={items} key={(c) => c.id}>
         {(c) => <Counter label={c.label} onRemove={() => remove(c.id)} />}
       </For>
     </section>

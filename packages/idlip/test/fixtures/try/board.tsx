@@ -41,7 +41,7 @@ export default function Board(): JSX.Element {
         <i>hidden</i>
       )}
       <ul>
-        <For each={items} key="id">
+        <For each={items} key={(item) => item.id}>
           {(item) => (
             <li>
               <Try catch={(error, reset) => <button on:click={reset}>{error}</button>}>
