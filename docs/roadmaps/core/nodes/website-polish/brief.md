@@ -1,7 +1,7 @@
 ---
 id: website-polish
 title: Give the website its own identity and a full landing page
-status: todo
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-22
-spent:
+spent: 750000
 owns:
   - website/src/**
   - website/DESIGN.md

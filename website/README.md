@@ -9,7 +9,7 @@ pnpm --filter website check:samples  # compiles every tsx block of the docs
 pnpm --filter website test
 ```
 
-`build` needs no other package. `check:samples` and `test` import `idlip/compiler`, so run `pnpm --filter idlip build` first.
+Every script imports `idlip`: `build` compiles and renders `examples/todo` for the landing demo, and `check:samples` and `test` import `idlip/compiler`. Run `pnpm --filter idlip build` first.
 
 ## Pages
 
