@@ -6,3 +6,4 @@ coverage
 .vercel
 .claude/
 .hot
+.vitest/
