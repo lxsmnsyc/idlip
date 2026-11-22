@@ -1,7 +1,7 @@
 ---
 id: plain-tsx
 title: Compile plain .tsx files, drop the .idlip.tsx extension
-status: todo
+status: done
 priority: must
 type: refactor
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-22
-spent:
+spent: 351000
 owns:
   - packages/idlip/src/vite/**
   - packages/idlip/src/compiler/index.ts
