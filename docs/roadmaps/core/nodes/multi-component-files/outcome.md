@@ -48,8 +48,8 @@
 
 ## Verification
 
-- `pnpm --filter idlip build` ok. `pnpm --filter idlip test`: 63 files, 705 tests passed (673 before, 32 new).
-- `pnpm --filter website build`: 28 pages. `check:samples`: 49 samples, 0 problems. `pnpm --filter website test`: 66 passed.
+- `pnpm --filter idlip build` ok. `pnpm --filter idlip test`: 64 files, 736 passed and 4 skipped after the rebase on `batch/core` 12204d7 (the differential test included, with `widgets` as a subject).
+- `pnpm --filter website build`: 28 pages. `check:samples`: 49 samples, 0 problems. `pnpm --filter website test`: 87 passed.
 - `E2E_PORT=48621 E2E_COUNTERS_PORT=48622 E2E_SUBS_PORT=48623 E2E_HOT_PORT=48624 pnpm -C e2e test`: 18 passed, including the loader budget.
 - `pnpm -C benchmarks/idlip build`, `build:rows`, `build:dashboard`, `build:scale`: all exit 0.
 - `pnpm lint`: exit 0 (warnings only, none new in error). `pnpm exec oxfmt --check .`: clean.
