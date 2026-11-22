@@ -1,7 +1,7 @@
 ---
 id: for-key-callback
 title: Take the <For> key as a callback of the item
-status: todo
+status: done
 priority: must
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-22
-spent:
+spent: 477000
 owns:
   - packages/idlip/src/core/blocks.ts
   - packages/idlip/test/compiler/view/**

@@ -70,3 +70,7 @@ S: one pattern, two runtime lines.
 - A handler of a child component runs against the slot's model. The `$p` index counts the payload of that handler, and the payload's owner is not part of it.
 - Every handler entry with `bindings` also lists `$dynamic` when the module has the group (`dynamic-paths`). Keep it when you change `bindings`.
 - Loader budget: the todo loader with no flags is 3881 B gzip against 3900 B in the e2e test (`loader-trim`), so the flag-on code must sit behind `HAS_KEYED` and cost nothing when off.
+
+## Updates 2026-11-22
+
+- `for-key-callback` landed: `<For key={(t) => t.id}>`. Only a single-field key keeps keyed paths; any other key (nested field, template literal) is computed, the list chunk exports `key(item)`, and write sets under it are `*`. Read `nodes/for-key-callback/outcome.md` before starting. Consider supporting a nested field path (`t.meta.id`) as a keyed segment here.
