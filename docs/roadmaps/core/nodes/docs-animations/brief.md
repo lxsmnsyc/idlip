@@ -1,7 +1,7 @@
 ---
 id: docs-animations
 title: Reuse two hero samples as animated figures in the docs
-status: todo
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-22
-spent:
+spent: 377000
 owns:
   - website/src/figures/**
   - website/src/client/figures.ts
