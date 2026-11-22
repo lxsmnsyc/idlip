@@ -242,8 +242,8 @@ export type Binding = NodeBinding | ListBinding | PropBinding;
 export interface ViewChunk {
   /** The initial model from the state initializers and the props. */
   readonly init: (props: Props) => Model;
-  /** The whole view, without the boundary markers. */
-  readonly render: (scope: Scope) => string;
+  /** The whole view, without the boundary markers: HTML, or a fragment cloned in `doc`. */
+  readonly render: (scope: Scope, doc: Document) => string | DocumentFragment;
 }
 
 /** A handler export: the next model, or the next model and a task. */

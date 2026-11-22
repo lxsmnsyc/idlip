@@ -121,7 +121,10 @@ export function slot(path: string, site: number, ...keys: unknown[]): string {
 /** A client view chunk, as the item template chunk of a parent imports it. */
 export interface ViewChunk {
   init: (props: Props) => Model;
-  render: (scope: { model: Model; props: Props; rows: []; path: string }) => string;
+  render: (
+    scope: { model: Model; props: Props; rows: []; path: string },
+    doc: Document,
+  ) => string | DocumentFragment;
 }
 
 /** The slots `addChild` recorded in the reference client. */
@@ -131,10 +134,22 @@ export const slots: Map<string, Slot> = new Map<string, Slot>();
  * A reference `addChild` of `idlip/client`: makes the child's model, records the slot and returns
  * the child's markup between its boundary comments.
  */
-export function addChild(path: string, module: string, view: ViewChunk, props: Props): string {
+export function addChild(
+  path: string,
+  module: string,
+  view: ViewChunk,
+  props: Props,
+  doc?: Document,
+): string | Node {
   const model = view.init(props);
   slots.set(path, { module, model, props });
-  return `<!--n:${path}-->${view.render({ model, props, rows: [], path })}<!--/n-->`;
+  const rendered = view.render({ model, props, rows: [], path }, doc ?? document);
+  if (doc !== undefined) {
+    return rendered;
+  }
+  const wrapper = document.createElement('template');
+  wrapper.content.append(rendered);
+  return `<!--n:${path}-->${typeof rendered === 'string' ? rendered : wrapper.innerHTML}<!--/n-->`;
 }
 
 function collectModules(

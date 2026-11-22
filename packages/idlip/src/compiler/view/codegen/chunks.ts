@@ -387,9 +387,12 @@ export function emitListChunk(info: ListInfo, context: ChunkContext): GroupChunk
   }
   lines.push(...body);
   const sections: string[] = [];
-  const comment = scoped
-    ? "// `addChild` makes the child's model from `init`, records the slot and returns the child's\n// markup between its boundary comments.\n"
-    : '';
+  let comment = '';
+  if (scoped) {
+    comment = cloned
+      ? "// `addChild` makes the child's model from `init`, records the slot and returns the child's\n// nodes, which go between the boundary comments of the template.\n"
+      : "// `addChild` makes the child's model from `init`, records the slot and returns the child's\n// markup between its boundary comments.\n";
+  }
   // `patchList` passes the document, which a row that clones takes after the scope.
   if (cloned) {
     parameter = `${parameter === '' ? '$scope' : parameter}, $doc`;
@@ -617,9 +620,18 @@ export function emitViewChunk(context: ChunkContext): GroupChunk {
 
   // The whole view, with the server's names. A child it renders is added, as in a template.
   const emitter = new Emitter('server', usage, context.report);
-  const builder = new HtmlBuilder(context.component, context.plan, emitter);
-  builder.target = 'client';
-  const built = builder.build(component.view);
+  const cloned = canClone(component.view, 'html', component, context.plan);
+  let body: string[];
+  if (cloned) {
+    const clone = createCloneContext(component, context.plan, emitter);
+    const built = buildBody(component.view, 'html', 'templateV$', clone);
+    body = [...built.pre, `return ${built.expr};`];
+  } else {
+    const builder = new HtmlBuilder(context.component, context.plan, emitter);
+    builder.target = 'client';
+    const built = builder.build(component.view);
+    body = [...built.pre, `return ${toExpression({ pre: [], parts: built.parts })};`];
+  }
   const lines: string[] = [];
   if (component.state.length > 0) {
     usage.scope.add('model');
@@ -630,8 +642,13 @@ export function emitViewChunk(context: ChunkContext): GroupChunk {
     }
     lines.push(`const { ${names.join(', ')} } = model;`);
   }
-  lines.push(...built.pre, `return ${toExpression({ pre: [], parts: built.parts })};`);
-  const render = `// The whole view without the boundary markers, which the parent's template writes.\nexport function render(${printScope(usage, true)}) {\n${lines.join('\n')}\n}`;
+  lines.push(...body);
+  // A view that clones takes the document after the scope.
+  let parameter = printScope(usage, true);
+  if (cloned) {
+    parameter = `${parameter === '' ? '$scope' : parameter}, $doc`;
+  }
+  const render = `// The whole view without the boundary markers, which the parent's template writes.\nexport function render(${parameter}) {\n${lines.join('\n')}\n}`;
   const chunk: Module = { chunk: 'view', code: assemble(usage, [init, render], context) };
   return { module: chunk, usage };
 }

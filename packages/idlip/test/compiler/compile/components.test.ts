@@ -94,7 +94,8 @@ describe('several components in one file', () => {
       "import { init as $init_Row, render as $render_Row } from '/src/widgets.tsx?idlip-Row.view&lang.js';",
     );
     expect(list).toContain('const Row = { init: $init_Row, render: $render_Row };');
-    expect(list).toContain("addChild(slot$(path, 1, item.id), '/src/widgets.tsx#Row', Row,");
+    expect(list).toContain('const $np1 = slot$(path, 1, item.id);');
+    expect(list).toContain("addChild($np1, '/src/widgets.tsx#Row', Row,");
   });
 
   it('renders, resumes, and loads only the chunks of the component a click is in', async () => {

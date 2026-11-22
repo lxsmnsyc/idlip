@@ -4,6 +4,7 @@
 // block inside a body (a condition or a list) is a marked comment in the template, and the
 // body's writes clone the block's own templates next to it. Other bodies render HTML.
 import type { Component, Node } from '../analyze/index.ts';
+import { printProps, printSlot } from './child.ts';
 import { getMessage, isFixedMessage } from './events.ts';
 import type { Emitter } from './expr.ts';
 import type { Plan } from './plan.ts';
@@ -124,6 +125,8 @@ function isCloned(node: Node, parent: string, component: Component, plan: Plan):
       );
     case 'for':
       return isClonedBody(node.body, node.namespace, component, plan);
+    case 'child':
+      return true;
     default:
       return false;
   }
@@ -166,6 +169,8 @@ class TemplateBuilder {
       this.addCondition(node);
     } else if (node.kind === 'for') {
       this.addList(node);
+    } else if (node.kind === 'child') {
+      this.addChild(node);
     } else {
       throw new Error(`A ${node.kind} node does not clone (parent ${parent})`);
     }
@@ -229,6 +234,38 @@ class TemplateBuilder {
       ...body.pre,
       `${this.variable}[${mark}].before(${body.expr});`,
       '}',
+    );
+  }
+
+  /**
+   * A child is `<!--n:x<n>--><!--/n-->`: the write appends the slot path to the start comment and
+   * puts the nodes `addChild` returns after it.
+   */
+  addChild(node: Extract<Node, { kind: 'child' }>): void {
+    const { component, emitter, plan } = this.context;
+    const root = node.component;
+    const used = plan.uses.find(
+      (item) => (root.kind === 'import' || root.kind === 'module') && item.name === root.name,
+    );
+    if (used === undefined || !plan.children.has(node)) {
+      // `plan` reports a child that is neither an import nor a component of this file.
+      return;
+    }
+    const mark = this.addMark();
+    const target = `${this.variable}[${mark}]`;
+    const path = `${this.variable}p${mark}`;
+    this.html += `<!--n:x${mark}--><!--/n-->`;
+    this.blocks = true;
+    const { usage } = emitter;
+    usage.path = true;
+    usage.loader.add('addChild');
+    usage.views.set(used.name, used.view);
+    const slot = printSlot(emitter, plan, node, 'path');
+    const props = printProps({ component, emitter }, node, 'path');
+    this.writes.push(
+      `const ${path} = ${slot};`,
+      `${target}.data += ${path};`,
+      `${target}.after(addChild(${path}, ${quote(used.module)}, ${used.name}, ${props}, $doc));`,
     );
   }
 
@@ -311,7 +348,12 @@ class TemplateBuilder {
  * an event message that reads a value, or a block.
  */
 function hasWrite(node: Node, component: Component): boolean {
-  if (node.kind === 'text-hole' || node.kind === 'condition' || node.kind === 'for') {
+  if (
+    node.kind === 'text-hole' ||
+    node.kind === 'condition' ||
+    node.kind === 'for' ||
+    node.kind === 'child'
+  ) {
     return true;
   }
   if (node.kind !== 'element') {
@@ -340,8 +382,8 @@ function hasWrite(node: Node, component: Component): boolean {
 
 /**
  * Tells whether a client body renders by a clone: it has nodes, sits in HTML, holds only
- * elements, static text, text holes, and conditions and lists whose bodies clone, and writes
- * at least one value. A static body renders HTML: its parse is short. A child, `<Try>`,
+ * elements, static text, text holes, children, and conditions and lists whose bodies clone, and writes
+ * at least one value. A static body renders HTML: its parse is short. `<Try>`,
  * `<Subscribe>`, `<Head>`, a global listener, raw HTML, a dynamic hole, a write inside a
  * `<template>`, and a text hole in a text element, a table, a select or a `pre` render HTML.
  */

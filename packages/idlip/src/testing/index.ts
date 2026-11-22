@@ -208,7 +208,7 @@ async function start(
     server: { ...serverExports },
     client: {
       ...clientExports,
-      addChild(...args: Parameters<typeof addChild>): string {
+      addChild(...args: Parameters<typeof addChild>): ReturnType<typeof addChild> {
         Reflect.deleteProperty(slots, args[0]);
         return addChild(...args);
       },

@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { getChunkFile, getChunkId } from '../../src/core/format.ts';
 import type { Manifest, Model } from '../../src/core/format.ts';
 import { createContext, diffPaths, selectChunks, slot, toClientManifest } from './reference.ts';
+import { printRow } from './rows.ts';
 import type { NestedContext } from './reference.ts';
 
 // Server modules import the render helpers from the package. The reference versions stand in
@@ -327,6 +328,12 @@ describe.each(FIXTURES)('fixture %s', (name) => {
 
   it('renders each list row as the server does', async () => {
     const { model } = await renderServer(name);
+    // A row is HTML or a cloned fragment, so both sides print as nodes in a DOM.
+    const window = new Window();
+    const globals = ['document', 'Node', 'DocumentFragment', 'Element'] as const;
+    for (const key of globals) {
+      Reflect.set(globalThis, key, Reflect.get(window, key));
+    }
     for (const [id, list] of Object.entries(manifest.lists)) {
       const template = await importChunk(name, list.chunk);
       const group = manifest.groups[findGroupOf(manifest, `l${id}`)];
@@ -342,10 +349,16 @@ describe.each(FIXTURES)('fixture %s', (name) => {
       let rows = '';
       for (const [index, item] of values.entries()) {
         const scope = { model, props: {}, rows: [{ item, index }] };
-        rows += `<!--i-->${String(callExport(template, 'render', scope))}<!--/i-->`;
+        rows += printRow(callExport(template, 'render', scope, document));
       }
-      expect(page).toContain(`<!--l${id}-->${rows}<!--/l-->`);
+      const start = page.indexOf(`<!--l${id}-->`) + `<!--l${id}-->`.length;
+      const end = page.indexOf('<!--/l-->', start);
+      expect(rows).toBe(printRow(page.slice(start, end)));
     }
+    for (const key of globals) {
+      Reflect.deleteProperty(globalThis, key);
+    }
+    await window.happyDOM.close();
   });
 
   it('marks the node of every binding in the page', async () => {

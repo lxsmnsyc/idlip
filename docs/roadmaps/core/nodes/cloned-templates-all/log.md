@@ -24,3 +24,12 @@ The `nested-blocks` subject failed on the base, with the HTML path: a click that
 - The list chunk exports `blocks = true` when a cloned row holds a block, and `patchList` then walks the row for blocks to run the hooks. Rows without blocks skip the walk as before.
 - Differential subjects `nested-blocks` (marked) and `nested-blocks-unmarked` (empty branch of an unbound condition). Mutation: appending `0` for every branch fails 2 tests.
 - Sizes: todo loader 4073 B (+10, the `blocks` check), helpers 969 B (+42). Counters loader 5016 B, dashboard loader 4890 B (+32 with `HAS_INNER_LISTS` on), dashboard dist 104462 B, rows dist 7711 B.
+
+## Step 2: children inside cloned bodies, and a child's view
+
+- A child in a body is `<!--n:x<n>--><!--/n-->`. The write computes the slot path once (`const $np1 = slot$(...)`), appends it to the start comment and puts `addChild(path, module, view, props, $doc)` after it.
+- `addChild` with a document returns the child's nodes. Without one it returns the old HTML with the boundary comments, for bodies that still render HTML; a cloned view is serialized through a `<template>` there. Both forms are for the steps in between: once every body clones, only the node form stays.
+- The `view` chunk clones when its view writes a value: `render(scope, $doc)` returns the fragment of `templateV$`. A static view renders HTML until step 8.
+- Goldens: `UPDATE_NESTED=1` in `nesting.test.ts` writes the nested chunks again. `nested/counter/expected/client/view.js` and `nested/board/expected/client/list.2.js` are the compiled output now. The fixture row test prints both sides as nodes (`printRow`) in a happy-dom window, and the reference `addChild` takes the document.
+- Differential subject `cloned-children` (child `tally.tsx` with a condition and a list in its view): children next to holes in a row, in a row's condition, in a list in a branch. Mutation: dropping the slot path from the start comment fails 2 tests.
+- Sizes: todo loader 4073 B, helpers 969 B (no change). Counters loader 5113 B (+97, the two forms of `addChild`), counters helpers 845 B (the counters app now uses `clone$`). Dashboard dist 107015 B (+2.5 kB: the child views are templates plus writes, longer than the HTML strings).

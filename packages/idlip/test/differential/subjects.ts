@@ -129,6 +129,18 @@ export const SUBJECTS: readonly Subject[] = [
     children: { './counter.tsx': read(import.meta.dirname, 'subjects/counter.tsx') },
   },
   {
+    // Children in cloned rows and branches, with a child view that clones blocks.
+    name: 'cloned-children',
+    source: read(import.meta.dirname, 'subjects/cloned-children.tsx'),
+    props: {
+      items: [
+        { id: 'a1', label: 'First', on: true },
+        { id: 'a2', label: 'Second', on: false },
+      ],
+    },
+    children: { './tally.tsx': read(import.meta.dirname, 'subjects/tally.tsx') },
+  },
+  {
     name: 'example-board-subs',
     source: read(EXAMPLES, 'counters-subs/src/board.tsx'),
     props: {
