@@ -407,7 +407,7 @@ diagnostics: 104
   187:31 error event-target: console.log is not a handler, a message prop or reset
   189:25 error event-param: An event arrow takes at most one parameter, the event, as a plain name
   191:31 error event-mode-twice: click has both on: and latest:, or appears twice
-  195:7 error for-key: <For> takes key as a callback of the item, key={(item) => item.id}, with an expression body
+  195:7 error for-key: <For> takes its key as an arrow written in place: key={(item) => item.id}. A name or a string does not work.
   197:7 error for-render: <For> takes one child: (item, index?) => <jsx>
   201:14 error ref-form: ref takes a string literal, or [literal, loop variable path] inside <For>
   203:12 error html-trusted: html takes trusted(value) from idlip

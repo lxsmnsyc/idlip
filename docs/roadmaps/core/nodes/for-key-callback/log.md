@@ -8,3 +8,4 @@
 - Regenerated `counter.json` and `todo.json` with a throwaway test, then ran oxfmt.
 - e2e ports 48631 to 48634. The example builds had to run first.
 - Edits in `test/differential/**` (shared with another worker): `subjects.ts` entry and `subjects/computed-key.tsx`, and the key map type (`string | undefined`) in `harness.ts` and `states.ts`.
+- Review fixes: rebased on `batch/core`, KEY_FN detection tests, oracle key test, stricter key grammar (async, constant, plain parameter), for-of in `readKeyReads`, `readKey` as a declaration, docs on the cost of a computed key.

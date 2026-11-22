@@ -96,6 +96,39 @@ describe('feature detection', () => {
     expect([...getFeatures([compileSource(source, '/src/dynamic.tsx')])]).toEqual(['DYNAMIC']);
   });
 
+  it('turns KEY_FN on for a computed key, also in a child component, and not for a field key', () => {
+    const list = (key: string): string => `
+      import { For } from 'idlip';
+      export default function App() {
+        let items = [{ id: 1, kind: 'a' }];
+        return <ul><For each={items} key={${key}}>{(t) => <li>{t.kind}</li>}</For></ul>;
+      }
+    `;
+    const field = compileSource(list('(t) => t.id'), '/src/app.tsx');
+    const template = compileSource(list('(t) => `${t.kind}:${t.id}`'), '/src/app.tsx');
+    expect([...getFeatures([field])]).not.toContain('KEY_FN');
+    expect([...getFeatures([template])]).toContain('KEY_FN');
+    // The computed list is in a component the default export renders, not in the main one.
+    const child = compileSource(
+      `
+      import { For } from 'idlip';
+      export default function App() {
+        let open = true;
+        function toggle() { open = !open; }
+        return <main><button on:click={toggle}>x</button><Board /></main>;
+      }
+      function Board() {
+        let items = [{ id: 1, kind: 'a' }];
+        function more() { items = [...items, { id: 2, kind: 'b' }]; }
+        return <ul><button on:click={more}>m</button><For each={items} key={(t) => \`\${t.kind}:\${t.id}\`}>{(t) => <li>{t.kind}</li>}</For></ul>;
+      }
+    `,
+      '/src/app.tsx',
+    );
+    expect(child.components).toBeDefined();
+    expect([...getFeatures([child])]).toContain('KEY_FN');
+  });
+
   it('turns CHILDREN on for a child module and for a module with children', () => {
     const todo = compileFixture('', '/src/todo.tsx');
     const child = { ...todo, manifest: { ...todo.manifest, view: { chunk: 'view' } } };

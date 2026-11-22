@@ -2204,20 +2204,31 @@ class Analyzer {
     node: JSXElement,
   ): ForKey {
     const failed: ForKey = { kind: 'field', field: '' };
-    if (
-      keyNode?.type !== 'ArrowFunctionExpression' ||
-      keyNode.params.length !== 1 ||
-      keyNode.params[0].type !== 'Identifier' ||
-      keyNode.body.type === 'BlockStatement'
-    ) {
+    if (keyNode?.type !== 'ArrowFunctionExpression') {
       const old =
         keyNode?.type === 'Literal' && typeof keyNode.value === 'string'
-          ? ` key="${keyNode.value}" is gone: write key={(item) => item.${keyNode.value}}`
+          ? ` key="${keyNode.value}" is gone. Write key={(item) => item.${keyNode.value}}.`
           : '';
       this.reportError(
         'for-key',
-        `<For> takes key as a callback of the item, key={(item) => item.id}, with an expression body${old}`,
+        `<For> takes its key as an arrow written in place: key={(item) => item.id}. A name or a string does not work.${old}`,
         keyNode ?? node.openingElement,
+      );
+      return failed;
+    }
+    if (keyNode.async || keyNode.params.length !== 1 || keyNode.params[0].type !== 'Identifier') {
+      this.reportError(
+        'for-key',
+        'The key callback is not async and has one plain parameter, as in (item) => item.id. Destructuring and extra parameters are not allowed.',
+        keyNode,
+      );
+      return failed;
+    }
+    if (keyNode.body.type === 'BlockStatement') {
+      this.reportError(
+        'for-key',
+        'The key callback has an expression body, as in (item) => item.id.',
+        keyNode,
       );
       return failed;
     }
@@ -2231,10 +2242,20 @@ class Analyzer {
     if (this.diagnostics.length > errors) {
       return failed;
     }
-    if (!readsOnlyItem(expr, itemRoot)) {
+    const reads = { item: false, other: false };
+    readKeyReads(expr, itemRoot, reads);
+    if (reads.other) {
       this.reportError(
         'for-key',
-        'The <For> key reads the item and nothing else: no state, props, index or helper call',
+        'The <For> key reads the item and nothing else: no state, props, index or helper call.',
+        keyNode.body,
+      );
+      return failed;
+    }
+    if (!reads.item) {
+      this.reportError(
+        'for-key',
+        'The <For> key must read the item. A constant gives every row the same key.',
         keyNode.body,
       );
       return failed;
@@ -3602,40 +3623,56 @@ function collectNonBlank(children: AstNode[]): AstNode[] {
   return out;
 }
 
-/** Tells whether an expression reads the loop item and globals only, and no path computes a segment. */
-function readsOnlyItem(expr: Expr, item: Root): boolean {
+/**
+ * Records what a key expression reads: `item` when it reads the loop item, `other` when it reads
+ * anything the key may not (state, props, the index, a call, a computed path segment).
+ */
+function readKeyReads(expr: Expr, item: Root, reads: { item: boolean; other: boolean }): void {
   switch (expr.kind) {
     case 'literal':
-      return true;
+      return;
     case 'path':
       for (const segment of expr.segments) {
         if (typeof segment !== 'string') {
-          return false;
+          reads.other = true;
         }
       }
-      return expr.root === item || expr.root.kind === 'global';
+      if (expr.root === item) {
+        reads.item = true;
+      } else if (expr.root.kind !== 'global') {
+        reads.other = true;
+      }
+      return;
     case 'unary':
-      return readsOnlyItem(expr.arg, item);
+      readKeyReads(expr.arg, item, reads);
+      return;
     case 'binary':
     case 'logical':
-      return readsOnlyItem(expr.left, item) && readsOnlyItem(expr.right, item);
+      readKeyReads(expr.left, item, reads);
+      readKeyReads(expr.right, item, reads);
+      return;
     case 'conditional':
-      return (
-        readsOnlyItem(expr.test, item) &&
-        readsOnlyItem(expr.then, item) &&
-        readsOnlyItem(expr.else, item)
-      );
+      readKeyReads(expr.test, item, reads);
+      readKeyReads(expr.then, item, reads);
+      readKeyReads(expr.else, item, reads);
+      return;
     case 'template':
-      return expr.exprs.every((one) => readsOnlyItem(one, item));
+      for (const one of expr.exprs) {
+        readKeyReads(one, item, reads);
+      }
+      return;
     case 'method':
-      return (
-        readsOnlyItem(expr.receiver, item) && expr.args.every((one) => readsOnlyItem(one, item))
-      );
+      readKeyReads(expr.receiver, item, reads);
+      for (const one of expr.args) {
+        readKeyReads(one, item, reads);
+      }
+      return;
     case 'property':
-      return readsOnlyItem(expr.receiver, item);
+      readKeyReads(expr.receiver, item, reads);
+      return;
     default:
       // Objects, arrays and calls.
-      return false;
+      reads.other = true;
   }
 }
 

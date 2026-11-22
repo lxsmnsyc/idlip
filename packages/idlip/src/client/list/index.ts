@@ -233,8 +233,9 @@ export async function patchList(...args: Parameters<PatchList>): Promise<void> {
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion
     chunk = (await page.load(page.manifest.module, list.chunk)) as ListChunk;
   }
-  const readKey = (item: unknown): unknown =>
-    HAS_KEY_FN && key === undefined ? chunk?.key?.(item) : readField(item, key ?? '');
+  function readKey(item: unknown): unknown {
+    return HAS_KEY_FN && key === undefined ? chunk?.key?.(item) : readField(item, key ?? '');
+  }
 
   // Pair the new items with the old rows by key. The DOM holds the old rows in order.
   // A key that is new or repeated counts as an insert.

@@ -179,9 +179,9 @@ export default function Steps(props: { steps: { id: string; label: string }[] })
 }
 ```
 
-A row moves with its key when the list changes. The key body is one expression that reads the item and nothing else: a field (`step.id`, `step.meta.id`), a template literal (`` `${step.kind}:${step.id}` ``) or another expression of the closed grammar. `key="id"` is the error `for-key`, which names the callback form.
+A row moves with its key when the list changes. The key body is one expression that reads the item and nothing else. `key="id"` is the error `for-key`, which names the callback form.
 
-A key that is one field of the item, such as `step.id`, keeps keyed writes: a write set can name one row (`steps[id=selected].done`). Any other key still moves the rows by key. Its write sets treat the row as any row (`steps.*.done`), which patches more rows than needed and never fewer, and the list loads its row chunk on each change to read the keys. `.map()` in a view is the error `view-map`.
+Only a key that is one field of the item, `step.id`, keeps keyed writes: a write set can name one row (`steps[id=selected].done`). A computed key moves the rows by key all the same. Computed keys are a nested field (`step.meta.id`), a template literal (`` `${step.kind}:${step.id}` ``) or another expression of the closed grammar. Their write sets treat the row as any row (`steps.*.done`), so a change to the list loads the list chunk and runs the row bindings of every row. That patches more than needed and never less. `.map()` in a view is the error `view-map`.
 
 ### Try
 

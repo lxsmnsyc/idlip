@@ -9,10 +9,11 @@
 - Computed key (template literal, nested field `t.meta.id`, any other expression): `lists[n].key` is absent and the list chunk exports `key(item)`. `patchList` loads the chunk first and pairs rows with it. The analysis never keeps a keyed segment for such a list, so a `find` becomes `*` plus the field path. `diffPaths` counts every `*` path under it as changed when the list changed (`undefined` in `getListKeys`). Child slots in rows print the same expression in `slot$`.
 - Refs in a row of a computed-key list: the tuple key must be a field key, else `ref-key`.
 - Contract: `contracts/compiled-format.v15.change-request.md`.
-- Types: `JSX.IntrinsicAttributes.key` accepts a callback so `<For key>` type checks and types the item.
+- Types: `JSX.IntrinsicAttributes.key` accepts a callback so `<For key>` type checks and types the item. This weakens the type a little: any function component now accepts a callback as `key` at type level. The compiler rejects it outside `<For>`.
 - Converted every `<For key="...">` in examples, benchmarks (apps, README and the dashboard harness), fixtures, tests, website docs and REPL. `docs/proposals/**` keeps its text. The landing has no `<For>`.
 - Docs: `views.md`, `reference/idlip.md`, `reference/syntax.md`, `reference/compiler.md` (`ForKey`), `reference/client.md`, `reference/jsx-runtime.md`, `refs.md`.
-- Tests: `test/compiler/view/codegen/key.test.ts` (10: manifest forms, diagnostics, a property test that the chunk `key` equals the source arrow for random items, the server slot expression), differential subject `computed-key` (template and nested keys), `api.test.ts` type test.
+- Grammar rejects `async` arrows, constant keys (`for-key`, the key must read the item), a name instead of an arrow, destructuring and extra parameters.
+- Tests: `test/compiler/view/codegen/key.test.ts` (13: manifest forms, diagnostics, `ref-key` in a computed list, an oracle test that compares the chunk `key` with the same source run by `new Function` on random items for 11 key bodies, the server slot expression), `KEY_FN` detection in `test/vite/features.test.ts` (template key, computed list in a child component, field key off), differential subject `computed-key` (template and nested keys), `api.test.ts` type test.
 
 ## Deviations
 
@@ -32,7 +33,7 @@
 
 ## Verification
 
-- `pnpm --filter idlip build` ok. `pnpm --filter idlip test`: 65 files, 748 passed, 4 skipped.
+- `pnpm --filter idlip build` ok. `pnpm --filter idlip test`: 65 files, 756 passed, 18 skipped (after the rebase on `batch/core`).
 - `pnpm --filter website build`: 28 pages. `test`: 87 passed. `check:samples`: 49 samples, 0 problems.
 - e2e (ports 48631 to 48634): 18 passed, including the loader budget.
 - Benchmark apps `build`, `build:rows`, `build:dashboard`, `build:scale`: exit 0.
