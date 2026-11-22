@@ -1,0 +1,842 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>idlip hero: freeze and thaw</title>
+    <style>
+      /*BASE_CSS*/
+
+      /* Header: the phase, one pill whose label changes. */
+      .phase {
+        top: 24px;
+        left: 24px;
+        display: grid;
+        height: 40px;
+      }
+      .phase > .pill {
+        grid-area: 1 / 1;
+        height: 40px;
+        padding: 0 16px 0 12px;
+        transition:
+          opacity var(--duration) var(--ease-out),
+          transform var(--mid) var(--ease);
+      }
+      .phase .p-browser {
+        background: var(--accent-fill);
+        color: var(--on-accent);
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      .board.at-ship .phase .p-browser {
+        opacity: 1;
+        transform: none;
+      }
+      .board.at-ship .phase .p-server {
+        opacity: 0;
+        transform: translateY(-8px);
+      }
+      .legend {
+        top: 24px;
+        right: 24px;
+        display: flex;
+        gap: 16px;
+        align-items: center;
+        height: 40px;
+        opacity: 0;
+        transition: opacity var(--mid) var(--ease-out);
+      }
+      .board.at-ship .legend {
+        opacity: 1;
+        transition-delay: 500ms;
+      }
+      .legend span {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        color: var(--on-ink-muted);
+        font-family: var(--mono);
+        font-size: 10px;
+      }
+      .legend i {
+        width: 10px;
+        height: 10px;
+        border-radius: 3px;
+      }
+      .legend .cold i {
+        background: color-mix(in srgb, var(--on-ink-muted) 60%, transparent);
+      }
+      .legend .warm i {
+        background: var(--accent-fill);
+      }
+
+      /* The page: the todo app as the server renders it, with its state at the bottom. */
+      .page {
+        top: 96px;
+        left: 24px;
+        width: 276px;
+        padding: 10px 12px 12px;
+        gap: 6px;
+        isolation: isolate;
+      }
+      .bar {
+        position: relative;
+        display: grid;
+        height: 24px;
+        padding: 0 2px;
+      }
+      .bar > span {
+        grid-area: 1 / 1;
+        align-self: center;
+        transition: opacity var(--duration) var(--ease-out);
+      }
+      .bar .dots {
+        display: flex;
+        gap: 4px;
+        opacity: 0;
+      }
+      .bar .dots i {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--surface-strong);
+      }
+      .bar .tag {
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 9px;
+      }
+      .board.at-ship .bar .dots {
+        opacity: 1;
+      }
+      .board.at-ship .bar .tag {
+        opacity: 0;
+      }
+      .page .app-head {
+        position: relative;
+        height: 36px;
+        align-items: center;
+        padding: 0 4px;
+      }
+      .page .app-title {
+        font-size: 18px;
+        font-weight: 800;
+        letter-spacing: -0.035em;
+      }
+      .page .count {
+        padding: 2px 6px;
+        font-size: 13px;
+      }
+      .page .row {
+        height: 60px;
+        padding: 0 16px;
+        border-radius: 12px;
+        font-size: 16px;
+      }
+      .page .box {
+        width: 24px;
+        height: 24px;
+        border-radius: 8px;
+      }
+      .page .row,
+      .page .app-head,
+      .page .state {
+        opacity: 0;
+        transform: translateY(8px);
+        transition:
+          opacity var(--duration) var(--ease-out),
+          transform var(--mid) var(--ease-out);
+      }
+      .board.at-render .page .row,
+      .board.at-render .page .app-head {
+        opacity: 1;
+        transform: none;
+      }
+      .board.at-render .page .r1 {
+        transition-delay: 80ms;
+      }
+      .board.at-render .page .r2 {
+        transition-delay: 160ms;
+      }
+
+      /* The state, encoded into the page. */
+      .state {
+        position: relative;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        height: 44px;
+        margin-top: 2px;
+        padding: 0 16px;
+        border-radius: 12px;
+        background: var(--surface);
+        font-family: var(--mono);
+        font-size: 10px;
+      }
+      .state .k {
+        color: var(--syn-tag);
+      }
+      .state .a {
+        color: var(--syn-attr);
+      }
+      .bits {
+        display: flex;
+        gap: 4px;
+        margin-left: auto;
+      }
+      .bits i {
+        width: 14px;
+        height: 8px;
+        border-radius: 3px;
+        background: var(--surface-strong);
+        transform: scaleX(0.4);
+        opacity: 0;
+        transition:
+          opacity var(--duration) var(--ease-out),
+          transform var(--mid) var(--ease);
+      }
+      .bits i.on {
+        background: var(--accent-fill);
+      }
+      .board.at-condense .page .state {
+        opacity: 1;
+        transform: none;
+        transition-delay: 120ms;
+      }
+      .board.at-condense .bits i {
+        opacity: 1;
+        transform: none;
+      }
+      .board.at-condense .bits i:nth-child(1) {
+        transition-delay: 640ms;
+      }
+      .board.at-condense .bits i:nth-child(2) {
+        transition-delay: 760ms;
+      }
+      .board.at-condense .bits i:nth-child(3) {
+        transition-delay: 820ms;
+      }
+      .board.at-condense .bits i:nth-child(4) {
+        transition-delay: 880ms;
+      }
+
+      /* The values that condense into the state. */
+      .val {
+        position: absolute;
+        top: 50%;
+        right: 12px;
+        margin-top: -11px;
+        height: 22px;
+        padding: 0 8px;
+        border-radius: 6px;
+        background: var(--surface-strong);
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 10px;
+        line-height: 22px;
+        opacity: 0;
+        transform: scale(0.8);
+        transition:
+          opacity var(--duration) var(--ease-out),
+          transform var(--duration) var(--ease);
+      }
+      .board.at-condense:not(.at-ship) .val {
+        opacity: 1;
+        transform: none;
+      }
+      .board.at-condense .val {
+        transition-delay: 0ms;
+      }
+      .rider .val-rider {
+        display: block;
+        height: 22px;
+        padding: 0 8px;
+        border-radius: 6px;
+        background: var(--accent-fill);
+        color: var(--on-accent);
+        font-family: var(--mono);
+        font-size: 10px;
+        line-height: 22px;
+      }
+
+      /* Frost: a grey layer that takes the color out (saturation blend), and a wash with a fine
+   grain that cools it. The script adds a wash after each frost. Both move by opacity only. */
+      .frost,
+      .wash {
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 600ms var(--ease-out);
+      }
+      .frost {
+        background: #808080;
+        mix-blend-mode: saturation;
+      }
+      .wash {
+        background:
+          radial-gradient(
+              circle at 1px 1px,
+              color-mix(in srgb, var(--muted) 30%, transparent) 0.8px,
+              transparent 1.2px
+            )
+            0 0 / 5px 5px,
+          color-mix(in srgb, var(--bg-elevated) 42%, transparent);
+      }
+      .board.at-ship .frost,
+      .board.at-ship .wash {
+        opacity: 1;
+      }
+      .board.at-ship .page .app-head :is(.frost, .wash) {
+        transition-delay: 60ms;
+      }
+      .board.at-ship .page .r1 :is(.frost, .wash) {
+        transition-delay: 120ms;
+      }
+      .board.at-ship .page .r2 :is(.frost, .wash) {
+        transition-delay: 180ms;
+      }
+      .board.at-ship .page .state :is(.frost, .wash) {
+        transition-delay: 240ms;
+      }
+      .page .count :is(.frost, .wash) {
+        border-radius: 6px;
+      }
+      .board.at-thaw .r2 :is(.frost, .wash) {
+        opacity: 0;
+        transition-delay: 160ms;
+        transition-duration: 500ms;
+      }
+      .board.at-thaw .state :is(.frost, .wash) {
+        opacity: 0;
+        transition-delay: 420ms;
+        transition-duration: 500ms;
+      }
+      .board.at-thaw .count :is(.frost, .wash) {
+        opacity: 0;
+        transition-delay: 760ms;
+        transition-duration: 500ms;
+      }
+
+      /* The click and what it changes. */
+      .board.at-press .r2 .box {
+        transform: scale(0.88);
+      }
+      .board.at-thaw .r2 .box {
+        transform: none;
+      }
+      .board.at-thaw .r2 .box::before,
+      .board.at-thaw .r2 .box svg {
+        opacity: 1;
+        transform: none;
+        transition-delay: 420ms;
+      }
+      .board.at-thaw .r2 .txt {
+        opacity: 0.6;
+        transition-delay: 420ms;
+      }
+      .count .now {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      .board.at-thaw .count .now {
+        opacity: 1;
+        transform: none;
+        transition-delay: 820ms;
+      }
+      .board.at-thaw .count .was {
+        opacity: 0;
+        transform: translateY(-6px);
+        transition-delay: 820ms;
+      }
+      .ripple {
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 11;
+        width: 120px;
+        height: 120px;
+        margin: -60px 0 0 -60px;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle,
+          color-mix(in srgb, var(--accent-fill) 55%, transparent) 0,
+          transparent 70%
+        );
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      /* Files: the loader comes with the page, the click brings two chunks. */
+      .files {
+        top: 96px;
+        opacity: 0;
+        transition: opacity var(--mid) var(--ease-out);
+        left: 316px;
+        display: grid;
+        gap: 8px;
+        width: 220px;
+      }
+      .board.at-ship .files {
+        opacity: 1;
+        transition-delay: 300ms;
+      }
+      .file {
+        position: relative;
+        display: grid;
+        height: 64px;
+        overflow: hidden;
+        border-radius: var(--radius-row);
+        background: var(--well);
+        font-family: var(--mono);
+        font-size: 10px;
+        font-variant-numeric: tabular-nums;
+      }
+      .file > span {
+        grid-area: 1 / 1;
+        display: grid;
+        gap: 4px;
+        align-content: center;
+        padding: 0 14px;
+        border-radius: inherit;
+        transition:
+          opacity var(--duration) var(--ease-out),
+          transform var(--mid) var(--ease);
+      }
+      .file .empty {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        color: var(--on-ink-muted);
+      }
+      .file .got {
+        opacity: 0;
+        transform: translateX(24px);
+      }
+      .board.at-ship .f-loader .got,
+      .board.at-thaw .f-handler .got,
+      .board.at-thaw .f-binding .got {
+        opacity: 1;
+        transform: none;
+      }
+      .board.at-ship .f-loader .empty,
+      .board.at-thaw .f-handler .empty,
+      .board.at-thaw .f-binding .empty {
+        opacity: 0;
+      }
+      .file .name {
+        color: var(--on-ink);
+        white-space: nowrap;
+      }
+      .file .size {
+        color: var(--on-ink-muted);
+      }
+      .file .size b {
+        color: var(--on-ink);
+        font-weight: 700;
+      }
+      .file.lit .got {
+        background: var(--accent-fill);
+      }
+      .file.lit .name,
+      .file.lit .size,
+      .file.lit .size b {
+        color: var(--on-accent);
+      }
+      .board.at-ship .f-loader > span {
+        transition-delay: 400ms;
+      }
+      .board.at-thaw .f-handler > span {
+        transition-delay: 200ms;
+      }
+      .board.at-thaw .f-binding > span {
+        transition-delay: 620ms;
+      }
+      .ran {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 64px;
+        padding: 0 16px;
+        border-radius: var(--radius-row);
+        color: var(--on-ink-muted);
+        font-family: var(--mono);
+        font-size: 10px;
+        opacity: 0;
+        transition: opacity var(--mid) var(--ease-out);
+      }
+      .ran .grow {
+        display: grid;
+        color: var(--on-ink);
+        font-family: var(--mono);
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: -0.04em;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+      }
+      .ran .grow > span {
+        grid-area: 1 / 1;
+        padding: 0 6px;
+        justify-self: end;
+        transition:
+          opacity var(--duration) var(--ease-out),
+          transform var(--duration) var(--ease-out);
+      }
+      .ran .grow .now {
+        padding: 0 6px;
+        border-radius: 6px;
+        background: var(--accent-fill);
+        color: var(--on-accent);
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      .board.at-ship .ran {
+        opacity: 1;
+        transition-delay: 600ms;
+      }
+      .board.at-thaw .ran .now {
+        opacity: 1;
+        transform: none;
+        transition-delay: 900ms;
+      }
+      .board.at-thaw .ran .was {
+        opacity: 0;
+        transform: translateY(-6px);
+        transition-delay: 900ms;
+      }
+
+      .pointer {
+        transform: translate(calc(var(--tx) + 64px), calc(var(--ty) + 72px));
+      }
+      .board.at-aim .pointer {
+        opacity: 1;
+        transform: translate(var(--tx), var(--ty));
+      }
+      .board.at-press .pointer svg {
+        transform: scale(0.88);
+      }
+      .board.at-thaw .pointer svg {
+        transform: none;
+      }
+      .board.at-rest .pointer {
+        opacity: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <!--THEME-->
+    <main>
+      <figure
+        class="board"
+        data-board
+        aria-label="The todo page arrives from the server inert; a click wakes only the row it touched and the count"
+        style="margin: 0"
+      >
+        <p class="visually-hidden" role="status" aria-live="polite" data-live></p>
+        <div class="scene">
+          <div class="abs phase" aria-hidden="true">
+            <span class="pill p-server"
+              ><svg
+                viewBox="0 0 24 24"
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <rect x="4" y="4" width="16" height="7" rx="2" />
+                <rect x="4" y="13" width="16" height="7" rx="2" />
+                <path d="M8 7.5h.01M8 16.5h.01" /></svg
+              >Server renders</span
+            >
+            <span class="pill p-browser"
+              ><svg
+                viewBox="0 0 24 24"
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <rect x="3" y="4" width="18" height="16" rx="3" />
+                <path d="M3 9h18" /></svg
+              >Browser shows</span
+            >
+          </div>
+          <div class="abs legend" aria-hidden="true">
+            <span class="cold"><i></i>no code</span><span class="warm"><i></i>woken</span>
+          </div>
+
+          <div class="abs app page">
+            <div class="bar">
+              <span class="tag">HTML</span><span class="dots"><i></i><i></i><i></i></span>
+            </div>
+            <div class="app-head">
+              <span class="app-title">Todos</span
+              ><span class="count"
+                ><span class="was"><b>1</b> left</span><span class="now"><b>0</b> left</span
+                ><i class="frost"></i
+              ></span>
+            </div>
+            <div class="row r1 done">
+              <span class="box"
+                ><svg
+                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.4"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M5 12.5l4.5 4.5L19 7.5" /></svg></span
+              ><span class="txt">Write the format</span><span class="val">true</span
+              ><i class="frost"></i>
+            </div>
+            <div class="row r2" data-target>
+              <span class="box"
+                ><svg
+                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.4"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M5 12.5l4.5 4.5L19 7.5" /></svg></span
+              ><span class="txt">Build the runtime</span><span class="val">false</span
+              ><i class="frost"></i>
+            </div>
+            <div class="state" data-state>
+              <span
+                ><span class="k">&lt;script</span> <span class="a">i-state</span
+                ><span class="k">&gt;</span></span
+              ><span class="bits"><i class="on"></i><i></i><i class="on"></i><i></i></span
+              ><i class="frost"></i>
+            </div>
+          </div>
+
+          <div class="abs files">
+            <div class="file f-loader">
+              <span class="empty"
+                ><svg
+                  viewBox="0 0 24 24"
+                  width="14"
+                  height="14"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="5" y="11" width="14" height="10" rx="2" />
+                  <path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg
+                >not loaded</span
+              ><span class="got"
+                ><span class="name">loader.js</span
+                ><span class="size"><b>3.9 kB</b> with the page</span></span
+              >
+            </div>
+            <div class="file f-handler lit">
+              <span class="empty"
+                ><svg
+                  viewBox="0 0 24 24"
+                  width="14"
+                  height="14"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="5" y="11" width="14" height="10" rx="2" />
+                  <path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg
+                >not loaded</span
+              ><span class="got"
+                ><span class="name">todo.handler.toggle.js</span
+                ><span class="size"><b>119 B</b> on click</span></span
+              >
+            </div>
+            <div class="file f-binding lit">
+              <span class="empty"
+                ><svg
+                  viewBox="0 0 24 24"
+                  width="14"
+                  height="14"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="5" y="11" width="14" height="10" rx="2" />
+                  <path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg
+                >not loaded</span
+              ><span class="got"
+                ><span class="name">todo.binding.todos._.done.js</span
+                ><span class="size"><b>505 B</b> on click</span></span
+              >
+            </div>
+            <div class="ran" aria-hidden="true">
+              <span>component JS</span
+              ><span class="grow"><span class="was">0 B</span><span class="now">624 B</span></span>
+            </div>
+          </div>
+
+          <span class="rider" data-r-v1><span class="val-rider">true</span></span>
+          <span class="rider" data-r-v2><span class="val-rider">false</span></span>
+          <span class="ripple" data-ripple></span>
+          <svg class="wire" viewBox="0 0 560 440" aria-hidden="true">
+            <path data-p1 d="" />
+            <path data-p2 d="" />
+          </svg>
+
+          <span class="pointer" aria-hidden="true"
+            ><svg
+              viewBox="0 0 24 24"
+              width="22"
+              height="22"
+              fill="currentColor"
+              stroke="var(--bg-elevated)"
+              stroke-width="1.5"
+              stroke-linejoin="round"
+            >
+              <path d="M5 3l14 7.5-6.2 1.6L10 18z" /></svg
+          ></span>
+          <button
+            class="hit"
+            type="button"
+            aria-label="Toggle Build the runtime"
+            title="Toggle Build the runtime"
+            disabled
+          ></button>
+        </div>
+      </figure>
+    </main>
+    <script>
+      /*BASE_JS*/
+
+      const board = document.querySelector('[data-board]');
+      for (const frost of board.querySelectorAll('.frost')) {
+        const wash = document.createElement('i');
+        wash.className = 'wash';
+        frost.after(wash);
+      }
+      const live = board.querySelector('[data-live]');
+      const hit = board.querySelector('.hit');
+      const ripple = board.querySelector('[data-ripple]');
+      const rides = [
+        {
+          el: board.querySelector('[data-r-v1]'),
+          path: board.querySelector('[data-p1]'),
+          from: '.r1 .val',
+        },
+        {
+          el: board.querySelector('[data-r-v2]'),
+          path: board.querySelector('[data-p2]'),
+          from: '.r2 .val',
+        },
+      ];
+      let target = { x: 0, y: 0 };
+
+      function centerOf(selector) {
+        const frame = board.getBoundingClientRect();
+        const rect = board.querySelector(selector).getBoundingClientRect();
+        return {
+          x: rect.left + rect.width / 2 - frame.left,
+          y: rect.top + rect.height / 2 - frame.top,
+        };
+      }
+
+      // Measure the layout once: the checkbox for the pointer, and the paths of the values.
+      function place() {
+        for (const el of board.querySelectorAll('.page .row, .page .app-head, .page .state')) {
+          el.style.transition = 'none';
+          el.style.transform = 'none';
+        }
+        target = centerOf('[data-target] .box');
+        board.style.setProperty('--tx', `${target.x - 4}px`);
+        board.style.setProperty('--ty', `${target.y - 2}px`);
+        hit.style.left = `${target.x - 22}px`;
+        hit.style.top = `${target.y - 22}px`;
+        const state = centerOf('[data-state] .bits');
+        for (const ride of rides) {
+          const a = centerOf(ride.from);
+          ride.path.setAttribute(
+            'd',
+            `M${a.x} ${a.y} C${a.x + 60} ${a.y}, ${state.x + 40} ${state.y - 40}, ${state.x} ${state.y}`,
+          );
+        }
+        for (const el of board.querySelectorAll('.page .row, .page .app-head, .page .state')) {
+          el.style.transform = '';
+          void el.offsetWidth;
+          el.style.transition = '';
+        }
+      }
+
+      const steps = [
+        { id: 'start', ms: 300 },
+        { id: 'render', ms: 900 },
+        { id: 'condense', ms: 1200 },
+        { id: 'ship', ms: 1200 },
+        { id: 'aim', ms: 700 },
+        { id: 'press', ms: 200 },
+        { id: 'thaw', ms: 1400 },
+        { id: 'rest', ms: 1700 },
+      ];
+
+      const player = createPlayer(board, steps, {
+        onStep(id, n, previous) {
+          hit.disabled = n < player.indexOf('ship');
+          if (n < previous) {
+            cancelRides(board);
+            return;
+          }
+          if (id === 'condense') {
+            for (const [k, item] of rides.entries()) {
+              ride(item.el, item.path, { duration: 640, delay: 260 + k * 90, hold: false });
+            }
+          } else if (id === 'thaw' && !REDUCE) {
+            ripple.animate(
+              [
+                { transform: `translate(${target.x}px, ${target.y}px) scale(0.2)`, opacity: 1 },
+                { transform: `translate(${target.x}px, ${target.y}px) scale(2.4)`, opacity: 0 },
+              ],
+              { duration: 700, easing: EASE },
+            );
+          }
+          if (id === 'thaw') {
+            live.textContent =
+              'Loaded todo.handler.toggle.js, 119 B, and todo.binding.todos._.done.js, 505 B. Only the clicked row and the count changed.';
+          }
+        },
+      });
+
+      hit.addEventListener('click', () => {
+        const n = player.index;
+        if (n >= player.indexOf('press')) {
+          board.classList.remove('user');
+          player.jump('ship', 2600);
+          live.textContent = 'Build the runtime is not done.';
+        } else {
+          board.classList.add('user');
+          player.jump(REDUCE ? 'rest' : 'press');
+        }
+      });
+
+      document.fonts.ready.then(() => {
+        place();
+        player.start();
+      });
+    </script>
+  </body>
+</html>

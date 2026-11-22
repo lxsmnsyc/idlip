@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>idlip hero samples</title>
+    <style>
+      /*BASE_CSS*/
+
+      body {
+        place-items: start center;
+        padding: 72px 24px;
+      }
+      .wrap {
+        display: grid;
+        gap: 32px;
+        width: min(100%, 960px);
+      }
+      h1 {
+        margin: 0;
+        font-size: clamp(2rem, 5vw, 3.25rem);
+        font-weight: 800;
+        letter-spacing: -0.05em;
+        line-height: 1;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: var(--gap);
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .tile {
+        display: grid;
+        gap: 8px;
+        height: 100%;
+        padding: 24px;
+        border-radius: var(--radius-lg);
+        background: var(--bg-elevated);
+        color: var(--text);
+        text-decoration: none;
+        transition:
+          transform var(--duration-fast) var(--ease-out),
+          background var(--duration-fast);
+      }
+      .tile:hover {
+        transform: translateY(-2px);
+      }
+      .tile:active {
+        transform: scale(0.98);
+      }
+      .tile:focus-visible {
+        outline: 3px solid var(--focus);
+        outline-offset: 2px;
+      }
+      .num {
+        display: inline-grid;
+        place-items: center;
+        width: 32px;
+        height: 32px;
+        border-radius: var(--radius);
+        background: var(--accent-fill);
+        color: var(--on-accent);
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .name {
+        margin: 8px 0 0;
+        font-size: var(--text-lg);
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+      .cap {
+        margin: 0;
+        color: var(--muted);
+        font-size: var(--text-sm);
+        line-height: 1.5;
+      }
+      .file {
+        margin: 0;
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: var(--text-xs);
+      }
+    </style>
+  </head>
+  <body>
+    <!--THEME-->
+    <main class="wrap">
+      <h1>Hero samples</h1>
+      <ul class="grid">
+        <li>
+          <a class="tile" href="mvu-loop.html"
+            ><span class="num">1</span>
+            <p class="name">The MVU loop</p>
+            <p class="cap">
+              The server runs Model to View once and seals the state; a click lights only Update,
+              Model and one View slot.
+            </p>
+            <p class="file">mvu-loop.html</p></a
+          >
+        </li>
+        <li>
+          <a class="tile" href="freeze-thaw.html"
+            ><span class="num">2</span>
+            <p class="name">Freeze and thaw</p>
+            <p class="cap">
+              The page arrives cold with its state encoded; the click thaws only the row it touched
+              and the count.
+            </p>
+            <p class="file">freeze-thaw.html</p></a
+          >
+        </li>
+        <li>
+          <a class="tile" href="message-trace.html"
+            ><span class="num">3</span>
+            <p class="name">Message trace</p>
+            <p class="cap">
+              The on:click message travels to the handler, the model diff names the path, and its
+              binding repaints two nodes.
+            </p>
+            <p class="file">message-trace.html</p></a
+          >
+        </li>
+        <li>
+          <a class="tile" href="page-wake.html"
+            ><span class="num">4</span>
+            <p class="name">The page wakes where you click</p>
+            <p class="cap">
+              A whole page renders in one server pass; the click wakes one block, and a scrubbable
+              timeline shows component JS at 0 B until then.
+            </p>
+            <p class="file">page-wake.html</p></a
+          >
+        </li>
+        <li>
+          <a class="tile" href="page-mvu.html"
+            ><span class="num">5</span>
+            <p class="name">The page wakes, the loop turns once</p>
+            <p class="cap">
+              The page of #4 with the loop of #1: the click lifts the todo block, and Update, Model
+              and View run once next to it before only the row and the count repaint.
+            </p>
+            <p class="file">page-mvu.html</p></a
+          >
+        </li>
+      </ul>
+    </main>
+    <script>
+      const THEME_KEY = 'idlip-animations-theme';
+      const root = document.documentElement;
+      root.dataset.theme = localStorage.getItem(THEME_KEY) || 'dark';
+      const themeButton = document.querySelector('.theme');
+      function paintThemeButton() {
+        const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+        themeButton.setAttribute('aria-label', `Switch to ${next} theme`);
+        themeButton.title = `Switch to ${next} theme`;
+      }
+      themeButton.addEventListener('click', () => {
+        root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+        localStorage.setItem(THEME_KEY, root.dataset.theme);
+        paintThemeButton();
+      });
+      paintThemeButton();
+    </script>
+  </body>
+</html>

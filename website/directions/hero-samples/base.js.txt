@@ -1,0 +1,185 @@
+// Theme: dark by default, the choice is kept for these samples only.
+const THEME_KEY = 'idlip-animations-theme';
+const root = document.documentElement;
+root.dataset.theme = localStorage.getItem(THEME_KEY) || 'dark';
+const themeButton = document.querySelector('.theme');
+function paintThemeButton() {
+  const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+  themeButton.setAttribute('aria-label', `Switch to ${next} theme`);
+  themeButton.title = `Switch to ${next} theme`;
+}
+themeButton.addEventListener('click', () => {
+  root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+  localStorage.setItem(THEME_KEY, root.dataset.theme);
+  paintThemeButton();
+});
+paintThemeButton();
+
+const REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const EASE = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
+
+/** Moves `el` along an SVG path with transform keyframes, from `from` to `to` (0..1). */
+function travel(el, path, { from = 0, to = 1, duration = 700, delay = 0, easing = EASE } = {}) {
+  const length = path.getTotalLength();
+  const frames = [];
+  const count = 32;
+  for (let i = 0; i <= count; i++) {
+    const at = path.getPointAtLength(length * (from + ((to - from) * i) / count));
+    frames.push({ transform: `translate(${at.x}px, ${at.y}px)` });
+  }
+  return el.animate(frames, {
+    duration: REDUCE ? 0 : duration,
+    delay: REDUCE ? 0 : delay,
+    easing,
+    fill: 'forwards',
+  });
+}
+
+/** Fades `el` in, keeps it, and fades it out at the end of a ride. */
+function ride(el, path, { duration = 700, delay = 0, hold = true, from = 0, to = 1 } = {}) {
+  const move = travel(el, path, { from, to, duration, delay });
+  const fade = el.animate(
+    hold
+      ? [{ opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 1 }]
+      : [{ opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 1, offset: 0.8 }, { opacity: 0 }],
+    { duration: REDUCE ? 0 : duration, delay: REDUCE ? 0 : delay, easing: 'linear', fill: 'forwards' },
+  );
+  return [move, fade];
+}
+
+/** Cancels every script animation on the board, for a reset. */
+function cancelRides(board) {
+  for (const animation of board.getAnimations({ subtree: true })) {
+    if (!(animation instanceof CSSTransition) && !(animation instanceof CSSAnimation)) {
+      animation.cancel();
+    }
+  }
+}
+
+/**
+ * Plays `steps` (each `{ id, ms }`) on `board`: entering step n sets the class `at-<id>` for every
+ * step up to n, so CSS transitions reverse when a step is left. Loops with a fade. Pauses when the
+ * tab is hidden or the board is off screen. With reduced motion it shows the last step and waits.
+ */
+function createPlayer(board, steps, { onStep = () => {}, onReset = () => {} } = {}) {
+  let index = -1;
+  let timer = 0;
+  let due = 0;
+  let left = 0;
+  let hidden = document.hidden;
+  let offscreen = false;
+  let resetting = false;
+
+  function apply(n) {
+    const previous = index;
+    index = n;
+    for (const [k, step] of steps.entries()) {
+      board.classList.toggle(`at-${step.id}`, k <= n);
+    }
+    board.dataset.step = steps[n].id;
+    onStep(steps[n].id, n, previous);
+  }
+
+  function blocked() {
+    return hidden || offscreen || REDUCE;
+  }
+
+  function schedule(ms = steps[index].ms) {
+    clearTimeout(timer);
+    left = ms;
+    if (blocked() || resetting) {
+      return;
+    }
+    due = performance.now() + ms;
+    timer = setTimeout(advance, ms);
+  }
+
+  function advance() {
+    if (index === steps.length - 1) {
+      reset();
+      return;
+    }
+    apply(index + 1);
+    schedule();
+  }
+
+  function reset() {
+    resetting = true;
+    board.classList.add('fade');
+    setTimeout(() => {
+      board.classList.add('snap');
+      cancelRides(board);
+      board.classList.remove('user');
+      onReset();
+      apply(0);
+      void board.offsetWidth;
+      board.classList.remove('snap', 'fade');
+      resetting = false;
+      schedule();
+    }, 320);
+  }
+
+  function pause() {
+    if (timer) {
+      clearTimeout(timer);
+      timer = 0;
+      left = Math.max(0, due - performance.now());
+    }
+    for (const animation of board.getAnimations({ subtree: true })) {
+      animation.pause();
+    }
+  }
+
+  function resume() {
+    if (blocked()) {
+      return;
+    }
+    for (const animation of board.getAnimations({ subtree: true })) {
+      if (animation.playState === 'paused') {
+        animation.play();
+      }
+    }
+    if (!resetting) {
+      schedule(left);
+    }
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    hidden = document.hidden;
+    if (hidden) {
+      pause();
+    } else {
+      resume();
+    }
+  });
+  new IntersectionObserver(([entry]) => {
+    offscreen = !entry.isIntersecting;
+    if (offscreen) {
+      pause();
+    } else {
+      resume();
+    }
+  }).observe(board);
+
+  return {
+    start() {
+      apply(REDUCE ? steps.length - 1 : 0);
+      schedule();
+    },
+    /** Goes to the step `id` and plays on from there. */
+    jump(id, ms) {
+      const n = steps.findIndex((step) => step.id === id);
+      apply(n);
+      schedule(ms ?? steps[n].ms);
+    },
+    get step() {
+      return steps[index].id;
+    },
+    get index() {
+      return index;
+    },
+    indexOf(id) {
+      return steps.findIndex((step) => step.id === id);
+    },
+  };
+}

@@ -1,0 +1,1132 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>idlip hero: the page wakes, the loop turns once</title>
+    <style>
+      /*BASE_CSS*/
+
+      /* The timeline sets these every frame, so no transition. */
+      .pointer {
+        transition: none;
+      }
+
+      /* The browser frame and the page inside it. */
+      .frame {
+        top: 24px;
+        left: 24px;
+        width: 512px;
+        height: 280px;
+        overflow: hidden;
+        border-radius: var(--radius-md);
+        background: var(--bg-elevated);
+        color: var(--text);
+      }
+      .bar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        height: 36px;
+        padding: 0 14px;
+      }
+      .dots {
+        display: flex;
+        gap: 5px;
+        margin-right: auto;
+      }
+      .dots i {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--surface-strong);
+      }
+      .net {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        height: 22px;
+        padding: 0 10px;
+        border-radius: var(--radius);
+        background: var(--surface);
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 9px;
+        white-space: nowrap;
+        opacity: 0;
+        transform: translateY(-6px);
+        transition:
+          opacity var(--duration) var(--ease-out),
+          transform var(--duration) var(--ease);
+      }
+      .net b {
+        color: var(--text);
+        font-weight: 700;
+      }
+      .board.on-load .net {
+        opacity: 1;
+        transform: none;
+      }
+
+      /* Blocks of the page. Their opacity comes from the timeline. */
+      .blk {
+        position: absolute;
+        border-radius: 8px;
+        background: var(--surface-strong);
+      }
+      .blk.soft {
+        background: var(--surface);
+      }
+      .media {
+        border-radius: 14px;
+        background:
+          repeating-linear-gradient(
+            135deg,
+            transparent 0 10px,
+            color-mix(in srgb, var(--surface-strong) 70%, transparent) 10px 11px
+          ),
+          var(--surface);
+      }
+      .media::after {
+        position: absolute;
+        left: 18px;
+        bottom: 16px;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: var(--surface-strong);
+        content: '';
+      }
+      .btn {
+        border-radius: var(--radius);
+        background: var(--text);
+      }
+
+      /* The one live block: the todo app. */
+      .widget {
+        position: absolute;
+        top: 100px;
+        left: 304px;
+        z-index: 2;
+        width: 196px;
+        padding: 10px;
+        gap: 4px;
+        background: var(--surface);
+      }
+      .widget .row {
+        height: 40px;
+        font-size: 12px;
+        background: var(--bg-elevated);
+      }
+      .widget .app-title {
+        font-size: 14px;
+      }
+      .widget .app-head {
+        height: 28px;
+        align-items: center;
+        padding: 0 4px;
+      }
+      .wake {
+        position: absolute;
+        inset: -4px;
+        border-radius: 24px;
+        box-shadow: 0 0 0 3px var(--accent-fill);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity var(--mid) var(--ease-out);
+      }
+      .board.on-click:not(.on-fold) .wake {
+        opacity: 1;
+      }
+      .board.on-press .r2 .box {
+        transform: scale(0.88);
+      }
+      .board.on-patch .r2 .box::before,
+      .board.on-patch .r2 .box svg {
+        opacity: 1;
+        transform: none;
+      }
+      .board.on-patch .r2 .txt {
+        opacity: 0.6;
+      }
+      .count .now {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      .board.on-patch .count .now {
+        opacity: 1;
+        transform: none;
+      }
+      .board.on-patch .count .was {
+        opacity: 0;
+        transform: translateY(-6px);
+      }
+      .count .flash {
+        inset: -3px -6px;
+        border-radius: 8px;
+      }
+      .board.on-patch:not(.on-fold) .flash {
+        opacity: 1;
+      }
+
+      /* The state the server sealed into the page: the model, then <script i-state>. */
+      .seal {
+        position: absolute;
+        top: 246px;
+        left: 304px;
+        display: grid;
+        place-items: center;
+        height: 24px;
+        padding: 0 10px;
+        border-radius: var(--radius);
+        background: var(--surface);
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 9px;
+        white-space: nowrap;
+        opacity: 0;
+        transform: translateY(-4px) scale(0.92);
+        transition:
+          opacity var(--duration) var(--ease-out),
+          transform var(--mid) var(--ease);
+      }
+      .seal > span {
+        grid-area: 1 / 1;
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        transition: opacity var(--duration) var(--ease-out);
+      }
+      .seal .k {
+        color: var(--syn-tag);
+      }
+      .seal .a {
+        color: var(--syn-attr);
+      }
+      .seal .sealed {
+        opacity: 0;
+      }
+      .board.on-modeled .seal {
+        opacity: 1;
+        transform: none;
+      }
+      .board.on-seal .seal .sealed {
+        opacity: 1;
+      }
+      .board.on-seal .seal .open {
+        opacity: 0;
+      }
+
+      /* The loop of the woken block: Update, Model and View, unfolded next to it. */
+      .strip {
+        position: absolute;
+        top: 100px;
+        left: 16px;
+        z-index: 1;
+        display: grid;
+        gap: 4px;
+        width: 272px;
+        padding: 6px;
+        border-radius: var(--radius-md);
+        background: var(--surface);
+        opacity: 0;
+        transform: translateX(24px) scale(0.94);
+        transform-origin: 100% 24%;
+        transition:
+          opacity 160ms var(--ease-out),
+          transform 180ms cubic-bezier(0.4, 0, 1, 1);
+      }
+      .board.on-unfold:not(.on-fold) .strip {
+        opacity: 1;
+        transform: none;
+        transition:
+          opacity var(--duration) var(--ease-out),
+          transform var(--mid) var(--ease-out);
+      }
+      .step {
+        display: grid;
+        gap: 2px;
+        padding: 5px 10px;
+        border-radius: var(--radius-row);
+        background: var(--bg-elevated);
+      }
+      .step > * {
+        opacity: 0.4;
+        transition: opacity var(--duration) var(--ease-out);
+      }
+      .board.on-update .s-update > *,
+      .board.on-model .s-model > *,
+      .board.on-view .s-view > * {
+        opacity: 1;
+      }
+      .step-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 20px;
+      }
+      .step-name {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .step-name svg {
+        color: var(--muted);
+      }
+      .step-body {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        height: 16px;
+        font-family: var(--mono);
+        font-size: 10px;
+        white-space: nowrap;
+      }
+      .step-body .path {
+        margin-right: auto;
+        color: var(--muted);
+      }
+      .step-body svg {
+        color: var(--muted);
+      }
+      .fn {
+        color: var(--syn-function);
+      }
+      .str {
+        color: var(--syn-string);
+      }
+      .strip .chip {
+        height: 20px;
+        padding: 0 8px;
+        font-size: 9px;
+        opacity: 0;
+        transform: translateY(-6px) scale(0.9);
+        transition:
+          opacity var(--duration) var(--ease-out),
+          transform var(--duration) var(--ease);
+      }
+      .board.on-update .s-update .chip,
+      .board.on-view .s-view .chip {
+        opacity: 1;
+        transform: none;
+        transition-delay: 120ms;
+      }
+      .val {
+        display: grid;
+      }
+      .val > span {
+        grid-area: 1 / 1;
+        justify-self: start;
+        padding: 1px 5px;
+        border-radius: 5px;
+        transition:
+          opacity var(--duration) var(--ease-out),
+          transform var(--duration) var(--ease-out);
+      }
+      .v-true {
+        background: var(--accent-fill);
+        color: var(--on-accent);
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      .board.on-model .v-true {
+        opacity: 1;
+        transform: none;
+        transition-delay: 200ms;
+      }
+      .board.on-model .v-false {
+        opacity: 0;
+        transform: translateY(-6px);
+        transition-delay: 200ms;
+      }
+
+      /* The print head of the server render: one pass, top to bottom. */
+      .scan {
+        position: absolute;
+        top: 36px;
+        left: 0;
+        right: 0;
+        z-index: 3;
+        height: 2px;
+        background: var(--accent-strong);
+        opacity: 0;
+        pointer-events: none;
+      }
+      .scan::before {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 2px;
+        height: 40px;
+        background: linear-gradient(to top, var(--accent-tint), transparent);
+        content: '';
+      }
+
+      /* The timeline: component JS run over time, with a scrubber. */
+      .timeline {
+        top: 316px;
+        left: 24px;
+        width: 512px;
+        height: 100px;
+        border-radius: var(--radius-md);
+        background: var(--tl-bg);
+        --tl-bg: color-mix(in srgb, var(--on-ink) 9%, var(--ink));
+      }
+      .tl-head {
+        position: absolute;
+        top: 12px;
+        left: 20px;
+        right: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 24px;
+      }
+      .tl-value {
+        display: grid;
+        font-family: var(--mono);
+        font-size: 14px;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+      }
+      .tl-value > span {
+        grid-area: 1 / 1;
+        justify-self: end;
+        padding: 1px 6px;
+        border-radius: 6px;
+        transition:
+          opacity var(--duration) var(--ease-out),
+          transform var(--duration) var(--ease-out);
+      }
+      .tl-value .lit {
+        background: var(--accent-fill);
+        color: var(--on-accent);
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      .board.on-update .tl-value .v1,
+      .board.on-view .tl-value .v2 {
+        opacity: 1;
+        transform: none;
+      }
+      .board.on-update .tl-value .v0,
+      .board.on-view .tl-value .v1 {
+        opacity: 0;
+        transform: translateY(-6px);
+      }
+      .chart {
+        position: absolute;
+        top: 0;
+        left: 0;
+        overflow: visible;
+      }
+      .chart .base {
+        fill: none;
+        stroke: var(--line);
+        stroke-width: 2;
+        stroke-linecap: round;
+      }
+      .chart .area {
+        fill: var(--accent-fill);
+      }
+      .chart .tick {
+        fill: var(--on-ink);
+      }
+      .chart text {
+        fill: var(--on-ink-muted);
+        font-family: var(--mono);
+        font-size: 9px;
+        transition: fill var(--duration);
+      }
+      .chart text.now {
+        fill: var(--on-ink);
+        font-weight: 700;
+      }
+      .mask {
+        position: absolute;
+        top: 44px;
+        left: 20px;
+        width: 476px;
+        height: 30px;
+        background: var(--tl-bg);
+        opacity: 0.72;
+        transform-origin: 100% 50%;
+        pointer-events: none;
+      }
+      .head {
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 3;
+        width: 2px;
+        height: 26px;
+        margin-left: -1px;
+        background: var(--on-ink);
+        pointer-events: none;
+      }
+      .knob {
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 4;
+        width: 44px;
+        height: 44px;
+        margin: -22px 0 0 -22px;
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        background: transparent;
+        cursor: grab;
+        touch-action: none;
+      }
+      .knob::before {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 14px;
+        height: 14px;
+        margin: -7px 0 0 -7px;
+        border-radius: 50%;
+        background: var(--on-ink);
+        box-shadow: 0 0 0 3px var(--tl-bg);
+        content: '';
+        transition: transform var(--duration-fast) var(--ease-out);
+      }
+      .knob:hover::before {
+        transform: scale(1.15);
+      }
+      .knob:active {
+        cursor: grabbing;
+      }
+      .knob:active::before {
+        transform: scale(0.96);
+      }
+      .knob:focus-visible {
+        outline: 3px solid var(--focus);
+        outline-offset: -10px;
+      }
+      .scrub {
+        position: absolute;
+        top: 40px;
+        left: 20px;
+        width: 472px;
+        height: 60px;
+        cursor: pointer;
+        touch-action: none;
+      }
+    </style>
+  </head>
+  <body>
+    <!--THEME-->
+    <main>
+      <figure
+        class="board"
+        data-board
+        aria-label="A page rendered once on the server; a click wakes the todo block, which runs Update, Model and View once"
+        style="margin: 0"
+      >
+        <p class="visually-hidden" role="status" aria-live="polite" data-live></p>
+        <div class="scene">
+          <div class="abs frame" data-frame>
+            <div class="bar">
+              <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="net">loader.js <b>3.9 kB</b></span>
+            </div>
+
+            <!-- The page: blocks the server rendered, and the todo app. -->
+            <i class="blk" data-b style="top: 52px; left: 16px; width: 24px; height: 24px"></i>
+            <i
+              class="blk soft"
+              data-b
+              style="top: 60px; left: 56px; width: 44px; height: 8px; border-radius: 4px"
+            ></i>
+            <i
+              class="blk soft"
+              data-b
+              style="top: 60px; left: 112px; width: 52px; height: 8px; border-radius: 4px"
+            ></i>
+            <i
+              class="blk soft"
+              data-b
+              style="top: 60px; left: 176px; width: 40px; height: 8px; border-radius: 4px"
+            ></i>
+            <i class="blk btn" data-b style="top: 52px; left: 424px; width: 72px; height: 24px"></i>
+            <i
+              class="blk"
+              data-b
+              data-under
+              style="top: 100px; left: 16px; width: 248px; height: 20px; border-radius: 6px"
+            ></i>
+            <i
+              class="blk"
+              data-b
+              data-under
+              style="top: 126px; left: 16px; width: 176px; height: 20px; border-radius: 6px"
+            ></i>
+            <i
+              class="blk soft"
+              data-b
+              data-under
+              style="top: 160px; left: 16px; width: 264px; height: 8px; border-radius: 4px"
+            ></i>
+            <i
+              class="blk soft"
+              data-b
+              data-under
+              style="top: 174px; left: 16px; width: 240px; height: 8px; border-radius: 4px"
+            ></i>
+            <i
+              class="blk soft"
+              data-b
+              data-under
+              style="top: 188px; left: 16px; width: 200px; height: 8px; border-radius: 4px"
+            ></i>
+            <i
+              class="blk media"
+              data-b
+              data-under
+              style="top: 208px; left: 16px; width: 272px; height: 60px"
+            ></i>
+
+            <div class="app widget" data-b data-live-block>
+              <div class="app-head">
+                <span class="app-title">Todos</span
+                ><span class="count"
+                  ><span class="was"><b>1</b> left</span><span class="now"><b>0</b> left</span
+                  ><i class="flash"></i
+                ></span>
+              </div>
+              <div class="row r1 done">
+                <span class="box"
+                  ><svg
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.4"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M5 12.5l4.5 4.5L19 7.5" /></svg></span
+                ><span class="txt">Write the format</span>
+              </div>
+              <div class="row r2" data-target>
+                <span class="box"
+                  ><svg
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.4"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M5 12.5l4.5 4.5L19 7.5" /></svg></span
+                ><span class="txt">Build the runtime</span><i class="flash"></i>
+              </div>
+              <i class="wake"></i>
+            </div>
+
+            <div class="seal" aria-hidden="true">
+              <span class="open"
+                ><svg
+                  viewBox="0 0 24 24"
+                  width="12"
+                  height="12"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <ellipse cx="12" cy="6" rx="7" ry="3" />
+                  <path
+                    d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"
+                  /></svg
+                >model</span
+              >
+              <span class="sealed"
+                ><svg
+                  viewBox="0 0 24 24"
+                  width="12"
+                  height="12"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="5" y="11" width="14" height="10" rx="2" />
+                  <path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg
+                ><span
+                  ><span class="k">&lt;script</span> <span class="a">i-state</span
+                  ><span class="k">&gt;</span></span
+                ></span
+              >
+            </div>
+
+            <!-- The loop of the todo block, run once by the click. -->
+            <div class="strip" aria-hidden="true">
+              <div class="step s-update">
+                <div class="step-head">
+                  <span class="step-name"
+                    ><svg
+                      viewBox="0 0 24 24"
+                      width="14"
+                      height="14"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path
+                        d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"
+                      /></svg
+                    >Update</span
+                  ><span class="chip lit">toggle.js <b>119 B</b></span>
+                </div>
+                <div class="step-body">
+                  <span><span class="fn">toggle</span>(<span class="str">"a2"</span>)</span>
+                </div>
+              </div>
+              <div class="step s-model">
+                <div class="step-head">
+                  <span class="step-name"
+                    ><svg
+                      viewBox="0 0 24 24"
+                      width="14"
+                      height="14"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <ellipse cx="12" cy="6" rx="7" ry="3" />
+                      <path
+                        d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"
+                      /></svg
+                    >Model</span
+                  >
+                </div>
+                <div class="step-body">
+                  <span class="path">todos[1].done</span><span>false</span
+                  ><svg
+                    viewBox="0 0 24 24"
+                    width="12"
+                    height="12"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M5 12h14M13 6l6 6-6 6" /></svg
+                  ><span class="val"
+                    ><span class="v-false">false</span><span class="v-true">true</span></span
+                  >
+                </div>
+              </div>
+              <div class="step s-view">
+                <div class="step-head">
+                  <span class="step-name"
+                    ><svg
+                      viewBox="0 0 24 24"
+                      width="14"
+                      height="14"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <rect x="3" y="4" width="18" height="16" rx="3" />
+                      <path d="M3 9h18" /></svg
+                    >View</span
+                  ><span class="chip lit">todos._.done.js <b>505 B</b></span>
+                </div>
+                <div class="step-body"><span class="path">row a2, count</span></div>
+              </div>
+            </div>
+            <i class="scan" data-scan></i>
+          </div>
+
+          <div class="abs timeline">
+            <div class="tl-head" aria-hidden="true">
+              <p class="label">component JS run</p>
+              <p class="tl-value" style="margin: 0">
+                <span class="v0">0 B</span><span class="lit v1">119 B</span
+                ><span class="lit v2">624 B</span>
+              </p>
+            </div>
+            <svg
+              class="chart"
+              width="512"
+              height="100"
+              viewBox="0 0 512 100"
+              aria-hidden="true"
+              data-chart
+            ></svg>
+            <i class="mask" data-mask></i>
+            <div class="scrub" data-scrub></div>
+            <i class="head" data-head></i>
+            <button
+              class="knob"
+              type="button"
+              role="slider"
+              aria-label="Timeline"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              aria-valuenow="0"
+              title="Drag to scrub"
+              data-knob
+            ></button>
+          </div>
+
+          <span class="pointer" aria-hidden="true" data-pointer
+            ><svg
+              viewBox="0 0 24 24"
+              width="22"
+              height="22"
+              fill="currentColor"
+              stroke="var(--bg-elevated)"
+              stroke-width="1.5"
+              stroke-linejoin="round"
+            >
+              <path d="M5 3l14 7.5-6.2 1.6L10 18z" /></svg
+          ></span>
+          <button
+            class="hit"
+            type="button"
+            aria-label="Toggle Build the runtime"
+            title="Toggle Build the runtime"
+            disabled
+          ></button>
+        </div>
+      </figure>
+    </main>
+    <script>
+      /*BASE_JS*/
+
+      const board = document.querySelector('[data-board]');
+      const live = board.querySelector('[data-live]');
+      const hit = board.querySelector('.hit');
+      const scan = board.querySelector('[data-scan]');
+      const pointer = board.querySelector('[data-pointer]');
+      const pointerIcon = pointer.querySelector('svg');
+      const mask = board.querySelector('[data-mask]');
+      const head = board.querySelector('[data-head]');
+      const knob = board.querySelector('[data-knob]');
+      const scrub = board.querySelector('[data-scrub]');
+      const blocks = [...board.querySelectorAll('[data-b]')];
+      const liveBlock = board.querySelector('[data-live-block]');
+
+      // The story on a 0..1 timeline. Every visual is a function of t, so scrubbing goes both ways.
+      const LOOP_MS = 8000;
+      const T = {
+        render: 0.03,
+        modeled: 0.17,
+        rendered: 0.2,
+        seal: 0.23,
+        load: 0.28,
+        aim: 0.35,
+        click: 0.43,
+        unfold: 0.445,
+        update: 0.48,
+        model: 0.56,
+        view: 0.63,
+        patch: 0.67,
+        fold: 0.8,
+      };
+      // The moments that set a class on the board, so CSS transitions reverse when t goes back.
+      const MOMENTS = [
+        'modeled',
+        'seal',
+        'load',
+        'click',
+        'unfold',
+        'update',
+        'model',
+        'view',
+        'patch',
+        'fold',
+      ];
+      // The base line of the chart, the top of the area, and the row of step labels under them.
+      const TRACK = { x: 20, w: 472, base: 70, top: 46, labels: 92 };
+      const REDUCED_AT = 0.74;
+      let t = 0;
+      let playing = !REDUCE;
+      let holdUntil = 0;
+      let last = 0;
+      let frame = 0;
+      let hidden = document.hidden;
+      let offscreen = false;
+      let wrapping = false;
+      let blockTops = [];
+      let target = { x: 0, y: 0 };
+      let labels = {};
+
+      function clamp(value, min = 0, max = 1) {
+        return Math.min(max, Math.max(min, value));
+      }
+      function smooth(edge0, edge1, value) {
+        const k = clamp((value - edge0) / (edge1 - edge0));
+        return k * k * (3 - 2 * k);
+      }
+      function xAt(time) {
+        return TRACK.x + time * TRACK.w;
+      }
+
+      // Draw the chart once: the base line, the area from the first chunk, the ticks and their labels.
+      function drawChart() {
+        const chart = board.querySelector('[data-chart]');
+        const xr = xAt(T.render);
+        const xl = xAt(T.load);
+        const xc = xAt(T.click);
+        const xu = xAt(T.update);
+        const end = TRACK.x + TRACK.w;
+        chart.innerHTML = `
+    <rect class="area" x="${xu}" y="${TRACK.top}" width="${end - xu}" height="${TRACK.base - TRACK.top}" rx="6"/>
+    <path class="base" d="M${TRACK.x} ${TRACK.base} H${xu}"/>
+    <circle class="tick" cx="${xr}" cy="${TRACK.base}" r="3"/>
+    <circle class="tick" cx="${xl}" cy="${TRACK.base}" r="3"/>
+    <circle class="tick" cx="${xc}" cy="${TRACK.base}" r="3"/>
+    <text data-l="render" x="${xr - 3}" y="${TRACK.labels}">server render</text>
+    <text data-l="load" x="${xl - 3}" y="${TRACK.labels}">page load</text>
+    <text data-l="click" x="${xc - 3}" y="${TRACK.labels}">click</text>`;
+        labels = {
+          render: chart.querySelector('[data-l="render"]'),
+          load: chart.querySelector('[data-l="load"]'),
+          click: chart.querySelector('[data-l="click"]'),
+        };
+      }
+
+      function place() {
+        const frameRect = board.querySelector('[data-frame]').getBoundingClientRect();
+        const page = frameRect.height - 36;
+        blockTops = [];
+        for (const block of blocks) {
+          const rect = block.getBoundingClientRect();
+          blockTops.push((rect.top - frameRect.top - 36) / page);
+        }
+        const boardRect = board.getBoundingClientRect();
+        const box = board.querySelector('[data-target] .box').getBoundingClientRect();
+        target = {
+          x: box.left + box.width / 2 - boardRect.left,
+          y: box.top + box.height / 2 - boardRect.top,
+        };
+        hit.style.left = `${target.x - 22}px`;
+        hit.style.top = `${target.y - 22}px`;
+      }
+
+      function phase() {
+        if (t < T.load) return 'render';
+        if (t < T.click) return 'load';
+        return 'click';
+      }
+
+      function render() {
+        // The server render: a print head passes once and each block appears as it is reached.
+        const pass = smooth(T.render, T.rendered, t);
+        scan.style.transform = `translateY(${pass * 244}px)`;
+        scan.style.opacity =
+          t > T.render && t < T.rendered + 0.02
+            ? String(1 - smooth(T.rendered - 0.02, T.rendered + 0.02, t))
+            : '0';
+
+        // After the click the other blocks dim, and the todo block lifts while its loop runs.
+        const dim = smooth(T.click, T.update, t);
+        const lift = smooth(T.click, T.unfold + 0.02, t) * (1 - smooth(T.fold, T.fold + 0.04, t));
+        // The blocks under the strip step aside while it is open, so no corner shows past it.
+        const open = smooth(T.unfold, T.unfold + 0.02, t) * (1 - smooth(T.fold, T.fold + 0.025, t));
+        for (const [k, block] of blocks.entries()) {
+          const shown = clamp((pass - blockTops[k]) * 8);
+          const isLive = block === liveBlock;
+          const under = block.hasAttribute('data-under') ? 1 - open : 1;
+          block.style.opacity = String(shown * under * (isLive ? 1 : 1 - 0.55 * dim));
+          block.style.transform = `translateY(${(1 - shown) * 6 - (isLive ? lift * 4 : 0)}px)`;
+        }
+
+        for (const name of MOMENTS) {
+          board.classList.toggle(`on-${name}`, t >= T[name]);
+        }
+        board.classList.toggle('on-press', t >= T.click - 0.012 && t < T.click + 0.012);
+        hit.disabled = t < T.load;
+
+        // The pointer of the autoplay comes in, presses, and leaves.
+        const come = smooth(T.aim, T.click - 0.02, t);
+        const away = smooth(T.click + 0.03, T.click + 0.08, t);
+        const shownPointer = board.classList.contains('user')
+          ? 0
+          : Math.min(smooth(T.aim, T.aim + 0.04, t), 1 - away);
+        pointer.style.opacity = String(shownPointer);
+        pointer.style.transform = `translate(${target.x - 4 + (1 - come) * 70}px, ${target.y - 2 + (1 - come) * 80}px)`;
+        pointerIcon.style.transform = board.classList.contains('on-press') ? 'scale(0.88)' : '';
+
+        // The timeline: the playhead, a veil over what has not happened yet, and the current step.
+        const x = xAt(t);
+        const now = phase();
+        board.dataset.step = now;
+        for (const [name, label] of Object.entries(labels)) {
+          label.classList.toggle('now', name === now);
+        }
+        head.style.transform = `translate(${x}px, 44px)`;
+        knob.style.transform = `translate(${x}px, ${TRACK.base}px)`;
+        mask.style.transform = `scaleX(${1 - t})`;
+        knob.setAttribute('aria-valuenow', String(Math.round(t * 100)));
+        knob.setAttribute('aria-valuetext', describe());
+      }
+
+      function describe() {
+        if (t < T.seal) return 'Server render';
+        if (t < T.load) return 'The model is sealed into the page';
+        if (t < T.click) return 'Page loaded, no component code run';
+        if (t < T.model) return 'Update: toggle.js loads, 119 B';
+        if (t < T.view) return 'Model: todos[1].done turns true';
+        if (t < T.patch) return 'View: todos._.done.js loads, 505 B';
+        return 'One row and the count patched, 624 B of component code';
+      }
+
+      function tick(now) {
+        frame = 0;
+        const dt = last ? now - last : 0;
+        last = now;
+        if (playing && now >= holdUntil && !wrapping) {
+          t += dt / LOOP_MS;
+          if (t >= 1) {
+            t = 1;
+            wrap();
+          }
+          const before = board.classList.contains('on-patch');
+          render();
+          if (!before && board.classList.contains('on-patch')) {
+            live.textContent =
+              'Update loaded toggle.js, 119 B. The model changed one path. View loaded todos._.done.js, 505 B, and patched one row and the count.';
+          }
+        }
+        schedule();
+      }
+
+      function schedule() {
+        if (!frame && playing && !hidden && !offscreen) {
+          frame = requestAnimationFrame(tick);
+        }
+      }
+
+      function wrap() {
+        wrapping = true;
+        board.classList.add('fade');
+        setTimeout(() => {
+          board.classList.add('snap');
+          board.classList.remove('user');
+          t = 0;
+          render();
+          void board.offsetWidth;
+          board.classList.remove('snap', 'fade');
+          wrapping = false;
+          last = 0;
+        }, 320);
+      }
+
+      function seek(value, { hold = 0 } = {}) {
+        t = clamp(value);
+        holdUntil = performance.now() + hold;
+        last = 0;
+        render();
+      }
+
+      // Scrubbing: drag the knob or the track. Play resumes a moment after release.
+      function timeFromEvent(event) {
+        const rect = scrub.getBoundingClientRect();
+        return clamp((event.clientX - rect.left) / rect.width);
+      }
+      function startScrub(event) {
+        event.preventDefault();
+        const el = event.currentTarget;
+        el.setPointerCapture(event.pointerId);
+        board.classList.add('user');
+        seek(timeFromEvent(event), { hold: 1e9 });
+        const move = (e) => seek(timeFromEvent(e), { hold: 1e9 });
+        const up = () => {
+          el.removeEventListener('pointermove', move);
+          el.removeEventListener('pointerup', up);
+          el.removeEventListener('pointercancel', up);
+          holdUntil = performance.now() + 1500;
+        };
+        el.addEventListener('pointermove', move);
+        el.addEventListener('pointerup', up);
+        el.addEventListener('pointercancel', up);
+      }
+      knob.addEventListener('pointerdown', startScrub);
+      scrub.addEventListener('pointerdown', startScrub);
+      knob.addEventListener('keydown', (event) => {
+        const steps = {
+          ArrowLeft: -0.02,
+          ArrowDown: -0.02,
+          ArrowRight: 0.02,
+          ArrowUp: 0.02,
+          Home: -1,
+          End: 1,
+        };
+        if (event.key in steps) {
+          event.preventDefault();
+          board.classList.add('user');
+          seek(t + steps[event.key], { hold: 2500 });
+        }
+      });
+
+      hit.addEventListener('click', () => {
+        board.classList.add('user');
+        if (t >= T.click) {
+          // Toggle back: before the click, and wait.
+          seek(T.click - 0.06, { hold: 2600 });
+          live.textContent = 'Build the runtime is not done.';
+        } else {
+          seek(REDUCE ? REDUCED_AT : T.click - 0.012);
+        }
+      });
+
+      document.addEventListener('visibilitychange', () => {
+        hidden = document.hidden;
+        last = 0;
+        if (hidden) {
+          cancelAnimationFrame(frame);
+          frame = 0;
+        } else {
+          schedule();
+        }
+      });
+      new IntersectionObserver(([entry]) => {
+        offscreen = !entry.isIntersecting;
+        last = 0;
+        if (offscreen) {
+          cancelAnimationFrame(frame);
+          frame = 0;
+        } else {
+          schedule();
+        }
+      }).observe(board);
+
+      document.fonts.ready.then(() => {
+        drawChart();
+        place();
+        // With reduced motion the board shows the loop after the click, and waits.
+        t = REDUCE ? REDUCED_AT : 0;
+        board.classList.add('snap');
+        render();
+        void board.offsetWidth;
+        board.classList.remove('snap');
+        schedule();
+      });
+    </script>
+  </body>
+</html>

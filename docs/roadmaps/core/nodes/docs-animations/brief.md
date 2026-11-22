@@ -43,7 +43,7 @@ depends_on:
 
 # Reuse two hero samples as animated figures in the docs
 
-User decision (2026-11-22): reuse the hero samples that fit the docs. Sources in `/private/tmp/claude-501/-Users-alexis-Documents-GitHub-idlip/66a8e5a8-2b9f-4b59-b751-902fd595146a/scratchpad/src/` (`mvu-loop.html`, `message-trace.html`, shared parts in `build.py`), built files and screenshots in `/private/tmp/claude-501/-Users-alexis-Documents-GitHub-idlip/66a8e5a8-2b9f-4b59-b751-902fd595146a/scratchpad/animations/`.
+User decision (2026-11-22): reuse the hero samples that fit the docs. Sources in `website/directions/hero-samples/` (`mvu-loop.html`, `message-trace.html`, shared parts in `build.py`), build them with `build.py` there.
 
 Picked by the orchestrator:
 

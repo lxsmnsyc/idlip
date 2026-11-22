@@ -1,0 +1,778 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>idlip hero: message trace</title>
+    <style>
+      /*BASE_CSS*/
+
+      /* Left: the app, its markup and the meter. */
+      .page {
+        top: 24px;
+        left: 24px;
+        width: 240px;
+      }
+      .page .app-head {
+        height: 32px;
+        align-items: center;
+      }
+      .page .app-title {
+        font-size: 17px;
+        font-weight: 800;
+        letter-spacing: -0.035em;
+      }
+      .page .row {
+        height: 48px;
+        font-size: 14px;
+      }
+      .page .count {
+        padding: 2px 6px;
+        font-size: 13px;
+      }
+
+      .markup {
+        top: 196px;
+        left: 24px;
+        display: grid;
+        gap: 6px;
+        width: 240px;
+        padding: 16px;
+        border-radius: var(--radius-md);
+        background: var(--code-bg);
+        color: var(--syn-punct);
+        font-family: var(--mono);
+        font-size: 10px;
+        line-height: 16px;
+      }
+      .markup .t {
+        color: var(--syn-tag);
+      }
+      .markup .a {
+        color: var(--syn-attr);
+      }
+      .attr {
+        display: flex;
+        gap: 2px;
+        align-items: center;
+        padding-left: 12px;
+      }
+      .msg {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        height: 24px;
+        padding: 0 8px;
+        border-radius: 7px;
+        background: var(--surface-strong);
+        white-space: nowrap;
+      }
+      .msg .s {
+        color: var(--syn-string);
+      }
+      .msg::after {
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        box-shadow: 0 0 0 2px var(--focus);
+        content: '';
+        opacity: 0;
+        transition: opacity var(--duration) var(--ease-out);
+      }
+      .board.at-press:not(.at-update) .msg::after {
+        opacity: 1;
+      }
+
+      .meter {
+        top: 330px;
+        left: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 240px;
+        height: 84px;
+        padding: 0 20px;
+        border-radius: var(--radius-md);
+        background: var(--well);
+      }
+      .meter-value {
+        display: grid;
+        margin: 0;
+        font-family: var(--mono);
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: -0.04em;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      .meter-value > span {
+        grid-area: 1 / 1;
+        justify-self: end;
+        padding: 0 6px;
+        border-radius: 6px;
+        transition:
+          opacity var(--duration) var(--ease-out),
+          transform var(--duration) var(--ease-out);
+      }
+      .meter-value .now {
+        background: var(--accent-fill);
+        color: var(--on-accent);
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      .board.at-patch .meter-value .now {
+        opacity: 1;
+        transform: none;
+      }
+      .board.at-patch .meter-value .was {
+        opacity: 0;
+        transform: translateY(-6px);
+      }
+
+      /* Right: the three steps, each a card with its chunk. */
+      .cards {
+        top: 24px;
+        left: 280px;
+        display: grid;
+        gap: 12px;
+        width: 256px;
+      }
+      .card {
+        position: relative;
+        display: grid;
+        gap: 8px;
+        height: 122px;
+        align-content: start;
+        padding: 14px 16px;
+        border-radius: var(--radius-md);
+        background: var(--bg-elevated);
+        color: var(--text);
+      }
+      .card::after {
+        position: absolute;
+        inset: -4px;
+        border-radius: 24px;
+        box-shadow: 0 0 0 3px var(--accent-fill);
+        content: '';
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity var(--mid) var(--ease-out);
+      }
+      .card-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 24px;
+      }
+      .card-title {
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .card-title svg {
+        color: var(--muted);
+      }
+      .file {
+        overflow: hidden;
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 10px;
+        line-height: 16px;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+      .size {
+        display: grid;
+      }
+      .size > span {
+        grid-area: 1 / 1;
+        justify-self: end;
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        height: 24px;
+        padding: 0 10px;
+        border-radius: var(--radius);
+        font-family: var(--mono);
+        font-size: 10px;
+        white-space: nowrap;
+        transition:
+          opacity var(--duration) var(--ease-out),
+          transform var(--duration) var(--ease);
+      }
+      .size .off {
+        background: var(--surface);
+        color: var(--muted);
+      }
+      .size .on {
+        background: var(--accent-fill);
+        color: var(--on-accent);
+        font-weight: 700;
+        opacity: 0;
+        transform: scale(0.8);
+      }
+      .body {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        height: 36px;
+        padding: 0 12px;
+        border-radius: 12px;
+        background: var(--surface);
+        font-family: var(--mono);
+        font-size: 11px;
+        white-space: nowrap;
+      }
+      .body.stack {
+        display: grid;
+        align-items: center;
+      }
+      .fn {
+        color: var(--syn-function);
+      }
+      .str {
+        color: var(--syn-string);
+      }
+      .key {
+        color: var(--muted);
+      }
+      .stack {
+        display: grid;
+      }
+      .stack > * {
+        grid-area: 1 / 1;
+        transition:
+          opacity var(--duration) var(--ease-out),
+          transform var(--duration) var(--ease-out);
+      }
+      .stack .after {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+
+      /* Update: loads, then calls toggle("a2"). */
+      .board.at-update .c-update .size .on,
+      .board.at-binding .c-binding .size .on {
+        opacity: 1;
+        transform: none;
+      }
+      .board.at-update .c-update .size .off,
+      .board.at-binding .c-binding .size .off {
+        opacity: 0;
+      }
+      .c-update .body .stack .after {
+        transform: none;
+      }
+      .board.at-update .c-update .body .after {
+        opacity: 1;
+        transition-delay: 200ms;
+      }
+      .board.at-update .c-update .body .before {
+        opacity: 0;
+      }
+      .board.at-update:not(.at-model) .c-update::after,
+      .board.at-model:not(.at-path) .c-model::after,
+      .board.at-binding:not(.at-rest) .c-binding::after {
+        opacity: 1;
+      }
+
+      /* Model: the diff, and the path that changed. */
+      .v-false {
+        color: var(--text);
+      }
+      .v-true {
+        padding: 1px 6px;
+        border-radius: 5px;
+        background: var(--accent-fill);
+        color: var(--on-accent);
+      }
+      .c-model .stack {
+        justify-items: start;
+      }
+      .board.at-model .c-model .v .after {
+        opacity: 1;
+        transform: none;
+        transition-delay: 240ms;
+      }
+      .board.at-model .c-model .v .before {
+        opacity: 0;
+        transform: translateY(-6px);
+        transition-delay: 240ms;
+      }
+      .arrow {
+        color: var(--subtle);
+        transition: opacity var(--duration);
+      }
+      .path {
+        display: grid;
+        margin-left: auto;
+      }
+      .path > span {
+        grid-area: 1 / 1;
+        font-family: var(--mono);
+        padding: 2px 6px;
+        border-radius: 6px;
+        font-size: 10px;
+        transition: opacity var(--duration) var(--ease-out);
+      }
+      .path .off {
+        background: var(--surface-strong);
+        color: var(--muted);
+      }
+      .path .on {
+        background: var(--accent-fill);
+        color: var(--on-accent);
+        opacity: 0;
+      }
+      .board.at-model .c-model .path .on {
+        opacity: 1;
+        transition-delay: 480ms;
+      }
+
+      /* Binding: the two nodes it patches. */
+      .target {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        height: 24px;
+        padding: 0 10px;
+        border-radius: var(--radius);
+        background: var(--surface-strong);
+        color: var(--muted);
+        font-size: 10px;
+        position: relative;
+      }
+      .target::before {
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: var(--accent-fill);
+        content: '';
+        opacity: 0;
+        transition: opacity var(--duration) var(--ease-out);
+      }
+      .target span {
+        position: relative;
+        transition: color var(--duration);
+      }
+      .board.at-binding .target::before {
+        opacity: 1;
+        transition-delay: 240ms;
+      }
+      .board.at-binding .target span {
+        color: var(--on-accent);
+        transition-delay: 240ms;
+      }
+      .board.at-binding .target + .target::before,
+      .board.at-binding .target + .target span {
+        transition-delay: 340ms;
+      }
+
+      /* The patch on the app. */
+      .board.at-press .r2 .box {
+        transform: scale(0.88);
+      }
+      .board.at-lift .r2 .box {
+        transform: none;
+      }
+      .board.at-patch .r2 .box::before,
+      .board.at-patch .r2 .box svg {
+        opacity: 1;
+        transform: none;
+        transition-delay: 420ms;
+      }
+      .board.at-patch .r2 .txt {
+        opacity: 0.6;
+        transition-delay: 420ms;
+      }
+      .count .now {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      .board.at-patch .count .now {
+        opacity: 1;
+        transform: none;
+        transition-delay: 480ms;
+      }
+      .board.at-patch .count .was {
+        opacity: 0;
+        transform: translateY(-6px);
+        transition-delay: 480ms;
+      }
+      .count .flash {
+        inset: -3px;
+        border-radius: 9px;
+      }
+      .board.at-patch .flash {
+        opacity: 1;
+        transition-delay: 420ms;
+      }
+      .board.at-rest .flash {
+        opacity: 0;
+        transition-delay: 400ms;
+        transition-duration: 700ms;
+      }
+
+      /* Riders. */
+      .rider .msg {
+        background: var(--accent-fill);
+        color: var(--on-accent);
+        font-family: var(--mono);
+        font-size: 10px;
+      }
+      .rider .msg .s {
+        color: var(--on-accent);
+      }
+      .rider .p {
+        display: block;
+        padding: 2px 6px;
+        border-radius: 6px;
+        background: var(--accent-fill);
+        color: var(--on-accent);
+        font-family: var(--mono);
+        font-size: 10px;
+      }
+      .wire path {
+        stroke: var(--on-ink-muted);
+        stroke-width: 1.5;
+        stroke-dasharray: 2 5;
+        stroke-linecap: round;
+        opacity: 0;
+        transition: opacity var(--mid) var(--ease-out);
+      }
+      .board.at-lift:not(.at-model) .w-msg,
+      .board.at-path:not(.at-patch) .w-path,
+      .board.at-patch:not(.at-rest) .w-row,
+      .board.at-patch:not(.at-rest) .w-count {
+        opacity: 1;
+      }
+
+      .pointer {
+        transform: translate(calc(var(--tx) + 64px), calc(var(--ty) + 72px));
+      }
+      .board.at-aim .pointer {
+        opacity: 1;
+        transform: translate(var(--tx), var(--ty));
+      }
+      .board.at-press .pointer svg {
+        transform: scale(0.88);
+      }
+      .board.at-lift .pointer svg {
+        transform: none;
+      }
+      .board.at-update .pointer {
+        opacity: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <!--THEME-->
+    <main>
+      <figure
+        class="board"
+        data-board
+        aria-label="A click on a todo sends one message; the handler updates the model; the binding of the changed path repaints one row and the count"
+        style="margin: 0"
+      >
+        <p class="visually-hidden" role="status" aria-live="polite" data-live></p>
+        <div class="scene">
+          <div class="abs app page">
+            <div class="app-head">
+              <span class="app-title">Todos</span
+              ><span class="count" data-count
+                ><span class="was"><b>1</b> left</span><span class="now"><b>0</b> left</span
+                ><i class="flash"></i
+              ></span>
+            </div>
+            <div class="row r1 done">
+              <span class="box"
+                ><svg
+                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.4"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M5 12.5l4.5 4.5L19 7.5" /></svg></span
+              ><span class="txt">Write the format</span>
+            </div>
+            <div class="row r2" data-target>
+              <span class="box"
+                ><svg
+                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.4"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M5 12.5l4.5 4.5L19 7.5" /></svg></span
+              ><span class="txt">Build the runtime</span><i class="flash"></i>
+            </div>
+          </div>
+
+          <div class="abs markup" aria-hidden="true">
+            <div>
+              <span class="t">&lt;input</span> <span class="a">type</span>=<span
+                class="msg-s"
+                style="color: var(--syn-string)"
+                >"checkbox"</span
+              >
+            </div>
+            <div class="attr"><span class="a">on:click</span>=</div>
+            <div class="attr" style="padding-left: 24px">
+              <span class="msg" data-msg><span class="s">'["toggle",["a2"]]'</span></span>
+            </div>
+            <div><span class="t">/&gt;</span></div>
+          </div>
+
+          <div class="abs meter" aria-hidden="true">
+            <p class="label">component JS</p>
+            <p class="meter-value"><span class="was">0 B</span><span class="now">624 B</span></p>
+          </div>
+
+          <div class="abs cards">
+            <div class="card c-update" data-update>
+              <div class="card-head">
+                <span class="card-title"
+                  ><svg
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"
+                    /></svg
+                  >Update</span
+                >
+                <span class="size"
+                  ><span class="off">%LOCK%119 B</span><span class="on">119 B</span></span
+                >
+              </div>
+              <div class="file">todo.handler.toggle.js</div>
+              <div class="body stack">
+                <span class="before key">waiting for a message</span
+                ><span class="after"
+                  ><span class="fn">toggle</span>(<span class="str">"a2"</span>)</span
+                >
+              </div>
+            </div>
+
+            <div class="card c-model" data-model>
+              <div class="card-head">
+                <span class="card-title"
+                  ><svg
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <ellipse cx="12" cy="6" rx="7" ry="3" />
+                    <path
+                      d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"
+                    /></svg
+                  >Model</span
+                >
+                <span class="path" data-path
+                  ><span class="off">todos.*.done</span><span class="on">todos.*.done</span></span
+                >
+              </div>
+              <div class="file">&lt;script i-state&gt; in the page</div>
+              <div class="body">
+                <span class="key">todos[1].done</span
+                ><span class="stack v"
+                  ><span class="before v-false">false</span
+                  ><span class="after v-true">true</span></span
+                >
+              </div>
+            </div>
+
+            <div class="card c-binding" data-binding>
+              <div class="card-head">
+                <span class="card-title"
+                  ><svg
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M9 15l6-6M10.5 6.5l1.8-1.8a4 4 0 0 1 5.7 5.7l-1.8 1.8M13.5 17.5l-1.8 1.8a4 4 0 0 1-5.7-5.7l1.8-1.8"
+                    /></svg
+                  >Binding</span
+                >
+                <span class="size"
+                  ><span class="off">%LOCK%505 B</span><span class="on">505 B</span></span
+                >
+              </div>
+              <div class="file">todo.binding.todos._.done.js</div>
+              <div class="body" style="padding: 0 6px; background: transparent">
+                <span class="target"><span>row a2</span></span
+                ><span class="target"><span>count</span></span>
+              </div>
+            </div>
+          </div>
+
+          <svg class="wire" viewBox="0 0 560 440" aria-hidden="true">
+            <path class="w-msg" data-w-msg d="" />
+            <path class="w-path" data-w-path d="" />
+            <path class="w-row" data-w-row d="" />
+            <path class="w-count" data-w-count d="" />
+          </svg>
+          <span class="rider" data-r-msg
+            ><span class="msg"><span class="s">["toggle",["a2"]]</span></span></span
+          >
+          <span class="rider" data-r-path><span class="p">todos.*.done</span></span>
+          <span class="rider dot" data-r-row></span>
+          <span class="rider dot" data-r-count></span>
+
+          <span class="pointer" aria-hidden="true"
+            ><svg
+              viewBox="0 0 24 24"
+              width="22"
+              height="22"
+              fill="currentColor"
+              stroke="var(--bg-elevated)"
+              stroke-width="1.5"
+              stroke-linejoin="round"
+            >
+              <path d="M5 3l14 7.5-6.2 1.6L10 18z" /></svg
+          ></span>
+          <button
+            class="hit"
+            type="button"
+            aria-label="Toggle Build the runtime"
+            title="Toggle Build the runtime"
+          ></button>
+        </div>
+      </figure>
+    </main>
+    <script>
+      /*BASE_JS*/
+
+      const board = document.querySelector('[data-board]');
+      const live = board.querySelector('[data-live]');
+      const hit = board.querySelector('.hit');
+      const q = (selector) => board.querySelector(selector);
+
+      function rectOf(selector) {
+        const frame = board.getBoundingClientRect();
+        const rect = q(selector).getBoundingClientRect();
+        return {
+          x: rect.left - frame.left,
+          y: rect.top - frame.top,
+          w: rect.width,
+          h: rect.height,
+          cx: rect.left - frame.left + rect.width / 2,
+          cy: rect.top - frame.top + rect.height / 2,
+        };
+      }
+
+      // Measure the layout once: the pointer target and the four wires.
+      function place() {
+        const box = rectOf('[data-target] .box');
+        board.style.setProperty('--tx', `${box.cx - 4}px`);
+        board.style.setProperty('--ty', `${box.cy - 2}px`);
+        hit.style.left = `${box.cx - 22}px`;
+        hit.style.top = `${box.cy - 22}px`;
+
+        const msg = rectOf('[data-msg]');
+        const update = rectOf('[data-update] .body');
+        q('[data-w-msg]').setAttribute(
+          'd',
+          `M${msg.cx} ${msg.cy} C${msg.cx + 40} ${msg.cy - 120}, ${update.x - 60} ${update.cy}, ${update.x + 40} ${update.cy}`,
+        );
+        const path = rectOf('[data-path]');
+        const binding = rectOf('[data-binding] .body');
+        q('[data-w-path]').setAttribute(
+          'd',
+          `M${path.cx} ${path.cy} C${path.cx + 60} ${path.cy + 40}, ${binding.x + 200} ${binding.cy - 40}, ${binding.x + 120} ${binding.cy}`,
+        );
+        const row = rectOf('[data-target]');
+        const count = rectOf('[data-count]');
+        const from = rectOf('[data-binding]');
+        q('[data-w-row]').setAttribute(
+          'd',
+          `M${from.x + 24} ${from.cy + 22} C${from.x - 40} ${from.cy + 22}, ${row.x + row.w + 40} ${row.cy}, ${row.x + row.w - 16} ${row.cy}`,
+        );
+        q('[data-w-count]').setAttribute(
+          'd',
+          `M${from.x + 80} ${from.cy + 22} C${from.x - 60} ${from.cy + 60}, ${count.x + 80} ${count.cy}, ${count.cx} ${count.cy}`,
+        );
+      }
+
+      const steps = [
+        { id: 'start', ms: 500 },
+        { id: 'aim', ms: 700 },
+        { id: 'press', ms: 200 },
+        { id: 'lift', ms: 900 },
+        { id: 'update', ms: 800 },
+        { id: 'model', ms: 900 },
+        { id: 'path', ms: 800 },
+        { id: 'binding', ms: 700 },
+        { id: 'patch', ms: 900 },
+        { id: 'rest', ms: 1700 },
+      ];
+
+      const player = createPlayer(board, steps, {
+        onStep(id, n, previous) {
+          if (n < previous) {
+            cancelRides(board);
+            return;
+          }
+          if (id === 'lift') {
+            ride(q('[data-r-msg]'), q('[data-w-msg]'), { duration: 820, hold: false });
+          } else if (id === 'path') {
+            ride(q('[data-r-path]'), q('[data-w-path]'), { duration: 720, hold: false });
+          } else if (id === 'patch') {
+            ride(q('[data-r-row]'), q('[data-w-row]'), { duration: 520, hold: false });
+            ride(q('[data-r-count]'), q('[data-w-count]'), {
+              duration: 560,
+              delay: 60,
+              hold: false,
+            });
+            live.textContent =
+              'toggle("a2") set todos[1].done to true. The binding of todos.*.done repainted one row and the count.';
+          }
+        },
+      });
+
+      hit.addEventListener('click', () => {
+        const n = player.index;
+        if (n >= player.indexOf('press')) {
+          board.classList.remove('user');
+          player.jump('start', 2600);
+          live.textContent = 'Build the runtime is not done.';
+        } else {
+          board.classList.add('user');
+          player.jump(REDUCE ? 'rest' : 'press');
+        }
+      });
+
+      document.fonts.ready.then(() => {
+        place();
+        player.start();
+      });
+    </script>
+  </body>
+</html>

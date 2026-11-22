@@ -1,0 +1,367 @@
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url(../fonts/bricolage-grotesque.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Martian Mono';
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url(../fonts/martian-mono.woff2) format('woff2');
+}
+
+/*TOKENS*/
+
+:root {
+  /* Surfaces inside the ink tile. */
+  --well: color-mix(in srgb, var(--on-ink) 9%, transparent);
+  --well-strong: color-mix(in srgb, var(--on-ink) 15%, transparent);
+  --line: color-mix(in srgb, var(--on-ink-muted) 45%, transparent);
+  --slow: 520ms;
+  --mid: 360ms;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+}
+
+.mono {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The theme toggle, a pill in the corner of the page. */
+.theme {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    background var(--duration-fast);
+}
+.theme:hover {
+  transform: translateY(-2px);
+  background: var(--surface-strong);
+}
+.theme:active {
+  transform: scale(0.96);
+}
+.theme:focus-visible,
+.hit:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.theme .i-sun,
+:root[data-theme='dark'] .theme .i-moon {
+  display: none;
+}
+:root[data-theme='dark'] .theme .i-sun {
+  display: block;
+}
+
+/* The board: the hero's ink tile, at the size of the hero picture. */
+.board {
+  position: relative;
+  width: 560px;
+  height: 440px;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--ink);
+  color: var(--on-ink);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.board .scene {
+  position: absolute;
+  inset: 0;
+  transition: opacity 280ms var(--ease-out);
+}
+.board.fade .scene {
+  opacity: 0;
+}
+.board.snap *,
+.board.snap *::before,
+.board.snap *::after {
+  transition: none !important;
+}
+.abs {
+  position: absolute;
+}
+.wire path {
+  fill: none;
+}
+.wire {
+  position: absolute;
+  inset: 0;
+  width: 560px;
+  height: 440px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* A small label on the ink tile. */
+.label {
+  margin: 0;
+  color: var(--on-ink-muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 16px;
+  letter-spacing: 0.02em;
+}
+
+/* A pill on the ink tile, for the phase and for files. */
+.pill {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  height: 32px;
+  padding: 0 14px 0 10px;
+  border-radius: var(--radius);
+  background: var(--well);
+  color: var(--on-ink);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.pill svg {
+  flex: none;
+}
+
+/* A file chip: name and size. Lit when it has just loaded. */
+.chip {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: var(--radius);
+  background: var(--well-strong);
+  color: var(--on-ink);
+  font-family: var(--mono);
+  font-size: 10px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.chip b {
+  font-weight: 700;
+}
+.chip.lit {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+}
+
+/* The todo app, as the demo renders it. */
+.app {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  color: var(--text);
+}
+.app-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0 4px 4px;
+}
+.app-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.count {
+  position: relative;
+  display: grid;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.count > span {
+  grid-area: 1 / 1;
+  justify-self: end;
+  transition:
+    opacity var(--duration) var(--ease-out),
+    transform var(--duration) var(--ease-out);
+}
+.count b {
+  color: var(--text);
+  font-weight: 700;
+}
+.row {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  height: 40px;
+  padding: 0 10px;
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.row .txt {
+  position: relative;
+  transition: opacity var(--duration);
+}
+.box {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: var(--surface-strong);
+  color: var(--on-accent);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+.box::before {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--accent-fill);
+  content: '';
+  opacity: 0;
+  transform: scale(0.5);
+  transition:
+    opacity var(--duration) var(--ease-out),
+    transform var(--duration) var(--ease);
+}
+.box svg {
+  position: relative;
+  opacity: 0;
+  transform: scale(0.6);
+  transition:
+    opacity var(--duration) var(--ease-out),
+    transform var(--duration) var(--ease);
+}
+.row.done .box::before,
+.row.done .box svg {
+  opacity: 1;
+  transform: none;
+}
+.row.done .txt {
+  opacity: 0.6;
+}
+
+/* A wash over a node that a binding patched. */
+.flash {
+  position: absolute;
+  inset: -3px;
+  border-radius: 13px;
+  box-shadow: 0 0 0 3px var(--accent-fill);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--mid) var(--ease-out);
+}
+
+/* The pointer of the autoplay. Hidden once the visitor clicks. */
+.pointer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 20;
+  color: var(--text);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 640ms var(--ease-out),
+    opacity var(--duration) var(--ease-out);
+}
+.pointer svg {
+  display: block;
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+.board.user .pointer {
+  opacity: 0 !important;
+}
+
+/* The hit area of the clickable checkbox, at least 44px. */
+.hit {
+  position: absolute;
+  z-index: 15;
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  cursor: pointer;
+}
+.hit:disabled {
+  cursor: default;
+}
+
+/* A dot or chip that travels along a wire, moved by the Web Animations API. */
+.rider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 12;
+  translate: -50% -50%;
+  opacity: 0;
+  pointer-events: none;
+}
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent-fill);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-fill) 30%, transparent);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    transition-delay: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}

@@ -41,7 +41,7 @@ depends_on:
 
 # Build the chosen hero animation into the landing page
 
-User decision (2026-11-22): the hero uses sample 5, "the page wakes, the loop turns once" (`page-mvu.html`). Sources: `/private/tmp/claude-501/-Users-alexis-Documents-GitHub-idlip/66a8e5a8-2b9f-4b59-b751-902fd595146a/scratchpad/src/page-mvu.html` with shared parts inlined by `/private/tmp/claude-501/-Users-alexis-Documents-GitHub-idlip/66a8e5a8-2b9f-4b59-b751-902fd595146a/scratchpad/src/build.py`; built file and screenshots in `/private/tmp/claude-501/-Users-alexis-Documents-GitHub-idlip/66a8e5a8-2b9f-4b59-b751-902fd595146a/scratchpad/animations/` (`page-mvu-*.png`). The user was torn between sample 1 (MVU loop) and 4 (page wakes); 5 combines them.
+User decision (2026-11-22): the hero uses sample 5, "the page wakes, the loop turns once" (`page-mvu.html`). Sources: `website/directions/hero-samples/page-mvu.html` with shared parts inlined by `website/directions/hero-samples/build.py`; build them with `python3 website/directions/hero-samples/build.py <folder>`. The user was torn between sample 1 (MVU loop) and 4 (page wakes); 5 combines them.
 
 ## Do
 
