@@ -1979,7 +1979,8 @@ html:not(.js) .install-tabs {
 
 /* A ring over what a binding changed, and around the block the click woke. */
 .hero-flash,
-.hero-wake {
+.hero-wake,
+.fig-flash {
   position: absolute;
   inset: -3px;
   border-radius: 13px;
@@ -1989,7 +1990,7 @@ html:not(.js) .install-tabs {
   transition: opacity var(--duration) var(--ease-out);
 }
 
-.hero-count .hero-flash {
+.hero-count :is(.hero-flash, .fig-flash) {
   inset: -3px -6px;
   border-radius: 8px;
 }
@@ -3606,6 +3607,719 @@ html:not(.js) .live-bar .code-copy {
 
   .header-nav > a.nav-wide {
     display: none;
+  }
+}
+
+/* Docs figures: two hero samples redrawn for the docs column (`src/figures/`). The player sets the
+   class `on-<step>` of every step reached and `data-step` to the current one, so each change is a
+   CSS transition that reverses when the replay goes back. The server writes the last step, which
+   is what shows without the script and with reduced motion. The rows, boxes and count reuse the
+   hero's classes. */
+
+.fig {
+  container-type: inline-size;
+  display: grid;
+  gap: var(--gap);
+  max-width: 35rem;
+  margin: 1.75rem 0;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fig.is-snap *,
+.fig.is-snap *::before,
+.fig.is-snap *::after {
+  transition: none !important;
+}
+
+.fig-well {
+  position: relative;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.fig-foot {
+  display: flex;
+  gap: var(--gap);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fig-foot figcaption {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.fig-replay {
+  flex: none;
+}
+
+.fig-replay[hidden] {
+  display: none;
+}
+
+.prose .fig-well code {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  font-size: var(--text-xs);
+}
+
+.fig-str {
+  color: var(--syn-string);
+}
+
+.fig-fn {
+  color: var(--syn-function);
+}
+
+.fig-tag {
+  color: var(--syn-tag);
+}
+
+.fig-attr {
+  color: var(--syn-attr);
+}
+
+/* Cards: a node of the loop, or a chunk of the trace. The current step has a ring. */
+.fig-node,
+.fig-card {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px 12px 10px;
+  border-radius: var(--radius-row);
+  background: var(--bg-elevated);
+  color: var(--text);
+}
+
+.fig-node::after,
+.fig-card::after {
+  position: absolute;
+  inset: -3px;
+  border-radius: 17px;
+  outline: 3px solid var(--accent-strong);
+  content: '';
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration) var(--ease-out);
+}
+
+.fig-mvu[data-step='update'] .fig-update::after,
+.fig-mvu[data-step='model'] .fig-model::after,
+.fig-trace[data-step='send'] .c-update::after,
+.fig-trace[data-step='model'] .c-model::after,
+.fig-trace[data-step='binding'] .c-binding::after {
+  opacity: 1;
+}
+
+.fig-node > *,
+.fig-card > * {
+  transition: opacity var(--duration) var(--ease-out);
+}
+
+.fig-node-head {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  height: 24px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.fig-node-head svg {
+  color: var(--muted);
+}
+
+.fig-node-head > :is(.fig-chip, .fig-swap, .fig-path) {
+  margin-left: auto;
+}
+
+.fig-node-body {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  height: 22px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.fig-file {
+  overflow: hidden;
+  color: var(--muted);
+  font: var(--text-xs) / 1.5 var(--mono);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.fig-key {
+  margin-right: auto;
+  color: var(--muted);
+}
+
+/* A chunk chip, lit: the code loaded. */
+.fig-chip,
+.fig-path,
+.fig-target {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--radius);
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  font: var(--text-xs) var(--mono);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.fig-chip {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.9);
+  transition:
+    opacity var(--duration) var(--ease-out),
+    transform var(--duration) var(--ease);
+}
+
+.fig-mvu.on-update .fig-update .fig-chip,
+.fig-mvu.on-view .fig-bind .fig-chip {
+  opacity: 1;
+  transform: none;
+}
+
+/* A value that changes: the old one leaves upwards and the new one comes in from below. */
+.fig-swap {
+  display: inline-grid;
+}
+
+.fig-swap > span {
+  grid-area: 1 / 1;
+  justify-self: start;
+  transition:
+    opacity var(--duration) var(--ease-out),
+    transform var(--duration) var(--ease-out);
+}
+
+.fig-now {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+:is(
+    .on-update .at-update,
+    .on-model .at-model,
+    .on-send .at-send,
+    .on-binding .at-binding,
+    .on-patch .at-patch
+  )
+  > .fig-now {
+  opacity: 1;
+  transform: none;
+}
+
+:is(
+    .on-update .at-update,
+    .on-model .at-model,
+    .on-send .at-send,
+    .on-binding .at-binding,
+    .on-patch .at-patch
+  )
+  > .fig-was {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+.fig-val > span {
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+
+.fig-val > .fig-now,
+.fig-size > .fig-now {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+}
+
+.fig-call > .fig-was,
+.fig-size > .fig-was {
+  color: var(--muted);
+}
+
+.fig-size {
+  font: var(--text-xs) var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.fig-size > span {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  justify-self: end;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--radius);
+}
+
+.fig-size svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* The todo app. Only the clicked row is a checkbox. Its `--done` follows the patch step. */
+.fig-app {
+  display: grid;
+  gap: 4px;
+  padding: 6px 8px 8px;
+  border-radius: var(--radius-row);
+  background: var(--bg-elevated);
+  color: var(--text);
+}
+
+.fig-app > * {
+  transition:
+    opacity var(--duration) var(--ease-out),
+    transform var(--duration) var(--ease-out);
+}
+
+.fig .hero-row {
+  background: var(--surface);
+}
+
+.fig .hero-row.is-still {
+  cursor: default;
+  pointer-events: none;
+}
+
+.fig [data-target] {
+  --done: var(--was);
+}
+
+.fig.on-patch [data-target] {
+  --done: var(--now);
+}
+
+.fig-count .fig-swap > span {
+  justify-self: end;
+}
+
+.fig.on-patch :is([data-target], .fig-count) > .fig-flash {
+  opacity: 1;
+}
+
+/* The pointer of the autoplay comes in, presses the box and leaves. A visitor's click hides it. */
+.fig-pointer {
+  position: absolute;
+  top: 19px;
+  left: 16px;
+  z-index: 3;
+  color: var(--text);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(56px, 44px);
+  transition:
+    opacity var(--duration) var(--ease-out),
+    transform 450ms var(--ease-out);
+}
+
+.fig-pointer svg {
+  display: block;
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.fig.on-aim .fig-pointer {
+  transform: none;
+}
+
+.fig.on-aim:not(.on-update, .on-send, .is-hands) .fig-pointer {
+  opacity: 1;
+}
+
+.fig.on-press:not(.on-update, .on-send) :is(.fig-pointer svg, [data-target] .hero-box) {
+  transform: scale(0.88);
+}
+
+/* The code the click loaded: 0 B, then with the handler, then with the binding. */
+.fig-meter {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+  transition: opacity var(--duration) var(--ease-out);
+}
+
+.fig-meter-label {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.fig-meter-value {
+  display: grid;
+  font: 700 14px var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.fig-meter-value > span {
+  grid-area: 1 / 1;
+  justify-self: end;
+  padding: 1px 6px;
+  border-radius: 6px;
+  transition:
+    opacity var(--duration) var(--ease-out),
+    transform var(--duration) var(--ease-out);
+}
+
+.fig-v1,
+.fig-v2 {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+.fig-mvu.on-update .fig-v1,
+.fig-trace.on-send .fig-v1,
+.fig-mvu.on-view .fig-v2,
+.fig-trace.on-binding .fig-v2 {
+  opacity: 1;
+  transform: none;
+}
+
+.fig-mvu.on-update .fig-v0,
+.fig-trace.on-send .fig-v0,
+.fig-mvu.on-view .fig-v1,
+.fig-trace.on-binding .fig-v1 {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+/* The MVU loop. Above the ring: where the loop runs, and the meter. */
+.fig-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px var(--gap);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fig-phase {
+  position: relative;
+  display: flex;
+  padding: 4px;
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.fig-thumb {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 96px;
+  height: 32px;
+  border-radius: var(--radius);
+  background: var(--accent-fill);
+  transition: transform var(--duration) var(--ease-out);
+}
+
+.fig-seg {
+  position: relative;
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 32px;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  transition: color var(--duration) var(--ease-out);
+}
+
+.fig-mvu:not(.on-ship) .s-server,
+.fig-mvu.on-ship .s-browser {
+  color: var(--on-accent);
+}
+
+.fig-mvu.on-ship .fig-thumb {
+  transform: translateX(96px);
+}
+
+.fig-mvu .fig-meter {
+  opacity: 0;
+}
+
+.fig-mvu.on-ship .fig-meter {
+  opacity: 1;
+}
+
+/* The ring: Model on the left, View on the right, Update at the bottom. Its arcs light as the
+   loop passes and stay lit. The SVG stretches with the well, so the strokes do not scale. */
+.fig-mvu .fig-well {
+  height: 304px;
+}
+
+.fig-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.fig-ring :is(ellipse, path) {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+}
+
+.fig-ring ellipse {
+  stroke: var(--border-strong);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 6;
+}
+
+.fig-arc {
+  stroke: var(--accent-strong);
+  stroke-width: 2.5;
+  opacity: 0;
+  transition: opacity var(--duration) var(--ease-out);
+}
+
+.fig-mvu.on-render:not(.on-seal) .arc-top,
+.fig-mvu.on-update .arc-right,
+.fig-mvu.on-model .arc-left,
+.fig-mvu.on-view .arc-top {
+  opacity: 1;
+}
+
+.fig-mvu :is(.fig-model, .fig-update, .fig-view, .fig-bind) {
+  position: absolute;
+  translate: -50% -50%;
+}
+
+.fig-model {
+  top: 44%;
+  left: 20%;
+  width: 184px;
+}
+
+.fig-update {
+  top: 83%;
+  left: 44%;
+  width: 232px;
+}
+
+.fig-view {
+  top: 44%;
+  left: 80%;
+  display: grid;
+  width: 200px;
+}
+
+.fig-bind {
+  top: 5%;
+  left: 50%;
+}
+
+.fig-fields {
+  display: grid;
+  transition: opacity var(--duration) var(--ease-out);
+}
+
+.fig-field {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  height: 22px;
+  font: var(--text-xs) var(--mono);
+  white-space: nowrap;
+}
+
+.fig-plain {
+  padding: 1px 6px;
+}
+
+.fig-more {
+  display: flex;
+  min-height: 22px;
+}
+
+.fig-capsule {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  color: var(--syn-tag);
+  opacity: 0;
+  transform: translateY(-4px) scale(0.92);
+  transition:
+    opacity var(--duration) var(--ease-out),
+    transform var(--duration) var(--ease);
+}
+
+.fig-mvu.on-seal .fig-capsule {
+  opacity: 1;
+  transform: none;
+}
+
+/* The server renders the page and the model, then seals the model. In the browser the model
+   and Update wait until the click reaches them. */
+.fig-mvu:not(.on-render) :is(.fig-fields, .fig-app > *) {
+  opacity: 0;
+}
+
+.fig-mvu:not(.on-render) .fig-app > * {
+  transform: translateY(6px);
+}
+
+.fig-mvu.on-seal:not(.on-model) .fig-model > *,
+.fig-mvu:not(.on-update) .fig-update > * {
+  opacity: 0.4;
+}
+
+@container (max-width: 33rem) {
+  .fig-mvu .fig-well {
+    display: grid;
+    gap: 6px;
+    height: auto;
+    padding: 6px;
+  }
+
+  .fig-ring {
+    display: none;
+  }
+
+  .fig-mvu :is(.fig-model, .fig-update, .fig-view, .fig-bind) {
+    position: static;
+    width: auto;
+    translate: none;
+  }
+
+  .fig-view {
+    order: -2;
+    gap: 6px;
+  }
+
+  .fig-update {
+    order: -1;
+  }
+
+  .fig-bind {
+    display: flex;
+    justify-content: end;
+  }
+
+  .fig-capsule {
+    position: static;
+    justify-self: end;
+  }
+}
+
+/* Message trace: the app and its markup on the left, the three chunks on the right. */
+.fig-trace .fig-well {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px;
+  padding: 6px;
+}
+
+.fig-col {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  min-width: 0;
+}
+
+.fig-code {
+  position: relative;
+  isolation: isolate;
+  margin: 0;
+  padding: 10px 12px;
+  overflow-x: auto;
+  border-radius: var(--radius-row);
+  background: var(--bg-elevated);
+  font-size: var(--text-xs);
+  line-height: 1.8;
+}
+
+.fig-msg {
+  position: relative;
+}
+
+.fig-msg::before {
+  position: absolute;
+  inset: -1px -4px;
+  z-index: -1;
+  border-radius: 6px;
+  background: var(--accent-fill);
+  content: '';
+  opacity: 0;
+  transition: opacity var(--duration) var(--ease-out);
+}
+
+/* A lit mark keeps one color, so the syntax colors never sit on chartreuse. */
+.fig-trace.on-press .fig-msg::before {
+  opacity: 1;
+}
+
+.fig-trace.on-press .fig-msg,
+.fig-trace.on-press .fig-msg * {
+  color: var(--on-accent);
+}
+
+.fig-trace .fig-meter {
+  padding: 0 12px;
+}
+
+.fig-file-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.fig-card .fig-node-body {
+  height: 26px;
+}
+
+.fig-targets {
+  display: flex;
+  gap: 6px;
+  height: 28px;
+  align-items: center;
+}
+
+.fig-target {
+  background: var(--surface);
+  color: var(--muted);
+  transition:
+    opacity var(--duration) var(--ease-out),
+    transform var(--duration) var(--ease);
+}
+
+.fig-path {
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.fig-trace.on-model .fig-path,
+.fig-trace.on-patch .fig-target {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+}
+
+@container (max-width: 34rem) {
+  .fig-trace .fig-well {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

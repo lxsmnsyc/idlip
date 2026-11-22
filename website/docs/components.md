@@ -16,6 +16,12 @@ An idlip module is a `*.tsx` file that exports function components: a default ex
 
 Nothing is imported only to mark these. The block components of [views](./views.md#block-components) are the one exception.
 
+The model, the view and the handlers run as a loop. The server runs it once to render the page. A click in the browser runs it again, with only the code that click needs:
+
+```figure mvu-loop
+
+```
+
 ## A counter
 
 ```tsx

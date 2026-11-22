@@ -49,6 +49,10 @@ A click on the second checkbox runs these steps:
 4. The manifest says `toggle` writes `todos.*.done`. The loader imports the binding chunk of that path only.
 5. The binding chunk patches the checkbox, the `done` class of the row and the `0 left` count, since `countLeft(todos)` reads `todos.*.done`.
 
+```figure message-trace
+
+```
+
 The click makes two requests:
 
 | Request                                           | Raw    | gzip -9 |

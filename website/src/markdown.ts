@@ -7,7 +7,10 @@ import twinkleplop from '@twinkleplop/markdown-it';
 import { language as tsx } from '@twinkleplop/tsx';
 import { language as typescript } from '@twinkleplop/typescript';
 import MarkdownIt from 'markdown-it';
+import { FIGURE_NAMES, isFigureName } from './figures/names.ts';
+import type { FigureName } from './figures/names.ts';
 import { findLiveSamples } from './live/fence.ts';
+import type { FenceToken } from './live/fence.ts';
 import { renderLiveSample } from './live/markup.ts';
 import type { LiveOptions } from './live/markup.ts';
 import type { ReplFile } from './repl/files.ts';
@@ -53,6 +56,11 @@ export function slugify(text: string): string {
 export interface RendererOptions {
   /** The REPL link and the static frame of a live sample, from its files. */
   live?: (files: readonly ReplFile[]) => LiveOptions;
+  /**
+   * The markup of a ` ```figure <name> ` fence. Without it, a figure renders as an empty
+   * `<figure>`: only the site build has the demo numbers a figure shows.
+   */
+  figure?: (name: FigureName) => string;
 }
 
 /** The token type that stands for the fences of one live sample. */
@@ -67,8 +75,11 @@ export function createRenderer(settings: RendererOptions = {}): MarkdownIt {
   // A code block has a label with its language and a button that copies its text. A scrolling
   // block takes focus, so a keyboard user can scroll it.
   const fence = parser.renderer.rules.fence!;
-  parser.renderer.rules.fence = (tokens, index, options, env, self) => {
-    const language = tokens[index].info.trim().split(/\s+/)[0] ?? '';
+  parser.renderer.rules.fence = (tokens, index, options, env: RenderEnv, self) => {
+    const [language = '', name = ''] = tokens[index].info.trim().split(/\s+/);
+    if (language === 'figure') {
+      return renderFigureFence(tokens[index], name, env);
+    }
     const pre = fence(tokens, index, options, env, self).replace(
       /<pre(?=[\s>])/,
       '<pre tabindex="0" role="group" aria-label="Code"',
@@ -99,6 +110,18 @@ export function createRenderer(settings: RendererOptions = {}): MarkdownIt {
     const files: ReplFile[] = tokens[index].meta;
     return renderLiveSample(files, settings.live?.(files));
   };
+  // A figure fence names a figure and has no body. An unknown name fails the build.
+  function renderFigureFence(token: FenceToken, name: string, env: RenderEnv): string {
+    const at = `${env.file ?? 'markdown'}:${(token.map?.[0] ?? 0) + 1}`;
+    if (!isFigureName(name)) {
+      throw new Error(`${at}: unknown figure "${name}". Figures: ${FIGURE_NAMES.join(', ')}.`);
+    }
+    if (token.content.trim() !== '') {
+      throw new Error(`${at}: a figure fence has no body.`);
+    }
+    return `${settings.figure?.(name) ?? `<figure class="fig" data-figure="${name}"></figure>`}\n`;
+  }
+
   parser.renderer.rules.table_open = () =>
     '<div class="table-scroll" role="group" aria-label="Table" tabindex="0">\n<table>\n';
   parser.renderer.rules.table_close = () => '</table>\n</div>\n';

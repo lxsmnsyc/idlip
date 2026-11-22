@@ -71,7 +71,12 @@ export const LANDING_SAMPLE: { id: string; files: ReplFile[] } = {
  * and takes edits. It has no REPL button: the landing page sends no one to the REPL.
  */
 function renderSample(base: string, demo: DemoData): string {
-  const rest = demo.chunks.length - 2;
+  // The chunks the list names, so the last line counts the others.
+  const named = demo.helpers ? 3 : 2;
+  const rest = demo.chunks.length - named;
+  const helpers = demo.helpers
+    ? `<li><code>${escape(demo.helpers.name)}</code><span>${formatBytes(demo.helpers.gzip)}, same click</span></li>`
+    : '';
   return `<section aria-labelledby="sample-title">
   <h2 class="row-title" id="sample-title">The code <code>${escape(SAMPLE_FILE)}</code></h2>
   <div class="landing-sample sample">
@@ -82,6 +87,7 @@ function renderSample(base: string, demo: DemoData): string {
         <li><code>${escape(demo.loader.name)}</code><span>${formatBytes(demo.loader.gzip)}, with the page</span></li>
         <li><code>inline listener</code><span>${formatBytes(demo.listener.gzip)}, in the HTML</span></li>
         <li><code>${escape(demo.handler.name)}</code><span>${formatBytes(demo.handler.gzip)}, first click</span></li>
+        ${helpers}
         <li><code>${escape(demo.binding.name)}</code><span>${formatBytes(demo.binding.gzip)}, same click</span></li>
         <li><code>${rest} more chunks</code><span>One per event</span></li>
       </ul>

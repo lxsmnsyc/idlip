@@ -60,4 +60,19 @@ export default function Counter(props: { start: number }) {
 - **Edits.** The editor loads on the first focus or key in the code. The compiler, the render worker and the service worker load with the first edit. The edit then runs as in the REPL.
 - **Code from the address.** A docs page never runs code from its URL or hash. A sample runs the code the build put in the page, or the reader's own edits. Its REPL button opens a sample of one file by id (`#sample=`), which runs. An edited sample, or one of several files, opens with its files in the hash (`#files=`), where the REPL waits for Run.
 
+## Figures
+
+A `figure` fence with a name and no body is an animated figure:
+
+````md
+```figure mvu-loop
+
+```
+````
+
+- **Names.** `mvu-loop` (the MVU loop, on `components.md`) and `message-trace` (one click from its message to the row, on `resuming.md`). `src/figures/names.ts` lists them. An unknown name or a body fails the build with `docs/<page>.md:<line>: <reason>`.
+- **Numbers.** Names, sizes, todos and paths come from the demo build (`DemoData`), as on the landing page.
+- **Static.** The build writes the last step of the story. That is what shows without JS and with reduced motion. The search index keeps only the caption.
+- **Script.** `src/client/figures.ts` imports `src/figures/player.ts` when the first figure is 400 px from the viewport. The story plays when 40% of the figure shows, pauses off screen and in a hidden tab, and stops at the last step. The replay button starts it again. The row's checkbox takes clicks and keys.
+
 See [DESIGN.md](./DESIGN.md) for the tokens. `vercel.json` is not here; the deployment is set up by hand.

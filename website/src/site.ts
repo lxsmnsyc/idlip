@@ -8,6 +8,7 @@ import type { Heading, RenderEnv } from './markdown.ts';
 import benchmarks from './benchmarks.json' with { type: 'json' };
 import { DEMO_DATA } from './demo/data.ts';
 import type { DemoData } from './demo/data.ts';
+import { renderFigure, stripFigures } from './figures/index.ts';
 import { isBenchmarks } from './landing/benchmarks.ts';
 import type { Benchmarks } from './landing/benchmarks.ts';
 import { LANDING_SAMPLE, renderLanding } from './landing/index.ts';
@@ -73,12 +74,14 @@ const LIVE_FRAME_CSS = `${LIVE_FOLDER}frame.css`;
 /**
  * Reads and renders every page under `docs`. `samples` gets the source of each live sample of
  * one file, by the id its REPL link names, such as `views-3`. `live` gets every live sample.
+ * Figures show the numbers of `demo`. Without it they render empty.
  */
 export function loadPages(
   folder = DOCS,
   base = '/',
   samples = new Map<string, string>(),
   live: PageSample[] = [],
+  demo?: DemoData,
 ): Page[] {
   // The id of a sample is its page and its place among the page's live samples.
   let page = '';
@@ -97,7 +100,10 @@ export function loadPages(
     samples.set(id, files[0].source);
     return { repl: getSampleLink(base, id), frame };
   }
-  const renderer = createRenderer({ live: linkSample });
+  const renderer = createRenderer({
+    live: linkSample,
+    figure: demo ? (name) => renderFigure(name, demo) : undefined,
+  });
   const pages: Page[] = [];
   for (const name of listMarkdown(folder)) {
     page = name.slice(0, -'.md'.length).replaceAll('/', '-');
@@ -241,23 +247,27 @@ function findRuntime(outDir: string, base: string): string {
 export async function writeSite(outDir: string, base = '/'): Promise<string[]> {
   const samples = new Map<string, string>();
   const live: PageSample[] = [];
-  const pages = loadPages(DOCS, base, samples, live);
+  const demo = readDemo();
+  const pages = loadPages(DOCS, base, samples, live, demo);
   live.push({ file: 'src/landing/index.ts', ...LANDING_SAMPLE });
   // A live sample that does not compile fails the build, as it would fail in the page.
   const problems = checkLiveSamples(live);
   if (problems.length > 0) {
     throw new Error(`Live samples with errors:\n${problems.join('\n')}`);
   }
-  const files = renderSite(pages, base, readDemo());
+  const files = renderSite(pages, base, demo);
   for (const [name, html] of files) {
     const target = path.join(outDir, name);
     mkdirSync(path.dirname(target), { recursive: true });
     writeFileSync(target, html);
   }
   // The command bar fetches the index the first time it opens. The entries follow the sidebar.
+  // A figure counts only by its caption.
   const ordered: Page[] = [];
   for (const section of buildNav(pages)) {
-    ordered.push(...section.pages);
+    for (const page of section.pages) {
+      ordered.push({ ...page, html: stripFigures(page.html) });
+    }
   }
   writeFileSync(path.join(outDir, SEARCH_INDEX), JSON.stringify(buildSearchIndex(ordered)));
   writeFileSync(path.join(outDir, REPL_SAMPLES), JSON.stringify(Object.fromEntries(samples)));
