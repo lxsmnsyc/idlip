@@ -46,7 +46,7 @@ export const HEADER_LINKS: {
 }[] = [
   { label: 'Docs', href: (base, start) => `${base}${start}` },
   { label: 'REPL', href: (base) => `${base}repl/` },
-  { label: 'Benchmarks', href: (base) => `${base}#benchmarks`, wide: true },
+  { label: 'Benchmarks', href: (base) => `${base}docs/benchmarks/`, wide: true },
 ];
 
 /**
