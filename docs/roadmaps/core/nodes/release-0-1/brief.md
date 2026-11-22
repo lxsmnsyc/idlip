@@ -26,6 +26,15 @@ shared: []
 reserves: []
 provides: []
 depends_on:
+- on: plain-tsx
+  kind: hard
+  why: the file convention changes before the first release
+- on: multi-component-files
+  kind: hard
+  why: the module format changes before the first release
+- on: shared-helpers
+  kind: hard
+  why: the chunk format changes before the first release
   - on: safe-urls-2
     kind: hard
     why: ships in 0.1.0
