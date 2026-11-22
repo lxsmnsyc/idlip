@@ -8,7 +8,6 @@ import {
   HAS_DYNAMIC,
   HAS_ERRORS,
   HAS_HEAD,
-  HAS_PREIMPORT,
   HAS_REFS,
   HAS_RETRY,
   HAS_SKEW,
@@ -17,7 +16,6 @@ import {
 } from '../features.ts';
 import { checkSkew } from '../skew.ts';
 import { startHead } from '../head.ts';
-import { startPreimport } from '../preimport.ts';
 import { connectHot } from '../hot.ts';
 import type { Hot } from '../hot.ts';
 import { getChildren, installNesting } from '../nesting.ts';
@@ -558,9 +556,6 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
   };
   const stopSubs = HAS_SUBS ? startSubs(subsHost) : undefined;
   const stopHead = HAS_HEAD ? startHead() : undefined;
-  if (HAS_PREIMPORT) {
-    startPreimport(load);
-  }
   flush().catch(report);
 
   function stop(): void {

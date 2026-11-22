@@ -2,13 +2,7 @@ import { idlip } from 'idlip/vite';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  plugins: [
-    idlip({
-      entry: '/src/entry-server.ts',
-      // `IDLIP_PREIMPORT=0` builds the loader without the idle import, for an A/B.
-      preimport: process.env.IDLIP_PREIMPORT !== '0',
-    }),
-  ],
+  plugins: [idlip({ entry: '/src/entry-server.ts' })],
   environments: {
     client: {
       build: {

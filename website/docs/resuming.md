@@ -90,4 +90,3 @@ The first click waits for one round trip to fetch its chunks. `renderPreload(pag
 - **Opt-in.** `examples/todo` calls it, and `?preload=off` leaves the links out. The counts above are without it.
 - **With it on**, the first click makes no request, and the page makes three more requests at load.
 - **`format: 'header'`** returns a `Link` header value instead, for a 103 Early Hints response.
-- **`idlip({ preimport: true })`** makes the loader import the preloaded modules at idle after `load`, so the click does not wait for an import task.
