@@ -176,12 +176,14 @@ export async function renderDocument(nonce: string): Promise<string> {
 
 For the todo page it writes three `<link rel="modulepreload">` tags: the shared helpers module, the `toggle` handler and the `todos.*.done` binding. With them, the first click on a checkbox makes no request.
 
-- **Gain.** In the prefetch benchmark at 150 ms round trip time, click to updated page went from 221 ms to 60 ms (medians).
-- **Cost.** Two more requests at load, under 1 kB gzip for the todo page, also for visitors who never click. The load event comes about 20 ms later.
-- **103 Early Hints.** `renderPreload(chunks, manifest, { format: 'header' })` returns a `Link` header value. It reads only the manifests, not the page, so it can go out before the page renders.
+- **Gain.** In the prefetch benchmark at 150 ms round trip time, click to updated page went from 227 ms to 60 ms (medians).
+- **Cost.** Three more requests at load, about 1 kB gzip for the todo page, also for visitors who never click. The load event comes about 40 ms later on that throttled page.
+- **103 Early Hints.** `renderPreload(page.chunks, page.manifests, { format: 'header' })` returns a `Link` header value.
+- **Early Hints need a render.** `page.chunks` and `page.manifests` come from a render and are read-only. They are the same for every render of a page, so a server can keep them from the first render and send the header before the next ones.
+- **The header under a nonce policy.** A `Link` header carries no nonce. In Chrome 158 a `rel=modulepreload` in the header of the page response loaded under `script-src 'nonce-…' 'strict-dynamic'`, with no violation, and the loader's import reused it. A 103 response (HTTP/2 only in Chrome) and other browsers were not tested.
 - **Children.** `page.manifests` holds the manifests of the child modules too, so their handlers are named.
-- **Early Hints need a render.** `page.chunks` and `page.manifests` come from a render. They are the same for every render of a page, so a server can keep them from the first render and send the header before the next ones.
-- **Import before the click.** A preload only fetches a module. The click still imports it, which resolves in a task of its own, and runs it. With `idlip({ preimport: true })` the loader imports every module that a modulepreload link of the page names, after `load` when the browser is idle, so the click finds them run. It costs about 86 B gzip of loader, so it is off by default and the todo example leaves it off. See [the plugin options](./reference/vite.md#idlipoptions).
+- **Scripts off.** With scripts off, Chromium cancels module preloads. Devtools shows them as failed requests. It is harmless: the page works without scripts as before.
+- **No import before the click.** A preload only fetches a module. The click still imports it, which resolves in a task of its own. Importing the preloaded modules at idle after `load` was measured and dropped: the first DOM write came 13 ms sooner, but the frame that shows it did not move beyond the noise, for 86 B gzip of loader.
 
 See [idlip/server](./reference/server.md#renderpreload) for the options.
 

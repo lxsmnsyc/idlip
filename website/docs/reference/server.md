@@ -70,7 +70,7 @@ interface RenderResult {
 }
 ```
 
-`renderPreload(page.chunks, page.manifests)` names the chunks of the first click of the rendered page.
+`renderPreload(page.chunks, page.manifests)` names the chunks of the first click of the rendered page. Both are read-only: the same frozen objects come back from every render of the module.
 
 ### `renderListener`
 
@@ -114,6 +114,18 @@ interface PreloadOptions {
   crossorigin?: 'anonymous' | 'use-credentials';
 }
 ```
+
+### `ChunkUrls`
+
+```ts
+type ChunkUrls = Readonly<Record<string, string>>;
+```
+
+Chunk id (such as `/src/todo.tsx?idlip-handler=toggle&lang.js`) to the URL the loader imports. `RenderResult.chunks` is one, frozen and shared by every render of the module.
+
+### `Manifest`
+
+The manifest of a compiled module: its event types (`events`), the handlers each event dispatches (`listens`), the handler entries with their chunks and write sets (`handlers`), the binding groups (`groups`) and the lists (`lists`), plus optional fields for tasks, sources, `<Try>` regions, `<Head>` and child views. Every field is read-only. `renderPreload` reads `module`, `listens`, `handlers` and `groups`. The full shape is in the compiled format.
 
 ## Render helpers
 

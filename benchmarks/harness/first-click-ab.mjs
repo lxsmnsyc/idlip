@@ -24,6 +24,7 @@ import { parseArgs } from 'node:util';
 import { chromium } from 'playwright-core';
 import { measureFirstClick } from './browser.mjs';
 import { findChrome } from './chrome.mjs';
+import { parseSide } from './sides.mjs';
 
 const { values } = parseArgs({
   options: {
@@ -116,10 +117,8 @@ const requests = {};
 let browser;
 try {
   for (const entry of values.side ?? []) {
-    const [name, spec] = entry.split('=');
-    const off = spec.endsWith(':off');
-    const dist = path.resolve(off ? spec.slice(0, -':off'.length) : spec);
-    sides.push({ name, ...(await serve(dist, !off)) });
+    const { name, path: dist, preload } = parseSide(entry);
+    sides.push({ name, ...(await serve(path.resolve(dist), preload)) });
     results[name] = [];
     writes[name] = [];
     frames[name] = [];

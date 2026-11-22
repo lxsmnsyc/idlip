@@ -18,3 +18,12 @@
 - Run 1 of the A/B (harness metric only; load 2.2 to 4.8): preimport within noise, trending slower than links on both pages. Added page-clock metrics (click event to first DOM change, and to the frame after it) and ran again with N = 21 at load 2.24: write 15.9 to 2.9 ms (todos) and 17.6 to 4.6 ms (dashboard), real; frame and harness number within noise. Both runs are in the outcome.
 - prefetch run.mjs, 20 rounds at load 2.6 to 2.8: off 227 ms, on 60 ms.
 - Mutation check: without the `startPreimport` call the new loader test fails.
+
+## 2026-11-22, review
+
+- Rebased onto f3ba72d. Removed `preimport`, `HAS_PREIMPORT`, `client/preimport.ts`, its tests, docs and rules; the benchmark builds run with links only. Finding and numbers kept in the outcome.
+- `renderPage`'s `chunks` and `manifests` are frozen copies made once per static part (freezing `urls` itself would make seroval write `Object.freeze` in the fallback state path). `ChunkUrls` and `Manifest` exported from `idlip/server`, with headings in `reference/server.md`.
+- Early Hints check: a `Link: </a.js>; rel=modulepreload` header on the page response, CSP `default-src 'none'; script-src 'nonce-abc' 'strict-dynamic'`, Chrome 158 headless: `/a.js` fetched once, no console violation, and a nonce'd `import('/a.js')` 800 ms later resolved with no second request. 103 not tested (Chrome needs HTTP/2 for it).
+- e2e: cold click before the preloads arrive (chunk requests held, loader not): applies after release, each chunk fetched once. Helpers-fail-once runs on `/` and `/?preload=off`; both pass.
+- `first-click-ab.mjs` uses `parseSide` from `sides.mjs` (splits on the first `=`), tested in `sides.test.mjs`.
+- A/B not rerun: load 4.9 to 5.0 when checked. The links side of run 2 is the build that ships.

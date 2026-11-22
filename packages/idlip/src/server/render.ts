@@ -71,9 +71,15 @@ export interface RenderResult {
   /** The elements of every `<Head>`. The title of the last block is first. */
   head: string;
   body: string;
-  /** The chunk URLs of the page, the root's and its children's: the first argument of `renderPreload`. */
+  /**
+   * The chunk URLs of the page, the root's and its children's: the first argument of
+   * `renderPreload`. Frozen and shared by every render of the module.
+   */
   chunks: ChunkUrls;
-  /** The manifests of the root and of the child modules: the second argument of `renderPreload`. */
+  /**
+   * The manifests of the root and of the child modules: the second argument of
+   * `renderPreload`. The array is frozen and shared; treat the manifests as read-only too.
+   */
   manifests: readonly Manifest[];
 }
 
@@ -99,7 +105,9 @@ interface StaticPart {
   readonly urls: Record<string, string>;
   /** The manifests of the child modules. */
   readonly modules: ReadonlyMap<string, Manifest>;
-  /** The root's manifest, then the child manifests. */
+  /** A frozen copy of `urls`, which `renderPage` returns to every caller. */
+  readonly pageChunks: ChunkUrls;
+  /** The root's manifest, then the child manifests, frozen, which `renderPage` returns. */
   readonly manifests: readonly Manifest[];
   /** `manifest` and `chunks` as seroval wrote them, without the braces. Undefined if not plain. */
   readonly head: string | undefined;
@@ -254,7 +262,10 @@ function buildPart(root: ComponentState, children: Iterable<ComponentState> = []
     build,
     urls,
     modules,
-    manifests: [root.manifest, ...modules.values()],
+    // Every render returns these objects, so a caller cannot change them for the next one. A copy,
+    // since seroval writes a frozen object with `Object.freeze`.
+    pageChunks: Object.freeze({ ...urls }),
+    manifests: Object.freeze([root.manifest, ...modules.values()]),
     head: openPlain(serialize({ manifest: root.manifest, chunks: urls }, SEROVAL_OPTIONS)),
     tail,
   };
@@ -402,7 +413,7 @@ function renderSync(
   return {
     head: head.join(''),
     body: markup + writeState(part, root, children, nonce),
-    chunks: part.urls,
+    chunks: part.pageChunks,
     manifests: part.manifests,
   };
 }

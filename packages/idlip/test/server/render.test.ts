@@ -245,6 +245,9 @@ describe('kept module data', () => {
       '/c?idlip-list=1&lang.js': '/a/c.js',
     });
     expect(page.manifests).toEqual([manifest, childManifest]);
+    // Every render returns the same objects, so they are frozen.
+    expect(Object.isFrozen(page.chunks)).toBe(true);
+    expect(Object.isFrozen(page.manifests)).toBe(true);
   });
 
   it('writes the nonce on a kept part', async () => {

@@ -8,3 +8,4 @@ export type { RenderOptions, RenderResult } from './render.ts';
 export { renderListener } from '../client/loader/listener.ts';
 export { renderPreload } from './preload.ts';
 export type { PreloadOptions } from './preload.ts';
+export type { ChunkUrls, Manifest } from '../core/format.ts';
