@@ -1684,8 +1684,17 @@ html:not(.js) .install-tabs {
   font-variant-numeric: tabular-nums;
 }
 
+.hero-meter-value {
+  color: var(--on-ink);
+}
+
+/* A filled mark like the headline's, so the value reads on a light or a dark tile. */
 .hero-meter-value .hero-now {
-  color: var(--accent-fill);
+  justify-self: start;
+  padding: 0 0.2em;
+  border-radius: 0.2em;
+  background: var(--accent-fill);
+  color: var(--on-accent);
 }
 
 .hero-app {
