@@ -57,3 +57,8 @@ Measure: loader gzip, first-click bytes and requests (e2e todo spec counts), tot
 - No helper body appears in more than one emitted file of a build (test over the todo and dashboard builds).
 - First click still one network round trip; e2e request-count assertions updated only if option 2 is picked, with the reason.
 - Benchmarks rerun on a quiet machine (load < 3); numbers in outcome.md.
+
+## Updates 2026-11-22
+
+- From `multi-component-files`: builds emit two view files per child (for example `counter.view.<hash>.js` and `counter.tsx_idlip-view_lang.<hash>.js`, also in `examples/counters`), probably because Rolldown splits the view module out when it is both an entry and a static import. Remove the duplicate as part of this node, and count it in the "no helper body in more than one file" test.
+- The todo loader is 4007 B of the 4096 B budget. Option 1 (helpers in the loader) must stay within it, behind feature flags, or report the numbers and stop.

@@ -1,7 +1,7 @@
 ---
 id: multi-component-files
 title: Allow several components in one .tsx file
-status: todo
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-22
-spent:
+spent: 1258000
 owns:
   - packages/idlip/src/compiler/**
   - packages/idlip/src/vite/**
