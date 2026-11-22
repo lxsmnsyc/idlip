@@ -16,6 +16,10 @@ interface Roots {
 }
 
 export function readField(value: unknown, field: string): unknown {
+  // A string is the one primitive a hole reads a field of, as `label.length`.
+  if (typeof value === 'string') {
+    return field === 'length' ? value.length : undefined;
+  }
   return isRecord(value) ? value[field] : undefined;
 }
 

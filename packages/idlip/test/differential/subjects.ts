@@ -63,6 +63,17 @@ export const SUBJECTS: readonly Subject[] = [
     },
   },
   {
+    // Holes that read the length of a string, at the top level and in a row.
+    name: 'string-length',
+    source: read(import.meta.dirname, 'subjects/string-length.tsx'),
+    props: {
+      items: [
+        { id: 'a1', label: 'One' },
+        { id: 'a2', label: '' },
+      ],
+    },
+  },
+  {
     // Rows and branches that render by a cloned template.
     name: 'cloned',
     source: read(import.meta.dirname, 'subjects/cloned.tsx'),
