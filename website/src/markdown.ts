@@ -1,5 +1,7 @@
 import { language as bash } from '@twinkleplop/bash';
 import { language as css } from '@twinkleplop/css';
+import { language as html } from '@twinkleplop/html';
+import { language as javascript } from '@twinkleplop/javascript';
 import { language as json } from '@twinkleplop/json';
 import twinkleplop from '@twinkleplop/markdown-it';
 import { language as tsx } from '@twinkleplop/tsx';
@@ -29,6 +31,8 @@ const LANGUAGES = {
   css: css(),
   bash: bash(),
   json: json(),
+  html: html(),
+  js: javascript(),
 };
 
 /** A heading id as GitHub makes it, so links between pages keep working. */

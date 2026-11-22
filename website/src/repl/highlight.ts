@@ -1,9 +1,10 @@
 // Highlights code in the REPL with the highlighter the docs use, so the colors are the same.
+import { language as html } from '@twinkleplop/html';
 import { language as json } from '@twinkleplop/json';
 import { language as tsx } from '@twinkleplop/tsx';
 import { language as typescript } from '@twinkleplop/typescript';
 
-const LANGUAGES = { tsx: tsx(), ts: typescript(), json: json() };
+const LANGUAGES = { tsx: tsx(), ts: typescript(), json: json(), html: html() };
 
 export type Language = keyof typeof LANGUAGES | 'plain';
 

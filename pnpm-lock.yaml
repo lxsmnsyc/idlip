@@ -359,6 +359,12 @@ importers:
       '@oxc-parser/binding-wasm32-wasi':
         specifier: 0.159.0
         version: 0.159.0
+      '@twinkleplop/html':
+        specifier: 0.1.7
+        version: 0.1.7
+      '@twinkleplop/javascript':
+        specifier: 0.1.7
+        version: 0.1.7
       idlip:
         specifier: workspace:*
         version: link:../packages/idlip

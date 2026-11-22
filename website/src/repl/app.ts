@@ -442,10 +442,10 @@ export function startRepl(root: HTMLElement, watch: typeof watchFrame): void {
     statePanel.innerHTML = state ? highlight(state[1], 'ts') : 'No state: the run did not render.';
     const markup = body.replace(/<script i-state[\s\S]*?<\/script>/, '');
     const head = served?.rendered.head ?? '';
-    htmlPanel.textContent =
+    htmlPanel.innerHTML =
       served === undefined
         ? 'No markup: the run did not render.'
-        : `${head === '' ? '' : `${head}\n\n`}${markup}`;
+        : highlight(`${head === '' ? '' : `${head}\n\n`}${markup}`, 'html');
   }
 
   /** The hash names the example or the docs sample the files still match, or holds the files. */

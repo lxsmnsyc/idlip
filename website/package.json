@@ -14,6 +14,8 @@
   },
   "dependencies": {
     "@oxc-parser/binding-wasm32-wasi": "0.159.0",
+    "@twinkleplop/html": "0.1.7",
+    "@twinkleplop/javascript": "0.1.7",
     "idlip": "workspace:*"
   },
   "devDependencies": {
