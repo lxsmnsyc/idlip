@@ -152,7 +152,7 @@ export function render(url) {
  */
 export function createConfig(
   root: string,
-  options: { compile?: Compile; client?: string } = {},
+  options: { compile?: Compile; client?: string; preimport?: boolean } = {},
 ): InlineConfig {
   return {
     configFile: false,
@@ -164,6 +164,7 @@ export function createConfig(
         entry: '/src/entry-server.js',
         compile: options.compile ?? createCheckedCompile(root).compile,
         client: options.client ?? CLIENT_STUB,
+        preimport: options.preimport,
       }),
     ],
     resolve: {

@@ -71,6 +71,10 @@ export interface RenderResult {
   /** The elements of every `<Head>`. The title of the last block is first. */
   head: string;
   body: string;
+  /** The chunk URLs of the page, the root's and its children's: the first argument of `renderPreload`. */
+  chunks: ChunkUrls;
+  /** The manifests of the root and of the child modules: the second argument of `renderPreload`. */
+  manifests: readonly Manifest[];
 }
 
 /** The slots a render recorded, by path. */
@@ -95,6 +99,8 @@ interface StaticPart {
   readonly urls: Record<string, string>;
   /** The manifests of the child modules. */
   readonly modules: ReadonlyMap<string, Manifest>;
+  /** The root's manifest, then the child manifests. */
+  readonly manifests: readonly Manifest[];
   /** `manifest` and `chunks` as seroval wrote them, without the braces. Undefined if not plain. */
   readonly head: string | undefined;
   /** `modules` as seroval wrote it, without the braces. Empty when there are none. */
@@ -248,6 +254,7 @@ function buildPart(root: ComponentState, children: Iterable<ComponentState> = []
     build,
     urls,
     modules,
+    manifests: [root.manifest, ...modules.values()],
     head: openPlain(serialize({ manifest: root.manifest, chunks: urls }, SEROVAL_OPTIONS)),
     tail,
   };
@@ -288,11 +295,11 @@ function getPart(root: ComponentState, children: Map<string, ComponentState>): S
  * Only the model, props, slots and dynamic holes go through seroval on each render.
  */
 function writeState(
+  part: StaticPart,
   root: ComponentState,
   children: Map<string, ComponentState>,
   nonce: string | undefined,
 ): string {
-  const part = getPart(root, children);
   const values: Record<string, unknown> = { model: root.model, props: root.props };
   let slots: Slots | undefined;
   if (children.size !== 0) {
@@ -391,7 +398,13 @@ function renderSync(
   }
   // The last title is the one that wins, so it goes first. The others follow, for the client.
   head.unshift(...titles.slice(-1), ...titles.slice(0, -1));
-  return { head: head.join(''), body: markup + writeState(root, children, nonce) };
+  const part = getPart(root, children);
+  return {
+    head: head.join(''),
+    body: markup + writeState(part, root, children, nonce),
+    chunks: part.urls,
+    manifests: part.manifests,
+  };
 }
 
 /**
@@ -417,7 +430,8 @@ export function render<P>(
 
 /**
  * Renders a compiled component and returns the markup for `<head>` next to the body markup.
- * The host writes `head` inside `<head>` and `body` in `<body>`.
+ * The host writes `head` inside `<head>` and `body` in `<body>`. `chunks` and `manifests` are
+ * what `renderPreload` reads: `renderPreload(page.chunks, page.manifests)`.
  */
 // oxlint-disable-next-line typescript/promise-function-async
 export function renderPage<P>(

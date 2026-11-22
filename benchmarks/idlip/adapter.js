@@ -21,7 +21,7 @@ export async function load() {
   const loader = await findLoader(dir);
   return {
     staticDir: `${dir}dist/client`,
-    render: (n) => server.page(n, loader),
+    render: (n, { preload = true } = {}) => server.page(n, loader, preload),
   };
 }
 
@@ -30,9 +30,9 @@ export async function loadDashboard() {
   const loader = await findLoader(`${dir}dashboard/`);
   return {
     staticDir: `${dir}dashboard/dist/client`,
-    // The page loads a handler chunk on the first click and preloads nothing while idle.
-    preloadOption: false,
-    render: () => server.page(loader),
+    // The page preloads the chunks of the first click, and `?preload=off` leaves them out.
+    preloadOption: true,
+    render: ({ preload = true } = {}) => server.page(loader, preload),
   };
 }
 
@@ -41,7 +41,7 @@ export async function loadRows() {
   const loader = await findLoader(`${dir}rows/`);
   return {
     staticDir: `${dir}rows/dist/client`,
-    render: (n) => server.page(n, loader),
+    render: (n, { preload = true } = {}) => server.page(n, loader, preload),
   };
 }
 

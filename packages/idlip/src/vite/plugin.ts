@@ -94,6 +94,14 @@ export interface IdlipOptions {
    * chunks gone and reloads. Only files of the build are deleted, never files from `publicDir`.
    */
   skew?: boolean;
+  /**
+   * After `load`, when the browser is idle, the loader imports every module that a
+   * `<link rel="modulepreload">` of the page names, such as the links of `renderPreload`. The
+   * first click then awaits modules that already ran, instead of a fetch or a task per import.
+   * Default: off. Costs about 100 B gzip of loader. Without preload links on the page it does
+   * nothing. It runs any modulepreload link of the page, not only idlip chunks.
+   */
+  preimport?: boolean;
 }
 
 /** The context methods the plugin reports diagnostics with. */
@@ -596,7 +604,11 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
         }
       }
       // Every module is compiled before the loader is bundled, so the loader sees the defines.
-      defines = getDefines(getFeatures(results), options.skew !== false);
+      defines = getDefines(
+        getFeatures(results),
+        options.skew !== false,
+        options.preimport === true,
+      );
     },
 
     resolveId(source) {

@@ -20,6 +20,7 @@ declare const __IDLIP_HAS_SKEW__: boolean | undefined;
 declare const __IDLIP_HAS_DYNAMIC__: boolean | undefined;
 declare const __IDLIP_HAS_KEY_FN__: boolean | undefined;
 declare const __IDLIP_HAS_INNER_LISTS__: boolean | undefined;
+declare const __IDLIP_HAS_PREIMPORT__: boolean | undefined;
 
 /** Handlers that `await`, which the task runner serves. */
 export const HAS_TASKS: boolean = typeof __IDLIP_HAS_TASKS__ === 'undefined' || __IDLIP_HAS_TASKS__;
@@ -52,3 +53,6 @@ export const HAS_KEY_FN: boolean =
 /** A list inside a condition, a region or a row, which a patch can render fresh before its own binding runs. */
 export const HAS_INNER_LISTS: boolean =
   typeof __IDLIP_HAS_INNER_LISTS__ === 'undefined' || __IDLIP_HAS_INNER_LISTS__;
+/** The import, at idle after `load`, of the modules the page's modulepreload links name. Set by the plugin option `preimport`. */
+export const HAS_PREIMPORT: boolean =
+  typeof __IDLIP_HAS_PREIMPORT__ === 'undefined' || __IDLIP_HAS_PREIMPORT__;

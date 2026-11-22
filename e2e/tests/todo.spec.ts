@@ -17,11 +17,17 @@ import {
 const listenerBudget = 1024;
 const loaderBudget = 4096;
 
+// The example page preloads the chunks of the first click. `?preload=off` leaves the links out,
+// so the tests of the loading path see the loader fetch the chunks itself.
+const NO_PRELOAD = '/?preload=off';
+
 test.describe('scripts off', () => {
   test.use({ javaScriptEnabled: false });
 
   test('the server render works before any script runs', async ({ page }) => {
-    await page.goto('/');
+    // With scripts off, Chromium cancels the module preloads, and each would count as a failed
+    // request.
+    await page.goto(NO_PRELOAD);
     await expect(page.getByText('Write the format')).toBeVisible();
     await expect(page.getByText('Build <the> runtime')).toBeVisible();
     await expect(page.locator('p')).toHaveText('1 left');
@@ -67,14 +73,14 @@ test('only the page and the loader load before the first event', async ({ page, 
     requests.push(labelRequest(request));
   }
   page.on('request', onRequest);
-  const response = await page.goto('/', { waitUntil: 'networkidle' });
+  const response = await page.goto(NO_PRELOAD, { waitUntil: 'networkidle' });
   // Pointer movement and focus are not handled events.
   await page.getByRole('checkbox').first().hover();
   await settle(page);
   page.off('request', onRequest);
 
   const html = (await response?.text()) ?? '';
-  const expected = ['document /'];
+  const expected = [`document ${NO_PRELOAD}`];
   for (const url of (await readLoaderFiles(page, html, baseURL ?? '')).keys()) {
     const { pathname, search } = new URL(url);
     expected.push(`script ${pathname}${search}`);
@@ -86,7 +92,7 @@ test('only the page and the loader load before the first event', async ({ page, 
 test('the first click loads the toggle chunk and the changed binding chunk only', async ({
   page,
 }) => {
-  await page.goto('/', { waitUntil: 'networkidle' });
+  await page.goto(NO_PRELOAD, { waitUntil: 'networkidle' });
   const second = page.getByRole('checkbox').nth(1);
   const chunks = await collectRequests(page, async () => {
     await second.click();
@@ -101,7 +107,7 @@ test('the first click loads the toggle chunk and the changed binding chunk only'
 test('the first click requests every file before any arrives, so it is one round trip', async ({
   page,
 }) => {
-  await page.goto('/', { waitUntil: 'networkidle' });
+  await page.goto(NO_PRELOAD, { waitUntil: 'networkidle' });
   // The loader asks for the helpers module with the chunks. Found as an import of a chunk, it
   // would be requested only after that chunk arrived.
   const finished: Request[] = [];
@@ -148,7 +154,7 @@ test('a helpers module that fails to load once costs at most the first patch', a
     }
     await route.continue();
   });
-  await page.goto('/', { waitUntil: 'networkidle' });
+  await page.goto(NO_PRELOAD, { waitUntil: 'networkidle' });
   await page.getByRole('checkbox').nth(1).click();
   await settle(page);
 
@@ -170,6 +176,29 @@ test('a helpers module that fails to load once costs at most the first patch', a
     expect(problem).toMatch(/_idlip-helpers|ERR_FAILED|Failed to fetch dynamically imported/);
   }
   problems.length = 0;
+});
+
+test('the preload links fetch the first click chunks with the page, so the click fetches nothing', async ({
+  page,
+}) => {
+  test.skip(process.env.E2E_TARGET === 'fixture', 'the fixture page has no preload links');
+  const loaded = await collectRequests(page, async () => {
+    await page.goto('/', { waitUntil: 'networkidle' });
+  });
+  const names: string[] = [];
+  for (const name of loaded) {
+    if (!name.startsWith('/')) {
+      names.push(name);
+    }
+  }
+  expect(names.toSorted()).toEqual(['binding=todos.*.done', 'handler=toggle', 'helpers']);
+  const chunks = await collectRequests(page, async () => {
+    await page.getByRole('checkbox').nth(1).click();
+    await expect(page.locator('p')).toHaveText('0 left');
+  });
+  expect(chunks).toEqual([]);
+  // The preloads raised no CSP violation under the page's nonce policy.
+  expect(await page.evaluate(() => window.idlipViolations)).toEqual([]);
 });
 
 test('a later click on the same handler loads nothing', async ({ page }) => {

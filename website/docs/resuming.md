@@ -85,10 +85,9 @@ The listener is inline in `<head>`, so it runs before the loader arrives. A clic
 
 ## Preload the first click
 
-The first click waits for one round trip to fetch its chunks. `renderPreload(chunks, manifest)` from `idlip/server` returns `<link rel="modulepreload">` tags for the chunks of the first click, so the browser fetches them with the page. For the todo page it names the `toggle` handler and the `todos.*.done` binding.
+The first click waits for one round trip to fetch its chunks. `renderPreload(page.chunks, page.manifests)` from `idlip/server`, with the result of `renderPage`, returns `<link rel="modulepreload">` tags for the chunks of the first click, so the browser fetches them with the page. For the todo page it names the shared helpers module, the `toggle` handler and the `todos.*.done` binding.
 
-- **Off by default.** `examples/todo` does not call it, and the counts above are without it.
-- **With it on**, the first click makes no request, and the page makes two more requests at load.
+- **Opt-in.** `examples/todo` calls it, and `?preload=off` leaves the links out. The counts above are without it.
+- **With it on**, the first click makes no request, and the page makes three more requests at load.
 - **`format: 'header'`** returns a `Link` header value instead, for a 103 Early Hints response.
-
-`chunks` and `manifest` are exports of the compiled module in the server build.
+- **`idlip({ preimport: true })`** makes the loader import the preloaded modules at idle after `load`, so the click does not wait for an import task.

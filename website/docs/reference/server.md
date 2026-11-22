@@ -63,8 +63,14 @@ interface RenderResult {
   /** The elements of every `<Head>`. The title of the last block is first. */
   head: string;
   body: string;
+  /** The chunk URLs of the page, the root's and its children's: the first argument of `renderPreload`. */
+  chunks: ChunkUrls;
+  /** The manifests of the root and of the child modules: the second argument of `renderPreload`. */
+  manifests: readonly Manifest[];
 }
 ```
+
+`renderPreload(page.chunks, page.manifests)` names the chunks of the first click of the rendered page.
 
 ### `renderListener`
 

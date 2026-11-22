@@ -1,6 +1,6 @@
 // Serves one framework's build of a scenario: the SSR page at / and its static client files.
-// The todos page reads ?n=<todos>, and the rows page ?n=<rows>. The dashboard page turns the idle
-// preload off with ?preload=off.
+// The todos page reads ?n=<todos>, and the rows page ?n=<rows>. ?preload=off turns the preload
+// off: the idle preload of a dashboard page, and the preload links of the idlip pages.
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import path from 'node:path';
@@ -25,14 +25,17 @@ const server = createServer(async (request, response) => {
   try {
     if (url.pathname === '/') {
       let html;
+      const preload = url.searchParams.get('preload') !== 'off';
       if (scenario === 'scale') {
         html = await app.render();
       } else if (scenario === 'dashboard') {
-        html = await app.render({ preload: url.searchParams.get('preload') !== 'off' });
+        html = await app.render({ preload });
       } else if (scenario === 'rows') {
-        html = await app.render(Number(url.searchParams.get('n') ?? 0));
+        html = await app.render(Number(url.searchParams.get('n') ?? 0), { preload });
       } else {
-        html = await app.render(Number(url.searchParams.get('n') ?? process.env.BENCH_TODOS ?? 3));
+        html = await app.render(Number(url.searchParams.get('n') ?? process.env.BENCH_TODOS ?? 3), {
+          preload,
+        });
       }
       response.setHeader('content-type', 'text/html; charset=utf-8');
       response.end(html);

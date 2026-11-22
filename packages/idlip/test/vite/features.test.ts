@@ -23,6 +23,8 @@ const LOADER = path.join(PACKAGE, 'src/client/index.ts');
 /** Text that only the task runner and the keyed diff hold. */
 const TASK_CODE = 'idlip: no task for';
 const KEYED_CODE = '\\[(\\w+)=';
+/** Text that only the idle import of preloaded modules holds. */
+const PREIMPORT_CODE = 'link[rel=modulepreload]';
 /** Text that only the loader code of dynamic holes holds. */
 const DYNAMIC_CODE = '$dynamic';
 
@@ -48,12 +50,20 @@ function compileInline(source: string, id: string): CompileResult {
 }
 
 /** Builds the fixture module with the real loader, and returns the text of the client files. */
-async function buildClient(name: string, compile?: CompileFn): Promise<string> {
-  return Object.values(await buildFiles(name, compile)).join('');
+async function buildClient(
+  name: string,
+  compile?: CompileFn,
+  preimport?: boolean,
+): Promise<string> {
+  return Object.values(await buildFiles(name, compile, preimport)).join('');
 }
 
 /** Builds the fixture module with the real loader, and returns the client files by name. */
-async function buildFiles(name: string, compile?: CompileFn): Promise<Record<string, string>> {
+async function buildFiles(
+  name: string,
+  compile?: CompileFn,
+  preimport?: boolean,
+): Promise<Record<string, string>> {
   const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'idlip-features-')));
   try {
     mkdirSync(path.join(root, 'src'));
@@ -68,7 +78,7 @@ async function buildFiles(name: string, compile?: CompileFn): Promise<Record<str
       'export function render() { return ""; }\n',
     );
     const checked = createCheckedCompile(root).compile;
-    const config = createConfig(root, { compile: compile ?? checked, client: LOADER });
+    const config = createConfig(root, { compile: compile ?? checked, client: LOADER, preimport });
     // The real loader, not the stub the fixture app aliases.
     // A chunk imports `idlip/client`, which is the loader itself here.
     config.resolve = { alias: { 'idlip/client': LOADER } };
@@ -171,9 +181,19 @@ describe('feature detection', () => {
     });
     expect(replaceFeatures('a(1)', defines)).toBeUndefined();
   });
+
+  it('turns the idle import on only through the preimport option', () => {
+    expect(getDefines(new Set()).get('__IDLIP_HAS_PREIMPORT__')).toBe('false');
+    expect(getDefines(new Set(), true, true).get('__IDLIP_HAS_PREIMPORT__')).toBe('true');
+  });
 });
 
 describe('feature flags in the client build', () => {
+  it('keeps the idle import of preloaded modules only with the preimport option', async () => {
+    expect(await buildClient('todo')).not.toContain(PREIMPORT_CODE);
+    expect(await buildClient('todo', undefined, true)).toContain(PREIMPORT_CODE);
+  }, 60_000);
+
   it('drops the task runner and the keyed diff from an app that uses neither', async () => {
     const text = await buildClient('todo');
     expect(text).not.toContain(TASK_CODE);

@@ -372,3 +372,21 @@ export async function measureDashboard(browser, base, { idleMs, preloadOption })
 export function measureDashboardWaterfall(browser, base, options) {
   return waterfall(browser, base, { ...options, url: `${base}/`, step: click('above', 'run') });
 }
+
+// One first click after idle on a throttled network, the "idle" run of the waterfall: the
+// counter of the todos page, or widget 1 of the dashboard. `first-click-ab.mjs` interleaves it.
+export function measureFirstClick(browser, base, { scenario, latency, idleMs }) {
+  const options = { latency, idleMs, cold: false };
+  if (scenario === 'dashboard') {
+    return waterfallRun(browser, base, {
+      ...options,
+      url: `${base}/`,
+      step: click('above', 'run'),
+    });
+  }
+  return waterfallRun(browser, base, {
+    ...options,
+    url: `${base}/?n=3`,
+    step: { arg: null, ...INTERACTIONS.counter },
+  });
+}

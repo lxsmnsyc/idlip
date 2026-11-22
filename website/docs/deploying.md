@@ -156,31 +156,32 @@ To turn it off, pass `idlip({ skew: false })`. A failed chunk then never reloads
 
 ## Preload the first click
 
-By default the page loads the document and the loader, and the first click waits one round trip for its chunks. `renderPreload` from `idlip/server` names those chunks so the browser fetches them with the page. It is off by default.
+By default the page loads the document and the loader, and the first click waits one round trip for its chunks. `renderPreload` from `idlip/server` names those chunks so the browser fetches them with the page. `renderPage` returns the chunk URLs and manifests it reads. `examples/todo` does this, and `?preload=off` turns it off there.
 
 ```ts
-import { renderListener, renderPreload } from 'idlip/server';
-import * as compiled from './todo.tsx';
+import { renderListener, renderPage, renderPreload } from 'idlip/server';
+import TodoApp from './todo.tsx';
 
-type PreloadArgs = Parameters<typeof renderPreload>;
-
-// The server build of a *.tsx module exports `chunks` and `manifest`, but its type
-// has only the default export.
-const chunks = Reflect.get(compiled, 'chunks') as PreloadArgs[0];
-const manifest = Reflect.get(compiled, 'manifest') as PreloadArgs[1];
-
-export function renderHead(nonce: string): string {
-  return renderPreload(chunks, manifest, { nonce }) + renderListener({ nonce });
+export async function renderDocument(nonce: string): Promise<string> {
+  const page = await renderPage(TodoApp, {}, { nonce });
+  return (
+    `<!doctype html><html><head>` +
+    renderListener({ nonce }) +
+    renderPreload(page.chunks, page.manifests, { nonce }) +
+    `<script type="module" src="/assets/loader.js" nonce="${nonce}"></script>` +
+    `${page.head}</head><body>${page.body}</body></html>`
+  );
 }
 ```
 
-For the todo page it writes two `<link rel="modulepreload">` tags, for the `toggle` handler and the `todos.*.done` binding. With them, the first click on a checkbox makes no request.
+For the todo page it writes three `<link rel="modulepreload">` tags: the shared helpers module, the `toggle` handler and the `todos.*.done` binding. With them, the first click on a checkbox makes no request.
 
 - **Gain.** In the prefetch benchmark at 150 ms round trip time, click to updated page went from 221 ms to 60 ms (medians).
 - **Cost.** Two more requests at load, under 1 kB gzip for the todo page, also for visitors who never click. The load event comes about 20 ms later.
 - **103 Early Hints.** `renderPreload(chunks, manifest, { format: 'header' })` returns a `Link` header value. It reads only the manifests, not the page, so it can go out before the page renders.
-- **Children.** Pass the manifests of child modules too, as an array, or their handlers are not named.
-- **Types.** An app cannot import `chunks` and `manifest` with types yet, hence the `Reflect.get` above.
+- **Children.** `page.manifests` holds the manifests of the child modules too, so their handlers are named.
+- **Early Hints need a render.** `page.chunks` and `page.manifests` come from a render. They are the same for every render of a page, so a server can keep them from the first render and send the header before the next ones.
+- **Import before the click.** A preload only fetches a module. The click still imports it, which resolves in a task of its own, and runs it. With `idlip({ preimport: true })` the loader imports every module that a modulepreload link of the page names, after `load` when the browser is idle, so the click finds them run. It costs about 86 B gzip of loader, so it is off by default and the todo example leaves it off. See [the plugin options](./reference/vite.md#idlipoptions).
 
 See [idlip/server](./reference/server.md#renderpreload) for the options.
 

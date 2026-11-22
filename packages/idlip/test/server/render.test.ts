@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { runInNewContext } from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
 import type { PageState, RenderContext } from '../../src/core/format.ts';
-import { attr, on, render, text } from '../../src/server/index.ts';
+import { attr, on, render, renderPage, text } from '../../src/server/index.ts';
 
 // Compiled fixture modules import the helpers from the package. Point them at this source.
 vi.mock('idlip/server', async () => import('../../src/server/index.ts'));
@@ -230,6 +230,21 @@ describe('kept module data', () => {
     expect(second).not.toHaveProperty('slots');
     expect(JSON.stringify(Reflect.get(Object(second), 'chunks'))).not.toContain('/a/c.js');
     expect(html).toContain('(["click",');
+  });
+
+  it('returns the chunk URLs and manifests that renderPreload reads, children included', async () => {
+    const childManifest = { module: '/c', events: [], handlers: {}, groups: {}, lists: {} };
+    const child = { manifest: childManifest, chunks: { '/c?idlip-list=1&lang.js': '/a/c.js' } };
+    const page = await renderPage((_props: unknown, context?: RenderContext) => {
+      context?.state({ manifest, chunks, model: {}, props: {}, uses: [child] } as PageState);
+      return '';
+    }, {});
+    // The build id is not a chunk.
+    expect(page.chunks).toEqual({
+      '/k?idlip-handler=go&lang.js': '/a/go.js',
+      '/c?idlip-list=1&lang.js': '/a/c.js',
+    });
+    expect(page.manifests).toEqual([manifest, childManifest]);
   });
 
   it('writes the nonce on a kept part', async () => {
