@@ -1598,141 +1598,318 @@ html:not(.js) .install-tabs {
   transform: scale(0.94);
 }
 
-/* Hero picture: the todo demo. At rest no component code is loaded. One click loads two chunks
-   and updates one row and the count. `--clicked` (0 at rest, 1 after the click) and `--done` on
-   each row drive every part, so each change is a transition of opacity or transform. The CSS
-   below the media query draws the end state, which is also the still frame without the script
-   and with reduced motion. */
-
-/* Registered, so the fallback animation below can move it. */
-@property --clicked {
-  syntax: '<number>';
-  inherits: true;
-  initial-value: 1;
-}
+/* Hero picture: a browser frame with a page the server rendered and the todo app, and a timeline
+   of the component code loaded. `src/client/hero.ts` sets the time on the stage each frame as
+   custom properties (`--t`, `--pass`, `--dim`, `--lift`, `--open`, `--come`, `--pointer`,
+   `--scan`) and an `on-<moment>` class per moment, so the class changes are transitions that
+   reverse when the timeline is scrubbed back. The defaults below are the still frame, which is
+   what shows without the script and with reduced motion. Below a stage width of 30rem the page
+   stacks: the todo app on top and its loop under it. */
 
 .hero-stage {
-  --clicked: 1;
+  --pass: 1;
+  --scan: 0;
+  --dim: 1;
+  --lift: 1;
+  --open: 1;
+  --come: 1;
+  --pointer: 0;
+  --line: color-mix(in srgb, var(--on-ink-muted) 45%, transparent);
+  --tl-bg: color-mix(in srgb, var(--on-ink) 9%, var(--ink));
+  container-type: inline-size;
   display: grid;
-  gap: 1rem;
+  gap: var(--gap);
   min-width: 0;
   margin: 0;
-  padding: 1.25rem;
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--on-ink) 10%, transparent);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
-/* The rest state, until the script sets `data-live`. If the script never runs, the animation
-   settles on the end state after 3.5 seconds, so the picture is not stuck at rest. The flip row
-   is done when `--clicked` and `--rest` differ. */
-@media (prefers-reduced-motion: no-preference) {
-  .js .hero-stage:not([data-live]) {
-    --clicked: 0;
-    animation: hero-settle 1ms 3.5s forwards;
-  }
+.hero-stage.is-snap *,
+.hero-stage.is-snap *::before,
+.hero-stage.is-snap *::after {
+  transition: none !important;
+}
 
-  .js .hero-stage:not([data-live]) .hero-row[data-flip] {
-    --done: calc(var(--rest) + var(--clicked) - 2 * var(--rest) * var(--clicked)) !important;
+/* Until the script runs, the page and the timeline are empty, as at the start of the story. If
+   the script never runs, they show the still frame after 3.5 seconds. */
+@media (prefers-reduced-motion: no-preference) {
+  .js .hero-stage:not([data-live]) :is(.hero-page, .hero-net, .hero-track, .hero-tl-value) {
+    opacity: 0;
+    animation: hero-settle 1ms 3.5s forwards;
   }
 }
 
 @keyframes hero-settle {
   to {
-    --clicked: 1;
+    opacity: 1;
   }
 }
 
-.hero-stack {
-  display: grid;
-  margin: 0;
-}
-
-.hero-stack > * {
-  grid-area: 1 / 1;
-}
-
-.hero-rest,
-.hero-now {
-  transition:
-    opacity var(--duration) var(--ease-out),
-    transform var(--duration) var(--ease-out);
-}
-
-.hero-rest {
-  opacity: calc(1 - var(--clicked));
-  transform: translateY(calc(var(--clicked) * -0.4em));
-}
-
-.hero-now {
-  opacity: var(--clicked);
-  transform: translateY(calc((1 - var(--clicked)) * 0.4em));
-}
-
-.hero-meter-title {
-  margin: 0;
-  color: var(--on-ink-muted);
-  font-size: var(--text-sm);
-}
-
-.hero-meter-value {
-  font-family: var(--mono);
-  font-size: clamp(2rem, 4vw, 3rem);
-  font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: -0.04em;
-  word-spacing: -0.3em;
-  font-variant-numeric: tabular-nums;
-}
-
-.hero-meter-value {
-  color: var(--on-ink);
-}
-
-/* A filled mark like the headline's, so the value reads on a light or a dark tile. */
-.hero-meter-value .hero-now {
-  justify-self: start;
-  padding: 0 0.2em;
-  border-radius: 0.2em;
-  background: var(--accent-fill);
-  color: var(--on-accent);
-}
-
-.hero-app {
-  display: grid;
-  gap: 0.4rem;
-  padding: 1rem;
+/* The browser frame. `--ph` is the height of the page under the bar, for the scan. */
+.hero-frame {
+  --ph: 252;
+  --sl: 16px;
+  --sw: calc(100% - 240px);
+  position: relative;
+  height: 288px;
+  overflow: hidden;
   border-radius: var(--radius-md);
   background: var(--bg-elevated);
   color: var(--text);
 }
 
-.hero-left {
-  color: var(--muted);
-  font-size: var(--text-sm);
+.hero-bar {
+  position: absolute;
+  inset: 0 0 auto;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  height: 36px;
+  padding: 0 14px;
 }
 
-.hero-left b {
-  color: var(--text);
+.hero-dots {
+  display: flex;
+  gap: 5px;
+  margin-right: auto;
+}
+
+.hero-dots i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--surface-strong);
+}
+
+.hero-net {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--muted);
   font-family: var(--mono);
+  font-size: 9px;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition:
+    opacity var(--duration) var(--ease-out),
+    transform var(--duration) var(--ease);
+}
+
+.hero-net b {
+  color: var(--text);
+}
+
+.on-load .hero-net {
+  opacity: 1;
+  transform: none;
+}
+
+.hero-page {
+  position: absolute;
+  inset: 0;
+}
+
+/* Blocks of the page. Each shows when the scan reaches its top, `--y` pixels under the bar. */
+.hero-blk {
+  --shown: clamp(0, (var(--pass) * var(--ph) - var(--y)) * 8 / var(--ph), 1);
+  position: absolute;
+  border-radius: 8px;
+  background: var(--surface-strong);
+  opacity: calc(var(--shown) * (1 - 0.55 * var(--dim)));
+  transform: translateY(calc((1 - var(--shown)) * 6px));
+}
+
+.hero-blk.soft {
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+/* The blocks under the loop step aside while it is open, so no corner shows past it. */
+.hero-blk.under {
+  opacity: calc(var(--shown) * (1 - var(--open)) * (1 - 0.55 * var(--dim)));
+}
+
+.b-logo {
+  --y: 16;
+  top: 52px;
+  left: 16px;
+  width: 24px;
+  height: 24px;
+}
+
+.b-nav-1,
+.b-nav-2,
+.b-nav-3 {
+  --y: 24;
+  top: 60px;
+  height: 8px;
+}
+
+.b-nav-1 {
+  left: 56px;
+  width: 44px;
+}
+
+.b-nav-2 {
+  left: 112px;
+  width: 52px;
+}
+
+.b-nav-3 {
+  left: 176px;
+  width: 40px;
+}
+
+.hero-blk.b-btn {
+  --y: 16;
+  top: 52px;
+  right: 16px;
+  width: 72px;
+  height: 24px;
+  border-radius: var(--radius);
+  background: var(--text);
+}
+
+.b-line-1,
+.b-line-2,
+.b-text-1,
+.b-text-2,
+.b-text-3,
+.b-media {
+  left: var(--sl);
+}
+
+.b-line-1 {
+  --y: 64;
+  top: 100px;
+  width: calc(var(--sw) * 0.91);
+  height: 20px;
+}
+
+.b-line-2 {
+  --y: 90;
+  top: 126px;
+  width: calc(var(--sw) * 0.65);
+  height: 20px;
+}
+
+.b-line-1,
+.b-line-2 {
+  border-radius: 6px;
+}
+
+.b-text-1,
+.b-text-2,
+.b-text-3 {
+  height: 8px;
+}
+
+.b-text-1 {
+  --y: 124;
+  top: 160px;
+  width: calc(var(--sw) * 0.97);
+}
+
+.b-text-2 {
+  --y: 138;
+  top: 174px;
+  width: calc(var(--sw) * 0.88);
+}
+
+.b-text-3 {
+  --y: 152;
+  top: 188px;
+  width: calc(var(--sw) * 0.74);
+}
+
+.hero-blk.b-media {
+  --y: 172;
+  top: 208px;
+  width: var(--sw);
+  height: 60px;
+  border-radius: var(--radius-row);
+  background:
+    repeating-linear-gradient(
+      135deg,
+      transparent 0 10px,
+      color-mix(in srgb, var(--surface-strong) 70%, transparent) 10px 11px
+    ),
+    var(--surface);
+}
+
+.b-media::after {
+  position: absolute;
+  bottom: 12px;
+  left: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--surface-strong);
+  content: '';
+}
+
+/* The one live block: the todo app. It lifts while its loop runs. */
+.hero-app {
+  --y: 64;
+  --shown: clamp(0, (var(--pass) * var(--ph) - var(--y)) * 8 / var(--ph), 1);
+  position: absolute;
+  top: 100px;
+  right: 12px;
+  z-index: 2;
+  display: grid;
+  gap: 4px;
+  width: 196px;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  opacity: var(--shown);
+  transform: translateY(calc((1 - var(--shown)) * 6px - var(--lift) * 4px));
+}
+
+.hero-app-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 28px;
+  padding: 0 4px;
+}
+
+.hero-app-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.hero-count {
+  position: relative;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hero-count b {
+  color: var(--text);
 }
 
 .hero-row {
   position: relative;
   display: flex;
-  gap: 0.75rem;
+  gap: 10px;
   align-items: center;
-  min-height: 2.75rem;
-  padding: 0.4rem 0.75rem;
-  border-radius: var(--radius-row);
-  background: var(--surface);
+  height: 44px;
+  padding: 0 10px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  font-size: 12px;
+  white-space: nowrap;
   cursor: pointer;
-  transition:
-    background var(--duration),
-    transform var(--duration) var(--ease);
-}
-
-.hero-row:hover {
-  background: var(--surface-strong);
+  transition: transform var(--duration-fast) var(--ease-out);
 }
 
 .hero-row:active {
@@ -1753,10 +1930,20 @@ html:not(.js) .install-tabs {
   display: grid;
   flex: none;
   place-items: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  border-radius: 0.5rem;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
   background: var(--surface-strong);
+  color: var(--on-accent);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.hero-row:hover .hero-box {
+  transform: scale(1.08);
+}
+
+.on-press [data-target] .hero-box {
+  transform: scale(0.88);
 }
 
 .hero-box::before {
@@ -1764,16 +1951,7 @@ html:not(.js) .install-tabs {
   inset: 0;
   border-radius: inherit;
   background: var(--accent-fill);
-  opacity: var(--done);
   content: '';
-  transition: opacity var(--duration) var(--ease-out);
-}
-
-.hero-box svg {
-  position: relative;
-  width: 1rem;
-  height: 1rem;
-  color: var(--on-accent);
   opacity: var(--done);
   transform: scale(calc(0.5 + 0.5 * var(--done)));
   transition:
@@ -1781,102 +1959,604 @@ html:not(.js) .install-tabs {
     transform var(--duration) var(--ease);
 }
 
-.hero-text {
+.hero-box svg {
   position: relative;
-  display: inline-block;
-  font-weight: 600;
-  opacity: calc(1 - 0.45 * var(--done));
+  width: 16px;
+  height: 16px;
+  opacity: var(--done);
+  transform: scale(calc(0.6 + 0.4 * var(--done)));
+  transition:
+    opacity var(--duration) var(--ease-out),
+    transform var(--duration) var(--ease);
+}
+
+.hero-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: calc(1 - 0.4 * var(--done));
+  transition: opacity var(--duration);
+}
+
+/* A ring over what a binding changed, and around the block the click woke. */
+.hero-flash,
+.hero-wake {
+  position: absolute;
+  inset: -3px;
+  border-radius: 13px;
+  outline: 3px solid var(--accent-fill);
+  opacity: 0;
+  pointer-events: none;
   transition: opacity var(--duration) var(--ease-out);
 }
 
-.hero-text::after {
-  position: absolute;
-  inset: 55% 0 auto;
-  height: 2px;
-  background: var(--muted);
-  content: '';
-  transform: scaleX(var(--done));
-  transform-origin: left;
-  transition: transform var(--duration) var(--ease-out);
+.hero-count .hero-flash {
+  inset: -3px -6px;
+  border-radius: 8px;
 }
 
-/* The pointer lands on the checkbox the picture clicks by itself, then fades. */
+.hero-wake {
+  inset: -4px;
+  border-radius: 24px;
+}
+
+.on-click:not(.on-fold) .hero-wake,
+.on-patch:not(.on-fold) :is([data-target], .hero-count) > .hero-flash,
+.hero-row.is-hit > .hero-flash {
+  opacity: 1;
+}
+
+/* The pointer of the autoplay. The script moves it every frame, so it has no transition. */
 .hero-pointer {
   position: absolute;
-  inset: auto auto -0.2rem 1.3rem;
-  color: var(--ink);
-  opacity: calc(1 - var(--clicked));
+  top: 19px;
+  left: 16px;
+  z-index: 3;
+  color: var(--text);
+  opacity: var(--pointer);
   pointer-events: none;
-  transform: translate(calc((1 - var(--clicked)) * 3rem), calc((1 - var(--clicked)) * 1rem));
+  transform: translate(calc((1 - var(--come)) * 70px), calc((1 - var(--come)) * 80px));
+}
+
+.hero-pointer svg {
+  display: block;
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.on-press .hero-pointer svg {
+  transform: scale(0.88);
+}
+
+/* The state the server wrote into the page: the model, then the `<script i-state>` element. */
+.hero-seal {
+  position: absolute;
+  top: 252px;
+  left: calc(100% - 208px);
+  display: grid;
+  place-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 9px;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(-4px) scale(0.92);
+  transition:
+    opacity var(--duration) var(--ease-out),
+    transform var(--duration) var(--ease);
+}
+
+.hero-seal > span {
+  display: inline-flex;
+  grid-area: 1 / 1;
+  gap: 6px;
+  align-items: center;
+  transition: opacity var(--duration) var(--ease-out);
+}
+
+.hero-seal svg {
+  width: 12px;
+  height: 12px;
+}
+
+.hero-seal code {
+  color: var(--syn-tag);
+}
+
+.hero-seal-shut,
+.on-seal .hero-seal-open {
+  opacity: 0;
+}
+
+.on-modeled .hero-seal {
+  opacity: 1;
+  transform: none;
+}
+
+.on-seal .hero-seal-shut {
+  opacity: 1;
+}
+
+/* The loop of the woken block: Update, Model and View, open beside it while they run. */
+.hero-strip {
+  position: absolute;
+  top: 100px;
+  left: var(--sl);
+  z-index: 1;
+  display: grid;
+  gap: 4px;
+  width: var(--sw);
+  padding: 6px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  opacity: 0;
+  transform: translateX(24px) scale(0.94);
+  transform-origin: 100% 24%;
+  transition:
+    opacity 160ms var(--ease-out),
+    transform 180ms cubic-bezier(0.4, 0, 1, 1);
+}
+
+.on-unfold:not(.on-fold) .hero-strip {
+  opacity: 1;
+  transform: none;
   transition:
     opacity var(--duration) var(--ease-out),
     transform var(--duration) var(--ease-out);
 }
 
-.hero-chunks {
+.hero-step {
   display: grid;
-  gap: 0.4rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  gap: 2px;
+  min-width: 0;
+  padding: 5px 10px;
+  border-radius: var(--radius-row);
+  background: var(--bg-elevated);
+}
+
+.hero-step > * {
+  opacity: 0.4;
+  transition: opacity var(--duration) var(--ease-out);
+}
+
+.on-update .s-update > *,
+.on-model .s-model > *,
+.on-view .s-view > * {
+  opacity: 1;
+}
+
+.hero-step-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  height: 20px;
+}
+
+.hero-step-name {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.hero-step-name svg,
+.hero-step-body svg {
+  color: var(--muted);
+}
+
+.hero-step-body {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  height: 16px;
+  overflow: hidden;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.hero-path {
+  margin-right: auto;
+  color: var(--muted);
+}
+
+.hero-str {
+  color: var(--syn-string);
 }
 
 .hero-chip {
-  position: relative;
-  display: flex;
-  gap: 0.6rem;
-  align-items: baseline;
-  justify-self: start;
-  max-width: 100%;
-  padding: 0.35rem 0.75rem;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--on-ink) 16%, transparent);
-  color: var(--on-ink);
-  font-family: var(--mono);
-  font-size: var(--text-xs);
-}
-
-.hero-chip code {
-  min-width: 0;
-  background: none;
-  font-size: inherit;
-  overflow-wrap: anywhere;
-}
-
-.hero-chip-load {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--radius);
   background: var(--accent-fill);
   color: var(--on-accent);
-  opacity: var(--clicked);
-  transform: translateY(calc((1 - var(--clicked)) * 0.6rem));
+  font-family: var(--mono);
+  font-size: 9px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  opacity: 0;
+  transform: translateY(-6px) scale(0.9);
+  transition:
+    opacity var(--duration) var(--ease-out),
+    transform var(--duration) var(--ease);
+}
+
+.on-update .s-update .hero-chip,
+.on-view .s-view .hero-chip {
+  opacity: 1;
+  transform: none;
+  transition-delay: 120ms;
+}
+
+.hero-val {
+  display: grid;
+}
+
+.hero-val > span {
+  grid-area: 1 / 1;
+  justify-self: start;
+  padding: 1px 5px;
+  border-radius: 5px;
   transition:
     opacity var(--duration) var(--ease-out),
     transform var(--duration) var(--ease-out);
 }
 
-.hero-hit {
+.v-now {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+.on-model .v-now {
+  opacity: 1;
+  transform: none;
+  transition-delay: 200ms;
+}
+
+.on-model .v-was {
+  opacity: 0;
+  transform: translateY(-6px);
+  transition-delay: 200ms;
+}
+
+/* The scan of the server render: one pass, top to bottom. */
+.hero-scan {
   position: absolute;
-  inset: -0.55rem 0.5rem auto auto;
-  padding: 0.1rem 0.5rem;
+  top: 36px;
+  right: 0;
+  left: 0;
+  z-index: 3;
+  height: 2px;
+  background: var(--accent-strong);
+  opacity: var(--scan);
+  pointer-events: none;
+  transform: translateY(calc(var(--pass) * var(--ph) * 1px));
+}
+
+.hero-scan::before {
+  position: absolute;
+  right: 0;
+  bottom: 2px;
+  left: 0;
+  height: 40px;
+  background: linear-gradient(to top, var(--accent-tint), transparent);
+  content: '';
+}
+
+/* The timeline: the component code loaded over time, with a knob to scrub it. */
+.hero-timeline {
+  position: relative;
+  height: 100px;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--tl-bg);
+  color: var(--on-ink);
+}
+
+.hero-tl-head {
+  position: absolute;
+  top: 12px;
+  right: 20px;
+  left: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 24px;
+}
+
+.hero-tl-title {
+  margin: 0;
+  color: var(--on-ink-muted);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+.hero-tl-value {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.hero-vals {
+  display: grid;
+}
+
+.hero-vals > span {
+  grid-area: 1 / 1;
+  justify-self: end;
+  padding: 1px 6px;
+  border-radius: 6px;
+  transition:
+    opacity var(--duration) var(--ease-out),
+    transform var(--duration) var(--ease-out);
+}
+
+.hero-vals .v1,
+.hero-vals .v2 {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+.on-update .hero-vals .v1,
+.on-view .hero-vals .v2 {
+  opacity: 1;
+  transform: none;
+}
+
+.on-update .hero-vals .v0,
+.on-view .hero-vals .v1 {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+/* A later click loads nothing: the chunks are cached. */
+.hero-cached {
+  padding: 1px 8px;
   border-radius: var(--radius);
   background: var(--on-ink);
   color: var(--ink);
   font: 700 var(--text-xs) var(--font);
   opacity: 0;
-  transform: translateY(0.3rem);
+  transform: translateX(4px);
   transition:
-    opacity var(--duration),
-    transform var(--duration) var(--ease);
+    opacity var(--duration) var(--ease-out),
+    transform var(--duration) var(--ease-out);
 }
 
-.hero-hit.is-hit {
+.hero-cached.is-hit {
   opacity: 1;
   transform: none;
 }
 
+.hero-track {
+  position: absolute;
+  top: 40px;
+  right: 20px;
+  left: 20px;
+  height: 60px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.hero-base,
+.hero-area,
+.hero-tick,
+.hero-tick-label,
+.hero-mask,
+.hero-run,
+.hero-head {
+  position: absolute;
+  pointer-events: none;
+}
+
+.hero-base {
+  top: 29px;
+  left: 0;
+  width: calc(var(--at) * 100%);
+  height: 2px;
+  border-radius: 1px;
+  background: var(--line);
+}
+
+.hero-area {
+  top: 6px;
+  right: 0;
+  left: calc(var(--at) * 100%);
+  height: 24px;
+  border-radius: 6px;
+  background: var(--accent-fill);
+}
+
+.hero-tick {
+  top: 27px;
+  left: calc(var(--at) * 100%);
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
+  border-radius: 50%;
+  background: var(--on-ink);
+}
+
+.hero-tick-label {
+  top: 40px;
+  left: calc(var(--at) * 100%);
+  margin-left: -3px;
+  color: var(--on-ink-muted);
+  font-family: var(--mono);
+  font-size: 9px;
+  line-height: 16px;
+  white-space: nowrap;
+  transition: color var(--duration);
+}
+
+[data-step='render'] .l-render,
+[data-step='load'] .l-load,
+[data-step='click'] .l-click {
+  color: var(--on-ink);
+  font-weight: 700;
+}
+
+/* A veil over what has not happened yet. */
+.hero-mask {
+  top: 4px;
+  right: 0;
+  left: 0;
+  height: 30px;
+  background: var(--tl-bg);
+  opacity: 0.72;
+  transform: scaleX(calc(1 - var(--t)));
+  transform-origin: 100% 50%;
+}
+
+/* The playhead and the knob, moved by the width of the track times `--t`. */
+.hero-run {
+  inset: 0;
+  transform: translateX(calc(var(--t) * 100%));
+}
+
+.hero-head {
+  top: 4px;
+  left: -1px;
+  width: 2px;
+  height: 26px;
+  background: var(--on-ink);
+}
+
+.hero-knob {
+  position: absolute;
+  top: 30px;
+  left: 0;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.hero-knob::before {
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  outline: 3px solid var(--tl-bg);
+  background: var(--on-ink);
+  content: '';
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.hero-knob:hover::before {
+  transform: scale(1.15);
+}
+
+.hero-knob:active {
+  cursor: grabbing;
+}
+
+.hero-knob:active::before {
+  transform: scale(0.96);
+}
+
+.hero-knob:disabled {
+  cursor: default;
+}
+
+.hero-knob:focus-visible {
+  outline: 3px solid var(--accent-fill);
+  outline-offset: -8px;
+}
+
 .hero-caption {
   margin: 0;
+  padding: 0 8px;
   color: var(--on-ink-muted);
   font-size: var(--text-xs);
+}
+
+/* A narrow stage: the todo app on top, its loop under it, and fewer blocks in the header. */
+@container (max-width: 30rem) {
+  .hero-frame {
+    --ph: 416;
+    --sl: 12px;
+    --sw: calc(100% - 24px);
+    height: 452px;
+  }
+
+  .b-nav-2,
+  .b-nav-3,
+  .hero-tick-lead {
+    display: none;
+  }
+
+  .hero-app {
+    --y: 56;
+    top: 92px;
+    left: 12px;
+    width: auto;
+  }
+
+  .hero-seal {
+    top: 244px;
+    left: 12px;
+  }
+
+  .hero-strip {
+    top: 276px;
+    transform: translateY(-12px) scale(0.96);
+    transform-origin: 50% 0;
+  }
+
+  .b-line-1 {
+    --y: 240;
+    top: 276px;
+  }
+
+  .b-line-2 {
+    --y: 266;
+    top: 302px;
+  }
+
+  .b-text-1 {
+    --y: 300;
+    top: 336px;
+  }
+
+  .b-text-2 {
+    --y: 314;
+    top: 350px;
+  }
+
+  .b-text-3 {
+    --y: 328;
+    top: 364px;
+  }
+
+  .hero-blk.b-media {
+    --y: 348;
+    top: 384px;
+    height: 56px;
+  }
 }
 
 /* On touch, the tabs and the copy button reach 44px. */

@@ -1,7 +1,9 @@
+// @vitest-environment happy-dom
 import { readFileSync } from 'node:fs';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DemoData, DemoFile } from '../src/demo/data.ts';
-import { renderHeroStage } from '../src/landing/hero.ts';
+import { STILL_AT, STORY_AT, renderHeroStage, shortenChunk } from '../src/landing/hero.ts';
 
 function makeFile(name: string, gzip: number): DemoFile {
   return { path: `demo/assets/${name}`, name, raw: gzip * 2, gzip };
@@ -16,284 +18,309 @@ const demo: DemoData = {
   binding: makeFile('todo.binding.todos._.done.js', 505),
   chunks: [],
   handlerName: 'toggle',
-  token: '',
+  token: '["toggle",["a2"]]',
   writes: ['todos.*.done'],
   row: '',
-  state: '',
+  state: '<script i-state>(self.$idlip||=[]).push([])</script>',
   todos: [
     { text: 'One', done: true },
     { text: 'Two <b>', done: false },
   ],
 };
 
-const stage = renderHeroStage(demo);
-const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8');
+const html = renderHeroStage(demo);
+const css = readFileSync(join(import.meta.dirname, '../src/styles.css'), 'utf8');
+
+/** The stage as the browser parses it. */
+function mount(markup = html): HTMLElement {
+  document.body.innerHTML = markup;
+  const stage = document.querySelector<HTMLElement>('[data-hero]');
+  if (!stage) {
+    throw new Error('no stage');
+  }
+  return stage;
+}
 
 describe('the hero picture', () => {
-  it('shows the real chunk names and sizes of the demo', () => {
-    expect(stage).toContain('<code>todo.handler.toggle.js</code><span>119 B</span>');
-    expect(stage).toContain('<code>todo.binding.todos._.done.js</code><span>505 B</span>');
-    // The loader loads with the page, so 0 B of component code next to it is no contradiction.
-    expect(stage).toContain('<code>loader.js</code><span>3.9 kB, with the page</span>');
-    // The two chunks of one click, summed.
-    expect(stage).toContain('624 B');
-    expect(stage).toContain('0 B');
+  it('shows the names and sizes of the demo build', () => {
+    const stage = mount();
+    const net = stage.querySelector('.hero-net');
+    expect(net?.textContent).toBe('loader.js 3.9 kB');
+    const chips = [...stage.querySelectorAll('.hero-chip')];
+    expect(chips.map((chip) => chip.textContent)).toEqual([
+      'toggle.js 119 B',
+      'todos._.done.js 505 B',
+    ]);
+    // The short names keep the full ones in the tooltip.
+    expect(chips.map((chip) => chip.getAttribute('title'))).toEqual([
+      'todo.handler.toggle.js',
+      'todo.binding.todos._.done.js',
+    ]);
+    const values = [...stage.querySelectorAll('.hero-vals > span')];
+    expect(values.map((value) => value.textContent)).toEqual(['0 B', '119 B', '624 B']);
   });
 
-  it('says the picture is a model', () => {
-    expect(stage).toContain('A model of the todo demo build. Nothing is fetched.');
+  it('shows the message, the changed path and the state tag of the demo', () => {
+    const stage = mount();
+    expect(stage.querySelector('.s-update .hero-step-body')?.textContent).toBe('["toggle",["a2"]]');
+    expect(stage.querySelector('.s-model .hero-path')?.textContent).toBe('todos[1].done');
+    expect(stage.querySelector('.v-was')?.textContent).toBe('false');
+    expect(stage.querySelector('.v-now')?.textContent).toBe('true');
+    expect(stage.querySelector('.s-view .hero-path')?.textContent).toBe('row a2, count');
+    expect(stage.querySelector('.hero-seal code')?.textContent).toBe('<script i-state>');
   });
 
-  it('draws the end state without the script, for the still frame', () => {
-    // No inline `--clicked`, so the stylesheet default (1) holds. The clicked row is done.
-    expect(stage).not.toContain('--clicked');
-    expect(stage).toContain('data-flip style="--done:1;--rest:0"');
-    expect(stage).toContain('<b data-left>0</b> left');
-    // The boxes are disabled until the script enables them.
-    expect(stage.match(/disabled/g)).toHaveLength(2);
+  it('writes the slider texts and the live lines from the demo', () => {
+    const stage = mount();
+    const story: unknown = JSON.parse(stage.dataset.story ?? '');
+    expect(story).toMatchObject({
+      at: STORY_AT,
+      still: STILL_AT,
+      live: {
+        first:
+          'Loaded todo.handler.toggle.js, 119 B, and todo.binding.todos._.done.js, 505 B. One row and the count changed.',
+        later: 'Already loaded.',
+      },
+    });
+    expect(JSON.stringify(story)).toContain('Page loaded with loader.js, 3.9 kB.');
+    expect(JSON.stringify(story)).toContain('Model: todos[1].done turns true');
   });
 
-  it('hides the cached mark from screen readers and has one polite live line', () => {
-    expect(stage.match(/<i class="hero-hit" aria-hidden="true">cached<\/i>/g)).toHaveLength(2);
-    expect(stage.match(/aria-live="polite"/g)).toHaveLength(1);
-    expect(stage).toContain(
-      'data-first="Loaded todo.handler.toggle.js and todo.binding.todos._.done.js, 624 B."',
+  it('draws the still frame without the script', () => {
+    const stage = mount();
+    expect(stage.classList.contains('on-patch')).toBe(true);
+    expect(stage.classList.contains('on-unfold')).toBe(true);
+    expect(stage.classList.contains('on-fold')).toBe(false);
+    expect(stage.style.getPropertyValue('--t')).toBe(String(STILL_AT));
+    const inputs = [...stage.querySelectorAll('input')];
+    expect(inputs.map((input) => input.checked)).toEqual([true, true]);
+    expect(inputs.map((input) => input.disabled)).toEqual([true, true]);
+    expect(stage.querySelector('[data-left]')?.textContent).toBe('0');
+    const knob = stage.querySelector('.hero-knob');
+    expect(knob?.getAttribute('role')).toBe('slider');
+    expect(knob?.hasAttribute('disabled')).toBe(true);
+    expect(knob?.getAttribute('aria-valuenow')).toBe('74');
+    expect(knob?.getAttribute('aria-valuetext')).toBe(
+      'One row and the count changed. 624 B of component code loaded',
     );
-    expect(stage).toContain('data-later="Already loaded."');
   });
 
-  it('escapes the todo text', () => {
-    expect(stage).toContain('Two &lt;b&gt;');
-    expect(stage).not.toContain('Two <b>');
+  it('says the picture is a model and has one polite live line', () => {
+    expect(html).toContain('A model of the todo demo build. Nothing is fetched.');
+    expect(html.match(/aria-live="polite"/g)).toHaveLength(1);
+    expect(html).toContain('<i class="hero-cached">cached</i>');
+    expect(html).toMatch(/<div class="hero-tl-head" aria-hidden="true">/);
   });
 
-  it('draws the rest state only with scripts and allowed motion, and settles by itself', () => {
+  it('escapes the todo text and the attribute JSON', () => {
+    expect(html).toContain('Two &lt;b&gt;');
+    expect(html).not.toContain('Two <b>');
+    const odd = renderHeroStage({
+      ...demo,
+      handler: makeFile('todo.handler.say"<x>.js', 119),
+    });
+    expect(odd).not.toContain('say"<x>');
+    const stage = mount(odd);
+    expect(stage.dataset.story).toContain('todo.handler.say\\"<x>.js');
+  });
+
+  it('shortens chunk names by their module and kind', () => {
+    expect(shortenChunk('todo.handler.toggle.js')).toBe('toggle.js');
+    expect(shortenChunk('todo.binding.todos._.done.js')).toBe('todos._.done.js');
+    expect(shortenChunk('loader.js')).toBe('loader.js');
+  });
+
+  it('hides the page until the script runs, and settles by itself', () => {
     expect(css).toMatch(
-      /@media \(prefers-reduced-motion: no-preference\) \{\s*\.js \.hero-stage:not\(\[data-live\]\) \{\s*--clicked: 0;\s*animation: hero-settle/,
+      /@media \(prefers-reduced-motion: no-preference\) \{\s*\.js \.hero-stage:not\(\[data-live\]\) :is\(\.hero-page, \.hero-net, \.hero-track, \.hero-tl-value\) \{\s*opacity: 0;\s*animation: hero-settle 1ms 3\.5s forwards;/,
     );
     expect(css).toContain('@keyframes hero-settle');
-    expect(css).toMatch(/\.hero-stage \{\s*--clicked: 1;/);
   });
 });
 
-type Listener = (event: unknown) => void;
+type Watch = (entries: { isIntersecting: boolean }[]) => void;
 
-class FakeInput {
-  checked: boolean;
-  disabled = true;
-  row: FakeRow | undefined;
+let watch: Watch | undefined;
 
-  constructor(checked: boolean) {
-    this.checked = checked;
-  }
-
-  closest(): FakeRow | undefined {
-    return this.row;
-  }
-}
-
-class FakeRow {
-  props: Record<string, string>;
-  input: FakeInput;
-  style = {
-    setProperty: (name: string, value: string): void => {
-      this.props[name] = value;
-    },
-    getPropertyValue: (name: string): string => this.props[name] ?? '',
-  };
-
-  constructor(input: FakeInput, props: Record<string, string>) {
-    this.input = input;
-    this.props = props;
-    input.row = this;
-  }
-
-  querySelector(): FakeInput {
-    return this.input;
-  }
-}
-
-interface FakeHit {
-  marks: Set<string>;
-  classList: { add: (name: string) => void; remove: (name: string) => void };
-}
-
-function makeHit(): FakeHit {
-  const marks = new Set<string>();
-  return {
-    marks,
-    classList: {
-      add: (name) => {
-        marks.add(name);
-      },
-      remove: (name) => {
-        marks.delete(name);
-      },
-    },
-  };
-}
-
-interface Fake {
-  props: Record<string, string>;
-  dataset: Record<string, string>;
-  live: { textContent: string; dataset: Record<string, string> };
-  count: { textContent: string };
-  flip: FakeInput;
-  other: FakeInput;
-  hits: FakeHit[];
-  fire: (type: string, event?: unknown) => void;
-  watch: ((entries: { isIntersecting: boolean }[]) => void) | undefined;
-}
-
-/** Loads `hero.ts` against a fake page whose motion preference is `reduced`. */
-async function load(reduced: boolean): Promise<Fake> {
-  const props: Record<string, string> = {};
-  const listeners: Record<string, Listener[]> = {};
-  const flip = new FakeInput(true);
-  const other = new FakeInput(true);
-  const flipRow = new FakeRow(flip, { '--rest': '0', '--done': '1' });
-  const hits = [makeHit(), makeHit()];
-  const live = {
-    textContent: '',
-    dataset: { first: 'Loaded both.', later: 'Already loaded.' },
-  };
-  const count = { textContent: '0' };
-  const fake: Fake = {
-    props,
-    dataset: {},
-    live,
-    count,
-    flip,
-    other,
-    hits,
-    fire: (type, event) => {
-      for (const listener of listeners[type] ?? []) {
-        listener(event);
-      }
-    },
-    watch: undefined,
-  };
-  const page = {
-    dataset: fake.dataset,
-    style: {
-      setProperty: (name: string, value: string): void => {
-        props[name] = value;
-      },
-    },
-    addEventListener: (type: string, listener: Listener): void => {
-      listeners[type] = [...(listeners[type] ?? []), listener];
-    },
-    querySelectorAll: (selector: string): unknown[] =>
-      selector.startsWith('input') ? [flip, other] : hits,
-    querySelector: (selector: string): unknown => {
-      if (selector === '[data-left]') {
-        return count;
-      }
-      if (selector === '[data-hero-live]') {
-        return live;
-      }
-      return selector === '[data-flip] input' ? flip : flipRow;
-    },
-  };
-  vi.stubGlobal('HTMLInputElement', FakeInput);
-  vi.stubGlobal('window', { IntersectionObserver: true });
+/** Mounts the stage and runs `hero.ts` against it with motion `reduced` or not. */
+async function load(reduced: boolean): Promise<HTMLElement> {
+  const stage = mount();
+  vi.stubGlobal('matchMedia', () => ({ matches: reduced }));
+  vi.stubGlobal('requestAnimationFrame', (callback: (now: number) => void) =>
+    setTimeout(() => {
+      callback(Date.now());
+    }, 16),
+  );
+  vi.stubGlobal('cancelAnimationFrame', (id: ReturnType<typeof setTimeout>) => {
+    clearTimeout(id);
+  });
   vi.stubGlobal(
     'IntersectionObserver',
     class {
-      constructor(callback: (entries: { isIntersecting: boolean }[]) => void) {
-        fake.watch = callback;
+      constructor(callback: Watch) {
+        watch = callback;
       }
 
       observe = vi.fn();
     },
   );
-  vi.stubGlobal('matchMedia', () => ({ matches: reduced }));
-  vi.stubGlobal('document', { querySelector: () => page });
   vi.resetModules();
   await import('../src/client/hero.ts');
-  return fake;
+  return stage;
+}
+
+/** The time of the story, from the `--t` the script wrote. */
+function readTime(stage: HTMLElement): number {
+  return Number(stage.style.getPropertyValue('--t'));
+}
+
+function getInputs(stage: HTMLElement): HTMLInputElement[] {
+  return [...stage.querySelectorAll('input')];
+}
+
+/** Runs the story for `share` of its 8 seconds. */
+function play(share: number): void {
+  vi.advanceTimersByTime(share * 8000);
 }
 
 describe('the hero script', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
+    watch = undefined;
   });
 
-  it('starts the picture at rest, then clicks by itself after the delay', async () => {
-    vi.useFakeTimers();
-    const fake = await load(false);
-    expect(fake.dataset.live).toBe('');
-    expect(fake.props['--clicked']).toBe('0');
-    expect(fake.flip.checked).toBe(false);
-    vi.advanceTimersByTime(1599);
-    expect(fake.props['--clicked']).toBe('0');
-    vi.advanceTimersByTime(1);
-    expect(fake.props['--clicked']).toBe('1');
-    expect(fake.flip.checked).toBe(true);
-    expect(fake.count.textContent).toBe('0');
-    expect(fake.live.textContent).toBe('Loaded both.');
+  it('plays the phases in order and clicks the todo by itself', async () => {
+    const stage = await load(false);
+    expect(stage.dataset.live).toBe('');
+    expect(readTime(stage)).toBe(0);
+    expect(stage.classList.contains('on-load')).toBe(false);
+    expect(stage.dataset.step).toBe('render');
+    expect(getInputs(stage).map((input) => input.checked)).toEqual([true, false]);
+    expect(getInputs(stage)[1].disabled).toBe(false);
+
+    // The page loads: the loader is in, no component code yet.
+    play(STORY_AT.load + 0.02);
+    expect(stage.classList.contains('on-load')).toBe(true);
+    expect(stage.classList.contains('on-click')).toBe(false);
+    expect(stage.dataset.step).toBe('load');
+
+    // The click: Update, then Model, then View, then the row and the count change.
+    play(STORY_AT.update - STORY_AT.load);
+    expect(stage.classList.contains('on-update')).toBe(true);
+    expect(stage.classList.contains('on-view')).toBe(false);
+    expect(getInputs(stage)[1].checked).toBe(false);
+    play(STORY_AT.patch - STORY_AT.update + 0.01);
+    expect(stage.classList.contains('on-view')).toBe(true);
+    expect(stage.classList.contains('on-patch')).toBe(true);
+    expect(getInputs(stage)[1].checked).toBe(true);
+    expect(stage.querySelector('[data-left]')?.textContent).toBe('0');
+    expect(stage.querySelector('[data-hero-live]')?.textContent).toContain(
+      'Loaded todo.handler.toggle.js, 119 B',
+    );
+
+    // The loop folds and the story stops at the end.
+    play(0.5);
+    expect(readTime(stage)).toBe(1);
+    expect(stage.classList.contains('on-fold')).toBe(true);
+    play(1);
+    expect(readTime(stage)).toBe(1);
   });
 
   it.each(['focusin', 'pointerenter', 'pointerdown'])(
     'never clicks by itself after %s',
     async (type) => {
-      vi.useFakeTimers();
-      const fake = await load(false);
-      fake.fire(type);
-      vi.advanceTimersByTime(10_000);
-      expect(fake.props['--clicked']).toBe('0');
-      expect(fake.flip.checked).toBe(false);
-      // The visitor's own click still loads the chunks.
-      fake.other.checked = false;
-      fake.fire('change', { target: fake.other });
-      expect(fake.props['--clicked']).toBe('1');
-      expect(fake.live.textContent).toBe('Loaded both.');
+      const stage = await load(false);
+      play(0.1);
+      stage.dispatchEvent(new Event(type));
+      play(2);
+      // It waits at the pointer's moment, before the click.
+      expect(readTime(stage)).toBeCloseTo(STORY_AT.aim, 2);
+      expect(stage.classList.contains('on-click')).toBe(false);
+      expect(Number(stage.style.getPropertyValue('--pointer'))).toBe(0);
+      expect(getInputs(stage)[1].checked).toBe(false);
+
+      // The visitor's own click runs the loop.
+      getInputs(stage)[1].click();
+      play(0.4);
+      expect(stage.classList.contains('on-patch')).toBe(true);
+      expect(getInputs(stage)[1].checked).toBe(true);
+      expect(stage.querySelector('[data-hero-live]')?.textContent).toContain('Loaded');
     },
   );
 
-  it('loads on the first click and serves later clicks from the cache', async () => {
-    vi.useFakeTimers();
-    const fake = await load(false);
-    fake.other.checked = false;
-    fake.fire('change', { target: fake.other });
-    expect(fake.props['--clicked']).toBe('1');
-    expect(fake.live.textContent).toBe('Loaded both.');
-    expect(fake.count.textContent).toBe('2');
-    // The timer is gone, so the picture does not click again.
-    vi.advanceTimersByTime(5000);
-    expect(fake.flip.checked).toBe(false);
-    expect(fake.hits[0].marks.has('is-hit')).toBe(false);
-    fake.other.checked = true;
-    fake.fire('change', { target: fake.other });
-    expect(fake.live.textContent).toBe('Already loaded.');
-    expect(fake.hits[0].marks.has('is-hit')).toBe(true);
+  it('takes no click before the loader and none on the other todo before the loop', async () => {
+    const stage = await load(false);
+    stage.dispatchEvent(new Event('pointerenter'));
+    getInputs(stage)[1].click();
+    expect(getInputs(stage)[1].checked).toBe(false);
+    expect(stage.classList.contains('on-click')).toBe(false);
+    play(1);
+    getInputs(stage)[0].click();
+    expect(getInputs(stage)[0].checked).toBe(true);
+    expect(stage.classList.contains('on-click')).toBe(false);
+  });
+
+  it('serves later clicks from the cache', async () => {
+    const stage = await load(false);
+    play(1.1);
+    const cached = stage.querySelector('.hero-cached');
+    getInputs(stage)[0].click();
+    expect(getInputs(stage)[0].checked).toBe(false);
+    expect(stage.querySelector('[data-left]')?.textContent).toBe('1');
+    expect(stage.querySelector('[data-hero-live]')?.textContent).toBe('Already loaded.');
+    expect(cached?.classList.contains('is-hit')).toBe(true);
+    expect(stage.querySelector('[data-row]')?.classList.contains('is-hit')).toBe(true);
     vi.advanceTimersByTime(1200);
-    expect(fake.hits[0].marks.has('is-hit')).toBe(false);
+    expect(cached?.classList.contains('is-hit')).toBe(false);
   });
 
-  it('pauses while off screen and waits again when back on screen', async () => {
-    vi.useFakeTimers();
-    const fake = await load(false);
-    fake.watch?.([{ isIntersecting: false }]);
-    vi.advanceTimersByTime(10_000);
-    expect(fake.props['--clicked']).toBe('0');
-    fake.watch?.([{ isIntersecting: true }]);
-    vi.advanceTimersByTime(1600);
-    expect(fake.props['--clicked']).toBe('1');
+  it('pauses off screen and goes on when back', async () => {
+    const stage = await load(false);
+    play(0.1);
+    watch?.([{ isIntersecting: false }]);
+    const paused = readTime(stage);
+    play(1);
+    expect(readTime(stage)).toBe(paused);
+    watch?.([{ isIntersecting: true }]);
+    play(0.2);
+    expect(readTime(stage)).toBeGreaterThan(paused);
   });
 
-  it('leaves the end state with reduced motion, and a click shows the cache', async () => {
-    vi.useFakeTimers();
-    const fake = await load(true);
-    expect(fake.dataset.live).toBeUndefined();
-    expect(fake.props['--clicked']).toBeUndefined();
-    expect(fake.flip.disabled).toBe(false);
-    vi.advanceTimersByTime(10_000);
-    expect(fake.flip.checked).toBe(true);
-    fake.other.checked = false;
-    fake.fire('change', { target: fake.other });
-    expect(fake.live.textContent).toBe('Already loaded.');
-    expect(fake.hits[0].marks.has('is-hit')).toBe(true);
+  it('moves with the arrow keys, Home and End, and says where it is', async () => {
+    const stage = await load(false);
+    play(0.5);
+    const knob = stage.querySelector<HTMLButtonElement>('.hero-knob');
+    expect(knob?.disabled).toBe(false);
+    knob?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home' }));
+    expect(knob?.getAttribute('aria-valuenow')).toBe('0');
+    expect(knob?.getAttribute('aria-valuetext')).toBe('The server renders the page');
+    knob?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+    expect(knob?.getAttribute('aria-valuenow')).toBe('2');
+    // A key stops the story where it is.
+    play(1);
+    expect(knob?.getAttribute('aria-valuenow')).toBe('2');
+    knob?.dispatchEvent(new KeyboardEvent('keydown', { key: 'End' }));
+    expect(readTime(stage)).toBe(1);
+    knob?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }));
+    expect(knob?.getAttribute('aria-valuenow')).toBe('98');
+    expect(getInputs(stage)[1].checked).toBe(true);
+  });
+
+  it('stays at the still frame with reduced motion, and clicks show the cache', async () => {
+    const stage = await load(true);
+    expect(readTime(stage)).toBe(STILL_AT);
+    expect(stage.classList.contains('on-patch')).toBe(true);
+    play(2);
+    expect(readTime(stage)).toBe(STILL_AT);
+    expect(getInputs(stage).map((input) => input.disabled)).toEqual([false, false]);
+    getInputs(stage)[1].click();
+    expect(getInputs(stage)[1].checked).toBe(false);
+    expect(stage.querySelector('[data-hero-live]')?.textContent).toBe('Already loaded.');
+    expect(stage.querySelector('.hero-cached')?.classList.contains('is-hit')).toBe(true);
   });
 });
