@@ -63,6 +63,17 @@ export const SUBJECTS: readonly Subject[] = [
     },
   },
   {
+    // A list whose `each` is a prop, and row holes that read component state.
+    name: 'for-prop-each',
+    source: read(import.meta.dirname, 'subjects/for-prop-each.tsx'),
+    props: {
+      items: [
+        { id: 'a1', label: 'One' },
+        { id: 'a2', label: 'Two' },
+      ],
+    },
+  },
+  {
     // Holes that read the length of a string, at the top level and in a row.
     name: 'string-length',
     source: read(import.meta.dirname, 'subjects/string-length.tsx'),

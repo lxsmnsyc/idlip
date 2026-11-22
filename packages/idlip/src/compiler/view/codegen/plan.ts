@@ -263,6 +263,21 @@ class Planner {
     return hole.id;
   }
 
+  /** Whether a binding sits in the rows of the list, or of a list inside them. */
+  hasRowBinding(list: number): boolean {
+    for (const binding of this.bindings.values()) {
+      if (binding.list === list) {
+        return true;
+      }
+    }
+    for (const inner of this.lists) {
+      if (inner.parent === list && this.hasRowBinding(inner.id)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /** Binds a dynamic hole at the top level of a root component, where reads are recorded. */
   bindDynamic(
     hole: Hole,
@@ -497,7 +512,7 @@ class Planner {
         }
         case 'for': {
           const id = node.each.id;
-          this.bindHole(node.each, 'l', context, { kind: 'list', node });
+          const listed = this.bindHole(node.each, 'l', context, { kind: 'list', node });
           const frame: Frame = {
             item: node.item,
             index: node.index,
@@ -510,6 +525,12 @@ class Planner {
             loops: [...context.loops, node],
             blocks: context.blocks,
           });
+          // A list read from props has no state path, but its row bindings still need its `l`
+          // binding to reach the rows. It joins no group (no paths) and rides in their chunks.
+          if (listed === undefined && this.hasRowBinding(id)) {
+            this.bound.add(id);
+            this.addBinding('l', id, [], context, { kind: 'list', node });
+          }
           break;
         }
         case 'condition':
@@ -647,6 +668,10 @@ function hasPrefix(path: string, prefix: string): boolean {
 export function planGroups(bindings: Binding[]): Group[] {
   const byKey = new Map<string, Group>();
   for (const binding of bindings) {
+    // A list of props has no path, and rides in the chunks of its row bindings.
+    if (binding.paths.length === 0 && binding.dynamic !== true) {
+      continue;
+    }
     const key = binding.paths.join(',');
     let group = byKey.get(key);
     if (group === undefined) {
