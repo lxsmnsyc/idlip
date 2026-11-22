@@ -62,3 +62,8 @@ Picked by the orchestrator:
 - Two figures render on their pages; the build fails if a figure name is unknown.
 - Tests: markdown parsing, static HTML, numbers from DemoData.
 - Playwright look in light and dark, reduced motion, 390 px; described in outcome.md.
+
+## Updates 2026-11-22
+
+- `hero-animation` landed: read its outcome for the shared styles and client patterns (story driven by `data-story`, per-frame custom properties, `on-<moment>` classes, hands-on cue, slider). `DemoData.helpers` now exists (the shared helpers module, 928 B, loaded on the first click): figures that count click bytes include it.
+- Also fix, in `website/src/landing/index.ts`, the "What the todo demo loads" chunk list in the sample section: add the helpers module (from `DemoData.helpers`).

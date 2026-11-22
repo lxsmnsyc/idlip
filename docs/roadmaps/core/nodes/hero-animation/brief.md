@@ -1,7 +1,7 @@
 ---
 id: hero-animation
 title: Build the chosen hero animation into the landing page
-status: todo
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-22
-spent:
+spent: 547000
 owns:
   - website/src/landing/hero.ts
   - website/src/client/hero.ts
