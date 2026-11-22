@@ -9,7 +9,10 @@ import { getChunkId, listCompiled, splitModule } from '../core/format.ts';
 import type {
   Boot,
   CompileResult,
+  Manifest,
   Model,
+  Page,
+  PageState,
   Patch,
   Props,
   RenderContext,
@@ -26,6 +29,8 @@ import * as serverExports from '../server/index.ts';
 import { compareTrees } from './compare.ts';
 import { bindImports, toDataUrl } from './modules.ts';
 import type { Scope } from './modules.ts';
+import { setDriver } from './internal.ts';
+import type { MountedChild } from './internal.ts';
 
 export interface MountOptions {
   /**
@@ -313,6 +318,7 @@ async function start(
   }
 
   // 4. Start the loader with a patcher that records the models it patched.
+  const records = [...boot];
   const patcher = clientExports.createPatch(patchList);
   let patched: Model | undefined;
   let checked = true;
@@ -345,6 +351,32 @@ async function start(
   }
   let stopped = false;
 
+  // The children the test drives itself, from a decode of the state script of its own.
+  let driven: PageState | undefined;
+  const shown = new Map<string, Model>();
+  function readDriven(): PageState {
+    if (driven === undefined) {
+      driven = records[0][1]();
+      for (const [path, slot] of Object.entries(driven.slots ?? {})) {
+        shown.set(path, slot.model);
+      }
+    }
+    return driven;
+  }
+  function findBoundary(path: string): Comment | undefined {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_COMMENT);
+    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+      if (node.nodeValue === `n:${path}`) {
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+        return node as Comment;
+      }
+    }
+    return undefined;
+  }
+  function getManifest(state: PageState, module: string): Manifest {
+    return { ...state.modules![module], events: [] };
+  }
+
   function getElement(selector: string): HTMLElement {
     const element = root.querySelector<HTMLElement>(selector);
     if (element === null) {
@@ -374,7 +406,7 @@ async function start(
     }
   }
 
-  return {
+  const mounted: MountedPage = {
     root,
     get: getElement,
     text: (selector) => getElement(selector).textContent,
@@ -415,4 +447,42 @@ async function start(
       }
     },
   };
+  setDriver(mounted, {
+    children: () => {
+      const state = readDriven();
+      const list: MountedChild[] = [];
+      for (const [path, slot] of Object.entries(state.slots ?? {})) {
+        list.push({
+          path,
+          manifest: getManifest(state, slot.module),
+          model: shown.get(path) ?? slot.model,
+        });
+      }
+      return list;
+    },
+    patchChild: async (path, model) => {
+      const state = readDriven();
+      const slot = state.slots?.[path];
+      const boundary = findBoundary(path);
+      const from = shown.get(path);
+      if (slot === undefined || boundary === undefined || from === undefined) {
+        throw new Error(`No child at ${path}`);
+      }
+      const manifest = getManifest(state, slot.module);
+      const page: Page = {
+        root,
+        manifest,
+        props: slot.props,
+        // oxlint-disable-next-line typescript/promise-function-async
+        load: (module, chunk) => import(/* @vite-ignore */ state.chunks[getChunkId(module, chunk)]),
+        path,
+        start: boundary,
+      };
+      await patcher(page, from, model);
+      shown.set(path, model);
+      slots[path] = { model };
+      checked = false;
+    },
+  });
+  return mounted;
 }

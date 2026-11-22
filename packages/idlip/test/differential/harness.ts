@@ -25,15 +25,10 @@ export interface Subject {
   readonly name: string;
   readonly source: string;
   readonly props: Props;
-  /** The sources of the stateful children, by import specifier. The subject then runs by handlers only. */
+  /** The sources of the stateful children, by import specifier. The subject skips the root model pairs: `open` renders no child. */
   readonly children?: Readonly<Record<string, string>>;
   /** Model pairs worth a run whatever the generator makes, from the initial model. */
   readonly pairs?: (initial: Model) => readonly (readonly [Model, Model])[];
-  /**
-   * Selects the elements the handler run clicks. The check renders a child from its initial
-   * model, so a run with children clicks only what changes the root. Default: every `on:click`.
-   */
-  readonly clicks?: string;
 }
 
 export interface Opened {

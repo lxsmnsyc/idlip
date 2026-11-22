@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Model } from '../../src/core/format.ts';
 import { mount } from '../../src/testing/index.ts';
 import type { MountedPage } from '../../src/testing/index.ts';
+import { getDriver } from '../../src/testing/internal.ts';
 import { DIVERGENCES, findDivergence } from './divergences.ts';
 import { open } from './harness.ts';
 import { createRandom, mutateModel } from './states.ts';
@@ -10,6 +11,8 @@ import { SUBJECTS } from './subjects.ts';
 
 /** Seeds per subject. Each seed makes three model pairs. */
 const SEEDS = 40;
+/** Models a child walks through, each patched from the one before. */
+const CHILD_STEPS = 40;
 /** Rounds of clicking every handler element of a page. */
 const ROUNDS = 2;
 
@@ -87,12 +90,57 @@ describe.each(SUBJECTS)('$name', (subject) => {
     },
   );
 
+  it.skipIf(subject.children === undefined)(
+    'patches a child through random models like a server render',
+    async () => {
+      const page = await mount(subject.source, subject.props, {
+        expectCaught: true,
+        children: subject.children,
+      });
+      const failures: string[] = [];
+      try {
+        const driver = getDriver(page);
+        for (const child of driver.children()) {
+          const keys = new Map<string, string>();
+          for (const list of Object.values(child.manifest.lists)) {
+            if (list.path !== undefined) {
+              keys.set(list.path, list.key);
+            }
+          }
+          const random = createRandom(child.path.length * 104_729 + 1);
+          // The page walks from state to state, so each step is a pair of models.
+          for (let step = 1; step <= CHILD_STEPS; step++) {
+            const next = mutateModel(random, keys, child.model);
+            // oxlint-disable-next-line no-await-in-loop
+            await driver.patchChild(child.path, next);
+            totals.steps++;
+            let difference: string | undefined;
+            try {
+              // oxlint-disable-next-line no-await-in-loop
+              await page.settled();
+            } catch (error) {
+              difference = error instanceof Error ? error.message : String(error);
+            }
+            difference = judge(subject.name, difference);
+            if (difference !== undefined) {
+              failures.push(`child ${child.path}, step ${step}: ${difference}`);
+              break;
+            }
+          }
+        }
+      } finally {
+        page.stop();
+      }
+      expect(failures).toEqual([]);
+    },
+  );
+
   it('keeps the page equal to a server render after each handler', async () => {
     const page = await mount(subject.source, subject.props, {
       expectCaught: true,
       children: subject.children,
     });
-    const selector = subject.clicks ?? '[on\\:click]';
+    const selector = '[on\\:click]';
     try {
       for (let round = 0; round < ROUNDS; round++) {
         const count = page.root.querySelectorAll(selector).length;

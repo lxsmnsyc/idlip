@@ -35,8 +35,7 @@ export const SUBJECTS: readonly Subject[] = [
   },
   { name: 'example-todo', source: read(EXAMPLES, 'todo/src/todo.tsx'), props: { initial: TODOS } },
   {
-    // A default export with a named and a private child in the same file. The handler run
-    // clicks inside each component, since the check renders each child from its slot model.
+    // A default export with a named and a private child in the same file.
     name: 'widgets',
     source: read(FIXTURES, 'widgets/widgets.tsx'),
     props: {
@@ -60,7 +59,6 @@ export const SUBJECTS: readonly Subject[] = [
         { id: 'a2', label: 'Second' },
       ],
     },
-    clicks: '[on\\:click*="remove"], [on\\:click*="clearAll"]',
     children: { '../counter/counter.tsx': read(FIXTURES, 'nested/counter/counter.tsx') },
   },
   {
@@ -72,15 +70,12 @@ export const SUBJECTS: readonly Subject[] = [
         { id: 'a2', label: 'Second', start: 0 },
       ],
     },
-    clicks: '[on\\:click*="remove"]',
     children: { './counter.tsx': read(EXAMPLES, 'counters/src/counter.tsx') },
   },
   {
     name: 'parent',
     source: read(import.meta.dirname, 'subjects/parent.tsx'),
     props: { items: [{ id: 'a1', label: 'First' }] },
-    clicks:
-      '[on\\:click*="add"], [on\\:click*="relabel"], [on\\:click*="reverse"], [on\\:click*="toggle"], [on\\:click*="rename"], [on\\:click*="remove"]',
     children: { './counter.tsx': read(import.meta.dirname, 'subjects/counter.tsx') },
   },
   {
@@ -92,7 +87,6 @@ export const SUBJECTS: readonly Subject[] = [
         { id: 'a2', label: 'Second', start: 0 },
       ],
     },
-    clicks: '[on\\:click*="remove"]',
     children: { './counter.tsx': read(EXAMPLES, 'counters-subs/src/counter.tsx') },
   },
 ];
