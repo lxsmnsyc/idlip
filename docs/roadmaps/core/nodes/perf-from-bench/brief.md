@@ -1,7 +1,7 @@
 ---
 id: perf-from-bench
 title: Performance work from the benchmark findings
-status: todo
+status: done
 priority: should
 type: docs
 story:
@@ -20,7 +20,7 @@ exclusive: [bench]
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 190000
 owns:
   - benchmarks/README.md
 shared: []
