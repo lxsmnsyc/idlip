@@ -3,6 +3,8 @@
 // Every name and size comes from the demo build (`DemoData`), so the figure follows the code.
 import type { DemoData, DemoFile } from '../demo/data.ts';
 import { ICON, escape } from '../layout.ts';
+import { createRenderer } from '../markdown.ts';
+import type { RenderEnv } from '../markdown.ts';
 import { formatBytes, sumGzip } from './format.ts';
 
 const STEPS = ['Render', 'Load', 'Click', 'Patch'];
@@ -190,7 +192,29 @@ interface Mark {
   lit: string;
 }
 
-/** Escapes text and wraps each mark, found in order, in a `<mark>` lit at its steps. */
+const renderer = createRenderer();
+
+/**
+ * Highlights a piece of the code. A piece that starts with `<` is HTML and the rest is the
+ * script. The edges stay plain text, so the line breaks and the indent around a piece survive.
+ */
+function highlight(text: string): string {
+  const core = text.trim();
+  if (core === '') {
+    return escape(text);
+  }
+  const start = text.indexOf(core);
+  const language = core.startsWith('<') ? 'html' : 'js';
+  const env: RenderEnv = { headings: [], lead: '', link: (href) => href };
+  const block = renderer.render(`\`\`\`${language}\n${core}\n\`\`\`\n`, env);
+  const code = /<code[^>]*>([\s\S]*)<\/code>/.exec(block)?.[1];
+  if (code === undefined) {
+    return escape(text);
+  }
+  return `${escape(text.slice(0, start))}${code.replace(/\n$/, '')}${escape(text.slice(start + core.length))}`;
+}
+
+/** Highlights text and wraps each mark, found in order, in a `<mark>` lit at its steps. */
 function markText(text: string, marks: readonly Mark[]): string {
   let html = '';
   let cursor = 0;
@@ -199,14 +223,15 @@ function markText(text: string, marks: readonly Mark[]): string {
     if (at === -1) {
       continue;
     }
-    html += escape(text.slice(cursor, at));
+    html += highlight(text.slice(cursor, at));
+    const inner = highlight(mark.text);
     html +=
       mark.lit === ''
-        ? `<span class="code-dim">${escape(mark.text)}</span>`
-        : `<mark class="code-mark" data-lit="${mark.lit}">${escape(mark.text)}</mark>`;
+        ? `<span class="code-dim">${inner}</span>`
+        : `<mark class="code-mark" data-lit="${mark.lit}">${inner}</mark>`;
     cursor = at + mark.text.length;
   }
-  return html + escape(text.slice(cursor));
+  return html + highlight(text.slice(cursor));
 }
 
 /** The markup of the second todo and the state script, with the part each step reads lit. */

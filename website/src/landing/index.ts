@@ -132,8 +132,7 @@ function findBenchmarksLink(pages: readonly Page[], base: string, source: string
 
 export function renderLanding(context: LandingContext): string {
   const { base, start, pages, demo, benchmarks } = context;
-  const description =
-    'A UI framework that resumes in the browser where the server stopped.';
+  const description = 'A UI framework that resumes in the browser where the server stopped.';
   return `<!doctype html>
 <html lang="en">
 ${renderHead(base, 'idlip', description, true)}

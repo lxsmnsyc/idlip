@@ -141,6 +141,14 @@ describe('the landing page', () => {
     expect(landing).toContain('todos.*.done');
   });
 
+  it('highlights the server HTML of the diagram and keeps the step marks', () => {
+    const code = landing.slice(landing.indexOf('class="tile resume-code"'));
+    const block = code.slice(0, code.indexOf('</pre>'));
+    expect(block).toContain('data-lit="3"');
+    expect(block).toContain('data-lit="4"');
+    expect(block).toMatch(/<span[^>]*style=|<span class=/);
+  });
+
   it('says the hydration lane is a model and announces steps in one live element', () => {
     expect(landing).toContain('class="resume-note"');
     expect(landing.match(/aria-live="polite"/g)).toHaveLength(1);

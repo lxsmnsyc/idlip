@@ -1009,8 +1009,17 @@ svg {
   color: var(--on-accent);
 }
 
-.code-dim {
+.code-dim,
+.code-dim span {
   color: var(--muted);
+}
+
+/* A lit mark keeps one color, so the syntax colors never sit on chartreuse. */
+.resume-stage[data-step='1'] .code-mark[data-lit~='1'] span,
+.resume-stage[data-step='2'] .code-mark[data-lit~='2'] span,
+.resume-stage[data-step='3'] .code-mark[data-lit~='3'] span,
+.resume-stage[data-step='4'] .code-mark[data-lit~='4'] span {
+  color: inherit;
 }
 
 .visually-hidden {
@@ -1551,7 +1560,7 @@ svg {
 
 .facts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
   gap: 1.5rem 2rem;
   margin: 0;
 }
@@ -1588,7 +1597,8 @@ svg {
 
 .code-block pre {
   margin: 0;
-  padding: 1.5rem 1.75rem;
+  /* The label and the copy button sit in the top 2.2rem, so a one-line block stays readable. */
+  padding: 2.75rem 1.75rem 1.5rem;
   overflow-x: auto;
   font-size: 0.8rem;
   line-height: 1.75;
