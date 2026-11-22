@@ -99,3 +99,12 @@ The `nested-blocks` subject failed on the base, with the HTML path: a click that
 - Found, not fixed (outside this node): `diffPaths` reads `.length` of a string as `undefined` (`readField` takes records only), so a hole that reads `row.label.length` never patches. The HTML path had the same bug. The subject reads `row.id` there instead.
 - Sizes: todo loader 4026 B (-47 from step 8, -37 from the base), helpers 969 B; counters loader 4957 B (-156 from step 8, -49 from the base); dashboard loader 4842 B (-16 from the base, with `HAS_INNER_LISTS` on); rows dist 7653 B; dashboard dist 106997 B.
 - Docs: `website/docs/reference/client.md` (`patchList`, `parseHtml`, `addChild`), `compiler/CLAUDE.md`, `client/CLAUDE.md`. Change request `contracts/compiled-format-cloned-templates-all.change-request.md`.
+
+## Review fixes (rebased on `batch/core` f1cb02d)
+
+- `pre` newline: the server's markup is back to what it was. The clone merges a leading run of static text and unbound holes into one text node and drops its first newline; raw HTML in a `pre`, `listing` or `textarea` drops the first newline of its value, in the clone and in the `html=` binding. A Chromium probe compared server markup and clone for `"\nabc"`, `"\n\nabc"`, `"abc"` and `""`, as a hole and as raw HTML: all the same. `compare.ts` drops the leading newlines of a `pre`'s first text on both sides, since happy-dom keeps the one browsers drop. The `raw-text` subject gains raw HTML in a `pre`.
+- `string-render.test.ts` now parses chunks with oxc and checks each render function whole (the old line scan stopped at the first `}` in column 0, after the `if (branch === 0)` block). Two compiler mutations of the empty branch, `return '<i></i>'` and `return '<' + 'i></i>'`, now fail it; both passed the old version.
+- `added` is cleared in a `finally` when a patch ends; `HAS_INNER_LISTS` costs 39 B (was 20 B).
+- `plan.uses.find` is a loop in `child.ts` and `template.ts`; the `helpers.ts` header is rewrapped.
+- Loader size: 4026 B with node `gzipSync(level 9)` on a clean build (the e2e method). The command-line `gzip -9` gives 4062 B for the same file (header bytes), and a kept `dist` holds the previous build's loader too.
+- Sizes after the fixes: todo loader 4026 B, helpers 969 B, counters loader 4957 B, dashboard loader 4860 B, rows dist 7653 B, dashboard dist 106929 B.
