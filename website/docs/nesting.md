@@ -139,10 +139,87 @@ A child that a project module renders also gets a `view` chunk. When the parent 
 
 The loader holds the nesting code behind a build flag. The plugin turns it on when a module renders a child, which adds about 650 B with gzip to the loader. A page with no children does not pay for it.
 
+## Several components in one file
+
+A parent and its children can share a file. The default export, each named export, and each component that one of them renders are components of their own:
+
+```tsx
+import { For } from 'idlip';
+import type { JSX } from 'idlip/jsx-runtime';
+
+interface Item {
+  id: string;
+  label: string;
+}
+
+export function Counter(props: { start: number }): JSX.Element {
+  let count = props.start;
+
+  function increment() {
+    count = count + 1;
+  }
+
+  return <button on:click={increment}>{count}</button>;
+}
+
+function Row(props: { label: string }): JSX.Element {
+  let done = false;
+
+  function toggle() {
+    done = !done;
+  }
+
+  return (
+    <li class={{ done }}>
+      <button on:click={toggle}>{props.label}</button>
+    </li>
+  );
+}
+
+export default function Dashboard(props: { items: Item[] }): JSX.Element {
+  return (
+    <main>
+      <Counter start={1} />
+      <ul>
+        <For each={props.items} key="id">
+          {(item) => <Row label={item.label} />}
+        </For>
+      </ul>
+    </main>
+  );
+}
+```
+
+`Row` is not exported, so only this file renders it. Each component has a module id and chunk names of its own:
+
+| Component   | Module id                  | A chunk of it                                 |
+| ----------- | -------------------------- | --------------------------------------------- |
+| `Dashboard` | `/src/widgets.tsx`         | `widgets.list.1.<hash>.js`                    |
+| `Counter`   | `/src/widgets.tsx#Counter` | `widgets.Counter.handler.increment.<hash>.js` |
+| `Row`       | `/src/widgets.tsx#Row`     | `widgets.Row.handler.toggle.<hash>.js`        |
+
+A first click on a `Counter` loads `widgets.Counter.handler.increment` and `widgets.Counter.binding.count`, and nothing of `Dashboard` or `Row`.
+
+- **The default export** keeps the names of a file with one component, so adding a second component to a file renames nothing.
+- **Any other component** adds its name after the file name. A component name starts with a capital letter and a chunk kind does not, so the two never mix up.
+- **The chunk id** carries the name too: `/src/widgets.tsx?idlip-Counter.handler=increment&lang.js`.
+
+Another file imports a named component by name and renders it as a child, with the same slots and messages as a default import:
+
+```tsx no-check
+import { Counter } from './widgets.tsx';
+
+export default function Page() {
+  return <Counter start={5} />;
+}
+```
+
+A component must keep its name when it is exported. `export { Counter as Tally }` is the error `component-export`, since the name is part of the chunk names. Import it under another name instead: `import { Counter as Tally } from './widgets.tsx'`.
+
 ## Limits
 
 - **A child handler cannot call a callback prop.** `props.onRemove()` inside a handler is the compile error `handler-props-unlisted`. Use the prop in an event attribute, as `Counter` does.
 - **A dynamic hole inside a child** binds with its static paths. The read-tracking fallback of the root does not run in a child.
 - **A child's model is dropped when its block is removed.** When the block returns, the child starts again from its props. A condition that turns false and then true again does this.
 - **On a hot update**, a remounted child keeps its model. Its props come from the fresh render.
-- **A child is found only through another idlip module** that imports it and renders it in JSX. The plugin's `modules` option (default `src/**/*.tsx`) must match that parent and the child. A child in a `.tsx` file that the option misses is a build error that names the option.
+- **A child is found only through an idlip module** that renders it in JSX: a component of the same file, or one that imports it. The plugin's `modules` option (default `src/**/*.tsx`) must match that parent and the child. A child in a `.tsx` file that the option misses is a build error that names the option.

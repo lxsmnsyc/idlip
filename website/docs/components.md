@@ -5,7 +5,7 @@ section: Guide
 description: A module is a function component. let is state, const is derived, function declarations are handlers and return is the view.
 ---
 
-An idlip module is a `*.tsx` file whose default export is a function component. The compiler reads the body and never runs it. Each declaration form has one meaning:
+An idlip module is a `*.tsx` file that exports function components: a default export, named exports, or both. The compiler reads each body and never runs it. Each declaration form has one meaning:
 
 | Source             | Meaning                                                      |
 | ------------------ | ------------------------------------------------------------ |
@@ -184,15 +184,61 @@ export default function Greeting({ name }: { name: string }) {
 
 The server passes the props of the root component: `render(TodoApp, { initial })` from `idlip/server`. They go into the state script with the model, so they must serialize too.
 
+## Several components in one file
+
+A file can hold more than one component. Each of these is a component with its own model, handlers and chunks:
+
+- **The default export.**
+- **Each named export**, such as `export function Counter()`.
+- **A component that is not exported** and that one of the above renders, such as `<Row />`.
+
+```tsx
+import type { JSX } from 'idlip/jsx-runtime';
+
+export function Counter(props: { start: number }): JSX.Element {
+  let count = props.start;
+
+  function increment() {
+    count = count + 1;
+  }
+
+  return <button on:click={increment}>{count}</button>;
+}
+
+export default function Panel(): JSX.Element {
+  let title = 'Counters';
+
+  function rename() {
+    title = `${title}!`;
+  }
+
+  return (
+    <section>
+      <h2 on:click={rename}>{title}</h2>
+      <Counter start={1} />
+      <Counter start={10} />
+    </section>
+  );
+}
+```
+
+`Panel` and each `Counter` keep their own model, and a click inside a `Counter` loads only the chunks of `Counter`. The server renders either one as a root: `render(Panel, {})` or `render(Counter, { start: 3 })`. [Nesting](./nesting.md#several-components-in-one-file) shows how the chunks are named and how another file imports `Counter`.
+
+A component is a function declaration whose name starts with a capital letter. A component with no `let` and no handler has no model, and the file that declares it inlines it where it renders it.
+
 ## Common errors
 
-| Rule id          | Cause                                                              |
-| ---------------- | ------------------------------------------------------------------ |
-| `body-statement` | A statement in the body that is not a declaration or `return`.     |
-| `let-annotation` | `let x: T = v`. Write `let x = v satisfies T as T`.                |
-| `let-bare-as`    | `let x = v as T`. Write `let x = v satisfies T as T`.              |
-| `let-unassigned` | A `let` that no handler assigns. A warning. Use `const`.           |
-| `handler-mutate` | A handler changes state in place, such as `todos.push(x)`.         |
-| `handler-impure` | A handler calls `Math.random()`, `Date.now()` or a similar global. |
+| Rule id               | Cause                                                                                                                    |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `body-statement`      | A statement in the body that is not a declaration or `return`.                                                           |
+| `let-annotation`      | `let x: T = v`. Write `let x = v satisfies T as T`.                                                                      |
+| `let-bare-as`         | `let x = v as T`. Write `let x = v satisfies T as T`.                                                                    |
+| `let-unassigned`      | A `let` that no handler assigns. A warning. Use `const`.                                                                 |
+| `handler-mutate`      | A handler changes state in place, such as `todos.push(x)`.                                                               |
+| `handler-impure`      | A handler calls `Math.random()`, `Date.now()` or a similar global.                                                       |
+| `component-form`      | A component written as an arrow or a function expression, or an unnamed default export. Write `function Name(props) {}`. |
+| `component-export`    | A component exported under another name, or exported both as default and by name.                                        |
+| `component-duplicate` | Two components whose names differ only in case. Their chunk files would collide.                                         |
+| `component-unused`    | A warning. A component with state that is not exported and that no exported component renders.                           |
 
 [Views](./views.md) lists the errors of the view.
