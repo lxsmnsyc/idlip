@@ -14,7 +14,7 @@ export interface Divergence {
 export const DIVERGENCES: readonly Divergence[] = [
   {
     id: 'caught-region-stays',
-    subjects: ['try-board'],
+    subjects: ['try-board', 'block-kinds'],
     pattern:
       /comment <!--e\d+:0-->\[\d+\]: the server render has comment <!--e\d+:0-->, the page has comment <!--e\d+:1-->/,
     reason:

@@ -427,11 +427,11 @@ export function emitListChunk(info: ListInfo, context: ChunkContext): GroupChunk
 }
 
 /**
- * Emits the chunk of a `<Try>` region. `render(error, scope)` returns the catch view, with
- * `error` the message of what was thrown, a string. A catch view with `reset` also gets
- * `region(scope, start)`: the whole region with its markers, built the way the server builds
- * it, for the reset. A region inside a `<For>` reads its rows from the DOM around `start`, with
- * `listPaths`, the `each` path of each list.
+ * Emits the chunk of a `<Try>` region. `render(error, scope, doc)` returns the catch view, with
+ * `error` the message of what was thrown, a string: a cloned fragment, or HTML for a static
+ * view. A catch view with `reset` also gets `region(scope, start)`: the whole region with its
+ * markers, cloned in the document of `start`, for the reset. A region inside a `<For>` reads its
+ * rows from the DOM around `start`, with `listPaths`, the `each` path of each list.
  */
 export function emitTryChunk(
   info: TryInfo,
@@ -441,18 +441,32 @@ export function emitTryChunk(
   const usage = createUsage();
   const emitter = new Emitter('client', usage, context.report);
   emitter.frames = info.frames;
-  const builder = new HtmlBuilder(context.component, context.plan, emitter);
-  const built = builder.buildCatch(info.node, info.id);
-  const body = [...built.pre, `return ${toExpression({ pre: [], parts: built.parts })};`];
-  const error = getLocalName(info.node.error);
-  const sections = [
-    `export function render(${printParams(error, usage)}) {\n${body.join('\n')}\n}`,
-  ];
-  if (info.node.reset !== undefined) {
-    const whole = builder.build([info.node]);
-    const lines = [...whole.pre, `return ${toExpression({ pre: [], parts: whole.parts })};`];
-    const inRow = info.frames.length > 0;
-    if (inRow) {
+  const { component, plan } = context;
+  const { node } = info;
+  let body: string[];
+  const cloned = canClone(node.catch, component, plan);
+  if (cloned) {
+    const clone = createCloneContext(component, plan, emitter);
+    clone.catching.push(info.id);
+    const built = buildBody(node.catch, node.namespace, `templateE${info.id}_1$`, clone);
+    body = [...built.pre, `return ${built.expr};`];
+  } else {
+    const builder = new HtmlBuilder(component, plan, emitter);
+    const built = builder.buildCatch(node, info.id);
+    body = [...built.pre, `return ${toExpression({ pre: [], parts: built.parts })};`];
+  }
+  const error = getLocalName(node.error);
+  // A view that clones takes the document after the scope.
+  let parameters = printParams(error, usage);
+  if (cloned) {
+    parameters += `${parameters === error ? ', $scope' : ''}, $doc`;
+  }
+  const sections = [`export function render(${parameters}) {\n${body.join('\n')}\n}`];
+  if (node.reset !== undefined) {
+    const clone = createCloneContext(component, plan, emitter);
+    const whole = buildBody([node], node.namespace, `templateR${info.id}$`, clone);
+    const lines = ['const $doc = start.ownerDocument;', ...whole.pre, `return ${whole.expr};`];
+    if (info.frames.length > 0) {
       // The rows are read at the reset, not passed in.
       usage.helpers.add('getRows');
       usage.scope.delete('rows');
@@ -462,7 +476,7 @@ export function emitTryChunk(
     }
     const params = printParams(undefined, usage);
     sections.push(
-      `export function region(${params}${inRow ? `${params === '' ? '' : ', '}start` : ''}) {\n${lines.join('\n')}\n}`,
+      `export function region(${params === '' ? '$scope' : params}, start) {\n${lines.join('\n')}\n}`,
     );
   }
   if (info.node.namespace !== 'html') {

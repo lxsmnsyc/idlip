@@ -175,12 +175,12 @@ describe('cloned templates', () => {
     throw new Error('No list chunk');
   }
 
-  it.each([
-    ['a write inside a template', '<li><template><b>{row.label}</b></template></li>', 'ul'],
-    ['static events only', '<li><a on:click={() => touch()}>static</a></li>', 'ul'],
-  ])('renders HTML for %s', (_name, row, parent) => {
-    expect(findRowChunk(row, parent)).not.toContain('clone$');
-  });
+  it.each([['static events only', '<li><a on:click={() => touch()}>static</a></li>', 'ul']])(
+    'renders HTML for %s',
+    (_name, row, parent) => {
+      expect(findRowChunk(row, parent)).not.toContain('clone$');
+    },
+  );
 
   it.each([
     ['a text hole directly in a table row', '<tr>{row.label}</tr>', 'tbody', 'html-nesting'],
@@ -246,6 +246,57 @@ describe('cloned templates', () => {
     expect(mi instanceof Element && mi.namespaceURI).toBe(
       page.firstElementChild?.firstElementChild?.namespaceURI,
     );
+  });
+
+  it('clones a branch with a <Head> whose elements write values', async () => {
+    const source = `
+      import { Head } from 'idlip';
+      export default function Page() {
+        let open = false;
+        let count = 1;
+        function toggle() {
+          open = !open;
+          count = count + 1;
+        }
+        return (
+          <main>
+            <button on:click={toggle}>toggle</button>
+            {open && (
+              <section>
+                <Head>
+                  <title>{\`\${count} open\`}</title>
+                  <meta name="count" content={\`\${count}\`} />
+                </Head>
+                <p>{count}</p>
+              </section>
+            )}
+          </main>
+        );
+      }
+    `;
+    const code = findChunk(source, 'binding=open');
+    expect(code).toMatch(/<!--c\d+:h--><template i-x="1" i-head=""[^>]*><\/template><!--\/c-->/);
+    expect(code).toContain('$n[1].content.append(');
+    const page = await mount(source, {});
+    try {
+      page.click('button');
+      await page.settled();
+      await new Promise((resolve) => {
+        setTimeout(resolve, 5);
+      });
+      expect(document.title).toBe('2 open');
+      expect(document.head.querySelector('meta[name="count"]')?.getAttribute('content')).toBe('2');
+      expect(page.root.querySelector('p')?.textContent).toBe('2');
+    } finally {
+      page.stop();
+      document.title = '';
+    }
+  });
+
+  it('clones the content of a template with a write from its own template', () => {
+    const code = findRowChunk('<li><template><b>{row.label}</b></template></li>');
+    expect(code).toMatch(/<li><template i-x="1"><\/template><\/li>/);
+    expect(code).toMatch(/\$n\[1\]\.content\.append\(\$n2\[0\]\);/);
   });
 
   it.each([

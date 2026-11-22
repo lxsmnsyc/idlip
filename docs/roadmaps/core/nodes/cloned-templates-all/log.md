@@ -59,3 +59,16 @@ The `nested-blocks` subject failed on the base, with the HTML path: a click that
 - The probe also confirmed steps 3 and 4 in Chromium: SVG and MathML wrappers give the right namespaces (`foreignObject` content is HTML), and a `pre` or `textarea` with the server's leading newline matches the template plus its write.
 - Differential subject `select-text`: holes directly in a `select` in rows and in a branch, table rows. `template.test.ts`: a colgroup text hole is `html-nesting`, a select hole clones.
 - Sizes: no loader or helpers code change.
+
+## Step 6: `<Try>`, `<Subscribe>`, `<Head>`, global listeners and `<template>` content
+
+- `<Try>` in a body is `<!--e<id>:x<n>--><!--/e-->`. The body clones inside a `try` block into `$nc<n>`, the catch view in the `catch` block (with `error` declared as on the server), and only then the state goes on the start comment and the nodes after it, so a throw leaves no half-written nodes. Templates `templateE<id>_0$` (body) and `templateE<id>_1$` (catch view). A `reset` in a catch view writes `["$reset",[id]]` as the server does (`catching` in the clone context).
+- The `try=<id>` chunk: `render(error, scope, doc)` clones the catch view (a static one renders HTML until step 8), and `region(scope, start)` clones the whole region (`templateR<id>$`) in `start.ownerDocument`. `errors.ts` takes a node or HTML: it wraps a cloned catch view in its region comments and swaps the nodes in. HTML stays for the static catch view until step 8.
+- `<Subscribe>`: `<!--c<id>:s--><template i-sub>` with `i-input` and `i-key` written by `putAttr$(..., JSON.stringify(value))`, as `attr$` wrote them, and events as on elements.
+- `<Head>` (client form): `<!--c<id>:h--><template i-head>`. Its elements go in the template's content, which the walk of `clone$` does not enter, so when they write a value they clone from their own template (`templateH<id>$`) and the write appends the fragment to `.content`. A title with a hole sets its text.
+- An author `<template>` with a write inside does the same (`templateT<offset>$`).
+- Global listeners: `<template i-global>` with events.
+- Element start tags, events and anchors share `openTag`, `addEvents` and `addAnchor`.
+- Differential subject `block-kinds`: `<Subscribe>` with input and key in a row, `<Try>` in a row (kept rows that recover keep the catch view: the accepted divergence `caught-region-stays` now lists this subject too) and in a branch with a reset, a global listener that reads the state, a `<template>` with holes. A `<Head>` binding reads `document.head`, which the model-pair harness leaves out (with HTML too), so `template.test.ts` mounts a branch with a cloned `<Head>` and checks the title and the meta.
+- Goldens of the `try` fixture rewritten (`UPDATE_TRY=1`).
+- Sizes: todo loader 4073 B, helpers 969 B (no change; the `errors.ts` change is behind `HAS_ERRORS`).

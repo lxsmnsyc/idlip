@@ -19,9 +19,10 @@ interface Region {
 
 /** The exports of a `try=<id>` chunk. */
 interface TryChunk {
-  readonly render: (error: string, scope: Scope) => string;
-  /** Only a catch view with `reset` has it. A region in a row also takes its start marker. */
-  readonly region: (scope: Scope, start: Comment) => string;
+  /** The catch view: a cloned fragment, or HTML for a static view. */
+  readonly render: (error: string, scope: Scope, doc: Document) => string | Node;
+  /** Only a catch view with `reset` has it: the region with its markers, cloned in the document of `start`. */
+  readonly region: (scope: Scope, start: Comment) => Node;
   /** Set when the region is inside `<svg>` or `<math>`. */
   readonly namespace?: Namespace;
 }
@@ -90,8 +91,8 @@ function findEnd(start: Comment): Comment | undefined {
   return undefined;
 }
 
-/** Replaces a region, markers included, with markup that holds its new markers. */
-function swapRegion(start: Comment, html: string, ns?: Namespace): void {
+/** Replaces a region, markers included, with nodes or markup that hold its new markers. */
+function swapRegion(start: Comment, html: string | Node, ns?: Namespace): void {
   const end = findEnd(start);
   const parent = start.parentNode;
   if (end === undefined || parent === null) {
@@ -108,7 +109,8 @@ function swapRegion(start: Comment, html: string, ns?: Namespace): void {
     parent.removeChild(node);
     node = after!;
   }
-  const nodes = parseHtml(start.ownerDocument, html, ns);
+  const nodes =
+    typeof html === 'string' ? parseHtml(start.ownerDocument, html, ns) : [...html.childNodes];
   for (const node of nodes) {
     parent.insertBefore(node, next);
   }
@@ -148,7 +150,15 @@ export async function failRegion(
   }
   const { render, namespace } = await loadTry(page, region.id);
   const text = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-  swapRegion(region.start, `<!--e${region.id}:1-->${render(text, scope)}<!--/e-->`, namespace);
+  const doc = region.start.ownerDocument;
+  const view = render(text, scope, doc);
+  let nodes: string | Node = `<!--e${region.id}:1-->${String(view)}<!--/e-->`;
+  if (typeof view !== 'string') {
+    const fragment = doc.createDocumentFragment();
+    fragment.append(doc.createComment(`e${region.id}:1`), view, doc.createComment('/e'));
+    nodes = fragment;
+  }
+  swapRegion(region.start, nodes, namespace);
   fireError(error, page.path);
   return true;
 }

@@ -3,9 +3,9 @@
 // would parse to, markers included, so the patcher and the server render see no difference. A
 // block inside a body (a condition or a list) is a marked comment in the template, and the
 // body's writes clone the block's own templates next to it. Other bodies render HTML.
-import type { Component, Node } from '../analyze/index.ts';
+import type { Component, Event, Node } from '../analyze/index.ts';
 import { printProps, printSlot } from './child.ts';
-import { getMessage, isFixedMessage } from './events.ts';
+import { getMessage, isFixedMessage, printModifiers } from './events.ts';
 import type { Emitter } from './expr.ts';
 import type { Plan } from './plan.ts';
 import { escapeAttribute, escapeSingleQuoted, escapeText, getLocalName, quote } from './text.ts';
@@ -44,6 +44,8 @@ export interface CloneContext {
   readonly emitter: Emitter;
   /** The number of fragment variables (`$n`, `$n2`, ...) the function declared. */
   variables: number;
+  /** The ids of the `<Try>` regions whose catch view is being built, innermost last. */
+  catching: number[];
 }
 
 /** Makes the context of one render function. */
@@ -52,7 +54,7 @@ export function createCloneContext(
   plan: Plan,
   emitter: Emitter,
 ): CloneContext {
-  return { component, plan, emitter, variables: 0 };
+  return { component, plan, emitter, variables: 0, catching: [] };
 }
 
 /** The code that builds a body: statements, then an expression of its fragment. */
@@ -64,8 +66,7 @@ export interface BodyCode {
 }
 
 function isClonedElement(node: Element, component: Component, plan: Plan): boolean {
-  // The walk of `clone$` does not enter the content of a nested `<template>`.
-  if (node.html !== undefined || (node.tag === 'template' && hasWrite(node, component))) {
+  if (node.html !== undefined) {
     return false;
   }
   for (const attr of node.attrs) {
@@ -110,7 +111,13 @@ function isCloned(node: Node, component: Component, plan: Plan): boolean {
       return isClonedBody(node.then, component, plan) && isClonedBody(node.else, component, plan);
     case 'for':
       return isClonedBody(node.body, component, plan);
+    case 'try':
+      return isClonedBody(node.body, component, plan) && isClonedBody(node.catch, component, plan);
+    case 'head':
+      return isClonedBody(node.children, component, plan);
     case 'child':
+    case 'subscribe':
+    case 'global':
       return true;
     default:
       return false;
@@ -156,9 +163,190 @@ class TemplateBuilder {
       this.addList(node);
     } else if (node.kind === 'child') {
       this.addChild(node);
+    } else if (node.kind === 'try') {
+      this.addTry(node);
+    } else if (node.kind === 'head') {
+      this.addHead(node);
+    } else if (node.kind === 'subscribe') {
+      this.addSubscribe(node);
     } else {
-      throw new Error(`A ${node.kind} node does not clone`);
+      const write = this.openTag('template');
+      this.html += ` i-global="${node.target}"`;
+      this.addEvents(node.events, write);
+      this.addAnchor(node);
+      this.html += '></template>';
     }
+  }
+
+  /**
+   * Opens a start tag. Returns the function that adds a write on the element: the first call
+   * marks the element with `i-x`.
+   */
+  openTag(tag: string): (print: (target: string) => string) => void {
+    this.html += `<${tag}`;
+    // The mark goes after the tag name once the element has its first write.
+    const at = this.html.length;
+    let mark = 0;
+    return (print) => {
+      if (mark === 0) {
+        mark = this.addMark();
+        this.html = `${this.html.slice(0, at)} i-x="${mark}"${this.html.slice(at)}`;
+      }
+      this.writes.push(print(`${this.variable}[${mark}]`));
+    };
+  }
+
+  /** Writes the events of a tag: a fixed message in the template, any other through `setOn$`. */
+  addEvents(events: readonly Event[], write: (print: (target: string) => string) => void): void {
+    const { component, emitter, catching } = this.context;
+    for (const event of events) {
+      const region = catching.at(-1);
+      if (event.target.kind === 'reset' && region !== undefined) {
+        // The loader handles the reserved tag `$reset` itself: it renders the region again.
+        const modifiers = printModifiers(event);
+        const message = modifiers === '' ? ['$reset', [region]] : ['$reset', [region], modifiers];
+        this.html += ` on:${event.name}='${JSON.stringify(message)}'`;
+        continue;
+      }
+      if (event.target.kind !== 'handler' && event.target.kind !== 'prop') {
+        continue;
+      }
+      emitter.at = event.span;
+      const message = getMessage(component, event, emitter);
+      if (message.json === undefined) {
+        emitter.usage.helpers.add('setOn');
+        write((target) => `setOn$(${target}, ${quote(event.name)}, ${message.code});`);
+      } else {
+        this.html += ` on:${event.name}='${escapeSingleQuoted(message.json)}'`;
+      }
+    }
+  }
+
+  addAnchor(node: Node): void {
+    const ids = this.context.plan.anchors.get(node);
+    if (ids !== undefined) {
+      this.html += ` i-a="${ids.join(' ')}"`;
+    }
+  }
+
+  /** Builds a nested body, or an empty fragment for no nodes. */
+  buildPart(nodes: readonly Node[], namespace: string, name: string): BodyCode {
+    if (nodes.length === 0) {
+      return { pre: [], expr: '$doc.createDocumentFragment()', blocks: false };
+    }
+    const body = buildBody(nodes, namespace, name, this.context);
+    this.blocks ||= body.blocks;
+    return body;
+  }
+
+  /**
+   * Puts nodes in the content of a marked `<template>` element, which the walk of `clone$` does
+   * not enter: they clone from their own template.
+   */
+  addContent(
+    nodes: readonly Node[],
+    name: string,
+    write: (print: (target: string) => string) => void,
+  ): void {
+    const body = this.buildPart(nodes, 'html', name);
+    write((target) => [...body.pre, `${target}.content.append(${body.expr});`].join('\n'));
+  }
+
+  /**
+   * A `<Try>` region is `<!--e<id>:x<n>--><!--/e-->`. The body clones inside a `try` block, and
+   * the catch view when the body throws, so a throw leaves no half-written nodes. The write
+   * appends the state to the start comment and puts the nodes after it.
+   */
+  addTry(node: Extract<Node, { kind: 'try' }>): void {
+    const { context } = this;
+    const id = context.plan.tryIds.get(node);
+    if (id === undefined) {
+      return;
+    }
+    const mark = this.addMark();
+    const target = `${this.variable}[${mark}]`;
+    const content = `${this.variable}c${mark}`;
+    this.html += `<!--e${id}:x${mark}--><!--/e-->`;
+    const body = this.buildPart(node.body, node.namespace, `templateE${id}_0$`);
+    context.catching.push(id);
+    const caught = this.buildPart(node.catch, node.namespace, `templateE${id}_1$`);
+    context.catching.pop();
+    const error = getLocalName(node.error);
+    this.writes.push(
+      `let ${content};`,
+      'try {',
+      ...body.pre,
+      `${content} = ${body.expr};`,
+      `${target}.data += 0;`,
+      '} catch ($e) {',
+      `const ${error} = $e instanceof Error ? $e.name + ': ' + $e.message : String($e);`,
+      ...caught.pre,
+      `${content} = ${caught.expr};`,
+      `${target}.data += 1;`,
+      '}',
+      `${target}.after(${content});`,
+    );
+  }
+
+  /**
+   * A `<Head>` is its marker block around a `<template i-head>` that holds the elements, which
+   * the loader moves to `<head>`.
+   */
+  addHead(node: Extract<Node, { kind: 'head' }>): void {
+    const { plan, component } = this.context;
+    const id = plan.heads.get(node);
+    this.html += `<!--c${id}:h-->`;
+    this.blocks = true;
+    const write = this.openTag('template');
+    this.html += ' i-head=""';
+    this.addAnchor(node);
+    this.html += '>';
+    const elements: Node[] = [];
+    let writes = false;
+    for (const child of node.children) {
+      if (child.kind === 'element') {
+        elements.push(child);
+        writes ||= hasWrite(child, component);
+      }
+    }
+    if (writes) {
+      this.addContent(elements, `templateH${id}$`, write);
+    } else {
+      for (const element of elements) {
+        this.add(element);
+      }
+    }
+    this.html += '</template><!--/c-->';
+  }
+
+  /**
+   * A `<Subscribe>` is its marker block around a `<template i-sub>`. `:s` tells the loader it is
+   * not a condition.
+   */
+  addSubscribe(node: Extract<Node, { kind: 'subscribe' }>): void {
+    const { plan, emitter } = this.context;
+    const id = plan.subs.get(node);
+    if (node.source.kind !== 'import' && node.source.kind !== 'module') {
+      return;
+    }
+    this.html += `<!--c${id}:s-->`;
+    this.blocks = true;
+    const write = this.openTag('template');
+    this.html += ` i-sub="${node.source.name}"`;
+    for (const [name, hole] of [
+      ['i-input', node.input],
+      ['i-key', node.key],
+    ] as const) {
+      if (hole !== undefined) {
+        emitter.at = hole.span;
+        emitter.usage.helpers.add('putAttr');
+        const value = emitter.expr(hole.expr, 0);
+        write((target) => `putAttr$(${target}, ${quote(name)}, JSON.stringify(${value}));`);
+      }
+    }
+    this.addEvents(node.events, write);
+    this.addAnchor(node);
+    this.html += '></template><!--/c-->';
   }
 
   /**
@@ -255,18 +443,8 @@ class TemplateBuilder {
   }
 
   addElement(node: Element): void {
-    const { emitter, component, plan } = this.context;
-    this.html += `<${node.tag}`;
-    // The mark goes after the tag name once the element has its first write.
-    const at = this.html.length;
-    let mark = 0;
-    const write = (print: (target: string) => string): void => {
-      if (mark === 0) {
-        mark = this.addMark();
-        this.html = `${this.html.slice(0, at)} i-x="${mark}"${this.html.slice(at)}`;
-      }
-      this.writes.push(print(`${this.variable}[${mark}]`));
-    };
+    const { emitter, component } = this.context;
+    const write = this.openTag(node.tag);
     for (const attr of node.attrs) {
       if (attr.value.kind === 'static') {
         this.html +=
@@ -284,18 +462,7 @@ class TemplateBuilder {
       }
       write((target) => `putAttr$(${target}, ${quote(attr.name)}, ${value});`);
     }
-    for (const event of node.events) {
-      if (event.target.kind !== 'handler' && event.target.kind !== 'prop') {
-        continue;
-      }
-      const message = getMessage(component, event, emitter);
-      if (message.json === undefined) {
-        emitter.usage.helpers.add('setOn');
-        write((target) => `setOn$(${target}, ${quote(event.name)}, ${message.code});`);
-      } else {
-        this.html += ` on:${event.name}='${escapeSingleQuoted(message.json)}'`;
-      }
-    }
+    this.addEvents(node.events, write);
     const { ref } = node;
     if (ref?.kind === 'name') {
       this.html += ` i-ref="${escapeAttribute(ref.name)}"`;
@@ -305,15 +472,17 @@ class TemplateBuilder {
       const key = emitter.expr(ref.key, 14);
       write((target) => `putAttr$(${target}, 'i-ref', ${quote(`${ref.name} `)} + ${key});`);
     }
-    const ids = plan.anchors.get(node);
-    if (ids !== undefined) {
-      this.html += ` i-a="${ids.join(' ')}"`;
-    }
+    this.addAnchor(node);
     this.html += '>';
     if (VOID_TAGS.has(node.tag)) {
       return;
     }
     const html = node.namespace === 'html';
+    if (html && node.tag === 'template' && hasWrite(node, component)) {
+      this.addContent(node.children, `templateT${node.span.start}$`, write);
+      this.html += '</template>';
+      return;
+    }
     // The parser drops a newline that starts a textarea or a `pre`, so the server and the
     // template write one, and the text after it stays as it is.
     if (html && NEWLINE_TAGS.has(node.tag) && node.children.length > 0) {
@@ -368,16 +537,21 @@ function hasTextHole(nodes: readonly Node[]): boolean {
  * an event message that reads a value, or a block.
  */
 function hasWrite(node: Node, component: Component): boolean {
-  if (
-    node.kind === 'text-hole' ||
-    node.kind === 'condition' ||
-    node.kind === 'for' ||
-    node.kind === 'child'
-  ) {
-    return true;
-  }
-  if (node.kind !== 'element') {
-    return false;
+  switch (node.kind) {
+    case 'text':
+      return false;
+    case 'element':
+      break;
+    case 'head':
+      return hasAnyWrite(node.children, component);
+    case 'subscribe':
+      return (
+        node.input !== undefined || node.key !== undefined || hasFreeMessage(node.events, component)
+      );
+    case 'global':
+      return hasFreeMessage(node.events, component);
+    default:
+      return true;
   }
   for (const attr of node.attrs) {
     if (attr.value.kind !== 'static') {
@@ -387,13 +561,22 @@ function hasWrite(node: Node, component: Component): boolean {
   if (node.ref !== undefined && node.ref.kind !== 'name') {
     return true;
   }
-  for (const event of node.events) {
-    if (!isFixedMessage(component, event)) {
+  return hasFreeMessage(node.events, component) || hasAnyWrite(node.children, component);
+}
+
+function hasAnyWrite(nodes: readonly Node[], component: Component): boolean {
+  for (const node of nodes) {
+    if (hasWrite(node, component)) {
       return true;
     }
   }
-  for (const child of node.children) {
-    if (hasWrite(child, component)) {
+  return false;
+}
+
+/** Tells whether an event's message reads a value at render. */
+function hasFreeMessage(events: readonly Event[], component: Component): boolean {
+  for (const event of events) {
+    if (!isFixedMessage(component, event)) {
       return true;
     }
   }
@@ -402,11 +585,12 @@ function hasWrite(node: Node, component: Component): boolean {
 
 /**
  * Tells whether a client body renders by a clone: it has nodes, holds only elements, static
- * text, text holes, children, and conditions and lists whose bodies clone, and writes at least
- * one value. A body in SVG or MathML parses its template in an `<svg>` or `<math>` wrapper. A
- * static body renders HTML: its parse is short. `<Try>`, `<Subscribe>`, `<Head>`, a global
- * listener, raw HTML, a dynamic hole and a write inside a `<template>` render HTML. A text hole in
- * an HTML text element sets the element's text.
+ * text, text holes, children, `<Subscribe>`, `<Head>`, global listeners, and conditions, lists
+ * and `<Try>` regions whose bodies clone, and writes at least one value. A body in SVG or MathML
+ * parses its template in an `<svg>` or `<math>` wrapper. A static body renders HTML: its parse
+ * is short. Raw HTML and a dynamic hole render HTML. A text hole in an HTML text element sets
+ * the element's text, and the content of a `<template>` with a write clones from its own
+ * template.
  */
 export function canClone(nodes: readonly Node[], component: Component, plan: Plan): boolean {
   if (nodes.length === 0 || !isClonedBody(nodes, component, plan)) {

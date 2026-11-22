@@ -128,6 +128,17 @@ export const SUBJECTS: readonly Subject[] = [
     },
   },
   {
+    // `<Subscribe>`, `<Try>`, a global listener and a `<template>` in cloned bodies.
+    name: 'block-kinds',
+    source: read(import.meta.dirname, 'subjects/block-kinds.tsx'),
+    props: {
+      items: [
+        { id: 'a1', n: 1 },
+        { id: 'a2', n: -1 },
+      ],
+    },
+  },
+  {
     name: 'nested-board',
     source: read(FIXTURES, 'nested/board/board.tsx'),
     props: {
