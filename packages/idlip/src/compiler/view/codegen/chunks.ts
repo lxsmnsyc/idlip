@@ -1,7 +1,7 @@
 // Emits the client chunks: binding groups and list item templates.
+import { HELPERS_MODULE } from '../../../core/helpers.ts';
 import type { Component, Expr } from '../analyze/index.ts';
 import type { Module } from '../../../core/format.ts';
-import { printHelpers } from '../../../core/helpers.ts';
 import { printSlot } from './child.ts';
 import { emitHeadBody } from './head.ts';
 import { printHtmlBody } from './raw.ts';
@@ -275,31 +275,40 @@ function addListExports(
 }
 
 /**
- * Joins the loader import, the module's imports, the copied runtime helpers, the module's
- * helpers and the code into a chunk.
+ * Joins the loader import, the helpers import, the module's imports, the module's helpers and
+ * the code into a chunk.
  */
 function assemble(usage: Usage, sections: string[], context: ChunkContext): string {
   const collected = context.source.collect(usage.modules, usage.imports);
   const imports: string[] = [];
-  const copied = printHelpers(usage.helpers);
-  // The loader's own exports come as they are, and the copies call it through forwarders.
-  const specifiers: string[] = [];
-  for (const name of [...copied.client].sort()) {
-    specifiers.push(`${name} as ${name}$`);
+  if (usage.loader.size > 0) {
+    imports.push(`import { ${[...usage.loader].sort().join(', ')} } from 'idlip/client';`);
   }
-  specifiers.push(...[...usage.loader].sort());
-  if (specifiers.length > 0) {
-    imports.push(`import { ${specifiers.join(', ')} } from 'idlip/client';`);
+  // The runtime helpers come from one shared module, which the loader loads with the first chunk.
+  if (usage.helpers.size > 0) {
+    const names: string[] = [];
+    for (const name of [...usage.helpers].sort()) {
+      names.push(`${name}$`);
+    }
+    imports.push(`import { ${names.join(', ')} } from '${HELPERS_MODULE}';`);
   }
+  // A view is imported by name, not as a namespace. The view is also an entry, and a namespace
+  // object is an export the entry does not have, so the bundler split the view into a second
+  // file behind a re-exporting entry file.
+  const views: string[] = [];
   for (const [name, id] of usage.views) {
-    imports.push(`import * as ${name} from ${quote(id)};`);
+    imports.push(`import { init as $init_${name}, render as $render_${name} } from ${quote(id)};`);
+    views.push(`const ${name} = { init: $init_${name}, render: $render_${name} };`);
   }
   imports.push(...collected.imports);
   const blocks: string[] = [];
   if (imports.length > 0) {
     blocks.push(imports.join('\n'));
   }
-  blocks.push(...copied.code, ...collected.code, ...sections);
+  if (views.length > 0) {
+    blocks.push(views.join('\n'));
+  }
+  blocks.push(...collected.code, ...sections);
   return `${blocks.join('\n\n')}\n`;
 }
 

@@ -1,6 +1,6 @@
 // oxlint-disable import/prefer-default-export
 import { DEV, warnDeepQueue } from '../../core/dev.ts';
-import { getChunkId } from '../../core/format.ts';
+import { HELPERS_KEY, getChunkId } from '../../core/format.ts';
 import { runAfter } from '../dom/run.ts';
 import { RESET, fireError, keepModel, resetRegion } from '../errors.ts';
 import {
@@ -302,7 +302,11 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
     if (url === undefined) {
       throw new DropError(`idlip: no chunk for ${tag}`);
     }
-    // The binding chunks start with the handler chunk, not after it. A failure surfaces in the patch.
+    // The binding chunks and the helpers module they import start with the handler chunk, not
+    // after it. A failure surfaces in the patch.
+    if (Object.hasOwn(chunks, HELPERS_KEY)) {
+      load(chunks[HELPERS_KEY]).catch(() => {});
+    }
     for (const key of entry?.bindings ?? []) {
       load(chunks[getChunkId(manifest.module, manifest.groups[key].chunk)]).catch(() => {});
     }

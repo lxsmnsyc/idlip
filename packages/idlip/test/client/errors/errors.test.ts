@@ -253,7 +253,8 @@ describe('a chunk that fails to load', () => {
     harness.start();
     document.querySelectorAll('button')[0].click();
     await harness.settled();
-    expect(getLoaded()).toEqual(['handler=increment']);
+    // The binding chunk of the write set loads with the handler chunk.
+    expect(getLoaded().toSorted()).toEqual(['binding=count', 'handler=increment']);
     expect(harness.patch).toHaveBeenCalledTimes(1);
     expect(events).toHaveLength(0);
   });

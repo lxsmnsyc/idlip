@@ -131,6 +131,18 @@ describe('a file with several components in a build', () => {
     expect(count('widgets.view')).toBe(1);
   });
 
+  it('ships each view in one file', () => {
+    // A view is an entry and a static import of the parent's list chunk. It is one file, not an
+    // entry file that re-exports a second file with the code.
+    const urls = readChunkUrls(path.join(root, 'dist/.idlip/chunks.json'));
+    const served = new Set(Object.values(urls));
+    for (const name of globSync('dist/client/assets/*.js', { cwd: root })) {
+      const url = `/${path.relative('dist/client', name)}`;
+      const file = path.basename(name);
+      expect(served.has(url) || file === 'build.js' || file.startsWith('index-'), file).toBe(true);
+    }
+  });
+
   it('maps the chunk ids of each component to their files', () => {
     const urls = readChunkUrls(path.join(root, 'dist/.idlip/chunks.json'));
     const counter = urls['/src/widgets.tsx?idlip-Counter.handler=increment&lang.js'];
@@ -247,7 +259,7 @@ describe('a file with named components only in a build', () => {
     );
     // No chunk has the file's id alone, since the file has no default export.
     for (const id of Object.keys(urls)) {
-      expect(id === 'build' || /\?idlip-[A-Z]/.test(id)).toBe(true);
+      expect(id === 'build' || id === 'helpers' || /\?idlip-[A-Z]/.test(id)).toBe(true);
     }
   });
 

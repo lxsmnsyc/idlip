@@ -15,6 +15,7 @@ import {
   createApp,
   createCheckedCompile,
   createConfig,
+  findCopiedHelpers,
   readChunkUrls,
 } from './app.ts';
 
@@ -173,8 +174,9 @@ describe('vite build', () => {
         expect(listExports(readFileSync(file, 'utf8')), id).toEqual(listExports(source));
       }
     }
-    // The build id (`skew`) is the one key that is not a chunk.
-    expect(Object.keys(urls).toSorted()).toEqual([...expected, 'build'].toSorted());
+    // The build id (`skew`) and the shared helpers module are the keys that are not chunks.
+    expect(Object.keys(urls).toSorted()).toEqual([...expected, 'build', 'helpers'].toSorted());
+    expect(urls.helpers).toMatch(/^\/assets\/_idlip-helpers-[\w-]+\.js$/);
     // Besides the chunks, only the loader (`idlip/client`) and the files it imports statically, which
     // the page loads at boot.
     const assets = path.join(client, 'assets');
@@ -197,6 +199,16 @@ describe('vite build', () => {
     for (const file of readdirSync(assets)) {
       expect(chunkUrls.has(`/assets/${file}`) || loaded.has(file), file).toBe(true);
     }
+  });
+
+  it('declares each runtime helper in one file', () => {
+    const assets = path.join(root, 'dist/client/assets');
+    expect(findCopiedHelpers(assets)).toEqual([]);
+    // The fixture's chunks do use helpers, from the shared module.
+    const urls = readChunkUrls(path.join(root, 'dist/.idlip/chunks.json'));
+    expect(readFileSync(path.join(root, 'dist/client', urls.helpers), 'utf8')).toContain(
+      'function setAttr$(',
+    );
   });
 
   it('writes the built URLs into the server module', async () => {
@@ -249,7 +261,7 @@ describe('vite build errors', () => {
   it('fails when a chunk imports a module the loader does not import', async () => {
     const root = createApp();
     try {
-      // The fixture chunks copy their helpers and import little. Every chunk imports the loader's
+      // The fixture chunks import their helpers and little else. Every chunk imports the loader's
       // `parseHtml` here, so the stub is shared and the bundler keeps it in a file of its own.
       const checked = createCheckedCompile(root).compile;
       function compile(source: string, id: string): CompileResult {

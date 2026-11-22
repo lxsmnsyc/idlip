@@ -1,5 +1,6 @@
 import { gzipSync } from 'node:zlib';
-import type { Request } from '@playwright/test';
+import type { Request, Response } from '@playwright/test';
+import getChunkName from '../fixture/chunk.ts';
 import {
   collectRequests,
   expect,
@@ -91,8 +92,38 @@ test('the first click loads the toggle chunk and the changed binding chunk only'
     await second.click();
     await expect(page.locator('p')).toHaveText('0 left');
   });
-  expect(chunks.toSorted()).toEqual(['binding=todos.*.done', 'handler=toggle']);
+  // A build also loads the helpers module the chunks share. The fixture's chunks import none.
+  const helpers = process.env.E2E_TARGET === 'fixture' ? [] : ['helpers'];
+  expect(chunks.toSorted()).toEqual(['binding=todos.*.done', 'handler=toggle', ...helpers]);
   expect(await page.evaluate(() => window.idlipDecoded)).toBe(1);
+});
+
+test('the first click requests every file before any arrives, so it is one round trip', async ({
+  page,
+}) => {
+  await page.goto('/', { waitUntil: 'networkidle' });
+  // The loader asks for the helpers module with the chunks. Found as an import of a chunk, it
+  // would be requested only after that chunk arrived.
+  const events: string[] = [];
+  function onRequest(request: Request): void {
+    events.push(`request ${getChunkName(request.url()) ?? request.url()}`);
+  }
+  function onResponse(response: Response): void {
+    events.push(`response ${getChunkName(response.url()) ?? response.url()}`);
+  }
+  page.on('request', onRequest);
+  page.on('response', onResponse);
+  await page.getByRole('checkbox').nth(1).click();
+  await expect(page.locator('p')).toHaveText('0 left');
+  page.off('request', onRequest);
+  page.off('response', onResponse);
+  const first = events.findIndex((event) => event.startsWith('response'));
+  const helpers = process.env.E2E_TARGET === 'fixture' ? [] : ['request helpers'];
+  expect(events.slice(0, first).toSorted()).toEqual([
+    'request binding=todos.*.done',
+    'request handler=toggle',
+    ...helpers,
+  ]);
 });
 
 test('a later click on the same handler loads nothing', async ({ page }) => {

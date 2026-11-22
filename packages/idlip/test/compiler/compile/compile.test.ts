@@ -3,11 +3,12 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { runInThisContext } from 'node:vm';
 import { format } from 'oxfmt';
+import * as runtime from '../../../src/core/helpers.ts';
 import { describe, expect, it, vi } from 'vitest';
 import { compile } from '../../../src/compiler/index.ts';
 import { getChunkFile } from '../../../src/core/format.ts';
 import { attr, createContext, on, text } from '../../fixtures/reference.ts';
-import { parseHtml, printRow } from '../../fixtures/rows.ts';
+import { printRow } from '../../fixtures/rows.ts';
 
 // Compiled server modules import the render helpers from the package.
 vi.mock('idlip/server', async () => import('../../fixtures/reference.ts'));
@@ -152,15 +153,15 @@ describe('compile() behavior', () => {
     const result = compile(readFixture('todo', 'todo.tsx'), readId('todo'));
     const chunk = result.client.find((module) => module.chunk === 'list=3');
     const actual = loadRender(chunk?.code ?? '', {
+      ...runtime,
       attr$: attr,
       on$: on,
       text$: text,
-      parseHtml$: parseHtml,
     });
     const expected = loadRender(readFixture('todo', 'expected', 'client', 'list.3.js'), {
-      attr,
-      on,
-      text,
+      attr$: attr,
+      on$: on,
+      text$: text,
     });
     const items = [
       { id: 'a1', text: 'one & two', done: true },

@@ -1,15 +1,17 @@
 // The render helpers (`text`, `attr`, `on`) and the DOM helpers (`setText`, `setAttr`, `setOn`,
-// `setBranch`) of compiled modules. Each has one source, here. The server imports the render
-// helpers. A client chunk does not import any of them: the compiler copies the ones it uses
-// into the chunk with `printHelpers`, from the text of these functions, so the loader stays
-// small. Rules for the sources:
+// `setBranch` and the rest) of compiled modules. Each has one source, here. The server imports
+// the render helpers. A client chunk imports the ones it uses from `idlip/helpers`, one shared
+// module that `printHelpersModule` writes from the text of these functions. The Vite plugin
+// serves it, the bundler keeps the helpers the chunks use, and the loader starts loading it
+// with the first chunk. The loader stays small, and a build ships each helper once. Rules for
+// the sources:
 // - Every function is named with a `$` suffix, so a copy cannot clash with a name in the module.
 // - No comment inside a body, since the copy is the text of the function.
 // - A function mentions only what `HELPERS` lists for it.
 // - A loader export is called as `name$`, through the forwarding function below. In a chunk the
 //   name is the import alias, `parseHtml as parseHtml$`. A bundler or a test runner renames
 //   imported bindings in the text of a function, but not a function declared in the module.
-// oxlint-disable typescript/no-base-to-string, no-control-regex
+// oxlint-disable typescript/no-base-to-string, no-control-regex, no-console
 import { addBlock, findInnerBlocks, removeBlock } from '../client/patch/blocks.ts';
 import { parseHtml } from '../client/patch/dom.ts';
 import { track$ } from './dynamic.ts';
@@ -34,7 +36,7 @@ function removeBlock$(start: Comment): void {
   removeBlock(start);
 }
 
-function getText$(value: unknown): string {
+export function getText$(value: unknown): string {
   if (value === null || value === undefined || typeof value === 'boolean') {
     return '';
   }
@@ -129,7 +131,6 @@ export function safeUrl$(value: unknown, name: string, embed?: boolean): unknown
   }
   if (unsafe) {
     if (process.env.NODE_ENV !== 'production') {
-      // oxlint-disable-next-line no-console
       console.warn(`idlip: dropped an unsafe URL from ${name}.`);
     }
     return undefined;
@@ -354,7 +355,7 @@ export function putText$(node: Node, value: unknown): void {
 }
 
 /** Reads the rows around a region from the DOM: `reset` has no binding scope. `paths` maps a list id to its `each` path. */
-function getRows$(
+export function getRows$(
   start: Node,
   model: unknown,
   paths: Record<string, string>,
@@ -450,42 +451,20 @@ export const HELPER_NAMES: readonly string[] = [
   ...Object.keys(FORWARDERS),
 ];
 
-export interface PrintedHelpers {
-  /** The source of each function the chunk needs, dependencies first. */
-  code: string[];
-  /** The names to import from `idlip/client`, which the loader holds. */
-  client: Set<string>;
-}
+/** The specifier chunks import the helpers from. */
+export const HELPERS_MODULE = 'idlip/helpers';
 
 /**
- * Returns the code to copy into a chunk that uses the given helpers (`text`, `setAttr` and
- * so on), and the loader exports that code needs.
+ * Returns the source of the `idlip/helpers` module: a copy of every helper, dependencies first,
+ * the loader exports they call as imports from `idlip/client`, and an export of each helper a
+ * chunk can import.
  */
-export function printHelpers(names: Iterable<string>): PrintedHelpers {
-  const wanted = new Set<string>();
-  const client = new Set<string>();
-  const queue: string[] = [];
-  for (const name of names) {
-    queue.push(`${name}$`);
-  }
-  while (queue.length > 0) {
-    const name = queue.pop()!;
-    const helper = HELPERS[name];
-    if (helper === undefined) {
-      throw new Error(`Unknown helper ${name}`);
-    }
-    if (wanted.has(name)) {
-      continue;
-    }
-    wanted.add(name);
-    queue.push(...helper.uses);
-    for (const imported of helper.client) {
-      client.add(imported);
-    }
-  }
+export function printHelpersModule(): string {
+  const exported: string[] = [];
   const code: string[] = [];
+  const client = new Set<string>();
   for (const [name, helper] of Object.entries(HELPERS)) {
-    if (helper === undefined || !wanted.has(name)) {
+    if (helper === undefined) {
       continue;
     }
     // A bundler may rename a function, which would break the names the copies call.
@@ -493,12 +472,18 @@ export function printHelpers(names: Iterable<string>): PrintedHelpers {
       throw new Error(`The helper ${name} was renamed to ${helper.source.name}`);
     }
     code.push(helper.source.toString());
+    exported.push(name);
+    for (const imported of helper.client) {
+      client.add(imported);
+    }
   }
-  for (const imported of client) {
+  const specifiers: string[] = [];
+  for (const imported of [...client].sort()) {
     const forwarder = FORWARDERS[`${imported}$`];
     if (forwarder?.name !== `${imported}$`) {
       throw new Error(`The forwarder ${imported}$ was renamed to ${forwarder?.name}`);
     }
+    specifiers.push(`${imported} as ${imported}$`);
   }
-  return { code, client };
+  return `import { ${specifiers.join(', ')} } from 'idlip/client';\n\n${code.join('\n\n')}\n\nexport { ${exported.join(', ')} };\n`;
 }

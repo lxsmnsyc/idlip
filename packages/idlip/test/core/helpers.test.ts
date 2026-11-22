@@ -1,15 +1,15 @@
-import { runInThisContext } from 'node:vm';
 import { Window } from 'happy-dom';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { getLocalName } from '../../src/compiler/view/codegen/text.ts';
 import * as blocks from '../../src/client/patch/blocks.ts';
 import { findNode } from '../../src/client/patch/nodes.ts';
 import { parseHtml } from '../../src/client/patch/dom.ts';
+import { importHelpers } from '../../src/testing/modules.ts';
 import {
   HELPER_NAMES,
   attr$,
   on$,
-  printHelpers,
+  printHelpersModule,
   setAttr$,
   setBranch$,
   setOn$,
@@ -19,7 +19,6 @@ import {
 
 type Callable = (...args: never[]) => unknown;
 
-const PUBLIC = ['text', 'attr', 'on', 'setText', 'setAttr', 'setOn', 'setBranch'];
 const SOURCES: Record<string, Callable> = {
   text: text$,
   attr: attr$,
@@ -44,21 +43,11 @@ function call(fn: Callable, ...args: unknown[]): unknown {
   return Reflect.apply(fn, undefined, args);
 }
 
-/** Evaluates a copy in a scope that holds only the loader's exports, as a chunk would. */
+let copies: Record<string, unknown> = {};
+
+/** Returns a helper of the `idlip/helpers` module, which reads only the loader's exports. */
 function getCopy(name: string): Callable {
-  const printed = printHelpers([name]);
-  const params: string[] = [];
-  const args: unknown[] = [];
-  for (const imported of printed.client) {
-    params.push(`${imported}$`);
-    args.push(LOADER[imported]);
-  }
-  const body = `${printed.code.join('\n')}\nreturn ${name}$;`;
-  const factory: unknown = runInThisContext(`(function (${params.join(', ')}) {\n${body}\n})`);
-  if (!isCallable(factory)) {
-    throw new TypeError('The copy has no factory');
-  }
-  const copy: unknown = call(factory, ...args);
+  const copy = copies[`${name}$`];
   if (!isCallable(copy)) {
     throw new TypeError(`${name} is not a function`);
   }
@@ -70,23 +59,28 @@ function find(root: unknown, name: string): unknown {
 }
 
 describe('chunk helpers', () => {
-  it('prints dependencies once, before the function that calls them', () => {
-    const { code } = printHelpers(['text', 'attr', 'setAttr']);
+  beforeAll(async () => {
+    Reflect.set(globalThis, '$idlipHelpersTest', { client: LOADER });
+    copies = await importHelpers('$idlipHelpersTest');
+  });
+
+  it('defines each helper once, after the helpers it calls', () => {
     const names: string[] = [];
-    for (const item of code) {
-      names.push(/^function (\w+\$)/.exec(item)?.[1] ?? '');
+    for (const match of printHelpersModule().matchAll(/^function (\w+\$)/gm)) {
+      names.push(match[1]);
     }
     expect(new Set(names).size).toBe(names.length);
     expect(names.indexOf('getText$')).toBeLessThan(names.indexOf('text$'));
     expect(names.indexOf('joinClass$')).toBeLessThan(names.indexOf('attr$'));
+    expect(names.indexOf('isElement$')).toBeLessThan(names.indexOf('clone$'));
   });
 
-  it('keeps comments and module references out of a copy', () => {
-    for (const name of PUBLIC) {
-      for (const item of printHelpers([name]).code) {
-        expect(item).not.toMatch(/\/\/|\/\*|__vite|__import|\bimport\b/);
-      }
-    }
+  it('imports only the loader, and keeps comments and module references out', () => {
+    const [imports, ...rest] = printHelpersModule().split('\n\n');
+    expect(imports).toBe(
+      "import { addBlock as addBlock$, findInnerBlocks as findInnerBlocks$, parseHtml as parseHtml$, removeBlock as removeBlock$ } from 'idlip/client';",
+    );
+    expect(rest.join('\n\n')).not.toMatch(/\/\/|\/\*|__vite|__import|\bimport\b/);
   });
 
   it('copies run on their own and equal the source', () => {
@@ -175,9 +169,5 @@ describe('chunk helpers', () => {
     for (const name of HELPER_NAMES) {
       expect(getLocalName(name), name).toBe(`${name}$`);
     }
-  });
-
-  it('rejects a helper that does not exist', () => {
-    expect(() => printHelpers(['nope'])).toThrow('Unknown helper nope$');
   });
 });

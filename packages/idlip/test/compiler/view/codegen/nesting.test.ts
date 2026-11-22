@@ -237,7 +237,9 @@ describe('nested behavior', () => {
         calls.push(args);
         return '';
       },
-      Counter: {},
+      $init_Counter: undefined,
+      $render_Counter: undefined,
+      slot$: slot,
     };
     const actual = loadChunk(findChunk(board, 'list=2'), ['render'], globals);
     const golden = loadChunk(
@@ -263,8 +265,13 @@ describe('nested behavior', () => {
   it('renders the view chunk of the counter as the golden one does', () => {
     const counter = compileFixture('counter', true);
     const names = ['init', 'render'];
-    const actual = loadChunk(findChunk(counter, 'view'), names, {});
-    const golden = loadChunk(readFixture('counter', 'expected', 'client', 'view.js'), names, {});
+    const globals = { text$: text, on$: on };
+    const actual = loadChunk(findChunk(counter, 'view'), names, globals);
+    const golden = loadChunk(
+      readFixture('counter', 'expected', 'client', 'view.js'),
+      names,
+      globals,
+    );
     const props = { label: 'A & B', onRemove: ['clearAll', [], '', ''] };
     expect(call(actual, 'init', props)).toEqual({ count: 0 });
     const model = call(golden, 'init', props);

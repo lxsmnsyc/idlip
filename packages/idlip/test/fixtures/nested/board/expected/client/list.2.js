@@ -1,17 +1,8 @@
 import { addChild } from 'idlip/client';
-import * as Counter from '/src/counter.tsx?idlip-view&lang.js';
+import { slot$ } from 'idlip/helpers';
+import { init as $init_Counter, render as $render_Counter } from '/src/counter.tsx?idlip-view&lang.js';
 
-function encode$(part) {
-	return encodeURIComponent(part).replaceAll("-", "%2D");
-}
-
-function slot$(path, site, ...keys) {
-	let id = String(site);
-	for (const key of keys) {
-		id += `:${encode$(String(key))}`;
-	};
-	return path === "" ? id : `${path}/${id}`;
-}
+const Counter = { init: $init_Counter, render: $render_Counter };
 
 // `addChild` makes the child's model from `init`, records the slot and returns the child's
 // markup between its boundary comments.

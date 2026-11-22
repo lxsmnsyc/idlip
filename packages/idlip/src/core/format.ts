@@ -153,6 +153,13 @@ export interface Slot {
 /** Chunk id (`getChunkId`) to the URL the loader imports. */
 export type ChunkUrls = Readonly<Record<string, string>>;
 
+/**
+ * The key of the shared helpers module in a built chunk map (`idlip/helpers`). Chunks import
+ * it, and the loader starts loading it with the first chunk, so a click stays one round trip.
+ * Chunk ids start with `/`, so none collides.
+ */
+export const HELPERS_KEY = 'helpers';
+
 /** What a state script pushes: its event types, separated by spaces, and its state. */
 export type StateRecord = readonly [events: string, state: () => PageState];
 

@@ -18,7 +18,7 @@ import * as clientExports from '../../src/client/patch/index.ts';
 import { restartSub } from '../../src/client/subs/index.ts';
 import * as serverExports from '../../src/server/index.ts';
 import { compareTrees } from '../../src/testing/compare.ts';
-import { bindImports, toDataUrl } from '../../src/testing/modules.ts';
+import { bindImports, importHelpers, toDataUrl } from '../../src/testing/modules.ts';
 
 export interface Subject {
   /** A name for reports. */
@@ -67,11 +67,14 @@ export async function open(subject: Subject): Promise<Opened> {
       throw new Error(`${subject.name} does not compile: ${item.message}`);
     }
   }
-  Reflect.set(globalThis, key, {
+  const scope = {
     server: { ...serverExports },
     client: { ...clientExports, patchList, restartSub },
+    helpers: {},
     loaded() {},
-  });
+  };
+  Reflect.set(globalThis, key, scope);
+  scope.helpers = await importHelpers(key);
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion
   const server = (await importCode(bindImports(compiled.server, key))) as ServerModule;
 

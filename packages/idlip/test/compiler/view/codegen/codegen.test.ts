@@ -3,6 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { runInThisContext } from 'node:vm';
 import { format } from 'oxfmt';
+import * as runtime from '../../../../src/core/helpers.ts';
 import { describe, expect, it } from 'vitest';
 import { analyze } from '../../../../src/compiler/view/analyze/index.ts';
 import type {
@@ -19,7 +20,7 @@ import type { GenerateResult } from '../../../../src/compiler/view/codegen/index
 import { getChunkFile } from '../../../../src/core/format.ts';
 import type { Model } from '../../../../src/core/format.ts';
 import { attr, createContext, on, text } from '../../../fixtures/reference.ts';
-import { parseHtml, printRow } from '../../../fixtures/rows.ts';
+import { printRow } from '../../../fixtures/rows.ts';
 
 const FIXTURES = join(import.meta.dirname, '..', '..', '..', 'fixtures');
 
@@ -243,15 +244,15 @@ describe('fixture todo list template', () => {
     const { result } = generateFixture('todo');
     const chunk = result.client.find((module) => module.chunk === 'list=3');
     const actual = runChunk(chunk?.code ?? '', {
+      ...runtime,
       attr$: attr,
       on$: on,
       text$: text,
-      parseHtml$: parseHtml,
     });
     const expected = runChunk(readFixture('todo', 'expected', 'client', 'list.3.js'), {
-      attr,
-      on,
-      text,
+      attr$: attr,
+      on$: on,
+      text$: text,
     });
     const items = [
       { id: 'a1', text: 'one & two', done: true },
@@ -480,7 +481,7 @@ describe('server module', () => {
     expect(html).toContain('title="xx"');
     expect(html).toContain('<!--t1-->xx<!--/t-->');
     const chunk = result.client.find((module) => module.chunk === 'binding=attr');
-    expect(chunk?.code).toContain('function setText$(start, value) {');
+    expect(chunk?.code).toContain("import { setAttr$, setText$ } from 'idlip/helpers';");
     expect(chunk?.code).not.toContain('idlip/client');
     expect(chunk?.code).toContain('function text(value) {');
   });
@@ -622,10 +623,10 @@ describe('client chunks', () => {
     expect(list?.code).toContain('const index = rows[0].index;');
     expect(list?.code).toContain('const item = rows[0].item;');
     const exports = runChunk(list?.code ?? '', {
+      ...runtime,
       attr$: attr,
       on$: on,
       text$: text,
-      parseHtml$: parseHtml,
     });
     const html = renderRow(exports, {
       model: { n: 3 },

@@ -5,6 +5,7 @@ import { vi } from 'vitest';
 import { renderListener } from '../../../src/client/loader/listener.ts';
 import { resume } from '../../../src/client/loader/resume.ts';
 import { getChunkFile } from '../../../src/core/format.ts';
+import { printHelpersModule } from '../../../src/core/helpers.ts';
 import type { Resumed } from '../../../src/client/loader/resume.ts';
 import type { Boot, Patch } from '../../../src/core/format.ts';
 
@@ -103,7 +104,11 @@ export function setup(fixture: string, options: Options = {}): Harness {
   scope.idlipBroken = [...(options.broken ?? [])];
 
   function writeChunk(chunk: string): void {
-    const source = readFileSync(join(expected, 'client', getChunkFile(chunk)), 'utf8');
+    // The copies run outside Vite, so they import the helpers module a build would serve.
+    const source = readFileSync(join(expected, 'client', getChunkFile(chunk)), 'utf8').replace(
+      "'idlip/helpers'",
+      "'./helpers.mjs'",
+    );
     const gate = options.gated?.includes(chunk)
       ? `await new Promise((r) => { globalThis.idlipGates[${JSON.stringify(chunk)}] = r; });\n`
       : '';
@@ -113,6 +118,16 @@ export function setup(fixture: string, options: Options = {}): Harness {
       `${fail}${gate}${source}\n(globalThis.idlipLoaded ??= []).push(${JSON.stringify(chunk)});\n`,
     );
   }
+
+  // The loader's DOM code is never called here, since `patch` is a mock.
+  writeFileSync(
+    join(dir, 'helpers.mjs'),
+    printHelpersModule().replace("'idlip/client'", "'./client.mjs'"),
+  );
+  writeFileSync(
+    join(dir, 'client.mjs'),
+    'export function addBlock() {}\nexport function findInnerBlocks() { return []; }\nexport function parseHtml() { return []; }\nexport function removeBlock() {}\n',
+  );
 
   // The state script maps chunk ids to URLs. Each URL becomes a copy of the fixture file.
   const script = state

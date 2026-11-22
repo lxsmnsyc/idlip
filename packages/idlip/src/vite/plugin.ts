@@ -12,9 +12,16 @@ import type {
   ViteDevServer,
 } from 'vite';
 import * as compiler from '../compiler/index.ts';
+import { HELPERS_MODULE, printHelpersModule } from '../core/helpers.ts';
 import type { CompileOptions } from '../compiler/index.ts';
 import type { ChunkUrls, Compile, CompileDiagnostic, CompileResult } from '../core/format.ts';
-import { getChunkFile, getChunkId, listCompiled, splitModule } from '../core/format.ts';
+import {
+  HELPERS_KEY,
+  getChunkFile,
+  getChunkId,
+  listCompiled,
+  splitModule,
+} from '../core/format.ts';
 import { getDefines, getFeatures, replaceFeatures } from './features.ts';
 import { HOT_EVENT, classifyEdit } from './hot.ts';
 import {
@@ -45,6 +52,9 @@ const CHUNKS_FILE = '.idlip/chunks.json';
 const DEV_LOADER = '\0idlip:dev-loader';
 /** The URL of the loader that dev pages write. */
 const DEV_LOADER_URL = '/@id/idlip/client';
+
+/** The module chunks import their helpers from (`idlip/helpers`), written by `printHelpersModule`. */
+const HELPERS_ID = '\0idlip-helpers';
 /** The default `modules` globs. */
 const DEFAULT_MODULES = ['src/**/*.tsx'];
 /** The id of a child's view chunk, with the component's name for a named component. */
@@ -190,6 +200,7 @@ function checkChunkImports(
   reporter: Reporter,
   bundle: Rolldown.OutputBundle,
   chunkFiles: ReadonlySet<string>,
+  helpersFile: string | undefined,
 ): void {
   const items: Partial<Rolldown.OutputBundle> = bundle;
   // Walk the static imports from every entry that is not an idlip chunk.
@@ -218,11 +229,14 @@ function checkChunkImports(
       views.add(item.fileName);
     }
   }
-  // Every static import of an idlip chunk must already be loaded. The one exception is a view
+  // Every static import of an idlip chunk must already be loaded. The exceptions are the helpers
+  // module, which the loader loads with the first chunk in the same round trip, and a view
   // reached from a chunk that can add a child in the browser: a list row, a condition branch in
-  // a binding chunk, a `<Try>` region, or another view.
+  // a binding chunk, a `<Try>` region, or another view. The helpers module itself may import
+  // only what the loader holds.
   const errors: string[] = [];
-  for (const file of chunkFiles) {
+  const checked = helpersFile === undefined ? [...chunkFiles] : [...chunkFiles, helpersFile];
+  for (const file of checked) {
     const item = items[file];
     if (item?.type !== 'chunk') {
       continue;
@@ -230,7 +244,11 @@ function checkChunkImports(
     const ids = [...item.moduleIds, item.facadeModuleId ?? ''];
     const addsChild = ids.some((id) => RENDER_CHUNK.test(id) || VIEW_CHUNK.test(id));
     for (const imported of item.imports) {
-      if (!loaded.has(imported) && !(addsChild && views.has(imported))) {
+      if (
+        !loaded.has(imported) &&
+        imported !== helpersFile &&
+        !(addsChild && views.has(imported))
+      ) {
         errors.push(`${file} imports ${imported}, which the loader does not import`);
       }
     }
@@ -240,6 +258,19 @@ function checkChunkImports(
       `idlip: a click would load a shared chunk. Import it from the loader, or copy the code into each chunk.\n${errors.join('\n')}`,
     );
   }
+}
+
+/**
+ * Returns the file of the shared helpers module (`idlip/helpers`) in a client bundle. It is
+ * `undefined` when no chunk imports a helper, or when one chunk alone does and holds them.
+ */
+function findHelpersFile(bundle: Rolldown.OutputBundle): string | undefined {
+  for (const item of Object.values(bundle)) {
+    if (item.type === 'chunk' && !item.isEntry && item.moduleIds.includes(HELPERS_ID)) {
+      return item.fileName;
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -488,9 +519,12 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
         }
       }
     }
-    // The server writes the build id on the state script and drops it from the chunk map.
-    if (all !== undefined && Object.hasOwn(all, BUILD_KEY)) {
-      urls[BUILD_KEY] = all[BUILD_KEY];
+    // The server writes the build id on the state script and drops it from the chunk map. The
+    // helpers URL stays in the map, for the loader.
+    for (const key of [BUILD_KEY, HELPERS_KEY]) {
+      if (all !== undefined && Object.hasOwn(all, key)) {
+        urls[key] = all[key];
+      }
     }
     return urls;
   }
@@ -566,12 +600,18 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
     },
 
     resolveId(source) {
+      if (source === HELPERS_MODULE) {
+        return HELPERS_ID;
+      }
       return source === DEV_LOADER ? DEV_LOADER : undefined;
     },
 
     async load(id) {
       if (id === DEV_LOADER) {
         return { code: "import 'idlip/client';\n", moduleType: 'js' };
+      }
+      if (id === HELPERS_ID) {
+        return { code: printHelpersModule(), moduleType: 'js' };
       }
       const parsed = parseChunkId(id);
       if (parsed === undefined) {
@@ -649,7 +689,11 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
         files.add(file);
         urls[key] = `${base}${file}`;
       }
-      checkChunkImports(this, bundle, files);
+      const helpersFile = findHelpersFile(bundle);
+      if (helpersFile !== undefined) {
+        urls[HELPERS_KEY] = `${base}${helpersFile}`;
+      }
+      checkChunkImports(this, bundle, files, helpersFile);
       if (options.skew !== false) {
         const id = getBuildId(Object.keys(bundle));
         urls[BUILD_KEY] = id;

@@ -16,7 +16,7 @@ test('getChunkName reads dev ids and built file names', () => {
   expect(getChunkName('/assets/counter.source.idle.Afm-GCnA.js')).toBe('source=idle');
   expect(getChunkName('/assets/todo.task.save.Afm-GCnA.js')).toBe('task=save');
   expect(getChunkName('/assets/counter.view.CXUOfqUo.js')).toBe('view');
-  expect(getChunkName('/assets/counter.tsx_idlip-view_lang.DncCKmVA.js')).toBe('view');
+  expect(getChunkName('/assets/_idlip-helpers.DVf3EE9Z.js')).toBe('helpers');
   expect(getChunkName('/src/counter.tsx?idlip-view&lang.js')).toBe('view');
   expect(getChunkName('/assets/loader.CinWKtZa.js')).toBeUndefined();
   expect(getChunkName('/')).toBeUndefined();

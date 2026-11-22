@@ -90,7 +90,10 @@ describe('several components in one file', () => {
   it('adds a private child from a row with its own view chunk', () => {
     const result = compile(WIDGETS, '/src/widgets.tsx');
     const list = findChunk(result, '/src/widgets.tsx', 'list=2');
-    expect(list).toContain("import * as Row from '/src/widgets.tsx?idlip-Row.view&lang.js';");
+    expect(list).toContain(
+      "import { init as $init_Row, render as $render_Row } from '/src/widgets.tsx?idlip-Row.view&lang.js';",
+    );
+    expect(list).toContain('const Row = { init: $init_Row, render: $render_Row };');
     expect(list).toContain("addChild(slot$(path, 1, item.id), '/src/widgets.tsx#Row', Row,");
   });
 

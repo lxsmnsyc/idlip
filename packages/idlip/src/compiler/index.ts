@@ -15,6 +15,7 @@ import type { GenerateOptions } from './view/codegen/index.ts';
 import { readImports, selectComponents } from './view/codegen/components.ts';
 import { planBindings } from './view/codegen/plan.ts';
 
+export { HELPERS_MODULE, printHelpersModule } from '../core/helpers.ts';
 export { compileHandlers, listHandlerProps, pickComponent } from './update/index.ts';
 export type { CompileHandlersResult } from './update/index.ts';
 export * from './view/analyze/index.ts';

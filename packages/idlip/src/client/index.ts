@@ -2,7 +2,8 @@
  * The client runtime that resumes server HTML. Importing it boots the loader, which takes
  * over the events the listener queued. It exports what binding and list chunks import: the
  * patcher, the list patcher, `diffPaths`, `parseHtml` and the block hooks. The DOM and render
- * helpers are copied into the chunks that use them.
+ * helpers are in `idlip/helpers`, one module the chunks share, which the loader loads with the
+ * first chunk.
  */
 import type { Boot, Patch } from '../core/format.ts';
 import { patchList } from './list/index.ts';

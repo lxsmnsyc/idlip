@@ -27,7 +27,7 @@ import * as clientExports from '../client/patch/index.ts';
 import { renderPage } from '../server/render.ts';
 import * as serverExports from '../server/index.ts';
 import { compareTrees } from './compare.ts';
-import { bindImports, toDataUrl } from './modules.ts';
+import { bindImports, importHelpers, toDataUrl } from './modules.ts';
 import type { Scope } from './modules.ts';
 import { setDriver } from './internal.ts';
 import type { MountedChild } from './internal.ts';
@@ -216,6 +216,7 @@ async function start(
       restartSub,
       setProp,
     },
+    helpers: {},
     loaded(chunk) {
       names.push(chunk);
     },
@@ -232,6 +233,8 @@ async function start(
           : `const ${name} = globalThis[${JSON.stringify(key)}].modules[${JSON.stringify(specifier)}];`,
     );
   }
+  // The chunks import their helpers from the module a build would serve.
+  scope.helpers = await importHelpers(key);
   scope.modules = {};
   for (const child of children) {
     // oxlint-disable-next-line no-await-in-loop
