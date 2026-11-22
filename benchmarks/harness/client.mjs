@@ -23,7 +23,7 @@ const CATEGORIES = [
 ];
 
 // What the page shows now, which the checks compare with what it showed before a click.
-function snapshot(page) {
+export function snapshot(page) {
   return page.evaluate(() => {
     const rows = document.querySelectorAll('tbody tr');
     const id = (row) => row?.cells[0].textContent.trim();
@@ -39,7 +39,7 @@ function snapshot(page) {
 
 // Waits until `done(now, before)` holds in the page, then for two frames, so the paint of the
 // change is in the trace.
-async function waitDone(page, done, before) {
+export async function waitDone(page, done, before) {
   await page.waitForFunction(
     ([source, previous]) => {
       const rows = document.querySelectorAll('tbody tr');
