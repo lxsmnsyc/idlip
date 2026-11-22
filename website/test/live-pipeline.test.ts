@@ -255,6 +255,41 @@ describe('the static frames', () => {
     expect(compiled).toMatch(/class="live-module-size">\d+ B</);
   });
 
+  it('serves the chunks of every component of a file', async () => {
+    outDir = mkdtempSync(path.join(tmpdir(), 'live-'));
+    const source = `export function Counter(props: { start: number }) {
+  let count = props.start;
+  function increment() {
+    count = count + 1;
+  }
+  return <button on:click={increment}>{count}</button>;
+}
+
+export default function Panel() {
+  let title = 'Counters';
+  function rename() {
+    title = title + '!';
+  }
+  return (
+    <section>
+      <h2 on:click={rename}>{title}</h2>
+      <Counter start={1} />
+    </section>
+  );
+}
+`;
+    await prebuildLiveSamples(
+      [{ file: 'docs/x.md', id: 'x-3', files: [{ name: 'panel.tsx', source }] }],
+      { outDir, base: '/', runtime: '/assets/runtime.js' },
+    );
+    const folder = path.join(outDir, 'live', 'x-3');
+    expect(readdirSync(folder)).toContain('panel.Counter.handler.increment.js');
+    const page = readFileSync(path.join(folder, 'index.html'), 'utf8');
+    // The state points the chunk of the named component at its file in the frame folder.
+    expect(page).toContain('/live/x-3/panel.Counter.handler.increment.js');
+    expect(page).not.toContain('idlip-Counter.handler=increment&lang.js\\":\\"/src/');
+  });
+
   it('fails on a sample that does not render', async () => {
     outDir = mkdtempSync(path.join(tmpdir(), 'live-'));
     const source =

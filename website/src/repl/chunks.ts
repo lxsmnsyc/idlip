@@ -2,6 +2,34 @@
 // The REPL page runs it, so it imports no compiler and no runtime.
 import type { CompiledFile, Project } from './project.ts';
 
+/** A client chunk of a file, named as the module ids name it. */
+export interface FileChunk {
+  /** `handler=increment` for the default export, `Counter.handler=increment` for `Counter`. */
+  chunk: string;
+  code: string;
+}
+
+/**
+ * The client chunks of every component of a file. A file with several components names the
+ * chunks of the others after the component: `/src/panel.tsx?idlip-Counter.handler=increment`.
+ */
+export function listFileChunks(file: CompiledFile): FileChunk[] {
+  const chunks: FileChunk[] = [];
+  for (const module of file.result.client) {
+    chunks.push({ chunk: module.chunk, code: module.code });
+  }
+  for (const component of file.result.components ?? []) {
+    const name = /#([A-Z][^#?/.]*)$/.exec(component.manifest.module)?.[1];
+    for (const module of component.client) {
+      chunks.push({
+        chunk: name === undefined ? module.chunk : `${name}.${module.chunk}`,
+        code: module.code,
+      });
+    }
+  }
+  return chunks;
+}
+
 /** A client chunk as a run serves it. */
 export interface ServedChunk {
   /** The file that the chunk comes from. */
@@ -56,7 +84,7 @@ export function writeFrameShim(project: Project): string {
   const names = new Set<string>();
   const imports = /import\s*\{([^}]*)\}\s*from\s*'idlip(?:\/client)?'/g;
   for (const file of project.files) {
-    for (const module of file.result.client) {
+    for (const module of listFileChunks(file)) {
       for (const match of module.code.matchAll(imports)) {
         addNames(names, match[1]);
       }
@@ -74,7 +102,7 @@ export function listChunks(project: Project, folder: string, runtime: string): S
   const chunks: ServedChunk[] = [];
   const taken = new Set<string>();
   for (const file of project.files) {
-    for (const module of file.result.client) {
+    for (const module of listFileChunks(file)) {
       let path = getChunkPath(file.name, module.chunk);
       // Two chunk names can share a file name once `*` and other marks become `_`.
       for (let count = 2; taken.has(path); count++) {

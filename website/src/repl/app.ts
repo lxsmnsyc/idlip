@@ -3,6 +3,7 @@
 // compiles the files in the REPL worker and, when they compile, runs them in the frame. Files
 // from a share link only compile until the reader chooses Run.
 import type { NetworkPanel, watchFrame } from '../client/lib/network.ts';
+import { listFileChunks } from './chunks.ts';
 import { createEditor } from './editor.ts';
 import { EXAMPLES } from './examples.ts';
 import {
@@ -428,7 +429,7 @@ export function startRepl(root: HTMLElement, watch: typeof watchFrame): void {
           file.result.server,
         );
       }
-      for (const chunk of file.result.client) {
+      for (const chunk of listFileChunks(file)) {
         js += renderModule(
           `${file.name}: ${chunk.chunk}`,
           paths.get(`${file.name}\0${chunk.chunk}`) ?? '',

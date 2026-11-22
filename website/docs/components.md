@@ -192,7 +192,7 @@ A file can hold more than one component. Each of these is a component with its o
 - **Each named export**, such as `export function Counter()`.
 - **A component that is not exported** and that one of the above renders, such as `<Row />`.
 
-```tsx
+```tsx live
 import type { JSX } from 'idlip/jsx-runtime';
 
 export function Counter(props: { start: number }): JSX.Element {

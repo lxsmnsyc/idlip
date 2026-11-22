@@ -1,6 +1,7 @@
 // The Compiled tab of a live sample: the server module and each client chunk, with its gzip size.
 // The site build writes it for the code as the page ships it, and the page writes it again after
 // an edit. It takes code that is already highlighted, so it pulls in no highlighter.
+import { listFileChunks } from '../repl/chunks.ts';
 import type { ServedChunk } from '../repl/chunks.ts';
 import REPL_ICON from '../repl/icons.ts';
 import type { Project } from '../repl/project.ts';
@@ -22,6 +23,17 @@ export interface CompiledRow {
   html: string;
 }
 
+/** When a client chunk loads, by its name. */
+function describeChunk(chunk: string): string {
+  if (chunk.includes('handler=')) {
+    return 'loads on its event';
+  }
+  // A child's view chunk renders a new child that the parent adds in the browser.
+  return chunk === 'view' || chunk.endsWith('.view')
+    ? 'loads for a new child'
+    : 'loads when its value changes';
+}
+
 /** The modules of a project, named as the run serves them. */
 export function listCompiledModules(
   project: Project,
@@ -40,12 +52,10 @@ export function listCompiledModules(
         code: file.result.server,
       });
     }
-    for (const chunk of file.result.client) {
+    for (const chunk of listFileChunks(file)) {
       modules.push({
         title: paths.get(`${file.name}\0${chunk.chunk}`) ?? `${file.name} ${chunk.chunk}`,
-        note: chunk.chunk.startsWith('handler')
-          ? 'loads on its event'
-          : 'loads when its value changes',
+        note: describeChunk(chunk.chunk),
         code: chunk.code,
       });
     }
