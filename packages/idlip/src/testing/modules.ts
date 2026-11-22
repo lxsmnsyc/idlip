@@ -36,6 +36,8 @@ export function toDataUrl(code: string): string {
 export interface Scope {
   server: Record<string, unknown>;
   client: Record<string, unknown>;
+  /** The server modules of the children, by the specifier a module imports them with. */
+  modules?: Record<string, unknown>;
   /** Called by a chunk when it is evaluated. */
   loaded: (chunk: string) => void;
 }
