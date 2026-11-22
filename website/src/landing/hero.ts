@@ -5,9 +5,9 @@
 // message and path comes from the demo build (`DemoData`). The server writes the still frame
 // (`STILL_AT`), which is what shows without JS and with reduced motion. `src/client/hero.ts`
 // plays the story and lets the visitor click and scrub.
-import type { DemoData } from '../demo/data.ts';
+import type { DemoData, DemoFile } from '../demo/data.ts';
 import { ICON, escape } from '../layout.ts';
-import { formatBytes } from './format.ts';
+import { formatBytes, sumGzip } from './format.ts';
 
 /**
  * The story on a 0 to 1 timeline. The client reads these from `data-story`, so the server markup
@@ -18,14 +18,14 @@ export const STORY_AT = {
   modeled: 0.17,
   rendered: 0.2,
   seal: 0.23,
-  load: 0.3,
+  load: 0.29,
   aim: 0.36,
-  click: 0.44,
-  unfold: 0.455,
-  update: 0.49,
-  model: 0.56,
-  view: 0.63,
-  patch: 0.67,
+  click: 0.45,
+  unfold: 0.465,
+  update: 0.5,
+  model: 0.57,
+  view: 0.64,
+  patch: 0.68,
   fold: 0.8,
 };
 
@@ -43,17 +43,18 @@ export const STORY_CLASSES = [
   'fold',
 ] as const;
 
-/** The still frame: the loop has run and is still open beside the todo block. */
+/** The still frame, where the autoplay stops: the loop has run and is still open beside the todo. */
 export const STILL_AT = 0.74;
 
-/** The todo the click flips: the first one not done, else the first one. */
-function findClicked(todos: DemoData['todos']): number {
-  for (const [index, todo] of todos.entries()) {
-    if (!todo.done) {
+/** The todo the click flips: the one whose id the checkbox message names. */
+export function findClicked(demo: DemoData): number {
+  const id = readArgs(demo.token)[0];
+  for (const [index, todo] of demo.todos.entries()) {
+    if (todo.id === id) {
       return index;
     }
   }
-  return 0;
+  throw new Error(`The demo has no todo with the id ${id} of ${demo.token}`);
 }
 
 function countLeft(todos: DemoData['todos'], flip: number): number {
@@ -139,22 +140,44 @@ const BLOCKS = [
 function renderRow(todo: DemoData['todos'][number], index: number, flip: number): string {
   const clicked = index === flip;
   const done = clicked ? !todo.done : todo.done;
-  // The pointer of the autoplay sits on the row it clicks.
+  // The row the autoplay clicks has its pointer, and the cue shown while the story waits.
   const target = clicked ? ' data-target' : '';
-  const pointer = clicked
-    ? `<span class="hero-pointer" aria-hidden="true">${ICON.pointer}</span>`
+  const extra = clicked
+    ? `<i class="hero-ring"></i><span class="hero-cue" aria-hidden="true">Click it</span><span class="hero-pointer" aria-hidden="true">${ICON.pointer}</span>`
     : '';
-  return `<label class="hero-row" data-row data-rest="${todo.done ? 1 : 0}" style="--done:${done ? 1 : 0}"${target}><input class="visually-hidden" type="checkbox"${done ? ' checked' : ''} disabled><span class="hero-box">${ICON.check}</span><span class="hero-text">${escape(todo.text)}</span><i class="hero-flash"></i>${pointer}</label>`;
+  return `<label class="hero-row" data-row data-rest="${todo.done ? 1 : 0}" style="--done:${done ? 1 : 0}"${target}><input class="visually-hidden" type="checkbox"${done ? ' checked' : ''} disabled><span class="hero-box">${ICON.check}</span><span class="hero-text">${escape(todo.text)}</span><i class="hero-flash"></i>${extra}</label>`;
 }
 
 /** A chunk chip of a step: the short name, the size, and the full name as a tooltip. */
-function renderChip(name: string, gzip: number): string {
-  return `<span class="hero-chip" title="${escape(name)}">${escape(shortenChunk(name))} <b>${formatBytes(gzip)}</b></span>`;
+function renderChip(file: DemoFile): string {
+  return `<span class="hero-chip" title="${escape(file.name)}">${escape(shortenChunk(file.name))} <b>${formatBytes(file.gzip)}</b></span>`;
+}
+
+/** A file and its size, as the slider and the live line say it. */
+function sayFile(file: DemoFile): string {
+  return `${file.name}, ${formatBytes(file.gzip)}`;
+}
+
+/** The files the click loads at Update: the handler chunk, and the helpers when the build has them. */
+function listUpdateFiles(demo: DemoData): DemoFile[] {
+  return demo.helpers ? [demo.handler, demo.helpers] : [demo.handler];
+}
+
+/** Joins words as a list: `a`, `a and b`, `a, b and c`. */
+function joinList(items: string[]): string {
+  if (items.length < 2) {
+    return items.join('');
+  }
+  return `${items.slice(0, -1).join(', ')} and ${items.at(-1) ?? ''}`;
 }
 
 /** The texts of the timeline slider, by the time each one starts. */
 function writeSteps(demo: DemoData, path: string, before: boolean): [number, string][] {
-  const loaded = formatBytes(demo.handler.gzip + demo.binding.gzip);
+  const loaded = formatBytes(sumGzip([...listUpdateFiles(demo), demo.binding]));
+  const update: string[] = [];
+  for (const file of listUpdateFiles(demo)) {
+    update.push(sayFile(file));
+  }
   return [
     [0, 'The server renders the page'],
     [STORY_AT.seal, 'The server writes the state into the page'],
@@ -162,10 +185,10 @@ function writeSteps(demo: DemoData, path: string, before: boolean): [number, str
       STORY_AT.load,
       `Page loaded with ${demo.loader.name}, ${formatBytes(demo.loader.gzip)}. No component code ran`,
     ],
-    [STORY_AT.click, `Click. Update loads ${demo.handler.name}, ${formatBytes(demo.handler.gzip)}`],
+    [STORY_AT.click, `Click. Update loads ${joinList(update)}`],
     [STORY_AT.model, `Model: ${path} turns ${String(!before)}`],
-    [STORY_AT.view, `View loads ${demo.binding.name}, ${formatBytes(demo.binding.gzip)}`],
-    [STORY_AT.patch, `One row and the count changed. ${loaded} of component code loaded`],
+    [STORY_AT.view, `View loads ${sayFile(demo.binding)}`],
+    [STORY_AT.patch, `One row and the count changed. The click loaded ${loaded}`],
   ];
 }
 
@@ -182,13 +205,18 @@ function findStep(steps: [number, string][], at: number): string {
 
 /** The picture: the browser frame with the page and the todo app, and the timeline. */
 export function renderHeroStage(demo: DemoData): string {
-  const flip = findClicked(demo.todos);
-  const before = demo.todos[flip]?.done ?? false;
+  const flip = findClicked(demo);
+  const before = demo.todos[flip].done;
   const args = readArgs(demo.token);
   const path = nameChangedPath(demo.writes, flip);
-  const handler = formatBytes(demo.handler.gzip);
-  const loaded = formatBytes(demo.handler.gzip + demo.binding.gzip);
+  const updateFiles = listUpdateFiles(demo);
+  const updated = formatBytes(sumGzip(updateFiles));
+  const loaded = formatBytes(sumGzip([...updateFiles, demo.binding]));
   const steps = writeSteps(demo, path, before);
+  const said: string[] = [];
+  for (const file of [...updateFiles, demo.binding]) {
+    said.push(sayFile(file));
+  }
 
   // The classes and the timeline of the still frame.
   let classes = 'hero-stage';
@@ -203,7 +231,7 @@ export function renderHeroStage(demo: DemoData): string {
     still: STILL_AT,
     steps,
     live: {
-      first: `Loaded ${demo.handler.name}, ${handler}, and ${demo.binding.name}, ${formatBytes(demo.binding.gzip)}. One row and the count changed.`,
+      first: `Loaded ${joinList(said)}: ${loaded}. One row and the count changed.`,
       later: 'Already loaded.',
     },
   };
@@ -242,15 +270,15 @@ export function renderHeroStage(demo: DemoData): string {
       </div>
       <div class="hero-seal" aria-hidden="true"><span class="hero-seal-open">${ICON_MODEL}model</span><span class="hero-seal-shut">${ICON.lock}<code>${escape(readStateTag(demo.state))}</code></span></div>
       <div class="hero-strip" aria-hidden="true">
-        <div class="hero-step s-update"><div class="hero-step-head"><span class="hero-step-name">${ICON_LOOP}Update</span>${renderChip(demo.handler.name, demo.handler.gzip)}</div><code class="hero-step-body">${highlightMessage(demo.token)}</code></div>
+        <div class="hero-step s-update"><div class="hero-step-head"><span class="hero-step-name">${ICON_LOOP}Update</span>${renderChip(demo.handler)}</div><code class="hero-step-body">${highlightMessage(demo.token)}</code>${demo.helpers ? `<div class="hero-step-more">${renderChip(demo.helpers)}</div>` : ''}</div>
         <div class="hero-step s-model"><div class="hero-step-head"><span class="hero-step-name">${ICON_MODEL}Model</span></div><code class="hero-step-body"><span class="hero-path">${escape(path)}</span><span>${String(before)}</span>${ICON_TO}<span class="hero-val"><span class="v-was">${String(before)}</span><span class="v-now">${String(!before)}</span></span></code></div>
-        <div class="hero-step s-view"><div class="hero-step-head"><span class="hero-step-name">${ICON_VIEW}View</span>${renderChip(demo.binding.name, demo.binding.gzip)}</div><code class="hero-step-body"><span class="hero-path">row ${escape(args[0] ?? '')}, count</span></code></div>
+        <div class="hero-step s-view"><div class="hero-step-head"><span class="hero-step-name">${ICON_VIEW}View</span>${renderChip(demo.binding)}</div><code class="hero-step-body"><span class="hero-path">row ${escape(args[0] ?? '')}, count</span></code></div>
       </div>
       <i class="hero-scan"></i>
     </div>
   </div>
   <div class="hero-timeline">
-    <div class="hero-tl-head" aria-hidden="true"><p class="hero-tl-title">Component code loaded</p><p class="hero-tl-value"><i class="hero-cached">cached</i><span class="hero-vals"><span class="v0">0 B</span><span class="v1">${handler}</span><span class="v2">${loaded}</span></span></p></div>
+    <div class="hero-tl-head" aria-hidden="true"><p class="hero-tl-title">Code loaded on click</p><p class="hero-tl-value"><i class="hero-cached">cached</i><span class="hero-vals"><span class="v0">0 B</span><span class="v1">${updated}</span><span class="v2">${loaded}</span></span></p></div>
     <div class="hero-track" data-scrub>
       <i class="hero-base" style="--at:${STORY_AT.update}"></i><i class="hero-area" style="--at:${STORY_AT.update}"></i>${ticks}
       <i class="hero-mask"></i>

@@ -35,8 +35,8 @@ const demo: DemoData = {
   state:
     '<script i-state>(self.$idlip||=[]).push(["click",()=>({manifest:{},model:{todos:[]},props:{}})])</script>',
   todos: [
-    { text: 'One', done: true },
-    { text: 'Two', done: false },
+    { id: 'a1', text: 'One', done: true },
+    { id: 'a2', text: 'Two', done: false },
   ],
 };
 

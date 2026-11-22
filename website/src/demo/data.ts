@@ -32,6 +32,11 @@ export interface DemoData {
   handler: DemoFile;
   /** The binding chunk of the path that handler writes. */
   binding: DemoFile;
+  /**
+   * The shared helpers module (`_idlip-helpers.js`). The loader fetches it with the first
+   * handler. Absent when the build has no shared helpers.
+   */
+  helpers?: DemoFile;
   /** Every handler, binding and list chunk: the component code of the app. */
   chunks: DemoFile[];
   /** The handler the second checkbox names, such as `toggle`. */
@@ -44,6 +49,6 @@ export interface DemoData {
   row: string;
   /** The `<script i-state>` element. */
   state: string;
-  /** The todos of the first render, by text and done. */
-  todos: { text: string; done: boolean }[];
+  /** The todos of the first render: the id their checkbox message names, the text and done. */
+  todos: { id: string; text: string; done: boolean }[];
 }

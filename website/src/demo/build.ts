@@ -99,15 +99,27 @@ function findChunkFile(output: ReadonlyMap<string, string>, chunk: string): stri
   return found[0];
 }
 
-/** Reads the todos of the first render from the markup: the text of each row and its checkbox. */
-function readTodos(body: string): { text: string; done: boolean }[] {
-  const todos: { text: string; done: boolean }[] = [];
+/** The first argument of a checkbox message: `a2` in `["toggle",["a2"]]`. */
+function readMessageId(token: string): string {
+  const message: unknown = JSON.parse(token);
+  const args: unknown = Array.isArray(message) ? message[1] : undefined;
+  return Array.isArray(args) && typeof args[0] === 'string' ? args[0] : '';
+}
+
+/**
+ * Reads the todos of the first render from the markup: the id the checkbox message names, the
+ * text of each row and its checkbox.
+ */
+function readTodos(body: string): { id: string; text: string; done: boolean }[] {
+  const todos: { id: string; text: string; done: boolean }[] = [];
   for (const match of body.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/g)) {
     const text = /<!--t\d+-->([\s\S]*?)<!--\/t-->/.exec(match[1])?.[1];
-    if (text === undefined) {
-      throw new Error(`The demo row has no text binding: ${match[0]}`);
+    const token = /on:click='([^']*)'/.exec(match[1])?.[1];
+    if (text === undefined || token === undefined) {
+      throw new Error(`The demo row has no text binding or no message: ${match[0]}`);
     }
     todos.push({
+      id: readMessageId(token),
       text: text.replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&amp;', '&'),
       done: /\bchecked\b/.test(match[1]),
     });
@@ -222,6 +234,11 @@ export async function buildDemo(outDir: string, base: string): Promise<DemoData>
     throw new Error(`The ${group.chunk} chunk no longer patches the row and the count`);
   }
 
+  // The loader fetches the shared helpers with the first handler, so a click loads them too.
+  const helpersUrl = /[{,]"?helpers"?:"([^"]+)"/.exec(body)?.[1];
+  const helpers =
+    helpersUrl === undefined ? undefined : findFile(files, helpersUrl.slice(base.length));
+
   const data: DemoData = {
     frame: 'demo/',
     document: measure(page, 'demo/', 'demo/'),
@@ -233,6 +250,7 @@ export async function buildDemo(outDir: string, base: string): Promise<DemoData>
     loader,
     handler: findFile(files, `demo/${handlerFile}`),
     binding: findFile(files, `demo/${bindingFile}`),
+    helpers,
     chunks,
     handlerName,
     token,

@@ -34,13 +34,14 @@ interface Story {
 }
 
 type Phase =
-  // Plays to the end and clicks the todo by itself.
+  // Plays to the still frame and clicks the todo by itself.
   | { kind: 'auto' }
-  // The visitor has a hand on the picture: it plays up to the pointer and waits for their click.
+  // The visitor's hand is on the page: it plays up to the pointer, shows a cue on the todo and
+  // waits for their click.
   | { kind: 'hands-on' }
-  // The visitor clicked the todo: the loop plays to the end, with no pointer.
+  // The visitor clicked the todo: the loop plays to the still frame, with no pointer.
   | { kind: 'replay' }
-  // Stopped: at the end, with reduced motion, or where the visitor scrubbed to.
+  // Stopped: at the still frame, with reduced motion, or where the visitor scrubbed to.
   | { kind: 'still' };
 
 /** How long the story takes from 0 to 1, in milliseconds. */
@@ -55,6 +56,8 @@ const KEY_STEPS = new Map([
   ['ArrowDown', -0.02],
   ['ArrowRight', 0.02],
   ['ArrowUp', 0.02],
+  ['PageDown', -0.1],
+  ['PageUp', 0.1],
   ['Home', -1],
   ['End', 1],
 ]);
@@ -88,6 +91,7 @@ function start(stage: HTMLElement, story: Story): void {
   const count = stage.querySelector<HTMLElement>('[data-left]');
   const knob = stage.querySelector<HTMLButtonElement>('.hero-knob');
   const track = stage.querySelector<HTMLElement>('[data-scrub]');
+  const frameBox = stage.querySelector<HTMLElement>('.hero-frame');
   const cached = stage.querySelector<HTMLElement>('.hero-cached');
   const rows: HTMLElement[] = [];
   const inputs: HTMLInputElement[] = [];
@@ -115,7 +119,7 @@ function start(stage: HTMLElement, story: Story): void {
   let last = 0;
   let frame = 0;
   let offscreen = false;
-  let announced = reduced;
+  let announced = false;
   let hitTimer: ReturnType<typeof setTimeout> | undefined;
 
   /** Draws the picture at `t`: custom properties per frame, classes per moment, and the rows. */
@@ -155,6 +159,7 @@ function start(stage: HTMLElement, story: Story): void {
       stage.classList.toggle(`on-${name}`, t >= at[name]);
     }
     stage.classList.toggle('on-press', t >= at.click - 0.012 && t < at.click + 0.012);
+    stage.classList.toggle('is-waiting', phase.kind === 'hands-on' && t >= at.load);
     let step = 'click';
     if (t < at.load) {
       step = 'render';
@@ -202,7 +207,7 @@ function start(stage: HTMLElement, story: Story): void {
     if (phase.kind === 'still') {
       return undefined;
     }
-    return phase.kind === 'hands-on' ? Math.max(t, at.aim) : 1;
+    return phase.kind === 'hands-on' ? Math.max(t, at.aim) : story.still;
   }
 
   function tick(now: number): void {
@@ -221,7 +226,7 @@ function start(stage: HTMLElement, story: Story): void {
       announced = true;
       announce(story.live.first);
     }
-    if (t >= 1) {
+    if (t >= end && phase.kind !== 'hands-on') {
       phase = { kind: 'still' };
     }
     render();
@@ -243,7 +248,7 @@ function start(stage: HTMLElement, story: Story): void {
     last = 0;
   }
 
-  /** A hand on the picture, from a pointer or the keyboard, ends the click by itself for good. */
+  /** A hand on the page, from a pointer or the keyboard, ends the click by itself for good. */
   function takeHands(): void {
     if (phase.kind === 'auto') {
       phase = t < at.click ? { kind: 'hands-on' } : { kind: 'replay' };
@@ -290,11 +295,17 @@ function start(stage: HTMLElement, story: Story): void {
       return;
     }
 
-    // A later click flips the row with the chunks already loaded.
+    // A click after the loop flips the row. Unless the story already said what loaded (it starts
+    // at the still frame with reduced motion), the first one says it, and later ones are cached.
     after[index] = !after[index];
     render();
-    showCached(rows[index]);
-    announce(story.live.later);
+    if (announced) {
+      showCached(rows[index]);
+      announce(story.live.later);
+    } else {
+      announced = true;
+      announce(story.live.first);
+    }
   }
 
   // The rows and the slider take input from now on.
@@ -304,9 +315,17 @@ function start(stage: HTMLElement, story: Story): void {
       handleClick(event, index);
     });
   }
-  stage.addEventListener('focusin', takeHands);
-  stage.addEventListener('pointerenter', takeHands);
-  stage.addEventListener('pointerdown', takeHands);
+  // A mouse over the page, focus on a todo, or a press on a todo is a hand. A touch that only
+  // scrolls past, and anything on the timeline, is not.
+  frameBox?.addEventListener('pointerenter', (event) => {
+    if (event.pointerType !== 'touch') {
+      takeHands();
+    }
+  });
+  frameBox?.addEventListener('focusin', takeHands);
+  for (const row of rows) {
+    row.addEventListener('pointerdown', takeHands);
+  }
 
   // Scrubbing: drag the knob or the track. The story stays where it is let go.
   function listenScrub(area: HTMLElement): void {

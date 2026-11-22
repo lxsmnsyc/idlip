@@ -1603,7 +1603,7 @@ html:not(.js) .install-tabs {
    custom properties (`--t`, `--pass`, `--dim`, `--lift`, `--open`, `--come`, `--pointer`,
    `--scan`) and an `on-<moment>` class per moment, so the class changes are transitions that
    reverse when the timeline is scrubbed back. The defaults below are the still frame, which is
-   what shows without the script and with reduced motion. Below a stage width of 30rem the page
+   what shows without the script and with reduced motion. Below a stage width of 32rem the page
    stacks: the todo app on top and its loop under it. */
 
 .hero-stage {
@@ -1648,11 +1648,11 @@ html:not(.js) .install-tabs {
 
 /* The browser frame. `--ph` is the height of the page under the bar, for the scan. */
 .hero-frame {
-  --ph: 252;
+  --ph: 280;
   --sl: 16px;
   --sw: calc(100% - 240px);
   position: relative;
-  height: 288px;
+  height: 316px;
   overflow: hidden;
   border-radius: var(--radius-md);
   background: var(--bg-elevated);
@@ -1686,13 +1686,13 @@ html:not(.js) .install-tabs {
   display: inline-flex;
   gap: 6px;
   align-items: center;
-  height: 22px;
+  height: 24px;
   padding: 0 10px;
   border-radius: var(--radius);
   background: var(--surface);
   color: var(--muted);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--text-xs);
   white-space: nowrap;
   opacity: 0;
   transform: translateY(-6px);
@@ -1832,7 +1832,7 @@ html:not(.js) .install-tabs {
   --y: 172;
   top: 208px;
   width: var(--sw);
-  height: 60px;
+  height: 88px;
   border-radius: var(--radius-row);
   background:
     repeating-linear-gradient(
@@ -1983,7 +1983,7 @@ html:not(.js) .install-tabs {
   position: absolute;
   inset: -3px;
   border-radius: 13px;
-  outline: 3px solid var(--accent-fill);
+  outline: 3px solid var(--accent-strong);
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--duration) var(--ease-out);
@@ -2026,6 +2026,56 @@ html:not(.js) .install-tabs {
   transform: scale(0.88);
 }
 
+/* The cue while the story waits for the visitor's click: a ring that pulses and a label. */
+.hero-ring {
+  position: absolute;
+  inset: -3px;
+  border-radius: 13px;
+  outline: 3px solid var(--accent-strong);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hero-cue {
+  position: absolute;
+  top: 50%;
+  right: calc(100% + 8px);
+  z-index: 3;
+  padding: 2px 10px;
+  border-radius: var(--radius);
+  background: var(--text);
+  color: var(--bg-elevated);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(6px, -50%);
+  transition:
+    opacity var(--duration) var(--ease-out),
+    transform var(--duration) var(--ease-out);
+}
+
+.is-waiting .hero-ring {
+  animation: hero-pulse 1.6s var(--ease-out) infinite;
+}
+
+.is-waiting .hero-cue {
+  opacity: 1;
+  transform: translate(0, -50%);
+}
+
+@keyframes hero-pulse {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
 /* The state the server wrote into the page: the model, then the `<script i-state>` element. */
 .hero-seal {
   position: absolute;
@@ -2033,13 +2083,13 @@ html:not(.js) .install-tabs {
   left: calc(100% - 208px);
   display: grid;
   place-items: center;
-  height: 24px;
+  height: 26px;
   padding: 0 10px;
   border-radius: var(--radius);
   background: var(--surface);
   color: var(--muted);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--text-xs);
   white-space: nowrap;
   opacity: 0;
   transform: translateY(-4px) scale(0.92);
@@ -2132,7 +2182,7 @@ html:not(.js) .install-tabs {
   gap: 8px;
   align-items: center;
   justify-content: space-between;
-  height: 20px;
+  height: 22px;
 }
 
 .hero-step-name {
@@ -2152,9 +2202,9 @@ html:not(.js) .install-tabs {
   display: flex;
   gap: 6px;
   align-items: center;
-  height: 16px;
+  height: 18px;
   overflow: hidden;
-  font-size: 10px;
+  font-size: var(--text-xs);
   white-space: nowrap;
 }
 
@@ -2171,13 +2221,13 @@ html:not(.js) .install-tabs {
   display: inline-flex;
   gap: 6px;
   align-items: center;
-  height: 20px;
+  height: 22px;
   padding: 0 8px;
   border-radius: var(--radius);
   background: var(--accent-fill);
   color: var(--on-accent);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--text-xs);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
   opacity: 0;
@@ -2191,7 +2241,17 @@ html:not(.js) .install-tabs {
 .on-view .s-view .hero-chip {
   opacity: 1;
   transform: none;
-  transition-delay: 120ms;
+}
+
+/* The helpers module loads with the first handler, on a line of its own. */
+.hero-step-more {
+  display: flex;
+  height: 22px;
+}
+
+.on-update .s-update .hero-step-more .hero-chip {
+  opacity: 1;
+  transform: none;
 }
 
 .hero-val {
@@ -2218,13 +2278,11 @@ html:not(.js) .install-tabs {
 .on-model .v-now {
   opacity: 1;
   transform: none;
-  transition-delay: 200ms;
 }
 
 .on-model .v-was {
   opacity: 0;
   transform: translateY(-6px);
-  transition-delay: 200ms;
 }
 
 /* The scan of the server render: one pass, top to bottom. */
@@ -2275,8 +2333,7 @@ html:not(.js) .install-tabs {
 .hero-tl-title {
   margin: 0;
   color: var(--on-ink-muted);
-  font-family: var(--mono);
-  font-size: 10px;
+  font-size: var(--text-xs);
 }
 
 .hero-tl-value {
@@ -2350,7 +2407,6 @@ html:not(.js) .install-tabs {
   left: 20px;
   height: 60px;
   cursor: pointer;
-  touch-action: none;
 }
 
 .hero-base,
@@ -2397,8 +2453,7 @@ html:not(.js) .install-tabs {
   left: calc(var(--at) * 100%);
   margin-left: -3px;
   color: var(--on-ink-muted);
-  font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--text-xs);
   line-height: 16px;
   white-space: nowrap;
   transition: color var(--duration);
@@ -2483,7 +2538,7 @@ html:not(.js) .install-tabs {
 }
 
 .hero-knob:focus-visible {
-  outline: 3px solid var(--accent-fill);
+  outline: 3px solid var(--on-ink);
   outline-offset: -8px;
 }
 
@@ -2495,12 +2550,12 @@ html:not(.js) .install-tabs {
 }
 
 /* A narrow stage: the todo app on top, its loop under it, and fewer blocks in the header. */
-@container (max-width: 30rem) {
+@container (max-width: 32rem) {
   .hero-frame {
-    --ph: 416;
+    --ph: 460;
     --sl: 12px;
     --sw: calc(100% - 24px);
-    height: 452px;
+    height: 496px;
   }
 
   .b-nav-2,
@@ -2522,40 +2577,45 @@ html:not(.js) .install-tabs {
   }
 
   .hero-strip {
-    top: 276px;
+    top: 282px;
     transform: translateY(-12px) scale(0.96);
     transform-origin: 50% 0;
   }
 
   .b-line-1 {
-    --y: 240;
-    top: 276px;
+    --y: 246;
+    top: 282px;
   }
 
   .b-line-2 {
-    --y: 266;
-    top: 302px;
+    --y: 272;
+    top: 308px;
   }
 
   .b-text-1 {
-    --y: 300;
-    top: 336px;
+    --y: 306;
+    top: 342px;
   }
 
   .b-text-2 {
-    --y: 314;
-    top: 350px;
+    --y: 320;
+    top: 356px;
   }
 
   .b-text-3 {
-    --y: 328;
-    top: 364px;
+    --y: 334;
+    top: 370px;
   }
 
   .hero-blk.b-media {
-    --y: 348;
-    top: 384px;
-    height: 56px;
+    --y: 354;
+    top: 390px;
+    height: 90px;
+  }
+
+  .hero-cue {
+    right: 10px;
+    left: auto;
   }
 }
 
