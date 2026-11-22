@@ -294,6 +294,8 @@ export interface ListChunk {
   /** The key of an item, for a list whose manifest entry has no `key` field. */
   readonly key?: (item: unknown) => unknown;
   readonly namespace?: 'svg' | 'mathml';
+  /** Set when a cloned row holds a block, so the block hooks run once the row is in the page. */
+  readonly blocks?: true;
 }
 
 /** Loads a chunk of a module: imports the URL the state record gives for its id. */

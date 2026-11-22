@@ -75,6 +75,32 @@ export const SUBJECTS: readonly Subject[] = [
     },
   },
   {
+    // Conditions and lists inside cloned rows and branches.
+    name: 'nested-blocks',
+    source: read(import.meta.dirname, 'subjects/nested-blocks.tsx'),
+    props: {
+      mark: true,
+      groups: [
+        {
+          id: 'g1',
+          name: 'First',
+          hot: true,
+          tags: [
+            { id: 't1', label: 'x', on: true },
+            { id: 't2', label: '<y>', on: false },
+          ],
+        },
+        { id: 'g2', name: 'Second', hot: false, tags: [] },
+      ],
+    },
+  },
+  {
+    // The condition that reads only props takes its empty branch: the clone removes its placeholder.
+    name: 'nested-blocks-unmarked',
+    source: read(import.meta.dirname, 'subjects/nested-blocks.tsx'),
+    props: { mark: false, groups: [{ id: 'g1', name: 'First', hot: true, tags: [] }] },
+  },
+  {
     name: 'nested-board',
     source: read(FIXTURES, 'nested/board/board.tsx'),
     props: {

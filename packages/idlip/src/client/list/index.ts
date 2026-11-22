@@ -295,8 +295,9 @@ export async function patchList(...args: Parameters<PatchList>): Promise<void> {
     }
     placed.push({ start: first, end: last });
     inserts[j] = nodes;
-    // The blocks of a parsed row, found before it moves into the page. A cloned row holds none.
-    blocks[j] = cloned ? [] : findInnerBlocks(first, last);
+    // The blocks of a row, found before it moves into the page. The chunk of a cloned row says
+    // whether it holds any.
+    blocks[j] = cloned && !chunk?.blocks ? [] : findInnerBlocks(first, last);
   }
   let before: ChildNode = end;
   for (let j = next.length - 1; j >= 0; j--) {

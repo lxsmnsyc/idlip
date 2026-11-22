@@ -263,37 +263,42 @@ export interface Template {
   readonly h: string;
   /** The number of marks. */
   readonly n: number;
+  /** The namespace the HTML is parsed in, for a body inside `<svg>` or `<math>`. */
+  readonly s?: Namespace;
   /** The parsed content and the path of each mark, by document. */
   m?: WeakMap<Document, { c: ParentNode; p: number[][] }>;
 }
 
 /**
  * Clones a template of static markup in `doc`. Returns the fragment, then the node of each
- * mark: an element with `i-x="<n>"`, or a text node in place of `<!--x<n>-->`. The first call
- * in a document parses the template and finds the marks where the parser put them.
+ * mark: an element with `i-x="<n>"`, a text node in place of `<!--x<n>-->`, or a comment
+ * `<!--<data>x<n>-->` that keeps `<data>`, the start or end of a block. The first call in a
+ * document parses the template and finds the marks where the parser put them.
  */
 export function clone$(template: Template, doc: Document): Node[] {
   template.m ??= new WeakMap();
   let parsed = template.m.get(doc);
   if (parsed === undefined) {
-    const root = parseHtml$(doc, template.h)[0].parentNode!;
+    const root = doc.createDocumentFragment();
+    root.append(...parseHtml$(doc, template.h, template.s));
     const paths: number[][] = [];
     let found = 0;
     const walker = doc.createTreeWalker(root, 129);
     for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
-      const mark = isElement$(node)
-        ? node.getAttribute('i-x')
-        : /^x(\d+)$/.exec(node.nodeValue!)?.[1];
+      const match = isElement$(node) ? null : /^(.*?)x(\d+)$/.exec(node.nodeValue!);
+      const mark = isElement$(node) ? node.getAttribute('i-x') : match?.[2];
       if (mark === null || mark === undefined) {
         continue;
       }
       if (isElement$(node)) {
         node.removeAttribute('i-x');
-      } else {
+      } else if (match![1] === '') {
         const text = doc.createTextNode(' ');
         node.parentNode!.replaceChild(text, node);
         walker.currentNode = text;
         node = text;
+      } else {
+        node.nodeValue = match![1];
       }
       const path: number[] = [];
       for (let at = node; at !== root; at = at.parentNode!) {

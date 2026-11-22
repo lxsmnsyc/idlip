@@ -82,18 +82,18 @@ describe('cloned templates', () => {
       'list=',
     );
     expect(code).toMatch(
-      /const template\$ = \{ h: '<!--i--><li i-x="1"[^>]*><a i-x="2"[^>]*><!--t\d+--><!--x3-->/,
+      /const templateL\d+\$ = \{ h: '<!--i--><li i-x="1"[^>]*><a i-x="2"[^>]*><!--t\d+--><!--x3-->/,
     );
     expect(code).toContain('putAttr$($n[1], ');
     expect(code).toContain("setOn$($n[2], 'click', ['select', [row.id]]);");
   });
 
-  it('renders HTML for a row with a condition and for a static branch', () => {
+  it('clones a row with a condition and a nested list, and renders HTML for a static branch', () => {
     const code = findChunk(
       `
       import { For } from 'idlip';
       export default function App() {
-        let rows = [{ id: 1, on: true }];
+        let rows = [{ id: 1, on: true, tags: [{ id: 2 }] }];
         let open = false;
         function flip() {
           open = !open;
@@ -104,7 +104,12 @@ describe('cloned templates', () => {
             {open && <p>static</p>}
             <ul>
               <For each={rows} key={(row) => row.id}>
-                {(row) => <li>{row.on ? <b>on</b> : 'off'}</li>}
+                {(row) => (
+                  <li>
+                    {row.on ? <b>on</b> : 'off'}
+                    <For each={row.tags} key={(tag) => tag.id}>{(tag) => <i>{tag.id}</i>}</For>
+                  </li>
+                )}
               </For>
             </ul>
           </div>
@@ -113,7 +118,13 @@ describe('cloned templates', () => {
     `,
       'list=',
     );
-    expect(code).not.toContain('clone$');
+    // The condition's start comment and the nested list's end comment are marks.
+    expect(code).toMatch(/<li><!--c\d+:x1--><!--\/c--><!--l\d+--><!--\/lx2--><\/li>/);
+    expect(code).toContain('$n[1].data += 0;');
+    expect(code).toMatch(/for \(const tag of row\.tags\) \{/);
+    expect(code).toContain('$n[2].before(');
+    expect(code).toContain('export const blocks = true;');
+    expect(code).not.toContain('text$(');
     expect(
       findChunk(
         DISCLOSURE.replace('<h2>{title}</h2>', '').replace(' class={{ open }}', ''),
@@ -193,6 +204,10 @@ describe('cloned templates', () => {
     const [fragment, item, text] = clone$(template, document);
     expect(fragment.firstChild).toBe(item);
     expect(text.nodeType).toBe(Node.TEXT_NODE);
+    // A comment mark keeps the data before the mark: the start or end of a block.
+    const [, start, end] = clone$({ h: '<!--c4:x1--><!--/lx2-->', n: 2 }, document);
+    expect(start.nodeValue).toBe('c4:');
+    expect(end.nodeValue).toBe('/l');
     expect(item instanceof Element && item.hasAttribute('i-x')).toBe(false);
     const other = document.implementation.createHTMLDocument('');
     const [, otherItem] = clone$(template, other);

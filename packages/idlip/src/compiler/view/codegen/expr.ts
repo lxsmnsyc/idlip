@@ -34,6 +34,8 @@ export interface Usage {
   views: Map<string, string>;
   /** Whether the code reads the model path of the component it renders. */
   path: boolean;
+  /** Module-level cloned templates by name, such as `templateL3$`, with their declaration. */
+  templates: Map<string, string>;
 }
 
 export function createUsage(): Usage {
@@ -47,6 +49,7 @@ export function createUsage(): Usage {
     loader: new Set(),
     views: new Map(),
     path: false,
+    templates: new Map(),
   };
 }
 
@@ -74,6 +77,9 @@ export function mergeUsage(into: Usage, from: Usage): void {
   }
   for (const [name, id] of from.views) {
     into.views.set(name, id);
+  }
+  for (const [name, code] of from.templates) {
+    into.templates.set(name, code);
   }
   into.path = into.path || from.path;
 }

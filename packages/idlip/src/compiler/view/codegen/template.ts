@@ -1,12 +1,13 @@
-// Cloned templates: a client body of static elements, attributes, events and text holes renders
-// by cloning a `<template>` and writing the values on its marked nodes (`clone$` in
-// `core/helpers.ts`). The clone holds the same nodes the HTML would parse to, markers included,
-// so the patcher and the server render see no difference. Other bodies render HTML.
+// Cloned templates: a client body renders by cloning a parsed template and writing the values
+// on its marked nodes (`clone$` in `core/helpers.ts`). The clone holds the same nodes the HTML
+// would parse to, markers included, so the patcher and the server render see no difference. A
+// block inside a body (a condition or a list) is a marked comment in the template, and the
+// body's writes clone the block's own templates next to it. Other bodies render HTML.
 import type { Component, Node } from '../analyze/index.ts';
 import { getMessage, isFixedMessage } from './events.ts';
 import type { Emitter } from './expr.ts';
 import type { Plan } from './plan.ts';
-import { escapeAttribute, escapeSingleQuoted, escapeText, quote } from './text.ts';
+import { escapeAttribute, escapeSingleQuoted, escapeText, getLocalName, quote } from './text.ts';
 
 const VOID_TAGS = new Set([
   'area',
@@ -43,17 +44,33 @@ const TEXT_PARENT_TAGS = new Set([
   'listing',
 ]);
 
-/** A body that renders by a clone. */
-export interface ClonedBody {
-  /** The static HTML, with `i-x="<n>"` on written elements and `<!--x<n>-->` for written text. */
-  html: string;
-  /** The statements that write the values, on `$n[<n>]`. */
-  writes: string[];
-  /** The number of marks, which `clone$` checks it found. */
-  marks: number;
+type Element = Extract<Node, { kind: 'element' }>;
+
+/** What the builders of one render function share. */
+export interface CloneContext {
+  readonly component: Component;
+  readonly plan: Plan;
+  readonly emitter: Emitter;
+  /** The number of fragment variables (`$n`, `$n2`, ...) the function declared. */
+  variables: number;
 }
 
-type Element = Extract<Node, { kind: 'element' }>;
+/** Makes the context of one render function. */
+export function createCloneContext(
+  component: Component,
+  plan: Plan,
+  emitter: Emitter,
+): CloneContext {
+  return { component, plan, emitter, variables: 0 };
+}
+
+/** The code that builds a body: statements, then an expression of its fragment. */
+export interface BodyCode {
+  pre: string[];
+  expr: string;
+  /** Whether the body holds a block that the block hooks must see once it is in the page. */
+  blocks: boolean;
+}
 
 function isClonedElement(node: Element, component: Component, plan: Plan): boolean {
   // The walk of `clone$` does not enter the content of a nested `<template>`.
@@ -75,6 +92,23 @@ function isClonedElement(node: Element, component: Component, plan: Plan): boole
   return true;
 }
 
+function isClonedBody(
+  nodes: readonly Node[],
+  namespace: string,
+  component: Component,
+  plan: Plan,
+): boolean {
+  if (namespace !== 'html') {
+    return false;
+  }
+  for (const node of nodes) {
+    if (!isCloned(node, '', component, plan)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function isCloned(node: Node, parent: string, component: Component, plan: Plan): boolean {
   switch (node.kind) {
     case 'text':
@@ -83,6 +117,13 @@ function isCloned(node: Node, parent: string, component: Component, plan: Plan):
       return !plan.dynamic.has(node.hole.id) && !TEXT_PARENT_TAGS.has(parent);
     case 'element':
       return isClonedElement(node, component, plan);
+    case 'condition':
+      return (
+        isClonedBody(node.then, node.namespace, component, plan) &&
+        isClonedBody(node.else, node.namespace, component, plan)
+      );
+    case 'for':
+      return isClonedBody(node.body, node.namespace, component, plan);
     default:
       return false;
   }
@@ -92,11 +133,12 @@ class TemplateBuilder {
   html = '';
   writes: string[] = [];
   marks = 0;
+  blocks = false;
 
   constructor(
-    readonly component: Component,
-    readonly plan: Plan,
-    readonly emitter: Emitter,
+    readonly context: CloneContext,
+    /** The variable that holds the fragment and the marked nodes. */
+    readonly variable: string,
   ) {}
 
   addMark(): number {
@@ -104,25 +146,94 @@ class TemplateBuilder {
     return this.marks;
   }
 
-  add(node: Node): void {
-    const { emitter } = this;
+  add(node: Node, parent: string): void {
+    const { emitter } = this.context;
     if (node.kind === 'text') {
       this.html += escapeText(node.value);
     } else if (node.kind === 'text-hole') {
       emitter.at = node.hole.span;
       emitter.usage.helpers.add('putText');
       const mark = this.addMark();
-      this.writes.push(`putText$($n[${mark}], ${emitter.expr(node.hole.expr, 1)});`);
+      this.writes.push(`putText$(${this.variable}[${mark}], ${emitter.expr(node.hole.expr, 1)});`);
       const placeholder = `<!--x${mark}-->`;
       const id = node.hole.id;
-      this.html += this.plan.bound.has(id) ? `<!--t${id}-->${placeholder}<!--/t-->` : placeholder;
+      this.html += this.context.plan.bound.has(id)
+        ? `<!--t${id}-->${placeholder}<!--/t-->`
+        : placeholder;
     } else if (node.kind === 'element') {
       this.addElement(node);
+    } else if (node.kind === 'condition') {
+      this.addCondition(node);
+    } else if (node.kind === 'for') {
+      this.addList(node);
+    } else {
+      throw new Error(`A ${node.kind} node does not clone (parent ${parent})`);
     }
   }
 
+  /**
+   * A bound condition is `<!--c<id>:x<n>--><!--/c-->`: the write appends the branch number to
+   * the start comment and puts the branch after it. An unbound one has no markers, so its
+   * branch replaces a placeholder.
+   */
+  addCondition(node: Extract<Node, { kind: 'condition' }>): void {
+    const { context } = this;
+    const { emitter } = context;
+    const id = node.test.id;
+    const bound = context.plan.bound.has(id);
+    const mark = this.addMark();
+    const target = `${this.variable}[${mark}]`;
+    this.html += bound ? `<!--c${id}:x${mark}--><!--/c-->` : `<!--x${mark}-->`;
+    this.blocks ||= bound;
+    emitter.at = node.test.span;
+    const test = emitter.expr(node.test.expr, 0);
+    const branches: string[][] = [];
+    for (const [branch, nodes] of [node.then, node.else].entries()) {
+      const lines = bound ? [`${target}.data += ${branch};`] : [];
+      if (nodes.length === 0) {
+        if (!bound) {
+          lines.push(`${target}.remove();`);
+        }
+      } else {
+        const body = buildBody(nodes, node.namespace, `templateC${id}_${branch}$`, context);
+        this.blocks ||= body.blocks;
+        lines.push(
+          ...body.pre,
+          bound ? `${target}.after(${body.expr});` : `${target}.replaceWith(${body.expr});`,
+        );
+      }
+      branches.push(lines);
+    }
+    this.writes.push(`if (${test}) {`, ...branches[0], '} else {', ...branches[1], '}');
+  }
+
+  /** A list is `<!--l<id>--><!--/lx<n>-->`: each row is cloned and put before the end comment. */
+  addList(node: Extract<Node, { kind: 'for' }>): void {
+    const { context } = this;
+    const { emitter } = context;
+    const id = node.each.id;
+    const mark = this.addMark();
+    this.html += `<!--l${id}--><!--/lx${mark}-->`;
+    this.blocks = true;
+    emitter.at = node.each.span;
+    // Loop variables stay variables, as in the server render.
+    const each = emitter.expr(node.each.expr, node.index === undefined ? 1 : 17);
+    emitter.frames.push({ item: node.item, index: node.index, row: undefined });
+    const body = buildBody(node.body, node.namespace, `templateL${id}$`, context, true);
+    emitter.frames.pop();
+    const item = getLocalName(node.item);
+    const binding = node.index === undefined ? item : `[${getLocalName(node.index)}, ${item}]`;
+    const source = node.index === undefined ? each : `${each}.entries()`;
+    this.writes.push(
+      `for (const ${binding} of ${source}) {`,
+      ...body.pre,
+      `${this.variable}[${mark}].before(${body.expr});`,
+      '}',
+    );
+  }
+
   addElement(node: Element): void {
-    const { emitter } = this;
+    const { emitter, component, plan } = this.context;
     this.html += `<${node.tag}`;
     // The mark goes after the tag name once the element has its first write.
     const at = this.html.length;
@@ -132,7 +243,7 @@ class TemplateBuilder {
         mark = this.addMark();
         this.html = `${this.html.slice(0, at)} i-x="${mark}"${this.html.slice(at)}`;
       }
-      this.writes.push(print(`$n[${mark}]`));
+      this.writes.push(print(`${this.variable}[${mark}]`));
     };
     for (const attr of node.attrs) {
       if (attr.value.kind === 'static') {
@@ -155,7 +266,7 @@ class TemplateBuilder {
       if (event.target.kind !== 'handler' && event.target.kind !== 'prop') {
         continue;
       }
-      const message = getMessage(this.component, event, emitter);
+      const message = getMessage(component, event, emitter);
       if (message.json === undefined) {
         emitter.usage.helpers.add('setOn');
         write((target) => `setOn$(${target}, ${quote(event.name)}, ${message.code});`);
@@ -172,7 +283,7 @@ class TemplateBuilder {
       const key = emitter.expr(ref.key, 14);
       write((target) => `putAttr$(${target}, 'i-ref', ${quote(`${ref.name} `)} + ${key});`);
     }
-    const ids = this.plan.anchors.get(node);
+    const ids = plan.anchors.get(node);
     if (ids !== undefined) {
       this.html += ` i-a="${ids.join(' ')}"`;
     }
@@ -188,7 +299,7 @@ class TemplateBuilder {
       if (child.kind === 'text' && (node.tag === 'script' || node.tag === 'style')) {
         this.html += child.value;
       } else {
-        this.add(child);
+        this.add(child, node.tag);
       }
     }
     this.html += `</${node.tag}>`;
@@ -196,11 +307,11 @@ class TemplateBuilder {
 }
 
 /**
- * Tells whether a node writes a value on a clone: a hole, a bound attribute, a ref with a key
- * or an event message that reads a value.
+ * Tells whether a node writes a value on a clone: a hole, a bound attribute, a ref with a key,
+ * an event message that reads a value, or a block.
  */
 function hasWrite(node: Node, component: Component): boolean {
-  if (node.kind === 'text-hole') {
+  if (node.kind === 'text-hole' || node.kind === 'condition' || node.kind === 'for') {
     return true;
   }
   if (node.kind !== 'element') {
@@ -229,11 +340,10 @@ function hasWrite(node: Node, component: Component): boolean {
 
 /**
  * Tells whether a client body renders by a clone: it has nodes, sits in HTML, holds only
- * elements, static text and text holes, and writes at least one value. A static body renders
- * HTML: its parse is short, and the copied `clone$` would cost more bytes than it saves. A
- * child, a list, a condition, `<Try>`, `<Subscribe>`, `<Head>`, a global listener, raw HTML, a
- * dynamic hole, a write inside a `<template>`, and a text hole in a text element, a table, a
- * select or a `pre` render HTML.
+ * elements, static text, text holes, and conditions and lists whose bodies clone, and writes
+ * at least one value. A static body renders HTML: its parse is short. A child, `<Try>`,
+ * `<Subscribe>`, `<Head>`, a global listener, raw HTML, a dynamic hole, a write inside a
+ * `<template>`, and a text hole in a text element, a table, a select or a `pre` render HTML.
  */
 export function canClone(
   nodes: readonly Node[],
@@ -241,43 +351,49 @@ export function canClone(
   component: Component,
   plan: Plan,
 ): boolean {
-  if (nodes.length === 0 || namespace !== 'html') {
+  if (nodes.length === 0 || !isClonedBody(nodes, namespace, component, plan)) {
     return false;
   }
-  let writes = false;
   for (const node of nodes) {
-    if (!isCloned(node, '', component, plan)) {
-      return false;
+    if (hasWrite(node, component)) {
+      return true;
     }
-    writes ||= hasWrite(node, component);
   }
-  return writes;
-}
-
-/** Builds the template and writes of a body that `canClone` accepts. */
-export function buildClone(
-  nodes: readonly Node[],
-  component: Component,
-  plan: Plan,
-  emitter: Emitter,
-): ClonedBody {
-  const builder = new TemplateBuilder(component, plan, emitter);
-  for (const node of nodes) {
-    builder.add(node);
-  }
-  emitter.usage.helpers.add('clone');
-  return { html: builder.html, writes: builder.writes, marks: builder.marks };
-}
-
-/** Prints the module-level template `name` of a body, with `html` the body's HTML in full. */
-export function printTemplate(name: string, html: string, body: ClonedBody): string {
-  return `const ${name} = { h: ${quote(html)}, n: ${body.marks} };`;
+  return false;
 }
 
 /**
- * Prints the statements of a render that clones `name` in the document `$doc` and returns the
- * fragment.
+ * Builds the code of a body that `canClone` accepts: the module-level template `name` (added
+ * to the emitter's usage) and the statements that clone it in `$doc` and write the values.
+ * `row` wraps the template in the row markers.
  */
-export function printClone(name: string, body: ClonedBody): string[] {
-  return [`const $n = clone$(${name}, $doc);`, ...body.writes, 'return $n[0];'];
+export function buildBody(
+  nodes: readonly Node[],
+  namespace: string,
+  name: string,
+  context: CloneContext,
+  row = false,
+): BodyCode {
+  const { usage } = context.emitter;
+  context.variables++;
+  const variable = context.variables === 1 ? '$n' : `$n${context.variables}`;
+  const builder = new TemplateBuilder(context, variable);
+  for (const node of nodes) {
+    builder.add(node, '');
+  }
+  const html = row ? `<!--i-->${builder.html}<!--/i-->` : builder.html;
+  const namespaceField = namespace === 'html' ? '' : `, s: ${quote(namespace)}`;
+  usage.templates.set(
+    name,
+    `const ${name} = { h: ${quote(html)}, n: ${builder.marks}${namespaceField} };`,
+  );
+  usage.helpers.add('clone');
+  if (builder.writes.length === 0) {
+    return { pre: [], expr: `clone$(${name}, $doc)[0]`, blocks: builder.blocks };
+  }
+  return {
+    pre: [`const ${variable} = clone$(${name}, $doc);`, ...builder.writes],
+    expr: `${variable}[0]`,
+    blocks: builder.blocks,
+  };
 }
