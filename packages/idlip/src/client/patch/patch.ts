@@ -135,12 +135,9 @@ function readList(binding: Binding, scope: Scope): readonly unknown[] {
  * `patch-lists` provides `patchList`.
  */
 export function createPatch(patchList: PatchList): Patch {
-  return async (page, prev, next) => {
+  const runPatch: Patch = async (page, prev, next) => {
     const { manifest } = page;
     const plan = getPlan(manifest);
-    if (HAS_INNER_LISTS) {
-      added.clear();
-    }
     const selected = selectGroups(manifest, plan, prev, next);
     const changed = HAS_DYNAMIC ? getDynamic(page, prev, next, plan.keys) : [];
     if (HAS_DYNAMIC && changed.length > 0) {
@@ -212,4 +209,15 @@ export function createPatch(patchList: PatchList): Patch {
       }
     }
   };
+  // The blocks a patch adds are its own: the set starts and ends empty. Patches run one at a time.
+  return HAS_INNER_LISTS
+    ? async (page, prev, next) => {
+        added.clear();
+        try {
+          await runPatch(page, prev, next);
+        } finally {
+          added.clear();
+        }
+      }
+    : runPatch;
 }
