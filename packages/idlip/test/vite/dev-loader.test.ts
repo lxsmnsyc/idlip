@@ -15,7 +15,10 @@ describe('the dev loader', () => {
     const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'idlip-dev-loader-')));
     mkdirSync(path.join(root, 'src'));
     // Stands for a chunk that imports from the loader.
-    writeFileSync(path.join(root, 'src/chunk.js'), "import 'idlip/client';\n");
+    writeFileSync(
+      path.join(root, 'src/chunk.js'),
+      "import 'idlip/client';\nimport { setAttr$ } from 'idlip/helpers';\nexport { setAttr$ };\n",
+    );
     const vite = await createServer({
       configFile: false,
       root,
@@ -40,6 +43,15 @@ describe('the dev loader', () => {
       expect(imported).toMatch(/src\/client\/index\.ts$/);
       expect(chunk?.code).toContain(`import "${imported}"`);
       expect(code).not.toContain('resume(');
+      // The helpers module imports the loader from the same URL, so its DOM code and block hooks
+      // are the page's. In dev it loads after the chunk that imports it: one round trip is
+      // build-only.
+      const helpersUrl = /from ["']([^"']*idlip-helpers[^"']*)["']/.exec(chunk?.code ?? '')?.[1];
+      expect(helpersUrl).toBeDefined();
+      const helpers = await fetch(`http://127.0.0.1:${port}${helpersUrl ?? ''}`);
+      const helpersCode = await helpers.text();
+      expect(helpersCode).toMatch(/function setAttr\$\(/);
+      expect(/^import \{[^}]*\} from ["']([^"']+)["']/m.exec(helpersCode)?.[1]).toBe(imported);
     } finally {
       await new Promise((resolve) => {
         http.close(resolve);
