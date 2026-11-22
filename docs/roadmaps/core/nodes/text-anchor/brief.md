@@ -1,7 +1,7 @@
 ---
 id: text-anchor
 title: Patch a bound text that fills an element without comment markers
-status: todo
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: [benchmark]
 fulfilled_by:
 gate: false
 added: 2026-11-22
-spent:
+spent: 297000
 owns:
   - packages/idlip/test/compiler/view/codegen/text-anchor*
 shared:
