@@ -101,6 +101,12 @@ export const SUBJECTS: readonly Subject[] = [
     props: { mark: false, groups: [{ id: 'g1', name: 'First', hot: true, tags: [] }] },
   },
   {
+    // Rows and branches in SVG and MathML that clone in their namespace.
+    name: 'foreign',
+    source: read(import.meta.dirname, 'subjects/foreign.tsx'),
+    props: { title: 'Dots & <lines>' },
+  },
+  {
     name: 'nested-board',
     source: read(FIXTURES, 'nested/board/board.tsx'),
     props: {

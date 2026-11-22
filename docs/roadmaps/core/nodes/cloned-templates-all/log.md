@@ -33,3 +33,11 @@ The `nested-blocks` subject failed on the base, with the HTML path: a click that
 - Goldens: `UPDATE_NESTED=1` in `nesting.test.ts` writes the nested chunks again. `nested/counter/expected/client/view.js` and `nested/board/expected/client/list.2.js` are the compiled output now. The fixture row test prints both sides as nodes (`printRow`) in a happy-dom window, and the reference `addChild` takes the document.
 - Differential subject `cloned-children` (child `tally.tsx` with a condition and a list in its view): children next to holes in a row, in a row's condition, in a list in a branch. Mutation: dropping the slot path from the start comment fails 2 tests.
 - Sizes: todo loader 4073 B, helpers 969 B (no change). Counters loader 5113 B (+97, the two forms of `addChild`), counters helpers 845 B (the counters app now uses `clone$`). Dashboard dist 107015 B (+2.5 kB: the child views are templates plus writes, longer than the HTML strings).
+
+## Step 3: SVG and MathML bodies
+
+- A body in SVG or MathML clones: its template declares `s: 'svg'` or `s: 'mathml'`, and `clone$` parses it through `parseHtml$` with that namespace (inside an `<svg>` or `<math>` wrapper), then moves the nodes into a fragment of the document.
+- A `title`, `style` or `script` in SVG or MathML is an element like any other (the parser is in foreign content there), so its holes clone with comment marks. The server writes the same text, escaped, and the parser decodes it in foreign content.
+- `canClone` loses its `namespace` parameter.
+- Differential subject `foreign`: SVG rows with bound attributes, text and a `foreignObject` with HTML holes, an SVG `title` with a hole, an SVG branch with a nested list, MathML rows with a condition. The differential comparison does not read namespaces, so `template.test.ts` checks the namespace of a cloned SVG element. happy-dom keeps MathML in the HTML namespace, so the test compares with happy-dom's own parse; the real-browser check is at step 5.
+- Sizes: no loader or helpers code change (todo loader 4073 B, helpers 969 B).

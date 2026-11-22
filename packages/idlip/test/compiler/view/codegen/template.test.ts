@@ -177,7 +177,6 @@ describe('cloned templates', () => {
 
   it.each([
     ['a hole in a pre', '<li><pre>{row.label}</pre></li>', 'ul'],
-    ['a row inside svg', '<text>{row.label}</text>', 'svg'],
     ['a write inside a template', '<li><template><b>{row.label}</b></template></li>', 'ul'],
     ['static events only', '<li><a on:click={() => touch()}>static</a></li>', 'ul'],
   ])('renders HTML for %s', (_name, row, parent) => {
@@ -212,6 +211,24 @@ describe('cloned templates', () => {
     const other = document.implementation.createHTMLDocument('');
     const [, otherItem] = clone$(template, other);
     expect(otherItem.ownerDocument).toBe(other);
+  });
+
+  it('clones a row inside svg and math in its namespace', () => {
+    const svg = findRowChunk('<text>{row.label}</text>', 'svg');
+    expect(svg).toContain('<!--i--><text><!--t');
+    expect(svg).toContain("s: 'svg' };");
+    expect(findRowChunk('<mi>{row.label}</mi>', 'math')).toContain("s: 'mathml' };");
+    const [fragment] = clone$({ h: '<circle i-x="1"></circle>', n: 1, s: 'svg' }, document);
+    const circle = fragment.firstChild;
+    expect(circle instanceof Element && circle.namespaceURI).toBe('http://www.w3.org/2000/svg');
+    // happy-dom keeps MathML in the HTML namespace, so the clone matches its page parse.
+    const page = document.createElement('div');
+    page.innerHTML = '<math><mi>x</mi></math>';
+    const [math] = clone$({ h: '<mi>x</mi>', n: 0, s: 'mathml' }, document);
+    const mi = math.firstChild;
+    expect(mi instanceof Element && mi.namespaceURI).toBe(
+      page.firstElementChild?.firstElementChild?.namespaceURI,
+    );
   });
 
   it.each([

@@ -160,7 +160,7 @@ function emitCondition(
   const branches: string[][] = [];
   const expressions: string[] = [];
   for (const [index, nodes] of [node.then, node.else].entries()) {
-    if (canClone(nodes, node.namespace, context.component, context.plan)) {
+    if (canClone(nodes, context.component, context.plan)) {
       const body = buildBody(nodes, node.namespace, `templateC${node.test.id}_${index}$`, clone);
       branches.push([...body.pre, `return ${body.expr};`]);
       cloned = true;
@@ -335,7 +335,7 @@ export function emitListChunk(info: ListInfo, context: ChunkContext): GroupChunk
   let body: string[];
   let cloned = false;
   let blocks = false;
-  if (canClone(info.node.body, info.node.namespace, context.component, context.plan)) {
+  if (canClone(info.node.body, context.component, context.plan)) {
     const clone = createCloneContext(context.component, context.plan, emitter);
     const built = buildBody(
       info.node.body,
@@ -620,7 +620,7 @@ export function emitViewChunk(context: ChunkContext): GroupChunk {
 
   // The whole view, with the server's names. A child it renders is added, as in a template.
   const emitter = new Emitter('server', usage, context.report);
-  const cloned = canClone(component.view, 'html', component, context.plan);
+  const cloned = canClone(component.view, component, context.plan);
   let body: string[];
   if (cloned) {
     const clone = createCloneContext(component, context.plan, emitter);

@@ -83,25 +83,17 @@ function isClonedElement(node: Element, component: Component, plan: Plan): boole
       return false;
     }
   }
+  // In SVG and MathML a `title` or a `style` is an element like any other.
+  const text = node.namespace === 'html' && TEXT_TAGS.has(node.tag);
   for (const child of node.children) {
-    if (
-      TEXT_TAGS.has(node.tag) ? child.kind !== 'text' : !isCloned(child, node.tag, component, plan)
-    ) {
+    if (text ? child.kind !== 'text' : !isCloned(child, node.tag, component, plan)) {
       return false;
     }
   }
   return true;
 }
 
-function isClonedBody(
-  nodes: readonly Node[],
-  namespace: string,
-  component: Component,
-  plan: Plan,
-): boolean {
-  if (namespace !== 'html') {
-    return false;
-  }
+function isClonedBody(nodes: readonly Node[], component: Component, plan: Plan): boolean {
   for (const node of nodes) {
     if (!isCloned(node, '', component, plan)) {
       return false;
@@ -119,12 +111,9 @@ function isCloned(node: Node, parent: string, component: Component, plan: Plan):
     case 'element':
       return isClonedElement(node, component, plan);
     case 'condition':
-      return (
-        isClonedBody(node.then, node.namespace, component, plan) &&
-        isClonedBody(node.else, node.namespace, component, plan)
-      );
+      return isClonedBody(node.then, component, plan) && isClonedBody(node.else, component, plan);
     case 'for':
-      return isClonedBody(node.body, node.namespace, component, plan);
+      return isClonedBody(node.body, component, plan);
     case 'child':
       return true;
     default:
@@ -381,19 +370,15 @@ function hasWrite(node: Node, component: Component): boolean {
 }
 
 /**
- * Tells whether a client body renders by a clone: it has nodes, sits in HTML, holds only
- * elements, static text, text holes, children, and conditions and lists whose bodies clone, and writes
- * at least one value. A static body renders HTML: its parse is short. `<Try>`,
- * `<Subscribe>`, `<Head>`, a global listener, raw HTML, a dynamic hole, a write inside a
- * `<template>`, and a text hole in a text element, a table, a select or a `pre` render HTML.
+ * Tells whether a client body renders by a clone: it has nodes, holds only elements, static
+ * text, text holes, children, and conditions and lists whose bodies clone, and writes at least
+ * one value. A body in SVG or MathML parses its template in an `<svg>` or `<math>` wrapper. A
+ * static body renders HTML: its parse is short. `<Try>`, `<Subscribe>`, `<Head>`, a global
+ * listener, raw HTML, a dynamic hole, a write inside a `<template>`, and a text hole in an HTML
+ * text element, a table, a select or a `pre` render HTML.
  */
-export function canClone(
-  nodes: readonly Node[],
-  namespace: string,
-  component: Component,
-  plan: Plan,
-): boolean {
-  if (nodes.length === 0 || !isClonedBody(nodes, namespace, component, plan)) {
+export function canClone(nodes: readonly Node[], component: Component, plan: Plan): boolean {
+  if (nodes.length === 0 || !isClonedBody(nodes, component, plan)) {
     return false;
   }
   for (const node of nodes) {
