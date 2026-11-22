@@ -7,21 +7,20 @@
 - Two checks per subject:
   - Model pairs: server render of A, patch to B through `createPatch` (binding chunks for branches, list chunks for rows), compare with the server render of B. 40 seeds, 3 pairs each, plus hand-made pairs.
   - Handlers: `mount` with the server-render check, clicking every handler element twice over (for a parent, the elements that change the root model).
-- Subjects (14): counter, todo, form, refs, dynamic, pick, svg, raw, svg-try, try-board, example todo, rich (conditions with and without else, a condition and a list inside a row, a list in a list, raw HTML, SVG, `<Try>`), and three with children (nested board, example counters board, a parent whose children come and go in a list and a condition).
-- 1440 model pairs and 86 click steps per run. The file runs in about 1 s, the whole suite in about 22 s.
+- Subjects (15): counter, todo, form, refs, dynamic, pick, svg, raw, svg-try, try-board, example todo, rich (conditions with and without else, a condition and a list inside a row, a list in a list, raw HTML, SVG, `<Try>`), and four with children (nested board, the two example counters boards, a parent whose children come and go in a list and a condition).
+- About 1440 model pairs and 90 click steps per run. The test fails when more than 10% of the pairs cannot render on the server. The file runs in about 1 s, the whole suite in about 22 s.
 
 ## Proof
 
 - Changing `setBranch$` to write a wrong branch number fails the test (8 failures). Changing the label that `addChild` renders fails the parent subject.
-- `pnpm --filter idlip build && pnpm --filter idlip test`: 61 files, 701 passed, 3 skipped (model pairs of the three subjects with children).
+- `pnpm --filter idlip build && pnpm --filter idlip test`: 61 files, 702 passed, 4 skipped (model pairs of the four subjects with children).
 - `pnpm lint` and `pnpm exec oxfmt --check .`: clean for the new files.
 
 ## Accepted divergences
 
 Each entry fails the test when no run produces it any more.
 
-- `caught-region-stays` (try-board): a `<Try>` region that caught stays on its catch view until `reset` (proposal 0004, "a catch view is not patched"). A kept row whose model recovers keeps the catch view, while a server render of the new model shows the body. By design.
-- `input-value-newline` (todo, example-todo, rich): the `value` setter of an input drops line breaks, and happy-dom reads the raw attribute of a server-rendered input. A test environment difference, a browser sanitizes both.
+- `caught-region-stays` (try-board): a `<Try>` region that caught stays on its catch view until `reset` (`docs/roadmaps/core/nodes/errors/outcome.md:28`: catch view holes have no bindings). A kept row whose model recovers keeps the catch view, while a server render of the new model shows the body. By design.
 
 ## Bugs found
 
@@ -30,9 +29,9 @@ Each entry fails the test when no run produces it any more.
 
 ## Deviations
 
-- `src/testing/index.ts` and `modules.ts` changed (shared path) for the `children` option. The public `idlip/testing` API grew by one option. No changeset: the repo has none yet.
-- The `effects` fixture is not a subject: it imports `./api.ts` and `mount` takes one source.
-- Subjects with children do not run the model-pair check. A child patch needs the loader's nesting state, so they run through handlers. The check renders a child from its initial model, so a click on a child's own button is left out for them.
+- `src/testing/index.ts` and `modules.ts` changed (shared path) for the `children` option, documented in `website/docs/testing.md`. The line-break handling of an input's value moved into `compareTrees`, so that divergence is gone. No changeset: the package is unreleased (`0.0.0-stage`).
+- The `effects` fixture is not a subject: it imports `./api.ts`, which is not a component, and `mount` takes component sources only.
+- Left: children get no model-pair states. Subjects with children run through handlers only, and the check renders a child from its initial model, so a click on a child's own button is left out. A cheap way to drive child models: let `mount` expose `resume`'s root and child units (`getChildren` in `client/nesting.ts`), set a model on a child through the loader, and render the server page with `context.slots` filled from the live children's models. A follow-up node can do that.
 - The comparison stops at the first difference of a pair, so an accepted divergence hides later differences in the same pair.
 
 ## Stubs left

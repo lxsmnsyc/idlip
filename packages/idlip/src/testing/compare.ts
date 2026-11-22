@@ -23,7 +23,9 @@ function readLiveProperties(element: Element, attributes: Map<string, string>): 
   // A head block that a patch adds takes a number after every block on the page.
   attributes.delete('i-head');
   if (element instanceof HTMLInputElement) {
-    attributes.set('value', element.value);
+    // A browser strips line breaks from an input's value, on a set and on a parsed attribute.
+    // happy-dom does it on a set only, so both sides are sanitized here.
+    attributes.set('value', element.value.replaceAll(/[\r\n]/g, ''));
     attributes.set('checked', String(element.checked));
   } else if (element instanceof HTMLTextAreaElement) {
     attributes.set('value', element.value);

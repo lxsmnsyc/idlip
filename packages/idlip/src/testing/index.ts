@@ -85,6 +85,9 @@ interface ChildModule {
   readonly compiled: CompileResult;
 }
 
+// Both patterns assume the exact output of the compiler: `import * as Name from 'specifier';` in
+// a server module, and a quoted `...?idlip-<kind>&lang.js` id in a chunk. A change to either
+// output must change them too.
 const MODULE_IMPORT = /import\s*\*\s*as\s+(\w+)\s+from\s*'([^']+)';?/g;
 const CHUNK_IMPORT = /'([^']*\?idlip-[^']+&lang\.js)'/g;
 
@@ -255,16 +258,20 @@ async function start(
     }
   }
   const urls = new Map<string, string>();
+  // The chunks being built, so an import cycle of any length leaves its id as it is.
+  const building = new Set<string>();
   function getUrl(chunkId: string): string | undefined {
     const known = urls.get(chunkId);
     const found = sources.get(chunkId);
-    if (known !== undefined || found === undefined) {
+    if (known !== undefined || found === undefined || building.has(chunkId)) {
       return known;
     }
+    building.add(chunkId);
     const code = bindImports(found.code, key).replaceAll(CHUNK_IMPORT, (all, other: string) => {
-      const url = other === chunkId ? undefined : getUrl(other);
+      const url = getUrl(other);
       return url === undefined ? all : JSON.stringify(url);
     });
+    building.delete(chunkId);
     const body = `${code}\n;globalThis[${JSON.stringify(key)}].loaded(${JSON.stringify(found.chunk)});\n`;
     const url = toDataUrl(body);
     urls.set(chunkId, url);

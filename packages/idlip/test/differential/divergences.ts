@@ -18,14 +18,7 @@ export const DIVERGENCES: readonly Divergence[] = [
     pattern:
       /comment <!--e\d+:0-->\[\d+\]: the server render has comment <!--e\d+:0-->, the page has comment <!--e\d+:1-->/,
     reason:
-      'A `<Try>` region that caught stays on its catch view until `reset` renders the body again (proposal 0004). A kept row whose model recovers keeps the catch view, while a server render of the new model shows the body.',
-  },
-  {
-    id: 'input-value-newline',
-    subjects: ['todo', 'example-todo', 'rich'],
-    pattern: /attribute value is "[^"]*" in the page and "[^"]*\\n[^"]*" in the server render/,
-    reason:
-      'The `value` setter of an input drops line breaks. happy-dom reads the raw attribute of a server-rendered input, so the live value and the fresh one differ on a string with `\\n`. A browser sanitizes both.',
+      'A `<Try>` region that caught stays on its catch view until `reset` renders the body again (`docs/roadmaps/core/nodes/errors/outcome.md:28`). A kept row whose model recovers keeps the catch view, while a server render of the new model shows the body.',
   },
 ];
 

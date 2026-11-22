@@ -71,4 +71,16 @@ export const SUBJECTS: readonly Subject[] = [
       '[on\\:click*="add"], [on\\:click*="relabel"], [on\\:click*="reverse"], [on\\:click*="toggle"], [on\\:click*="rename"], [on\\:click*="remove"]',
     children: { './counter.tsx': read(import.meta.dirname, 'subjects/counter.tsx') },
   },
+  {
+    name: 'example-board-subs',
+    source: read(EXAMPLES, 'counters-subs/src/board.tsx'),
+    props: {
+      items: [
+        { id: 'a1', label: 'First', start: 2 },
+        { id: 'a2', label: 'Second', start: 0 },
+      ],
+    },
+    clicks: '[on\\:click*="remove"]',
+    children: { './counter.tsx': read(EXAMPLES, 'counters-subs/src/counter.tsx') },
+  },
 ];

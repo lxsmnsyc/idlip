@@ -15,7 +15,9 @@ const ROUNDS = 2;
 
 /** The accepted divergences that a run met, as `id:subject`, with their counts. */
 const met = new Map<string, number>();
-const totals = { pairs: 0, steps: 0 };
+const totals = { pairs: 0, steps: 0, skipped: 0 };
+/** The share of pairs the server may fail to render before the test fails. */
+const MAX_SKIPPED = 0.1;
 
 /** Returns the difference unless an accepted divergence explains it. */
 function judge(subject: string, difference: string | undefined): string | undefined {
@@ -68,6 +70,7 @@ describe.each(SUBJECTS)('$name', (subject) => {
         }
         for (const [index, [from, to]] of pairs.entries()) {
           if (page.render(from) === undefined || page.render(to) === undefined) {
+            totals.skipped++;
             continue;
           }
           totals.pairs++;
@@ -117,5 +120,7 @@ describe('accepted divergences', () => {
     }
     expect(stale).toEqual([]);
     expect(totals.pairs).toBeGreaterThan(0);
+    // A generator or server regression that makes most pairs unrenderable must not pass quietly.
+    expect(totals.skipped / (totals.pairs + totals.skipped)).toBeLessThanOrEqual(MAX_SKIPPED);
   });
 });

@@ -100,6 +100,14 @@ await page.settled();
 expect(page.text('p')).toContain('not a number');
 ```
 
+## Children
+
+A module that renders stateful children needs their sources. Pass `children`, one source for each specifier the module imports a child with. The children compile as children, and their chunks load like the module's:
+
+```ts
+page = await mount(boardSource, { items }, { children: { './counter.tsx': counterSource } });
+```
+
 ## Head and titles
 
 `<Head>` elements go into `document.head`, and `stop()` removes them. The title updates one task after the patch, so wait a tick before you read `document.title`:
