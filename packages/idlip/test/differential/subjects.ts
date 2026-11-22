@@ -35,6 +35,18 @@ export const SUBJECTS: readonly Subject[] = [
   },
   { name: 'example-todo', source: read(EXAMPLES, 'todo/src/todo.tsx'), props: { initial: TODOS } },
   {
+    // A default export with a named and a private child in the same file. The handler run
+    // clicks inside each component, since the check renders each child from its slot model.
+    name: 'widgets',
+    source: read(FIXTURES, 'widgets/widgets.tsx'),
+    props: {
+      items: [
+        { id: 'a1', label: 'One' },
+        { id: 'a2', label: 'Two' },
+      ],
+    },
+  },
+  {
     name: 'rich',
     source: read(import.meta.dirname, 'subjects/rich.tsx'),
     props: { title: 'Hello' },
