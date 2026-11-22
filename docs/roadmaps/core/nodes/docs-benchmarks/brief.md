@@ -1,7 +1,7 @@
 ---
 id: docs-benchmarks
 title: Benchmarks page
-status: todo
+status: done
 priority: should
 type: docs
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 60000
 owns:
   - website/docs/benchmarks.md
   - website/src/benchmarks.json
