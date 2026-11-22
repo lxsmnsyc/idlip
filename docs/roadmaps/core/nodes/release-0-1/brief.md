@@ -26,6 +26,9 @@ shared: []
 reserves: []
 provides: []
 depends_on:
+  - on: cloned-templates-all
+    kind: hard
+    why: every block body except raw HTML clones before the first release
   - on: differential-render-test
     kind: hard
     why: ships in 0.1.0

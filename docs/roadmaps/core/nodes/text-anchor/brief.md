@@ -32,6 +32,9 @@ shared:
 reserves: []
 provides: []
 depends_on:
+  - on: cloned-templates-all
+    kind: hard
+    why: works on the same client render and list code
   - on: cloned-templates
     kind: hard
     why: both change how client-made markup is anchored
