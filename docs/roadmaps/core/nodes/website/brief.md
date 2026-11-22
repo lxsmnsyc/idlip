@@ -27,6 +27,12 @@ shared: []
 reserves: []
 provides: []
 depends_on:
+  - on: website-search
+    kind: hard
+    why: the public site needs its search
+  - on: website-repl
+    kind: hard
+    why: the public site needs its repl
   - on: website-polish
     kind: hard
     why: the site goes public with its own identity and the full landing page

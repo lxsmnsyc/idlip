@@ -60,6 +60,7 @@ In this order, after the hero:
 - [ ] Replace the tokens in `styles.css` with the chosen direction's, self-host its fonts in `website/public/`, and restyle the header, sidebar, prose, code blocks, pager and table of contents to match.
 - [ ] Rewrite `DESIGN.md` for the new identity. Drop the line saying the tokens come from brumate.
 - [ ] Build the landing sections above.
+- [ ] Leave room in the header for a search bar (`website-search`) and a REPL link (`website-repl`), and keep page scripts in `website/src/client.ts` split by feature, so those two nodes add files instead of editing the same lines.
 - [ ] Delete `website/directions/` once the chosen tokens are in `styles.css`.
 - [ ] Tests: the landing page has each section, every feature card links to an existing page, and the benchmark data file has the fields the page reads.
 
