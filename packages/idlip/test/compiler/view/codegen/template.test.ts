@@ -176,7 +176,6 @@ describe('cloned templates', () => {
   }
 
   it.each([
-    ['a hole in a pre', '<li><pre>{row.label}</pre></li>', 'ul'],
     ['a write inside a template', '<li><template><b>{row.label}</b></template></li>', 'ul'],
     ['static events only', '<li><a on:click={() => touch()}>static</a></li>', 'ul'],
   ])('renders HTML for %s', (_name, row, parent) => {
@@ -211,6 +210,18 @@ describe('cloned templates', () => {
     const other = document.implementation.createHTMLDocument('');
     const [, otherItem] = clone$(template, other);
     expect(otherItem.ownerDocument).toBe(other);
+  });
+
+  it('writes the newline a pre and a textarea drop, and sets a textarea text', () => {
+    const result = compileRows("<li><pre>{row.label}</pre><textarea>{'fixed'}</textarea></li>");
+    let code = '';
+    for (const module of result.client) {
+      code += module.chunk.startsWith('list=') ? module.code : '';
+    }
+    expect(code).toContain('<pre>\\n<!--t');
+    expect(code).toContain('<textarea i-x="2">\\n</textarea>');
+    expect(code).toContain('$n[2].textContent += getText$(');
+    expect(result.server).toContain('<pre>\n<!--t');
   });
 
   it('clones a row inside svg and math in its namespace', () => {

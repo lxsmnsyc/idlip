@@ -107,6 +107,16 @@ export const SUBJECTS: readonly Subject[] = [
     props: { title: 'Dots & <lines>' },
   },
   {
+    // Holes in raw text and newline elements of cloned rows.
+    name: 'raw-text',
+    source: read(import.meta.dirname, 'subjects/raw-text.tsx'),
+    props: { lead: '\n<lead> & "q"', rest: '> b { color: red }' },
+    pairs: (initial) => [
+      [initial, { ...initial, items: [{ id: 'a3', label: '\n\nthird' }] }],
+      [{ ...initial, items: [] }, initial],
+    ],
+  },
+  {
     name: 'nested-board',
     source: read(FIXTURES, 'nested/board/board.tsx'),
     props: {

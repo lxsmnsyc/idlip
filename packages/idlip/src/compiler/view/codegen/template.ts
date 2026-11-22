@@ -26,24 +26,20 @@ const VOID_TAGS = new Set([
   'wbr',
 ]);
 
-/** Elements whose text the parser reads as text, not markup: no comment can mark a hole. */
+/**
+ * HTML elements whose text the parser reads as text, not markup: no comment can mark a hole, so
+ * a write sets the element's whole text. The compiler rejects a hole in a `script` or a `style`.
+ */
 const TEXT_TAGS = new Set(['script', 'style', 'textarea', 'title']);
 
+/** HTML elements whose parser drops a newline right after the start tag. */
+const NEWLINE_TAGS = new Set(['pre', 'listing', 'textarea']);
+
 /**
- * Parents where the parser changes text, so a text hole there renders HTML: it moves text out
- * of a table or a select, and drops a newline that starts a `pre` or a `listing`.
+ * Parents where the parser moves text out of a table or a select, so a text hole there renders
+ * HTML.
  */
-const TEXT_PARENT_TAGS = new Set([
-  'table',
-  'thead',
-  'tbody',
-  'tfoot',
-  'tr',
-  'colgroup',
-  'select',
-  'pre',
-  'listing',
-]);
+const TEXT_PARENT_TAGS = new Set(['table', 'thead', 'tbody', 'tfoot', 'tr', 'colgroup', 'select']);
 
 type Element = Extract<Node, { kind: 'element' }>;
 
@@ -86,7 +82,11 @@ function isClonedElement(node: Element, component: Component, plan: Plan): boole
   // In SVG and MathML a `title` or a `style` is an element like any other.
   const text = node.namespace === 'html' && TEXT_TAGS.has(node.tag);
   for (const child of node.children) {
-    if (text ? child.kind !== 'text' : !isCloned(child, node.tag, component, plan)) {
+    if (
+      text
+        ? child.kind !== 'text' && (child.kind !== 'text-hole' || plan.dynamic.has(child.hole.id))
+        : !isCloned(child, node.tag, component, plan)
+    ) {
       return false;
     }
   }
@@ -317,9 +317,19 @@ class TemplateBuilder {
     if (VOID_TAGS.has(node.tag)) {
       return;
     }
-    // The parser drops a newline that starts a textarea.
-    if (node.tag === 'textarea' && node.children.length > 0) {
+    const html = node.namespace === 'html';
+    // The parser drops a newline that starts a textarea or a `pre`, so the server and the
+    // template write one, and the text after it stays as it is.
+    if (html && NEWLINE_TAGS.has(node.tag) && node.children.length > 0) {
       this.html += '\n';
+    }
+    if (html && TEXT_TAGS.has(node.tag) && hasTextHole(node.children)) {
+      // The whole text goes after what the parser kept of the template's text, which is the
+      // newline of a textarea for a parser that keeps it, as it keeps the server's.
+      const value = this.printText(node.children);
+      write((target) => `${target}.textContent += ${value};`);
+      this.html += `</${node.tag}>`;
+      return;
     }
     for (const child of node.children) {
       if (child.kind === 'text' && (node.tag === 'script' || node.tag === 'style')) {
@@ -330,6 +340,31 @@ class TemplateBuilder {
     }
     this.html += `</${node.tag}>`;
   }
+
+  /** Prints the text of static parts and holes as one string expression. */
+  printText(nodes: readonly Node[]): string {
+    const { emitter } = this.context;
+    const parts: string[] = [];
+    for (const child of nodes) {
+      if (child.kind === 'text') {
+        parts.push(quote(child.value));
+      } else if (child.kind === 'text-hole') {
+        emitter.at = child.hole.span;
+        emitter.usage.helpers.add('getText');
+        parts.push(`getText$(${emitter.expr(child.hole.expr, 0)})`);
+      }
+    }
+    return parts.length === 0 ? "''" : parts.join(' + ');
+  }
+}
+
+function hasTextHole(nodes: readonly Node[]): boolean {
+  for (const node of nodes) {
+    if (node.kind === 'text-hole') {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -374,8 +409,8 @@ function hasWrite(node: Node, component: Component): boolean {
  * text, text holes, children, and conditions and lists whose bodies clone, and writes at least
  * one value. A body in SVG or MathML parses its template in an `<svg>` or `<math>` wrapper. A
  * static body renders HTML: its parse is short. `<Try>`, `<Subscribe>`, `<Head>`, a global
- * listener, raw HTML, a dynamic hole, a write inside a `<template>`, and a text hole in an HTML
- * text element, a table, a select or a `pre` render HTML.
+ * listener, raw HTML, a dynamic hole, a write inside a `<template>`, and a text hole in a table
+ * or a select render HTML. A text hole in an HTML text element sets the element's text.
  */
 export function canClone(nodes: readonly Node[], component: Component, plan: Plan): boolean {
   if (nodes.length === 0 || !isClonedBody(nodes, component, plan)) {

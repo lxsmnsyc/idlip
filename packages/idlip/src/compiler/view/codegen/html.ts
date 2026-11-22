@@ -38,6 +38,9 @@ type Content = 'html' | 'raw' | 'rcdata';
 
 const ESCAPABLE_RAW_TEXT_TAGS = new Set(['textarea', 'title']);
 
+/** HTML elements whose parser drops a newline right after the start tag. */
+const NEWLINE_TAGS = new Set(['pre', 'listing', 'textarea']);
+
 /** Markup as parts, with the statements it needs before the expression that holds it. */
 export interface Built {
   pre: string[];
@@ -377,8 +380,9 @@ export class HtmlBuilder {
       addText(built, `</${node.tag}>`);
       return;
     }
-    // The parser drops a newline that starts a textarea.
-    if (node.tag === 'textarea' && node.children.length > 0) {
+    // The parser drops a newline that starts a textarea or a `pre`, so one is written first and
+    // the text after it stays as it is.
+    if (NEWLINE_TAGS.has(node.tag) && node.namespace === 'html' && node.children.length > 0) {
       addText(built, '\n');
     }
     let content: Content = 'html';

@@ -41,3 +41,13 @@ The `nested-blocks` subject failed on the base, with the HTML path: a click that
 - `canClone` loses its `namespace` parameter.
 - Differential subject `foreign`: SVG rows with bound attributes, text and a `foreignObject` with HTML holes, an SVG `title` with a hole, an SVG branch with a nested list, MathML rows with a condition. The differential comparison does not read namespaces, so `template.test.ts` checks the namespace of a cloned SVG element. happy-dom keeps MathML in the HTML namespace, so the test compares with happy-dom's own parse; the real-browser check is at step 5.
 - Sizes: no loader or helpers code change (todo loader 4073 B, helpers 969 B).
+
+## Step 4: text holes in text elements and in a `pre`
+
+- The analyzer already rejects a hole in `script` and `style`, more than one hole in a `textarea`, and a `title` outside `<Head>`, so the reachable cases are a `textarea` with one unbound hole, a `pre` (or `listing`) with any holes, and a `<Head>` title (step 6).
+- A hole in an HTML `textarea` or `title` marks the element, and the write appends the text: `$n[5].textContent += getText$(value)`.
+- The newline rule: the parser drops a newline right after `<pre>`, `<listing>` and `<textarea>`. The server already wrote one for a textarea; it now writes one for a `pre` and a `listing` with children too (`html.ts`), and so does the template. The text after it then stays as written, whatever comes first (a hole, a marker or static text), so the clone needs no newline logic. happy-dom does not drop the newline, which is why the textarea write appends (`+=`): the template's newline stays in happy-dom as the server's does, and the browser drops both.
+- A first attempt dropped the newline in the write (`replace(/^\n/, '')`) and failed the differential test in happy-dom; writing the newline on both sides holds for both parsers.
+- Side effect, a fix: a `pre` whose static text starts with a newline kept it before only by luck of JSX trimming; the server's own newline now protects it.
+- Differential subject `raw-text`: a `pre` that starts with two unbound holes whose text starts with a newline, a `pre` with a bound hole (hand-made pair with a label that starts with two newlines), an unbound hole in a `pre` and in a `textarea`.
+- Sizes: no loader or helpers code change.
