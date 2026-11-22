@@ -988,11 +988,14 @@ function emitImports(scope: Scope, used: ReadonlySet<string>): string[] {
 /**
  * Compiles the handlers of a `*.tsx` file into client modules, one per handler.
  * `ir` is the analysis of the same source. Without it the source is analyzed here.
+ * `component` picks one component of a file that has several. By default it is the first
+ * stateful one.
  */
 export function compileHandlers(
   file: string,
   source: string,
   ir: ModuleIR = analyze(file, source),
+  component: Component | undefined = pickComponent(ir),
 ): CompileHandlersResult {
   const diagnostics: CompileDiagnostic[] = [];
   for (const diagnostic of ir.diagnostics) {
@@ -1000,7 +1003,6 @@ export function compileHandlers(
       diagnostics.push(diagnostic);
     }
   }
-  const component = pickComponent(ir);
   if (component === undefined) {
     return { client: [], diagnostics };
   }

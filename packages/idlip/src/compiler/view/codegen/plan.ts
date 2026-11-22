@@ -67,10 +67,15 @@ export interface ChildInfo {
 
 /** A stateful component that the view renders. */
 export interface Used {
-  /** The local name of the import, such as `Counter`. */
+  /** The local name of the import or of the component in this file, such as `Counter`. */
   name: string;
-  /** The specifier of the import, as the source writes it. */
+  /** The specifier of the import, as the source writes it. `''` for a component of this file. */
   source: string;
+  /**
+   * The name the server module reads the child's module record from: the import's local name,
+   * or `$<Name>` for a component of this file. `generate` sets it.
+   */
+  ref: string;
   /** The id of the child's module, which `generate` resolves from the specifier. */
   module: string;
   /** The id of the child's `view` chunk. */
@@ -330,14 +335,15 @@ class Planner {
   planChild(node: ChildNode, context: WalkContext): void {
     this.children.set(node, { site: this.children.size, loops: context.loops });
     const root: Root = node.component;
-    if (root.kind !== 'import' || root.name.includes('.')) {
+    if ((root.kind !== 'import' && root.kind !== 'module') || root.name.includes('.')) {
       this.report(
         'codegen-unsupported',
-        'A stateful child must be a component imported by its default name',
+        'A stateful child must be a component of this file or one imported by name, such as `import Counter from` or `import { Counter } from`',
         { start: 0, end: 0 },
       );
     } else if (!this.uses.some((used) => used.name === root.name)) {
-      this.uses.push({ name: root.name, source: root.source, module: '', view: '' });
+      const source = root.kind === 'import' ? root.source : '';
+      this.uses.push({ name: root.name, source, ref: root.name, module: '', view: '' });
     }
     for (const prop of node.props) {
       this.bindHole(prop.value, 'p', context, {

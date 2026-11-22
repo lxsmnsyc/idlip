@@ -14,7 +14,7 @@ import type {
 import * as compiler from '../compiler/index.ts';
 import type { CompileOptions } from '../compiler/index.ts';
 import type { ChunkUrls, Compile, CompileDiagnostic, CompileResult } from '../core/format.ts';
-import { getChunkFile, getChunkId } from '../core/format.ts';
+import { getChunkFile, getChunkId, listCompiled, splitModule } from '../core/format.ts';
 import { getDefines, getFeatures, replaceFeatures } from './features.ts';
 import { HOT_EVENT, classifyEdit } from './hot.ts';
 import {
@@ -40,10 +40,10 @@ function toPosix(file: string): string {
 const CHUNKS_FILE = '.idlip/chunks.json';
 /** The default `modules` globs. */
 const DEFAULT_MODULES = ['src/**/*.tsx'];
-/** The end of the id of a child's view chunk. */
-const VIEW_SUFFIX = '?idlip-view&lang.js';
+/** The id of a child's view chunk, with the component's name for a named component. */
+const VIEW_CHUNK = /\?idlip-(?:[A-Z][^.&=?]*\.)?view&lang\.js$/;
 /** The id of a list chunk, whose item template renders a child with its view. */
-const LIST_CHUNK = /\?idlip-list=[^&]*&lang\.js$/;
+const LIST_CHUNK = /\?idlip-(?:[A-Z][^.&=?]*\.)?list=[^&]*&lang\.js$/;
 
 export interface IdlipOptions {
   /** Globs of the idlip modules, relative to the root. Default: `src/**\/*.tsx`. */
@@ -204,7 +204,7 @@ function checkChunkImports(
   // The files that hold a child's view. The loader never imports them.
   const views = new Set<string>();
   for (const item of Object.values(bundle)) {
-    if (item.type === 'chunk' && item.moduleIds.some((id) => id.endsWith(VIEW_SUFFIX))) {
+    if (item.type === 'chunk' && item.moduleIds.some((id) => VIEW_CHUNK.test(id))) {
       views.add(item.fileName);
     }
   }
@@ -217,7 +217,7 @@ function checkChunkImports(
       continue;
     }
     const ids = [...item.moduleIds, item.facadeModuleId ?? ''];
-    const fromList = ids.some((id) => LIST_CHUNK.test(id) || id.endsWith(VIEW_SUFFIX));
+    const fromList = ids.some((id) => LIST_CHUNK.test(id) || VIEW_CHUNK.test(id));
     for (const imported of item.imports) {
       if (!loaded.has(imported) && !(fromList && views.has(imported))) {
         errors.push(`${file} imports ${imported}, which the loader does not import`);
@@ -277,11 +277,14 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
   let base = '/';
   let isServe = false;
   /** Compiled modules by file, with the source they came from. */
-  const cache = new Map<string, { source: string; child: boolean; result: CompileResult }>();
+  const cache = new Map<
+    string,
+    { source: string; key: string; rendered: readonly string[]; result: CompileResult }
+  >();
   /** Files already warned about, so each warns once. */
   const warned = new Set<string>();
-  /** The files that another module renders as a child, found on first use. */
-  let children: Set<string> | undefined;
+  /** The components that another module renders as a child, by file, found on first use. */
+  let children: Map<string, Set<string>> | undefined;
   /** Emitted chunk references of the client build, by chunk id. */
   const emitted = new Map<string, { id: string; reference: string }>();
   /** The chunk URL map of the client build in this process. */
@@ -314,18 +317,20 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
   }
 
   /**
-   * Finds the modules that another module renders as a child, through Vite's resolver, so an
-   * alias or a bare specifier works. The result stays until a file of the app changes.
+   * Finds the components that another module renders as a child, through Vite's resolver, so an
+   * alias or a bare specifier works: the imported names (`default`, or the name of a named
+   * component) by file. The result stays until a file of the app changes.
    */
-  async function findChildren(context: Rolldown.PluginContext): Promise<Set<string>> {
+  async function findChildren(context: Rolldown.PluginContext): Promise<Map<string, Set<string>>> {
     if (children !== undefined) {
       return children;
     }
-    const found = new Set<string>();
+    const found = new Map<string, Set<string>>();
     resolved.clear();
     for (const file of findModules()) {
       const importer = getModuleId(file);
-      for (const specifier of compiler.listChildren(readFileSync(file, 'utf8'), importer)) {
+      for (const child of compiler.listChildImports(readFileSync(file, 'utf8'), importer)) {
+        const specifier = child.source;
         // oxlint-disable-next-line no-await-in-loop
         const target = await context.resolve(specifier, file);
         const id = target?.id.split('?')[0];
@@ -340,7 +345,9 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
               `Add the file to the \`modules\` option of idlip(), for example \`modules: ['src/**/*.tsx']\`.`,
           );
         }
-        found.add(id);
+        const names = found.get(id) ?? new Set<string>();
+        names.add(child.imported);
+        found.set(id, names);
         resolved.set(`${importer}\0${specifier}`, getModuleId(id));
       }
     }
@@ -348,23 +355,39 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
     return found;
   }
 
+  /** The components of a file that other modules render, sorted: `default` and named ones. */
+  function listRendered(file: string): string[] {
+    return [...(children?.get(file) ?? [])].toSorted();
+  }
+
   function compileFile(
     reporter: Reporter,
     file: string,
     code?: string,
-    known?: boolean,
+    known?: readonly string[],
   ): CompileResult {
     const source = code ?? readFileSync(file, 'utf8');
-    // A module that is also a root takes the child output, which only adds the view chunk.
-    const child = known ?? children?.has(file) === true;
+    // A component that is also a root takes the child output, which only adds the view chunk.
+    const rendered = known ?? listRendered(file);
+    const key = rendered.join(',');
     const cached = cache.get(file);
-    if (cached?.source === source && cached.child === child) {
+    if (cached?.source === source && cached.key === key) {
       return cached.result;
     }
     compile ??= getDefaultCompile();
-    const result = compile(source, getModuleId(file), { child, resolve: resolveModule });
+    const named: string[] = [];
+    for (const name of rendered) {
+      if (name !== 'default') {
+        named.push(name);
+      }
+    }
+    const result = compile(source, getModuleId(file), {
+      child: rendered.includes('default'),
+      ...(named.length === 0 ? {} : { children: named }),
+      resolve: resolveModule,
+    });
     reportDiagnostics(reporter, getModuleId(file), source, result.diagnostics);
-    cache.set(file, { source, child, result });
+    cache.set(file, { source, key, rendered, result });
     return result;
   }
 
@@ -442,14 +465,16 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
     }
     const all = isServe ? undefined : readBuilt();
     const urls: Record<string, string> = {};
-    for (const chunk of listChunks(result.manifest)) {
-      const id = getChunkId(result.manifest.module, chunk);
-      if (all === undefined) {
-        urls[id] = `${base}${id.slice(1)}`;
-      } else if (Object.hasOwn(all, id)) {
-        urls[id] = all[id];
-      } else {
-        throw new Error(`idlip: the client build has no chunk ${id}`);
+    for (const { manifest } of listCompiled(result)) {
+      for (const chunk of listChunks(manifest)) {
+        const id = getChunkId(manifest.module, chunk);
+        if (all === undefined) {
+          urls[id] = `${base}${id.slice(1)}`;
+        } else if (Object.hasOwn(all, id)) {
+          urls[id] = all[id];
+        } else {
+          throw new Error(`idlip: the client build has no chunk ${id}`);
+        }
       }
     }
     // The server writes the build id on the state script and drops it from the chunk map.
@@ -505,18 +530,24 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       for (const file of findModules()) {
         const result = compileFile(this, file);
         results.push(result);
-        const name = path.basename(file, '.tsx');
-        for (const chunk of listChunks(result.manifest)) {
-          const reference = this.emitFile({
-            type: 'chunk',
-            id: getChunkId(file, chunk),
-            name: `${name}.${getChunkFile(chunk).slice(0, -'.js'.length)}`,
-            preserveSignature: 'exports-only',
-          });
-          emitted.set(getChunkId(result.manifest.module, chunk), {
-            id: getChunkId(file, chunk),
-            reference,
-          });
+        // A named component adds its name: `widgets.Counter.handler.add.js`.
+        const stem = path.basename(file, '.tsx');
+        for (const { manifest } of listCompiled(result)) {
+          const component = splitModule(manifest.module).name;
+          const local = component === undefined ? file : `${file}#${component}`;
+          const name = component === undefined ? stem : `${stem}.${component}`;
+          for (const chunk of listChunks(manifest)) {
+            const reference = this.emitFile({
+              type: 'chunk',
+              id: getChunkId(local, chunk),
+              name: `${name}.${getChunkFile(chunk).slice(0, -'.js'.length)}`,
+              preserveSignature: 'exports-only',
+            });
+            emitted.set(getChunkId(manifest.module, chunk), {
+              id: getChunkId(local, chunk),
+              reference,
+            });
+          }
         }
       }
       // Every module is compiled before the loader is bundled, so the loader sees the defines.
@@ -531,12 +562,20 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       this.addWatchFile(parsed.file);
       await findChildren(this);
       const result = compileFile(this, parsed.file);
-      for (const module of result.client) {
-        if (module.chunk === parsed.chunk) {
-          return { code: module.code, moduleType: 'js' };
+      // The chunk id names the component: none for the default export, `Name.` for another.
+      const name = splitModule(parsed.module).name;
+      for (const { manifest, client } of listCompiled(result)) {
+        if (splitModule(manifest.module).name !== name) {
+          continue;
+        }
+        for (const module of client) {
+          if (module.chunk === parsed.chunk) {
+            return { code: module.code, moduleType: 'js' };
+          }
         }
       }
-      return this.error(`${getModuleId(parsed.file)} has no chunk ${parsed.chunk}`);
+      const owner = name === undefined ? '' : ` (component ${name})`;
+      return this.error(`${getModuleId(parsed.file)}${owner} has no chunk ${parsed.chunk}`);
     },
 
     transform: {
@@ -654,7 +693,7 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
           },
           file,
           await read(),
-          cache.get(file)?.child,
+          cache.get(file)?.rendered,
         );
         message = classifyEdit(before, after, base, timestamp);
       } catch {

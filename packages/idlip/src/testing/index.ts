@@ -5,7 +5,7 @@
  */
 import { compile } from '../compiler/index.ts';
 import { resolveSpecifier } from '../compiler/view/codegen/path.ts';
-import { getChunkId } from '../core/format.ts';
+import { getChunkId, listCompiled, splitModule } from '../core/format.ts';
 import type {
   Boot,
   CompileResult,
@@ -196,9 +196,21 @@ async function start(
 ): Promise<MountedPage> {
   // Chunks and the server module read the runtime through one object, instead of a bare import.
   const names: string[] = [];
+  // The models of the children a patch changed, by path, for the server render of the check.
+  // A child that a patch adds again starts from its props, so its old slot model goes.
+  const slots: Record<string, { model: Model }> = {};
   const scope: Scope = {
     server: { ...serverExports },
-    client: { ...clientExports, addChild, patchList, restartSub, setProp },
+    client: {
+      ...clientExports,
+      addChild(...args: Parameters<typeof addChild>): string {
+        Reflect.deleteProperty(slots, args[0]);
+        return addChild(...args);
+      },
+      patchList,
+      restartSub,
+      setProp,
+    },
     loaded(chunk) {
       names.push(chunk);
     },
@@ -250,11 +262,19 @@ async function start(
 
   // 3. Serve the chunks from memory: the record's chunk ids map to data URLs.
   // A chunk of the module imports the view chunk of a child by its id, so those ids map to the
-  // data URL too.
+  // data URL too. A chunk of a named component records its name first, `Counter.handler=add`.
   const sources = new Map<string, { code: string; chunk: string }>();
-  for (const unit of [compiled, ...children.map((child) => child.compiled)]) {
-    for (const chunk of unit.client) {
-      sources.set(getChunkId(unit.manifest.module, chunk.chunk), chunk);
+  const units: CompileResult[] = [compiled];
+  for (const child of children) {
+    units.push(child.compiled);
+  }
+  for (const unit of units) {
+    for (const { manifest, client } of listCompiled(unit)) {
+      const component = splitModule(manifest.module).name;
+      for (const item of client) {
+        const chunk = component === undefined ? item.chunk : `${component}.${item.chunk}`;
+        sources.set(getChunkId(manifest.module, item.chunk), { code: item.code, chunk });
+      }
     }
   }
   const urls = new Map<string, string>();
@@ -300,11 +320,14 @@ async function start(
   const failures: unknown[] = [];
   const patch: Patch = async (page, prev, next) => {
     await patcher(page, prev, next);
-    // A child page has its own model, and the server renders from the root's.
-    if (page.path === undefined) {
+    // A child page has its own model. The check renders the root from the root's model and each
+    // child from the model of its slot.
+    if (page.path === undefined || page.path === '') {
       patched = next;
-      checked = false;
+    } else {
+      slots[page.path] = { model: next };
     }
+    checked = false;
   };
   const loader = resume(boot, patch, (error) => {
     failures.push(error);
@@ -331,13 +354,19 @@ async function start(
   }
 
   function checkPage(): void {
-    if (!check || patched === undefined || checked) {
+    if (!check || checked) {
       return;
     }
     checked = true;
-    // The server module renders from the model it is given instead of from props.
+    // The server module renders from the model it is given instead of from props, and each
+    // child from its slot's model. A root that no patch changed renders from its props.
     const fresh = document.createElement('div');
-    const context: RenderContext = { state() {}, headId: () => 0, head() {} };
+    const context: RenderContext & { slots: typeof slots } = {
+      state() {},
+      headId: () => 0,
+      head() {},
+      slots,
+    };
     fresh.innerHTML = server.default(props, context, patched);
     const difference = compareTrees(root, fresh, (node) => node instanceof HTMLScriptElement);
     if (difference !== undefined) {

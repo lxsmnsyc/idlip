@@ -45,8 +45,18 @@ describe('chunk ids', () => {
   it('splits an id into the file and the chunk name', () => {
     expect(parseChunkId('/a/src/todo.tsx?idlip-binding=todos.*.done&lang.js')).toEqual({
       file: '/a/src/todo.tsx',
+      module: '/a/src/todo.tsx',
       chunk: 'binding=todos.*.done',
     });
+    // A named component puts its name before the chunk name.
+    expect(parseChunkId('/a/src/widgets.tsx?idlip-Counter.binding=a.b&lang.js')).toEqual({
+      file: '/a/src/widgets.tsx',
+      module: '/a/src/widgets.tsx#Counter',
+      chunk: 'binding=a.b',
+    });
+    expect(getChunkId('/src/widgets.tsx#Counter', 'handler=add')).toBe(
+      '/src/widgets.tsx?idlip-Counter.handler=add&lang.js',
+    );
     expect(parseChunkId('/src/todo.tsx?idlip-binding=todos.%2A.done&lang.js')?.chunk).toBe(
       'binding=todos.*.done',
     );
@@ -73,7 +83,12 @@ describe('chunk ids', () => {
 
   it('names the view chunk of a child', () => {
     const id = '/src/counter.tsx?idlip-view&lang.js';
-    expect(parseChunkId(id)).toEqual({ file: '/src/counter.tsx', chunk: 'view' });
+    expect(parseChunkId(id)).toEqual({
+      file: '/src/counter.tsx',
+      module: '/src/counter.tsx',
+      chunk: 'view',
+    });
+    expect(parseChunkId('/src/app.tsx?idlip-Row.view&lang.js')?.module).toBe('/src/app.tsx#Row');
     const { manifest } = compileFixture('', '/src/counter.tsx');
     expect(listChunks({ ...manifest, view: { chunk: 'view' } })).toContain('view');
   });
@@ -89,8 +104,14 @@ export default function Board() {
 
   it('replaces the chunk URLs of a server module', async () => {
     const { server } = compileFixture('', '/src/counter.tsx');
-    const urls = { '/src/counter.tsx?idlip-handler=add&lang.js': '/assets/add.js' };
-    const code = replaceChunkUrls(server, urls);
+    const urls: Record<string, string> = {};
+    for (const chunk of ['increment', 'add', 'reset']) {
+      urls[`/src/counter.tsx?idlip-handler=${chunk}&lang.js`] = `/assets/${chunk}.js`;
+    }
+    urls['/src/counter.tsx?idlip-binding=count&lang.js'] = '/assets/count.js';
+    urls.build = '0123abcd';
+    // Another module's chunk in the map stays out of this module's map.
+    const code = replaceChunkUrls(server, { ...urls, '/src/x.tsx?idlip-view&lang.js': '/x.js' });
     const url = `data:text/javascript,${encodeURIComponent(code.replace(/^import .*$/m, ''))}`;
     const module: unknown = await import(/* @vite-ignore */ url);
     expect(module).toHaveProperty('chunks', urls);

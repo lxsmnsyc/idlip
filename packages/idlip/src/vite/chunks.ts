@@ -1,19 +1,35 @@
 import { parseSync } from 'oxc-parser';
+import type { ObjectExpression, Program } from '@oxc-project/types';
 import type { ChunkUrls, Manifest } from '../core/format.ts';
-
-/** `<file>?idlip-<kind>=<name>&lang.js`. Group 1 is the chunk name, such as `handler=toggle`. */
-const CHUNK_QUERY = /\?idlip-((?:(?:handler|binding|list|task|source|try)=[^&]*|view))&lang\.js$/;
+import { BUILD_KEY } from './skew.ts';
 
 /**
- * Splits a chunk id into the source file and the chunk name. Returns undefined
- * for any other id.
+ * `<file>?idlip-<Name>.<kind>=<name>&lang.js`, where `<Name>.` is there for a component other
+ * than the default export. Group 1 is the component's name, group 2 the chunk name, such as
+ * `handler=toggle`. A component name starts with a capital letter and a chunk kind does not.
  */
-export function parseChunkId(id: string): { file: string; chunk: string } | undefined {
+const CHUNK_QUERY =
+  /\?idlip-(?:([A-Z][^.&=?]*)\.)?((?:(?:handler|binding|list|task|source|try)=[^&]*|view))&lang\.js$/;
+
+/**
+ * Splits a chunk id into the source file, the module id of its component and the chunk name.
+ * The module id is the file for the default export and `<file>#<Name>` for any other component.
+ * Returns undefined for any other id.
+ */
+export function parseChunkId(
+  id: string,
+): { file: string; module: string; chunk: string } | undefined {
   const match = CHUNK_QUERY.exec(id);
   if (match === null) {
     return undefined;
   }
-  return { file: id.slice(0, match.index), chunk: decodeURIComponent(match[1]) };
+  const file = id.slice(0, match.index);
+  const name = match.at(1);
+  return {
+    file,
+    module: name === undefined ? file : `${file}#${decodeURIComponent(name)}`,
+    chunk: decodeURIComponent(match[2]),
+  };
 }
 
 /**
@@ -62,29 +78,74 @@ export function listChunks(manifest: Manifest): string[] {
   return [...chunks];
 }
 
+/** Reads the string keys of an object literal. */
+function readKeys(node: ObjectExpression): string[] {
+  const keys: string[] = [];
+  for (const property of node.properties) {
+    if (property.type === 'Property' && property.key.type === 'Literal') {
+      keys.push(String(property.key.value));
+    }
+  }
+  return keys;
+}
+
 /**
- * Replaces the value of `export const chunks = {…}` in a compiled server module
- * with the given map.
+ * Lists the chunk maps of a compiled server module: the value of `export const chunks = {…}`
+ * and the `chunks` field of each module record `const $Name = { …, chunks: {…} }`.
  */
-export function replaceChunkUrls(code: string, urls: ChunkUrls): string {
-  const program = parseSync('server.js', code, { lang: 'js', sourceType: 'module' }).program;
+function findChunkMaps(program: Program): ObjectExpression[] {
+  const maps: ObjectExpression[] = [];
   for (const statement of program.body) {
-    if (
-      statement.type !== 'ExportNamedDeclaration' ||
-      statement.declaration?.type !== 'VariableDeclaration'
-    ) {
+    const declaration =
+      statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+    if (declaration?.type !== 'VariableDeclaration') {
       continue;
     }
-    for (const declarator of statement.declaration.declarations) {
-      if (
-        declarator.id.type === 'Identifier' &&
-        declarator.id.name === 'chunks' &&
-        declarator.init !== null
-      ) {
-        const { start, end } = declarator.init;
-        return `${code.slice(0, start)}${JSON.stringify(urls, null, 2)}${code.slice(end)}`;
+    for (const declarator of declaration.declarations) {
+      if (declarator.id.type !== 'Identifier' || declarator.init?.type !== 'ObjectExpression') {
+        continue;
+      }
+      if (declarator.id.name === 'chunks' && statement.type === 'ExportNamedDeclaration') {
+        maps.push(declarator.init);
+      } else if (declarator.id.name.startsWith('$')) {
+        for (const property of declarator.init.properties) {
+          if (
+            property.type === 'Property' &&
+            property.key.type === 'Identifier' &&
+            property.key.name === 'chunks' &&
+            property.value.type === 'ObjectExpression'
+          ) {
+            maps.push(property.value);
+          }
+        }
       }
     }
   }
-  throw new Error('The compiled server module has no `export const chunks`');
+  return maps;
+}
+
+/**
+ * Replaces the chunk maps in a compiled server module with the URLs of the given map. Each map
+ * keeps its own chunk ids, and takes the build id of the map when there is one.
+ */
+export function replaceChunkUrls(code: string, urls: ChunkUrls): string {
+  const program = parseSync('server.js', code, { lang: 'js', sourceType: 'module' }).program;
+  const maps = findChunkMaps(program);
+  if (maps.length === 0) {
+    throw new Error('The compiled server module has no `export const chunks`');
+  }
+
+  // Replace from the end, so the earlier offsets stay valid.
+  let out = code;
+  for (const map of maps.toReversed()) {
+    const own: Record<string, string> = {};
+    for (const key of readKeys(map)) {
+      own[key] = Object.hasOwn(urls, key) ? urls[key] : key;
+    }
+    if (Object.hasOwn(urls, BUILD_KEY)) {
+      own[BUILD_KEY] = urls[BUILD_KEY];
+    }
+    out = `${out.slice(0, map.start)}${JSON.stringify(own, null, 2)}${out.slice(map.end)}`;
+  }
+  return out;
 }

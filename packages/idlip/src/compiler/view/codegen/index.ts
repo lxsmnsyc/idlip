@@ -1,6 +1,6 @@
 // Emits the server render module, the binding and list chunks and the manifest from the view IR,
 // as `contracts/compiled-format.md` fixes them. Handler chunks come from `compile-update`.
-import { getChunkId } from '../../../core/format.ts';
+import { getChunkId, splitModule } from '../../../core/format.ts';
 import type {
   BindingGroup,
   CompileDiagnostic,
@@ -10,7 +10,6 @@ import type {
   Module,
 } from '../../../core/format.ts';
 import { HELPER_NAMES } from '../../../core/helpers.ts';
-import { pickComponent } from '../../update/index.ts';
 import { listWrites, meetsPath } from '../../update/writes.ts';
 import type { Component, ModuleIR, Span } from '../analyze/index.ts';
 import {
@@ -21,8 +20,11 @@ import {
   emitViewChunk,
 } from './chunks.ts';
 import type { ChunkContext } from './chunks.ts';
+import { readImports, selectComponents } from './components.ts';
+import type { SelectOptions, Selected } from './components.ts';
 import { DYNAMIC_GROUP, DYNAMIC_STORE } from './dynamic.ts';
 import { Emitter, createUsage, mergeUsage } from './expr.ts';
+import type { Usage } from './expr.ts';
 import { HtmlBuilder, toExpression } from './html.ts';
 import { ModuleSource } from './module.ts';
 import { resolveSpecifier } from './path.ts';
@@ -32,18 +34,31 @@ import { getStatePaths, planBindings, planGroups } from './plan.ts';
 import type { Binding, Group, ListInfo, Plan } from './plan.ts';
 import { getAccessor, getKey, getLocalName, printHelperImport, quote, toLiteral } from './text.ts';
 
+/** The manifest and view chunks of a component other than the file's first one. */
+export interface GeneratedComponent {
+  /** The component's name in the source. */
+  name: string;
+  manifest: Manifest;
+  client: Module[];
+}
+
 export interface GenerateResult {
-  /** The server module's code. Empty when a diagnostic is an error. */
+  /** The server module's code, for every component. Empty when a diagnostic is an error. */
   server: string;
   /** Binding group chunks and list item template chunks. Handler chunks are not included. */
   client: Module[];
   manifest: Manifest;
+  /** The other components of the file. Absent when there are none. */
+  components?: GeneratedComponent[];
   diagnostics: CompileDiagnostic[];
 }
 
-export interface GenerateOptions {
-  /** True when a project module renders this module as a child: it gets a `view` chunk. */
-  child?: boolean;
+export interface GenerateOptions extends SelectOptions {
+  /**
+   * The components to generate, as `selectComponents` picked them. `compile` passes them, so
+   * it can compile the handlers of the same components. Picked here when absent.
+   */
+  selected?: readonly Selected[];
   /**
    * Returns the id of the module that an import specifier names. Vite resolves it. Without it,
    * a relative specifier is resolved against the id of the importer.
@@ -183,14 +198,31 @@ function getListPath(info: ListInfo, child: boolean): string | undefined {
   return undefined;
 }
 
-/** Generates the server module, the client chunks and the manifest of one `*.tsx` file. */
+/** The planned parts of one component, before its chunks and server code are emitted. */
+interface Planned {
+  selected: Selected;
+  plan: Plan;
+}
+
+/** The emitted parts of one component: its chunks, manifest and the pieces of its server code. */
+interface Emitted {
+  selected: Selected;
+  plan: Plan;
+  client: Module[];
+  manifest: ChildManifest;
+  server: ServerPart;
+}
+
+/**
+ * Generates the server module, the client chunks and the manifests of one `*.tsx` file: one
+ * manifest and one set of chunks per component that `selectComponents` picks.
+ */
 export function generate(
   ir: ModuleIR,
   source: string,
   id: string,
   options: GenerateOptions = {},
 ): GenerateResult {
-  const child = options.child === true;
   const resolve = options.resolve ?? resolveSpecifier;
   const diagnostics: CompileDiagnostic[] = [...ir.diagnostics];
   const report = (rule: string, message: string, span: Span): void => {
@@ -207,18 +239,113 @@ export function generate(
       return empty();
     }
   }
-  const component = pickComponent(ir) ?? ir.components.at(0);
-  if (component === undefined) {
+
+  // Pick the components. `compile` passes the ones it picked, with their diagnostics.
+  let selected = options.selected;
+  if (selected === undefined) {
+    const selection = selectComponents(ir, source, id, options);
+    diagnostics.push(...selection.diagnostics);
+    selected = selection.selected;
+  }
+  for (const diagnostic of diagnostics) {
+    if (diagnostic.severity === 'error') {
+      return empty();
+    }
+  }
+  if (selected.length === 0) {
     report('codegen-component', 'The file has no component', { start: 0, end: 0 });
     return empty();
   }
+  const count = diagnostics.length;
 
-  // Plan which holes and events patch, then group them by path set.
-  const plan = planBindings(component, report, child);
-  for (const used of plan.uses) {
-    used.module = resolve(used.source, id);
-    used.view = getChunkId(used.module, 'view');
+  // Plan which holes and events patch, and name the module of each child.
+  const byName = new Map<string, Selected>();
+  for (const item of selected) {
+    byName.set(item.component.name, item);
   }
+  const imports = readImports(ir.file, source);
+  const planned: Planned[] = [];
+  for (const item of selected) {
+    const plan = planBindings(item.component, report, item.child);
+    for (const used of plan.uses) {
+      const local = used.source === '' ? byName.get(used.name) : undefined;
+      if (used.source === '' && local === undefined) {
+        report(
+          'codegen-unsupported',
+          `<${used.name}> is not a component of this file. Declare it with \`function ${used.name}(props) { … }\``,
+          { start: 0, end: 0 },
+        );
+        continue;
+      }
+      if (local !== undefined) {
+        used.module = local.module;
+        used.ref = `$${local.component.name}`;
+      } else {
+        // A named import adds the component's name to the id of its file.
+        const imported = imports.get(used.name)?.imported ?? 'default';
+        const file = resolve(used.source, id);
+        used.module = imported === 'default' ? file : `${file}#${imported}`;
+      }
+      used.view = getChunkId(used.module, 'view');
+    }
+    planned.push({ selected: item, plan });
+  }
+
+  // A module-level name that codegen also generates would be declared twice in a chunk.
+  const moduleSource = new ModuleSource(ir.file, source);
+  const reserved = new Set(HELPER_NAMES);
+  if (selected.length > 1) {
+    for (const item of selected) {
+      reserved.add(`$${item.component.name}`);
+    }
+  }
+  for (const found of moduleSource.findNames(reserved)) {
+    report(
+      'module-reserved-name',
+      `The module-level name \`${found.name}\` is one that the compiler generates. Rename it.`,
+      { start: found.start, end: found.end },
+    );
+  }
+  if (diagnostics.length > count) {
+    return empty();
+  }
+
+  // Emit the chunks, manifest and server code of each component.
+  const emitted: Emitted[] = [];
+  for (const { selected: item, plan } of planned) {
+    emitted.push(emitComponent(item, plan, ir, source, moduleSource, report));
+  }
+  const first = emitted[0];
+  for (const diagnostic of diagnostics) {
+    if (diagnostic.severity === 'error') {
+      return { ...empty(), manifest: first.manifest };
+    }
+  }
+  const server = assembleServer(emitted, moduleSource);
+  const rest: GeneratedComponent[] = [];
+  for (const item of emitted.slice(1)) {
+    rest.push({ name: item.selected.component.name, manifest: item.manifest, client: item.client });
+  }
+  return {
+    server,
+    client: first.client,
+    manifest: first.manifest,
+    ...(rest.length === 0 ? {} : { components: rest }),
+    diagnostics,
+  };
+}
+
+/** Emits the client chunks, the manifest and the server code of one component. */
+function emitComponent(
+  selected: Selected,
+  plan: Plan,
+  ir: ModuleIR,
+  source: string,
+  moduleSource: ModuleSource,
+  report: ChunkContext['report'],
+): Emitted {
+  const { component, module: id, child } = selected;
+
   // The dynamic holes share one group at the end, whose paths the page state records.
   const staticBindings: Binding[] = [];
   const dynamicBindings: Binding[] = [];
@@ -233,18 +360,6 @@ export function generate(
   for (const group of groupList) {
     groups.set(group.key, group);
   }
-  const moduleSource = new ModuleSource(ir.file, source);
-  // A module-level name that codegen also generates would be declared twice in a chunk.
-  for (const found of moduleSource.findNames(new Set(HELPER_NAMES))) {
-    report(
-      'module-reserved-name',
-      `The module-level name \`${found.name}\` is one that the compiler generates. Rename it.`,
-      { start: found.start, end: found.end },
-    );
-  }
-  if (diagnostics.length > ir.diagnostics.length) {
-    return empty();
-  }
   const byId = new Map<number, Binding>();
   for (const binding of plan.bindings) {
     byId.set(binding.id, binding);
@@ -254,9 +369,9 @@ export function generate(
   // Client chunks.
   const client: Module[] = [];
   const clientUsage = createUsage();
-  const emitted = emitBindings(context);
+  const bindings = emitBindings(context);
   for (const group of groupList) {
-    const chunk = emitGroupChunk(group, groups, emitted, context);
+    const chunk = emitGroupChunk(group, groups, bindings, context);
     client.push(chunk.module);
     mergeUsage(clientUsage, chunk.usage);
   }
@@ -297,35 +412,32 @@ export function generate(
     listWrites(ir.file, source, component),
     child,
   );
-  const server = emitServer(
-    id,
-    component,
-    plan,
-    manifest,
-    clientUsage.props,
-    moduleSource,
-    report,
-    child,
-  );
-  for (const diagnostic of diagnostics) {
-    if (diagnostic.severity === 'error') {
-      return { ...empty(), manifest };
-    }
-  }
-  return { server, client, manifest, diagnostics };
+  const server = emitServer(id, component, plan, manifest, clientUsage.props, report, child);
+  return { selected, plan, client, manifest, server };
 }
 
-/** Emits the server module: the manifest, the chunk map and the render function. */
+/** The server code of one component, before the file's module is assembled. */
+interface ServerPart {
+  /** The render function's body, one statement a line. */
+  lines: string[];
+  /** The entries of the chunk map, one `'<id>': '<id>',` a line. */
+  urls: string[];
+  /** The helpers, module-level names and imports the render function reads. */
+  usage: Usage;
+  /** `''`, `', path'` or `", path = ''"`. */
+  pathParameter: string;
+}
+
+/** Emits the render function's body and the chunk map of one component. */
 function emitServer(
   id: string,
   component: Component,
   plan: Plan,
   manifest: ChildManifest,
   clientProps: Set<string>,
-  moduleSource: ModuleSource,
   report: ChunkContext['report'],
   child: boolean,
-): string {
+): ServerPart {
   const usage = createUsage();
   const emitter = new Emitter('server', usage, report);
 
@@ -344,12 +456,20 @@ function emitServer(
   for (const field of clientProps) {
     props.push(`${getKey(field)}: props${getAccessor(field, false)}`);
   }
-  // The root's path is `''`. A child gets its path from its parent.
+  // The root's path is `''`. A child gets its path from its parent. A component other than the
+  // main one reads its manifest, chunks and children from its module record.
   const parent = plan.uses.length > 0;
+  const record = id.includes('#') ? `$${component.name}` : undefined;
+  const fields =
+    record === undefined
+      ? ['manifest', 'chunks', ...(parent ? ['uses'] : [])]
+      : [
+          `manifest: ${record}.manifest`,
+          `chunks: ${record}.chunks`,
+          ...(parent ? [`uses: ${record}.uses`] : []),
+        ];
   const state = [
-    'manifest',
-    'chunks',
-    ...(parent ? ['uses'] : []),
+    ...fields,
     `model: { ${model.join(', ')} }`,
     `props: ${props.length === 0 ? '{}' : `{ ${props.join(', ')} }`}`,
     ...(plan.dynamic.size === 0 ? [] : [`dynamic: ${DYNAMIC_STORE}`]),
@@ -398,32 +518,6 @@ function emitServer(
     urls.push(`${chunkId}: ${chunkId},`);
   }
 
-  // Assemble the module.
-  const collected = moduleSource.collect(usage.modules, usage.imports);
-  const imports: string[] = [];
-  if (usage.helpers.size > 0) {
-    imports.push(printHelperImport(usage.helpers, 'idlip/server'));
-  }
-  // A child module is imported by the specifier of the source. Vite resolves it.
-  for (const used of plan.uses) {
-    imports.push(`import * as ${used.name} from ${quote(used.source)};`);
-  }
-  imports.push(...collected.imports);
-  const blocks: string[] = [];
-  if (imports.length > 0) {
-    blocks.push(imports.join('\n'));
-  }
-  blocks.push(
-    ...collected.code,
-    `export const manifest = ${toLiteral(manifest)};`,
-    `// \`vite-plugin\` replaces the URLs in a build.\nexport const chunks = {\n${urls.join('\n')}\n};`,
-  );
-  if (parent) {
-    const names = plan.uses.map((used) => used.name).join(', ');
-    blocks.push(
-      `// The server modules of the stateful children, so \`render()\` can write their manifests and\n// chunk URLs, also for children that no row renders yet.\nexport const uses = [${names}];`,
-    );
-  }
   // `path` is the model path of this component: the empty string for the root.
   let pathParameter = '';
   if (parent) {
@@ -431,8 +525,108 @@ function emitServer(
   } else if (child) {
     pathParameter = ', path';
   }
-  blocks.push(
-    `export default function ${component.name}(props, context, model${pathParameter}) {\n${lines.join('\n')}\n}`,
-  );
+  return { lines, urls, usage, pathParameter };
+}
+
+/**
+ * Joins the server code of every component into the file's server module. The main component
+ * exports `manifest`, `chunks`, `uses` and its render function as `default`. Every other one
+ * has a module record `$<Name>` with the same fields and its render function under its name.
+ */
+function assembleServer(emitted: readonly Emitted[], moduleSource: ModuleSource): string {
+  // Imports: the helpers, the children's server modules, and what module-level code needs.
+  const helpers = new Set<string>();
+  const modules = new Set<string>();
+  const imported = new Set<string>();
+  const childImports: string[] = [];
+  const importedNames = new Set<string>();
+  const localRefs = new Set<string>();
+  for (const { server, plan } of emitted) {
+    for (const name of server.usage.helpers) {
+      helpers.add(name);
+    }
+    for (const name of server.usage.modules) {
+      modules.add(name);
+    }
+    for (const name of server.usage.imports) {
+      imported.add(name);
+    }
+    // A default import reads the module's namespace, a named one the component's record.
+    for (const used of plan.uses) {
+      if (used.source === '') {
+        localRefs.add(used.ref);
+      } else if (!importedNames.has(used.name)) {
+        importedNames.add(used.name);
+        const name = splitModule(used.module).name;
+        childImports.push(
+          name === undefined
+            ? `import * as ${used.name} from ${quote(used.source)};`
+            : `import { $${name} as ${used.name} } from ${quote(used.source)};`,
+        );
+      }
+    }
+  }
+  const collected = moduleSource.collect(modules, imported);
+  const imports: string[] = [];
+  if (helpers.size > 0) {
+    imports.push(printHelperImport(helpers, 'idlip/server'));
+  }
+  // A child module is imported by the specifier of the source. Vite resolves it.
+  imports.push(...childImports, ...collected.imports);
+  const blocks: string[] = [];
+  if (imports.length > 0) {
+    blocks.push(imports.join('\n'));
+  }
+  blocks.push(...collected.code);
+
+  // The manifests and chunk maps. Records come before any `uses` list that names them.
+  const uses: string[] = [];
+  const functions: string[] = [];
+  for (const { selected, plan, manifest, server } of emitted) {
+    const name = selected.component.name;
+    const record = `$${name}`;
+    const parent = plan.uses.length > 0;
+    const children = plan.uses.map((used) => used.ref).join(', ');
+    const urls = `{\n${server.urls.join('\n')}\n}`;
+    if (selected.main) {
+      blocks.push(
+        `export const manifest = ${toLiteral(manifest)};`,
+        `// \`vite-plugin\` replaces the URLs in a build.\nexport const chunks = ${urls};`,
+      );
+      if (localRefs.has(record)) {
+        blocks.push(
+          `// The module record of ${name}, for the components of this file that render it.\nconst ${record} = { manifest, chunks, default: ${name} };`,
+        );
+        if (parent) {
+          uses.push(`${record}.uses = uses;`);
+        }
+      }
+      if (parent) {
+        uses.unshift(
+          `// The server modules of the stateful children, so \`render()\` can write their manifests and\n// chunk URLs, also for children that no row renders yet.\nexport const uses = [${children}];`,
+        );
+      }
+      functions.push(
+        `export default function ${name}(props, context, model${server.pathParameter}) {\n${server.lines.join('\n')}\n}`,
+      );
+      continue;
+    }
+    const keyword = selected.exported ? 'export ' : '';
+    blocks.push(
+      `// The module record of ${name}: what a parent's \`uses\` and \`render()\` read.\n${keyword}const ${record} = {\nmanifest: ${toLiteral(manifest)},\n// \`vite-plugin\` replaces the URLs in a build.\nchunks: ${urls},\ndefault: ${name},\n};`,
+    );
+    if (parent) {
+      uses.push(`${record}.uses = [${children}];`);
+    }
+    functions.push(
+      `${keyword}function ${name}(props, context, model${server.pathParameter}) {\n${server.lines.join('\n')}\n}`,
+    );
+  }
+  // The `uses` lists run after every record exists, so components of one file may render each
+  // other in any order.
+  if (uses.length > 0) {
+    blocks.push(uses.join('\n'));
+  }
+  blocks.push(...functions);
   return `${blocks.join('\n\n')}\n`;
 }

@@ -51,9 +51,11 @@ export function addChildNode(builder: HtmlBuilder, node: ChildNode, built: Built
   const { emitter, plan } = builder;
   const root = node.component;
   const info = plan.children.get(node);
-  const used = plan.uses.find((item) => root.kind === 'import' && item.name === root.name);
+  const used = plan.uses.find(
+    (item) => (root.kind === 'import' || root.kind === 'module') && item.name === root.name,
+  );
   if (info === undefined || used === undefined) {
-    // `plan` reports a child that is not an import.
+    // `plan` reports a child that is neither an import nor a component of this file.
     return;
   }
   if (builder.target === 'server') {
@@ -66,7 +68,7 @@ export function addChildNode(builder: HtmlBuilder, node: ChildNode, built: Built
       { kind: 'text', value: '-->' },
       {
         kind: 'code',
-        value: `${used.name}.default(${props}, context, context.slots?.[${local}]?.model, ${local})`,
+        value: `${used.ref}.default(${props}, context, context.slots?.[${local}]?.model, ${local})`,
       },
       { kind: 'text', value: '<!--/n-->' },
     );

@@ -353,12 +353,38 @@ export interface CompileDiagnostic {
   readonly span: { readonly start: number; readonly end: number };
 }
 
+/** The manifest and client chunks of one component of a file. */
+export interface CompiledComponent {
+  readonly manifest: Manifest;
+  readonly client: readonly Module[];
+}
+
 export interface CompileResult {
-  /** The server module's code. Empty when a diagnostic is an error. */
+  /** The server module's code, for every component of the file. Empty on an error. */
   readonly server: string;
+  /** The chunks of the first component: the default export, or the first named one. */
   readonly client: readonly Module[];
   readonly manifest: Manifest;
+  /** The other components of the file, in source order. Absent when there are none. */
+  readonly components?: readonly CompiledComponent[];
   readonly diagnostics: readonly CompileDiagnostic[];
+}
+
+/** Returns every component of a compile result, the first one first. */
+export function listCompiled(result: CompileResult): CompiledComponent[] {
+  return [{ manifest: result.manifest, client: result.client }, ...(result.components ?? [])];
+}
+
+/**
+ * Splits a module id into its file and the name of the component. The default export of a
+ * file has the file's id, `/src/todo.tsx`. Any other component adds `#` and its name,
+ * `/src/widgets.tsx#Counter`.
+ */
+export function splitModule(module: string): { file: string; name: string | undefined } {
+  const at = module.lastIndexOf('#');
+  return at === -1
+    ? { file: module, name: undefined }
+    : { file: module.slice(0, at), name: module.slice(at + 1) };
 }
 
 /** `idlip/compiler`. */
@@ -379,8 +405,13 @@ export function getChunkFile(chunk: string): string {
 }
 
 /**
- * Returns the Vite module id of a chunk: `/src/todo.tsx?idlip-handler=toggle&lang.js`.
+ * Returns the Vite module id of a chunk: `/src/todo.tsx?idlip-handler=toggle&lang.js`. A named
+ * component puts its name before the chunk: `/src/widgets.tsx?idlip-Counter.handler=add&lang.js`
+ * for the module `/src/widgets.tsx#Counter`.
  */
 export function getChunkId(module: string, chunk: string): string {
-  return `${module}?idlip-${chunk}&lang.js`;
+  const at = module.lastIndexOf('#');
+  return at === -1
+    ? `${module}?idlip-${chunk}&lang.js`
+    : `${module.slice(0, at)}?idlip-${module.slice(at + 1)}.${chunk}&lang.js`;
 }
