@@ -101,7 +101,7 @@ describe.each(SUBJECTS)('$name', (subject) => {
       try {
         const driver = getDriver(page);
         for (const child of driver.children()) {
-          const keys = new Map<string, string>();
+          const keys = new Map<string, string | undefined>();
           for (const list of Object.values(child.manifest.lists)) {
             if (list.path !== undefined) {
               keys.set(list.path, list.key);
