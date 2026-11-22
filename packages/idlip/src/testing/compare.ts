@@ -76,6 +76,16 @@ function takeSnapshots(parent: Node, skip: (node: Node) => boolean): Snapshot[] 
     }
   }
   flushText();
+  // A browser drops a newline that starts a `pre` or a `listing` in parsed markup, and happy-dom
+  // keeps it, so a clone written to match a browser differs from happy-dom's parse there. Both
+  // sides drop every leading newline of the first text.
+  if (parent instanceof Element && (parent.localName === 'pre' || parent.localName === 'listing')) {
+    const first = list.at(0);
+    if (first?.name === '#text') {
+      const data = first.data.replace(/^\n+/, '');
+      list.splice(0, 1, ...(data === '' ? [] : [{ ...first, data }]));
+    }
+  }
   return list;
 }
 

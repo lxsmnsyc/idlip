@@ -17,7 +17,7 @@ After `cloned-templates`, a row or branch with a child, a nested block, raw HTML
 - `try=<id>` chunk: `namespace` is gone; `render` takes the document third; `region(scope, start)` always takes `start` and clones in its document.
 - `addChild(path, module, view, props, doc)` returns the child's nodes (`view.render(scope, doc)`); the template holds the boundary comments. `ViewChunk.render(scope, doc)` returns a fragment.
 - The only markup a chunk parses is the value of `html=`: the `a` binding (`el.replaceChildren(...parseHtml(...))`, as before) and a cloned element with raw content (`el.append(...parseHtml($doc, value, ns))`).
-- Server output: a `pre` or `listing` with children starts with a newline, as a `textarea` did, since the parser drops one there. Text in a `colgroup` is the error `html-nesting`, as in a table.
+- Server output: unchanged. A clone writes what a browser reads from it: in a `pre` or `listing`, a leading run of static text and unbound holes drops its first newline, and raw HTML in a `pre`, `listing` or `textarea` drops the first newline of its value (the `a` binding of `html=` too). Text in a `colgroup` is the error `html-nesting`, as in a table.
 - Loader: `HAS_INNER_LISTS` (new flag) makes `patchList` skip a list that a branch swap in the same patch rendered from the new model (fix of a crash on the base, both render paths).
 
 ## Contract text

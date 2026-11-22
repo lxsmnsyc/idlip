@@ -143,7 +143,7 @@ describe('cloned templates', () => {
   // would be a dynamic hole outside a row.
   function compileRows(row: string, parent = 'ul'): ReturnType<typeof compile> {
     const source = `
-      import { For } from 'idlip';
+      import { For, trusted } from 'idlip';
       function show(view: { mode: string; a: string; b: string }): string {
         return view.mode === 'a' ? view.a : view.b;
       }
@@ -217,16 +217,27 @@ describe('cloned templates', () => {
     expect(otherItem.ownerDocument).toBe(other);
   });
 
-  it('writes the newline a pre and a textarea drop, and sets a textarea text', () => {
-    const result = compileRows("<li><pre>{row.label}</pre><textarea>{'fixed'}</textarea></li>");
+  it('drops the newline a pre and a textarea drop, as a browser parses the server markup', () => {
+    const result = compileRows(
+      "<li><pre>{row.label}</pre><pre>{'fixed'}</pre><textarea>{'fixed'}</textarea><pre html={trusted(a)} /></li>",
+    );
     let code = '';
     for (const module of result.client) {
       code += module.chunk.startsWith('list=') ? module.code : '';
     }
-    expect(code).toContain('<pre>\\n<!--t');
-    expect(code).toContain('<textarea i-x="2">\\n</textarea>');
-    expect(code).toContain('$n[2].textContent += getText$(');
-    expect(result.server).toContain('<pre>\n<!--t');
+    expect(result.diagnostics).toEqual([]);
+    // A bound hole starts with its marker, which the parser keeps: no newline to drop.
+    expect(code).toContain('<pre><!--t');
+    expect(result.server).toContain('<pre><!--t');
+    // An unbound hole runs into the start of the text, whose first newline the parser drops.
+    expect(code).toContain("putText$($n[2], String((getText$('fixed'))).replace(/^\\n/, ''));");
+    // The server writes a newline first in a textarea, and so does the template.
+    expect(code).toContain('<textarea i-x="3">\\n</textarea>');
+    expect(code).toContain("$n[3].textContent += (getText$('fixed'));");
+    // Raw HTML in a pre drops the first newline of its value.
+    expect(code).toContain(
+      "$n[4].append(...parseHtml($doc, String(((model.a) ?? '')).replace(/^\\n/, '')));",
+    );
   });
 
   it('clones a row inside svg and math in its namespace', () => {

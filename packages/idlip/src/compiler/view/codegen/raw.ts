@@ -9,6 +9,9 @@ import { quote } from './text.ts';
 
 type ElementNode = Extract<Node, { kind: 'element' }>;
 
+/** HTML elements whose parser drops a newline right after the start tag. */
+const NEWLINE_TAGS = new Set(['pre', 'listing', 'textarea']);
+
 /** The namespace the content of an element is parsed in, or `undefined` for HTML. */
 export function getContentNamespace(node: ElementNode): string | undefined {
   // `foreignObject` is in the SVG namespace and its content is HTML.
@@ -31,7 +34,11 @@ export function addRawHtml(emitter: Emitter, node: ElementNode, built: Built): v
 export function printHtmlBody(source: Extract<Source, { kind: 'html' }>, emitter: Emitter): string {
   emitter.at = source.hole.span;
   emitter.usage.loader.add('parseHtml');
-  const value = `(${emitter.expr(source.hole.expr, 0)}) ?? ''`;
+  let value = `(${emitter.expr(source.hole.expr, 0)}) ?? ''`;
+  // The server writes the value in place, where the parser drops a first newline.
+  if (source.node.namespace === 'html' && NEWLINE_TAGS.has(source.node.tag)) {
+    value = `String(${value}).replace(/^\\n/, '')`;
+  }
   const namespace = getContentNamespace(source.node);
   const ns = namespace === undefined ? '' : `, ${quote(namespace)}`;
   return `el.replaceChildren(...parseHtml(el.ownerDocument, ${value}${ns}));`;

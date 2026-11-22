@@ -40,6 +40,11 @@ const TEXT_TAGS = new Set(['script', 'style', 'textarea', 'title']);
 /** HTML elements whose parser drops a newline right after the start tag. */
 const NEWLINE_TAGS = new Set(['pre', 'listing', 'textarea']);
 
+/** Drops the newline that the parser drops at the start of a `pre`, `listing` or `textarea`. */
+function printDropNewline(value: string): string {
+  return `String(${value}).replace(/^\\n/, '')`;
+}
+
 type Element = Extract<Node, { kind: 'element' }>;
 
 /** What the builders of one render function share. */
@@ -375,9 +380,13 @@ class TemplateBuilder {
   addChild(node: Extract<Node, { kind: 'child' }>): void {
     const { component, emitter, plan } = this.context;
     const root = node.component;
-    const used = plan.uses.find(
-      (item) => (root.kind === 'import' || root.kind === 'module') && item.name === root.name,
-    );
+    let used: (typeof plan.uses)[number] | undefined;
+    for (const item of plan.uses) {
+      if ((root.kind === 'import' || root.kind === 'module') && item.name === root.name) {
+        used = item;
+        break;
+      }
+    }
     if (used === undefined || !plan.children.has(node)) {
       // `plan` reports a child that is neither an import nor a component of this file.
       return;
@@ -440,7 +449,11 @@ class TemplateBuilder {
       // it in place.
       emitter.at = node.html.span;
       emitter.usage.loader.add('parseHtml');
-      const value = `(${emitter.expr(node.html.expr, 0)}) ?? ''`;
+      let value = `(${emitter.expr(node.html.expr, 0)}) ?? ''`;
+      // The server writes the value in place, where the parser drops a first newline.
+      if (node.namespace === 'html' && NEWLINE_TAGS.has(node.tag)) {
+        value = printDropNewline(`(${value})`);
+      }
       const namespace = getContentNamespace(node);
       const ns = namespace === undefined ? '' : `, ${quote(namespace)}`;
       write((target) => `${target}.append(...parseHtml($doc, ${value}${ns}));`);
@@ -453,9 +466,9 @@ class TemplateBuilder {
       this.html += '</template>';
       return;
     }
-    // The parser drops a newline that starts a textarea or a `pre`, so the server and the
-    // template write one, and the text after it stays as it is.
-    if (html && NEWLINE_TAGS.has(node.tag) && node.children.length > 0) {
+    // The parser drops a newline that starts a textarea. The server writes one there, and so
+    // does the template, so the text after it stays as it is.
+    if (html && node.tag === 'textarea' && node.children.length > 0) {
       this.html += '\n';
     }
     if (html && TEXT_TAGS.has(node.tag) && hasTextHole(node.children)) {
@@ -466,7 +479,11 @@ class TemplateBuilder {
       this.html += `</${node.tag}>`;
       return;
     }
-    for (const child of node.children) {
+    let children: readonly Node[] = node.children;
+    if (html && NEWLINE_TAGS.has(node.tag)) {
+      children = this.addLeadingText(children);
+    }
+    for (const child of children) {
       if (child.kind === 'text' && (node.tag === 'script' || node.tag === 'style')) {
         this.html += child.value;
       } else {
@@ -474,6 +491,36 @@ class TemplateBuilder {
       }
     }
     this.html += `</${node.tag}>`;
+  }
+
+  /**
+   * A `pre` or `listing` drops a newline that starts its text in the server's markup. The static
+   * text and unbound holes before the first element or marker run together there, so a run that
+   * holds a hole becomes one text node, and its write drops the newline as a browser does. A run
+   * of static text stays in the template, whose parse drops it the same way. Returns the
+   * children after the run.
+   */
+  addLeadingText(children: readonly Node[]): readonly Node[] {
+    const { plan, emitter } = this.context;
+    let end = 0;
+    let holes = false;
+    for (const child of children) {
+      if (child.kind === 'text-hole' && !plan.bound.has(child.hole.id)) {
+        holes = true;
+      } else if (child.kind !== 'text') {
+        break;
+      }
+      end++;
+    }
+    if (!holes) {
+      return children;
+    }
+    const mark = this.addMark();
+    emitter.usage.helpers.add('putText');
+    const value = printDropNewline(this.printText(children.slice(0, end)));
+    this.writes.push(`putText$(${this.variable}[${mark}], ${value});`);
+    this.html += `<!--x${mark}-->`;
+    return children.slice(end);
   }
 
   /** Prints the text of static parts and holes as one string expression. */
@@ -488,7 +535,7 @@ class TemplateBuilder {
         parts.push(`getText$(${this.printHole(child.hole, `t${child.hole.id}`, 0)})`);
       }
     }
-    return parts.length === 0 ? "''" : parts.join(' + ');
+    return parts.length === 0 ? "''" : `(${parts.join(' + ')})`;
   }
 }
 

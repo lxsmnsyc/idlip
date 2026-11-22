@@ -1,9 +1,10 @@
 // Holes in elements whose text the parser reads its own way, inside cloned rows: a `pre` that
-// starts with unbound holes (the parser drops its first newline), one with a bound hole, and a
-// textarea whose text holds `<`, `&` and quotes. The compiler rejects a hole in a `script` or a
-// `style`, more than one in a textarea, and a `title` outside `<Head>`.
+// starts with unbound holes (the parser drops its first newline), one with a bound hole, a
+// textarea whose text holds `<`, `&` and quotes, and raw HTML in a `pre` whose value starts with
+// a newline. The compiler rejects a hole in a `script` or a `style`, more than one in a
+// textarea, and a `title` outside `<Head>`.
 // oxlint-disable typescript/no-confusing-void-expression, typescript/explicit-function-return-type, typescript/no-unnecessary-condition, prefer-const
-import { For } from 'idlip';
+import { For, trusted } from 'idlip';
 import type { JSX } from 'idlip/jsx-runtime';
 
 interface Item {
@@ -28,6 +29,7 @@ export default function RawText(props: { lead: string; rest: string }): JSX.Elem
             </pre>
             <pre>{item.label}</pre>
             <pre>{props.lead}</pre>
+            <pre html={trusted(`${props.lead}<b>${item.id}</b>`)} />
             <textarea>{props.lead}</textarea>
             <span>{item.label}</span>
           </li>
