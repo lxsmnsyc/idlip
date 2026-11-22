@@ -35,12 +35,6 @@ const TEXT_TAGS = new Set(['script', 'style', 'textarea', 'title']);
 /** HTML elements whose parser drops a newline right after the start tag. */
 const NEWLINE_TAGS = new Set(['pre', 'listing', 'textarea']);
 
-/**
- * Parents where the parser moves text out of a table or a select, so a text hole there renders
- * HTML.
- */
-const TEXT_PARENT_TAGS = new Set(['table', 'thead', 'tbody', 'tfoot', 'tr', 'colgroup', 'select']);
-
 type Element = Extract<Node, { kind: 'element' }>;
 
 /** What the builders of one render function share. */
@@ -85,7 +79,7 @@ function isClonedElement(node: Element, component: Component, plan: Plan): boole
     if (
       text
         ? child.kind !== 'text' && (child.kind !== 'text-hole' || plan.dynamic.has(child.hole.id))
-        : !isCloned(child, node.tag, component, plan)
+        : !isCloned(child, component, plan)
     ) {
       return false;
     }
@@ -95,19 +89,21 @@ function isClonedElement(node: Element, component: Component, plan: Plan): boole
 
 function isClonedBody(nodes: readonly Node[], component: Component, plan: Plan): boolean {
   for (const node of nodes) {
-    if (!isCloned(node, '', component, plan)) {
+    if (!isCloned(node, component, plan)) {
       return false;
     }
   }
   return true;
 }
 
-function isCloned(node: Node, parent: string, component: Component, plan: Plan): boolean {
+function isCloned(node: Node, component: Component, plan: Plan): boolean {
   switch (node.kind) {
     case 'text':
       return true;
     case 'text-hole':
-      return !plan.dynamic.has(node.hole.id) && !TEXT_PARENT_TAGS.has(parent);
+      // A table or a select would move text, but the template marks a hole with a comment,
+      // which the parser leaves in place, and the compiler rejects text inside a table.
+      return !plan.dynamic.has(node.hole.id);
     case 'element':
       return isClonedElement(node, component, plan);
     case 'condition':
@@ -138,7 +134,7 @@ class TemplateBuilder {
     return this.marks;
   }
 
-  add(node: Node, parent: string): void {
+  add(node: Node): void {
     const { emitter } = this.context;
     if (node.kind === 'text') {
       this.html += escapeText(node.value);
@@ -161,7 +157,7 @@ class TemplateBuilder {
     } else if (node.kind === 'child') {
       this.addChild(node);
     } else {
-      throw new Error(`A ${node.kind} node does not clone (parent ${parent})`);
+      throw new Error(`A ${node.kind} node does not clone`);
     }
   }
 
@@ -335,7 +331,7 @@ class TemplateBuilder {
       if (child.kind === 'text' && (node.tag === 'script' || node.tag === 'style')) {
         this.html += child.value;
       } else {
-        this.add(child, node.tag);
+        this.add(child);
       }
     }
     this.html += `</${node.tag}>`;
@@ -409,8 +405,8 @@ function hasWrite(node: Node, component: Component): boolean {
  * text, text holes, children, and conditions and lists whose bodies clone, and writes at least
  * one value. A body in SVG or MathML parses its template in an `<svg>` or `<math>` wrapper. A
  * static body renders HTML: its parse is short. `<Try>`, `<Subscribe>`, `<Head>`, a global
- * listener, raw HTML, a dynamic hole, a write inside a `<template>`, and a text hole in a table
- * or a select render HTML. A text hole in an HTML text element sets the element's text.
+ * listener, raw HTML, a dynamic hole and a write inside a `<template>` render HTML. A text hole in
+ * an HTML text element sets the element's text.
  */
 export function canClone(nodes: readonly Node[], component: Component, plan: Plan): boolean {
   if (nodes.length === 0 || !isClonedBody(nodes, component, plan)) {
@@ -441,7 +437,7 @@ export function buildBody(
   const variable = context.variables === 1 ? '$n' : `$n${context.variables}`;
   const builder = new TemplateBuilder(context, variable);
   for (const node of nodes) {
-    builder.add(node, '');
+    builder.add(node);
   }
   const html = row ? `<!--i-->${builder.html}<!--/i-->` : builder.html;
   const namespaceField = namespace === 'html' ? '' : `, s: ${quote(namespace)}`;

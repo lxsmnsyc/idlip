@@ -184,6 +184,12 @@ describe('cloned templates', () => {
 
   it.each([
     ['a text hole directly in a table row', '<tr>{row.label}</tr>', 'tbody', 'html-nesting'],
+    [
+      'a text hole directly in a colgroup',
+      '<table><colgroup>{row.label}</colgroup></table>',
+      'div',
+      'html-nesting',
+    ],
     ['a hole in a textarea', '<li><textarea>{row.label}</textarea></li>', 'ul', 'codegen-raw-text'],
   ])('never sees %s: the compiler rejects it', (_name, row, parent, rule) => {
     const rules: string[] = [];
@@ -243,6 +249,7 @@ describe('cloned templates', () => {
   });
 
   it.each([
+    ['a text hole directly in a select', '<li><select>{row.label}<option>o</option></select></li>'],
     ['a static template next to a hole', '<li>{row.label}<template><b>x</b></template></li>'],
     ['an svg element inside an HTML row', '<li><svg><text>{row.label}</text></svg></li>'],
     ['a cell of a table row', '<tr><td>{row.label}</td></tr>'],

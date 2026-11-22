@@ -117,6 +117,17 @@ export const SUBJECTS: readonly Subject[] = [
     ],
   },
   {
+    // Text holes directly in a select, and table rows, in cloned bodies.
+    name: 'select-text',
+    source: read(import.meta.dirname, 'subjects/select-text.tsx'),
+    props: {
+      items: [
+        { id: 'a1', label: 'One' },
+        { id: 'a2', label: '<two>' },
+      ],
+    },
+  },
+  {
     name: 'nested-board',
     source: read(FIXTURES, 'nested/board/board.tsx'),
     props: {

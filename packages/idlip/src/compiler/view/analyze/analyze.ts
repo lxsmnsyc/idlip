@@ -1529,7 +1529,7 @@ class Analyzer {
     const parent = context.open.at(-1);
     if (
       parent !== undefined &&
-      ['table', 'tbody', 'thead', 'tfoot', 'tr'].includes(parent) &&
+      ['table', 'tbody', 'thead', 'tfoot', 'tr', 'colgroup'].includes(parent) &&
       context.namespace === 'html'
     ) {
       this.report(

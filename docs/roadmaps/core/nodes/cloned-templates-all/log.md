@@ -51,3 +51,11 @@ The `nested-blocks` subject failed on the base, with the HTML path: a click that
 - Side effect, a fix: a `pre` whose static text starts with a newline kept it before only by luck of JSX trimming; the server's own newline now protects it.
 - Differential subject `raw-text`: a `pre` that starts with two unbound holes whose text starts with a newline, a `pre` with a bound hole (hand-made pair with a label that starts with two newlines), an unbound hole in a `pre` and in a `textarea`.
 - Sizes: no loader or helpers code change.
+
+## Step 5: text holes directly in a table or a select
+
+- Chromium check (`playwright-core`, a probe page that runs copies of `parseHtml` and `clone$`): the parser leaves comments where they are in a `select` and in a `colgroup`, and keeps text in a `select`. A template's hole is a comment at parse time, so the template parse never moves it; the clone matches the server in a `select`. In a `colgroup` the server's text moves before the table and its `<!--/t-->` with it, so no clone can match it, and patching it was already broken.
+- The analyzer already rejects text in `table`, `tbody`, `thead`, `tfoot` and `tr` (`html-nesting`). It now rejects text in `colgroup` too (one word in `analyze.ts`, outside the owned paths). With that, a text hole in a table or a select clones like any other, and `TEXT_PARENT_TAGS` goes. The brief's "anchor on the parent element" is not needed: the comment mark is the anchor, and the parser leaves comments in place.
+- The probe also confirmed steps 3 and 4 in Chromium: SVG and MathML wrappers give the right namespaces (`foreignObject` content is HTML), and a `pre` or `textarea` with the server's leading newline matches the template plus its write.
+- Differential subject `select-text`: holes directly in a `select` in rows and in a branch, table rows. `template.test.ts`: a colgroup text hole is `html-nesting`, a select hole clones.
+- Sizes: no loader or helpers code change.
