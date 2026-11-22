@@ -1,7 +1,7 @@
 ---
 id: perf-list-kept
 title: Run row bindings only on rows that change
-status: todo
+status: done
 priority: should
 type: refactor
 story:
@@ -20,7 +20,7 @@ exclusive: [bench]
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 792000
 owns:
   - packages/idlip/src/client/list/**
   - packages/idlip/src/client/patch/diff.ts
