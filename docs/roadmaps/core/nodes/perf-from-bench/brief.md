@@ -27,6 +27,12 @@ shared: []
 reserves: []
 provides: []
 depends_on:
+  - on: text-anchor
+    kind: hard
+    why: the final run measures every perf node
+  - on: fix-for-prop-each
+    kind: hard
+    why: the final run measures the fixed list code
   - on: bench-brumate-latest
     kind: hard
     why: works from the "Where idlip loses" list of the todos run
@@ -61,3 +67,8 @@ Close out the benchmark-driven performance work: rerun all three scenarios (todo
 - [ ] One full run of all scenarios with commit, date, machine and load in the README.
 - [ ] Each perf node's claimed gain shows in the run, or the README says it did not.
 - [ ] The "Where idlip loses" list matches the run; design costs are marked as such.
+
+## Updates 2026-11-23
+
+- Since this brief: cloned templates (all bodies), shared helpers, preload links (first click 232 to 66 ms with links), perf-list-kept (select -47%, remove -19% script time; the row skip was unsound and moved to `row-own-reads`, 0.2), text-anchor. Measure first click with and without preload links, both labelled (the README already has a section).
+- Also refresh `website/src/benchmarks.json` (the landing chart reads it; the scale run) and the share image numbers if they changed, and check the landing chart's lead and the docs `resuming.md` tables against the new numbers.
