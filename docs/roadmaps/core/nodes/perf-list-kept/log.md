@@ -112,3 +112,40 @@ Run 2, `--metric cpu` (main-thread task time from the click to the paint), load 
 - e2e with the four ports: 27 passed, the loader budget test included.
 - Benchmark builds (`pnpm build`, `build:rows`, `build:dashboard`, `build:scale` in `benchmarks/idlip`), harness tests 16 passed.
 - `rtk proxy pnpm lint`: exit 0. `pnpm exec oxfmt --check .`: clean.
+
+## Review round (2026-11-23), rebased on `batch/core` 7ad4079
+
+### The skip of kept rows was wrong, and is removed
+
+Writing the tests the review asked for (a keyed path and a key-callback list) found a counterexample. The manifest gives the same paths for a row's own item and for other items of the same list:
+
+| Hole in the row                              | Field key paths                       | Computed key paths                      |
+| -------------------------------------------- | ------------------------------------- | --------------------------------------- |
+| `r.label`                                    | `rows.*.label`                        | `rows.*.label`                          |
+| `rows[first]?.label`                         | `rows.*.label`, `first`               | same                                    |
+| `rows.find((x) => x.label === r.label)?.id`  | `rows.*.id`, `rows.*.label`           | same                                    |
+| `rows.find((x) => x.id === selected)?.label` | `rows[id=selected].label`, `selected` | `rows.*.id`, `rows.*.label`, `selected` |
+
+After a swap, `rows[first]` changes in rows whose own item is the same reference, and the skip left them stale ("rows that read other items of their list" in `kept-rows.test.ts` fails with the skip, passes without). The computed-key `find` failed the same way after a rename. No client rule can tell the reads apart, so the skip is gone and `contracts/compiled-format-perf-list-kept.change-request.md` now asks for a compiler mark on groups that read only their own item.
+
+### Other review fixes
+
+- Node cache: a row is walked again only when a block was added since its last walk (`addCount` in `blocks.ts`, bumped by `addBlock`; every `setBranch$` and region swap calls it). A binding absent from an inactive branch no longer walks the row on every lookup. Test "walks a row once while no block is added" counts `i-a` reads (0 over two renames); it fails with a re-walk on a missing name and with no re-walk after a swap. The `isConnected` check is gone: the hand-written swap in `list.test.ts` now calls `addBlock` as `setBranch$` does.
+- `onBlock` keeps its public two-argument form. `forgetNodes` registers with the internal `onPageBlock`, which does not count as a row hook.
+- `readRows`: the depth counter is updated outside the conditions, and a stray `/i` at depth 0 is skipped.
+- Loader: 3991 B with the skip removed (base 4044 B); the cuts from the first round stay.
+
+### A/B, three sides
+
+`rows-ab.mjs --dir base=… --dir cache=… --dir sync=… --runs 21 --metric cpu`, N fixed before the run, waited for the 1-minute load under 3 (8.27, 4.11, then 2.68). Load 2.68 5.02 5.28 at the start, 4.15 4.01 4.53 at the end. `cache` is the final code (node cache, block-count check, row hook count, no skip); `sync` adds a synchronous `patchRow` with the scope before the patch made only for nested lists (+38 B, loader 4029 B).
+
+| Op          | base       | cache      | Change | Noise | Verdict      | sync       | Change | Noise | Verdict      |
+| ----------- | ---------- | ---------- | -----: | ----: | ------------ | ---------- | -----: | ----: | ------------ |
+| select      | 3.5 (0.0)  | 1.9 (0.1)  | -46.9% |   0.3 | real         | 1.6 (0.1)  | -52.8% |   0.2 | real         |
+| swap        | 10.2 (1.2) | 8.7 (0.8)  | -14.5% |   3.6 | within noise | 9.7 (1.3)  |  -4.5% |   3.8 | within noise |
+| remove      | 9.7 (0.3)  | 7.9 (0.4)  | -19.1% |   1.1 | real         | 7.3 (0.2)  | -24.9% |   0.9 | real         |
+| update 10th | 14.0 (0.4) | 11.9 (0.9) | -15.0% |   2.6 | within noise | 13.0 (0.4) |  -7.5% |   1.2 | within noise |
+| clear       | 4.9 (0.6)  | 3.9 (0.2)  | -20.6% |   1.9 | within noise | 3.8 (0.1)  | -22.1% |   1.9 | within noise |
+| append      | 41.9 (0.8) | 42.8 (1.3) |  +2.1% |   3.8 | within noise | 41.5 (1.4) |  -0.9% |   4.1 | within noise |
+
+`sync` and `cache` differ by less than the noise on every operation (select 1.6 against 1.9, noise 0.3), so the smaller and simpler `cache` is kept. Clear was real in the first round's run (-21.4%, noise 0.7) and is within noise here (base MAD 0.6).

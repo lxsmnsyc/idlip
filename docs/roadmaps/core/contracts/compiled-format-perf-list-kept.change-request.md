@@ -1,35 +1,28 @@
-# Change request: kept rows whose item did not change
+# Change request: mark row bindings that read only their own item
 
 - From node: perf-list-kept
-- Status: proposed. The code in `client/patch/patch.ts` and `client/list/index.ts` already works this way.
+- Status: proposed. Not applied: the client keeps the v9 rule.
 
 ## Problem
 
-Behavior, "patchList": "A row binding whose group was chosen by this patch runs on every kept row of its list, whether or not the row's item changed, because its paths may include state outside the list". On the rows benchmark that means swap, remove, update every 10th and append run the row bindings on all 1,000 kept rows, though at most 100 items changed. The profile puts 4 to 9 ms of script a click there (`log.md`).
+Behavior, "patchList": a chosen row binding runs on every kept row of its list, whether or not the row's item changed. On the rows benchmark, swap, remove, update every 10th and append run the row bindings on all 1,000 kept rows, though at most 100 items changed.
+
+A first version of `perf-list-kept` skipped a kept row whose item is the same reference when every changed path the chosen bindings read is under `<list path>.*`. That rule is wrong, because the manifest gives the same paths for two different reads:
+
+- `{r.label}` (the row's own item) reads `rows.*.label`.
+- `{rows[first]?.label}` reads `rows.*.label, first`, and `{rows.find((x) => x.label === r.label)?.id}` reads `rows.*.id, rows.*.label`. With a computed key, `rows.find((x) => x.id === selected)` also becomes `rows.*.id, rows.*.label, selected`.
+
+After a swap, `rows[first]` changes for rows whose own item did not change, and the skipped rows showed stale text (`test/client/list/kept-rows.test.ts`, "rows that read other items of their list").
 
 ## Proposed change
 
-Replace the sentence with: "A chosen row binding runs on a kept row whose item changed. It runs on every kept row of its list when a path of its group that is not under the list's item (`<list path>.*`) changed, such as `selected` in `class={selected === t.id}` or the list path itself, which an index read gives. A kept row whose item is the same reference runs no binding otherwise."
+The compiler marks each group whose bindings read the `*` items of a list only through that list's own row item (the `<For>` parameter), for example `"item": true` on `BindingGroup`. A read through the list expression (an index, a `find`, a helper call on the list) leaves the mark off. `patch()` then passes the changed paths of the chosen row bindings, and `patchList` skips a kept row whose item is the same reference when every chosen binding is marked and each changed path it reads is under the list's item. The index reads the list path itself, so it already counts as outside.
 
-`patch()` decides this per list from `manifest.groups` (each group's `paths` are the paths of each of its `bindings`) and the changed paths, and passes it as a new optional field of the context:
-
-```ts
-interface RowContext extends ListContext {
-  /** True when each chosen row binding changed only through paths under its list's item. */
-  readonly items?: boolean;
-}
-```
-
-Absent or false keeps the v9 behavior, so a direct caller of `patchList` with a plain `ListContext` gets what it got before. `RowContext` lives in `client/patch/patch.ts`; `ListContext` in `core/format.ts` did not change.
-
-## Assumptions
-
-- Every binding a chunk exports is in the `bindings` of some group. Checked on the 92 row bindings of the differential subjects, the todo example and the benchmark apps.
-- A list with no `path` (its `each` is a call) compares paths against `undefined.*.`, which no state name starts, so its row bindings always run on every kept row.
+The client code for the skip measured about 90 B gzip on the todo loader; the loader is 4029 B without it.
 
 ## Affected nodes
 
-`patch-bindings`, `patch-lists`. No compiler change.
+`compile-view-codegen` (the mark), `patch-bindings`, `patch-lists`.
 
 ## Decision
 
