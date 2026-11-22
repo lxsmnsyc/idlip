@@ -79,4 +79,17 @@ In this order, after the hero:
 
 ## Pick
 
-(Filled in by the orchestrator after the user picks a direction.)
+The user picked **Block** (`website/directions/block/`): rounded tiles, the tile that changed turns chartreuse, Bricolage Grotesque and Martian Mono. Build it in light and dark. Self-host both fonts as `woff2` and check their licenses and sources, since the directions README wrote the links from memory.
+
+The user also said none of the three mocks visualizes resumability. The mocks' "resume diagram" is three tiles with byte counts, which tells the reader nothing about how it works. Replace it with a real visualization of the concept, the centerpiece of the landing page:
+
+- **Two lanes side by side, same todo app: hydration and resumption.** Each lane shows server, network and browser, and a running count of JS bytes loaded and component code executed.
+- **Steps the reader controls** (step buttons and scroll, reversible at any point):
+  1. The server runs the component and writes HTML. Show the HTML with its binding markers and the `<script i-state>` holding the serialized model.
+  2. The page arrives. Hydration downloads the whole app, re-runs every component and attaches listeners: its counters climb. Resumption loads the 962 B inline listener and runs nothing: its counters stay at zero, the state stays encoded.
+  3. The reader clicks a checkbox. Resumption: the listener reads the event token from the DOM, fetches `handler.toggle.js`, decodes the state, runs the update.
+  4. The update reports the changed path (`todos.1.done`). Resumption fetches only that binding chunk and patches only that one DOM node, which turns chartreuse. The rest of the tree stays dim to show it was never touched.
+- Use real names and sizes from `website/docs/resuming.md` and the compiled todo example, read at build time where possible, not hand-typed.
+- With `prefers-reduced-motion`, show the steps as a static sequence of panels.
+
+This visualization matters more than any other landing section. Show its screenshots per step in `outcome.md`.
