@@ -26,6 +26,9 @@ shared: []
 reserves: []
 provides: []
 depends_on:
+  - on: event-callbacks
+    kind: hard
+    why: ships before 0.1 (user decision 2026-11-23)
   - on: shared-templates
     kind: hard
     why: ships before 0.1 (user decision 2026-11-23)
