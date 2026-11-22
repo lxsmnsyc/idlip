@@ -13,3 +13,15 @@
 - Tests use `// @vitest-environment happy-dom`. `happy-dom` is not a dependency of `website`; it resolves through the vitest install, which has it as a peer from other packages. Noted in the outcome.
 - Playwright found horizontal overflow at 800 px: the playhead wrapper moves past the track. `.hero-timeline` now has `overflow: hidden`.
 - Checks pass: website build, 113 tests, 49 samples with 0 problems, typecheck, no lint findings in `website/`, oxfmt clean.
+
+## 2026-11-22, review fixes
+
+- Rebased onto `batch/core` (`f1cb02d`).
+- Text in the picture is 12 px at the smallest. At 12 px Martian Mono the side-by-side layout needs a 512 px stage, so the container query moved to 32rem. The tick labels use the text font, since mono labels touched.
+- The knob focus ring is `--on-ink`. The rings over changed nodes and the woken block are `--accent-strong`.
+- A hand is now a mouse or pen entering the frame, focus on a todo, or a press on a todo. The waiting story shows a pulsing ring and a "Click it" pill on the second todo. A touch that scrolls past, and anything on the timeline, is not a hand.
+- The loader fetches the shared helpers with the first handler (the `helpers` key of the chunk map). `buildDemo` reads that key into `DemoData.helpers`. The key is unquoted in the state script, so the regex takes an optional quote. The Update step shows a helpers chip, and the value and the live line count it: 1.3 kB, not 352 B.
+- `findClicked` picks the todo whose id the message names. `buildDemo` reads each row's id from its checkbox message.
+- The autoplay stops at `STILL_AT`. Chip and value transitions have no delay. Page Up and Page Down move by 0.1. Only the knob has `touch-action: none`.
+- With reduced motion the first click says the first-load line, and only later clicks say "cached".
+- Added `happy-dom` to the `website` devDependencies. New tests: the real demo build, a drag on the track, a click during the loop, each kind of hand then a click, touch and timeline focus not freezing, a click after a scrub, Page Up and Down, and the clicked todo by id. The CSS regex test is gone.
