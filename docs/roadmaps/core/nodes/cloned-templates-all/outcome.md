@@ -85,6 +85,7 @@ Every first click stays one round trip with the same requests. The todo toggle (
 - The textarea write appends (`textContent +=`) to what the parser kept of the template's newline.
 - Bugs found, not fixed: `diffPaths` reads `.length` of a string as `undefined` (`readField` takes records only), so a hole that reads `row.label.length` never patches, with either render path.
 - `benchmarks/results/*` files are written by the harness and ignored by git.
+- Two env-gated scratch tests (`test/tmp/`) went in with step 3 and left in `ecaf9f7`; rewriting history was not possible from the worktree.
 
 ## Proposed learnings
 
