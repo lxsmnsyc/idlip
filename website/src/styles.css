@@ -426,10 +426,10 @@ svg {
 
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
-  align-items: end;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  align-items: center;
   gap: 3rem;
-  padding: 4.5rem 3rem 3rem;
+  padding: 3.5rem 3rem;
 }
 
 .display {
@@ -890,21 +890,6 @@ svg {
   grid-area: 1 / 1;
 }
 
-.lane-notes {
-  display: grid;
-}
-
-.lane-notes > p {
-  grid-area: 1 / 1;
-  margin: 0;
-  color: var(--muted);
-}
-
-.lane-notes code {
-  color: var(--text);
-  font-size: 0.82em;
-}
-
 /* Step states. A `data-from` part shows from that step on, a `data-until` part up to that
    step, and a `data-at` part at that step only. */
 
@@ -1235,7 +1220,7 @@ svg {
 }
 
 .feature {
-  grid-column: span 4;
+  grid-column: span 3;
 }
 
 .feature a {
@@ -1243,7 +1228,7 @@ svg {
   flex-direction: column;
   gap: 0.5rem;
   height: 100%;
-  min-height: 13rem;
+  min-height: 9rem;
   padding: var(--pad);
   border-radius: var(--radius-lg);
   background: var(--bg-elevated);
@@ -1287,19 +1272,6 @@ svg {
   color: inherit;
   font-size: 0.82em;
 }
-
-.feature-code {
-  align-self: start;
-  max-width: 100%;
-  padding: 0.35rem 0.75rem;
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--text);
-  font-size: var(--text-xs);
-  overflow-wrap: anywhere;
-}
-
-/* Benchmarks. */
 
 .grow-tile {
   padding: var(--pad) 0;
@@ -1522,28 +1494,84 @@ svg {
   align-items: center;
 }
 
-.hero-note {
-  margin: 1.25rem 0 0;
-  color: var(--on-ink-muted);
-  font-size: var(--text-sm);
+.hero-copy,
+.final-copy {
+  display: grid;
+  gap: 1.5rem;
+  justify-items: start;
 }
 
-.hero-note a {
-  color: inherit;
+.hero-copy .lead {
+  margin: 0;
 }
+
+/* Install tabs: a package manager per tab, the command under them, one copy button. Without
+   the script the tabs hide and the pnpm command stays as plain text. */
 
 .install {
-  display: inline-flex;
-  gap: 0.75rem;
-  align-items: center;
-  min-height: 3rem;
-  padding: 0 0.5rem 0 1.25rem;
-  border-radius: var(--radius);
+  display: grid;
+  gap: 0.25rem;
+  width: min(100%, 24rem);
+  padding: 0.5rem;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--on-ink) 14%, transparent);
   color: var(--on-ink);
 }
 
-.install code {
+html:not(.js) .install-tabs {
+  display: none;
+}
+
+.install-tabs {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.install-tab {
+  min-height: 2rem;
+  padding: 0 0.9rem;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--on-ink-muted);
+  font: 600 var(--text-sm) var(--font);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast),
+    color var(--duration-fast),
+    transform var(--duration-fast) var(--ease);
+}
+
+.install-tab:hover {
+  color: var(--on-ink);
+}
+
+.install-tab:active {
+  transform: scale(0.96);
+}
+
+.install-tab[aria-selected='true'] {
+  background: var(--on-ink);
+  color: var(--ink);
+}
+
+/* The focus color is olive for light tiles. On the ink tile the ring is chartreuse. */
+.install-tab:focus-visible,
+.install .code-copy:focus-visible {
+  outline: 3px solid var(--accent-fill);
+  outline-offset: 2px;
+}
+
+.install-line {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 2.75rem;
+  padding: 0 0.25rem 0 0.75rem;
+}
+
+.install-command {
   background: none;
   font-size: var(--text-sm);
 }
@@ -1564,10 +1592,253 @@ svg {
   transform: scale(0.94);
 }
 
-/* The focus color is olive for light tiles. On the ink tile the ring is chartreuse. */
-.install .code-copy:focus-visible {
-  outline: 3px solid var(--accent-fill);
+/* Hero picture: the todo demo. At rest no component code is loaded. One click loads two chunks
+   and updates one row and the count. `--clicked` (0 at rest, 1 after the click) and `--done` on
+   each row drive every part, so each change is a transition of opacity or transform. The CSS
+   below the media query draws the end state, which is also the still frame without the script
+   and with reduced motion. */
+
+.hero-stage {
+  --clicked: 1;
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  margin: 0;
+  padding: 1.25rem;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--on-ink) 10%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .js .hero-stage:not([data-live]) {
+    --clicked: 0;
+  }
+
+  .js .hero-stage:not([data-live]) .hero-row[data-flip] {
+    --done: var(--rest) !important;
+  }
+}
+
+.hero-stack {
+  display: grid;
+  margin: 0;
+}
+
+.hero-stack > * {
+  grid-area: 1 / 1;
+}
+
+.hero-rest,
+.hero-now {
+  transition:
+    opacity var(--duration) var(--ease-out),
+    transform var(--duration) var(--ease-out);
+}
+
+.hero-rest {
+  opacity: calc(1 - var(--clicked));
+  transform: translateY(calc(var(--clicked) * -0.4em));
+}
+
+.hero-now {
+  opacity: var(--clicked);
+  transform: translateY(calc((1 - var(--clicked)) * 0.4em));
+}
+
+.hero-meter-title {
+  margin: 0;
+  color: var(--on-ink-muted);
+  font-size: var(--text-sm);
+}
+
+.hero-meter-value {
+  font-family: var(--mono);
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.04em;
+  word-spacing: -0.3em;
+  font-variant-numeric: tabular-nums;
+}
+
+.hero-meter-value .hero-now {
+  color: var(--accent-fill);
+}
+
+.hero-app {
+  display: grid;
+  gap: 0.4rem;
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  color: var(--text);
+}
+
+.hero-left {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.hero-left b {
+  color: var(--text);
+  font-family: var(--mono);
+}
+
+.hero-row {
+  position: relative;
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--radius-row);
+  background: var(--surface);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast),
+    transform var(--duration-fast) var(--ease);
+}
+
+.hero-row:hover {
+  background: var(--surface-strong);
+}
+
+.hero-row:active {
+  transform: scale(0.98);
+}
+
+.hero-row:has(input:disabled) {
+  cursor: default;
+}
+
+.hero-row:has(input:focus-visible) {
+  outline: 3px solid var(--focus);
   outline-offset: 2px;
+}
+
+.hero-box {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 0.5rem;
+  background: var(--surface-strong);
+}
+
+.hero-box::before {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--accent-fill);
+  opacity: var(--done);
+  content: '';
+  transition: opacity var(--duration) var(--ease-out);
+}
+
+.hero-box svg {
+  position: relative;
+  width: 1rem;
+  height: 1rem;
+  color: var(--on-accent);
+  opacity: var(--done);
+  transform: scale(calc(0.5 + 0.5 * var(--done)));
+  transition:
+    opacity var(--duration) var(--ease-out),
+    transform var(--duration) var(--ease);
+}
+
+.hero-text {
+  position: relative;
+  display: inline-block;
+  font-weight: 600;
+  opacity: calc(1 - 0.45 * var(--done));
+  transition: opacity var(--duration) var(--ease-out);
+}
+
+.hero-text::after {
+  position: absolute;
+  inset: 55% 0 auto;
+  height: 2px;
+  background: var(--muted);
+  content: '';
+  transform: scaleX(var(--done));
+  transform-origin: left;
+  transition: transform var(--duration) var(--ease-out);
+}
+
+/* The pointer lands on the checkbox the picture clicks by itself, then fades. */
+.hero-pointer {
+  position: absolute;
+  inset: auto auto -0.2rem 1.3rem;
+  color: var(--ink);
+  opacity: calc(1 - var(--clicked));
+  pointer-events: none;
+  transform: translate(calc((1 - var(--clicked)) * 3rem), calc((1 - var(--clicked)) * 1rem));
+  transition:
+    opacity var(--duration) var(--ease-out),
+    transform var(--duration) var(--ease-out);
+}
+
+.hero-chunks {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hero-chip {
+  position: relative;
+  display: flex;
+  gap: 0.6rem;
+  align-items: baseline;
+  justify-self: start;
+  max-width: 100%;
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--on-ink) 16%, transparent);
+  color: var(--on-ink);
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+}
+
+.hero-chip code {
+  min-width: 0;
+  background: none;
+  font-size: inherit;
+  overflow-wrap: anywhere;
+}
+
+.hero-chip-load {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  opacity: var(--clicked);
+  transform: translateY(calc((1 - var(--clicked)) * 0.6rem));
+  transition:
+    opacity var(--duration) var(--ease-out),
+    transform var(--duration) var(--ease-out);
+}
+
+.hero-hit {
+  position: absolute;
+  inset: -0.55rem 0.5rem auto auto;
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--radius);
+  background: var(--on-ink);
+  color: var(--ink);
+  font: 700 var(--text-xs) var(--font);
+  opacity: 0;
+  transform: translateY(0.3rem);
+  transition:
+    opacity var(--duration-fast),
+    transform var(--duration-fast) var(--ease);
+}
+
+.hero-hit.is-hit {
+  opacity: 1;
+  transform: none;
 }
 
 /* Facts before you start. */
@@ -2123,8 +2394,7 @@ svg {
     border-radius: 10px;
   }
 
-  .station p,
-  .lane-notes > p {
+  .station p {
     font-size: var(--text-xs);
   }
 

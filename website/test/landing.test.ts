@@ -3,10 +3,11 @@ import { compile } from 'idlip/compiler';
 import { describe, expect, it } from 'vitest';
 import benchmarks from '../src/benchmarks.json' with { type: 'json' };
 import type { DemoData, DemoFile } from '../src/demo/data.ts';
-import { isBenchmarks, readGrowth, writeHeadline } from '../src/landing/benchmarks.ts';
+import { isBenchmarks, readGrowth } from '../src/landing/benchmarks.ts';
 import type { Benchmarks } from '../src/landing/benchmarks.ts';
 import { FEATURES } from '../src/landing/features.ts';
-import { INSTALL_COMMAND, renderLanding } from '../src/landing/index.ts';
+import { renderLanding } from '../src/landing/index.ts';
+import { INSTALL_COMMANDS } from '../src/landing/install.ts';
 import { SAMPLE_SOURCE } from '../src/landing/sample.ts';
 import { EXAMPLES } from '../src/repl/examples.ts';
 import { loadPages, renderSite } from '../src/site.ts';
@@ -39,7 +40,6 @@ const demo: DemoData = {
   ],
 };
 
-const sizes = { loaderMin: '3.9 kB', loaderMax: '7.3 kB', listener: '991 B' };
 const pages = loadPages();
 if (!isBenchmarks(benchmarks)) {
   throw new TypeError('benchmarks.json has the wrong shape');
@@ -66,51 +66,57 @@ describe('the landing page', () => {
     }
   });
 
-  it('leads with the claim that holds for every app, and gives the measured facts', () => {
-    expect(landing).toContain(
-      `<h1 class="display">Your app grows. Its startup JavaScript <em>doesn't</em>.</h1>`,
-    );
+  it('leads with what the visitor gets: only the code they click loads', () => {
+    expect(landing).toContain('<h1 class="display">Only the code you <em>click</em> loads.</h1>');
     expect(landing).not.toMatch(/<h1[^>]*>[^<]*\d/);
-    expect(landing).toContain(
-      'one loader file, 3.9 kB to 7.3 kB gzip depending on the features the app uses, the same from 10 widgets to 1,000 widgets.',
-    );
-    expect(landing).toContain('A 991 B listener is inline in the HTML.');
-    expect(landing).toContain('Each click loads the handler and bindings it needs.');
-    expect(landing).toContain(
-      'idlip is a UI framework for TypeScript apps that the server renders.',
-    );
-    expect(landing).not.toContain('Server renders, browser resumes.');
-    expect(landing).not.toContain('4.9 kB');
+    expect(landing).toContain('idlip is a UI framework for server-rendered apps.');
+    expect(landing).not.toContain('Your app grows');
   });
 
-  it('names the chart by what it measures, not by the headline', () => {
+  it('keeps the scale claim and its conditions on the chart', () => {
     expect(landing).toContain('>JavaScript before the page is ready, by app size</h2>');
-    expect(landing.match(/Its startup JavaScript/g)).toHaveLength(1);
+    expect(landing).toContain('From 10 widgets to 1,000 widgets, idlip loads 4.7 kB');
+    expect(landing).toContain('loaded before the <code>load</code> event');
+    expect(landing).toContain('A loader is 3.9 kB to 7.3 kB');
+    expect(landing).toContain('991 B listener inline in the HTML');
+    expect(landing).toContain('Qwik 1 was not run');
   });
 
-  it('falls back to a plain headline when the cost grows', () => {
-    const grown = structuredClone(benchmarksData);
-    for (const group of grown.groups) {
-      if (group.name === grown.headline) {
-        group.metrics[group.metrics.length - 1].values.idlip = 50;
-      }
-    }
-    const headline = writeHeadline(grown, sizes);
-    expect(headline.conditions).toBe('');
-    expect(headline.before + headline.value + headline.after).toBe(
-      'Pages that run no view code on load.',
-    );
-    expect(writeHeadline(benchmarksData, sizes).conditions).not.toBe('');
-  });
-
-  it('has the install command with a copy button in the hero and at the end', () => {
-    expect(INSTALL_COMMAND).toBe('pnpm add idlip');
+  it('has the install tabs with a copy button in the hero and at the end', () => {
+    expect(landing.match(/data-install/g)).toHaveLength(2);
+    expect(landing.match(/role="tablist"/g)).toHaveLength(2);
+    expect(landing.match(/role="tab"/g)).toHaveLength(2 * INSTALL_COMMANDS.length);
+    // The pnpm tab is active and its command is plain text.
+    expect(landing.match(/aria-selected="true"[^>]*data-manager="pnpm"/g)).toHaveLength(2);
     expect(landing.match(/data-copy="pnpm add idlip"/g)).toHaveLength(2);
+    expect(
+      landing.match(/<code class="install-command"[^>]*>pnpm add idlip<\/code>/g),
+    ).toHaveLength(2);
+    expect(INSTALL_COMMANDS.map((item) => item.command)).toEqual([
+      'pnpm add idlip',
+      'npm install idlip',
+      'yarn add idlip',
+      'bun add idlip',
+    ]);
     const hero = landing.slice(0, landing.indexOf('id="resume-title"'));
-    expect(hero).toContain('data-copy="pnpm add idlip"');
+    expect(hero).toContain('data-install');
     const final = landing.slice(landing.indexOf('id="final-title"'));
     expect(final).toContain('class="button primary"');
-    expect(final).toContain('data-copy="pnpm add idlip"');
+    expect(final).toContain('data-install');
+    // Ids are unique across the two groups.
+    expect(landing).toContain('id="install-hero-pnpm"');
+    expect(landing).toContain('id="install-final-pnpm"');
+  });
+
+  it('has far less text than before the trim', () => {
+    const main = landing.slice(landing.indexOf('<main'), landing.indexOf('</main>'));
+    const text = main
+      .replaceAll(/<pre[\s\S]*?<\/pre>/g, ' ')
+      .replaceAll(/<[^>]+>/g, ' ')
+      .split(/\s+/)
+      .filter(Boolean);
+    // The page had 2,478 words in `<main>` outside code blocks. The goal was 40% fewer.
+    expect(text.length).toBeLessThan(1486);
   });
 
   it('answers the main objections with facts', () => {

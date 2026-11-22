@@ -5,10 +5,12 @@ import { ICON, REPOSITORY, escape, renderFooter, renderHead, renderHeader } from
 import { createRenderer } from '../markdown.ts';
 import type { RenderEnv } from '../markdown.ts';
 import type { Page } from '../site.ts';
-import { renderBenchmarks, writeHeadline } from './benchmarks.ts';
+import { renderBenchmarks } from './benchmarks.ts';
 import type { Benchmarks, Sizes } from './benchmarks.ts';
 import { renderFeatures } from './features.ts';
 import { formatBytes } from './format.ts';
+import { renderHeroStage } from './hero.ts';
+import { renderInstall } from './install.ts';
 import { renderResume } from './resume.ts';
 import { SAMPLE_FILE, SAMPLE_SOURCE } from './sample.ts';
 
@@ -30,9 +32,6 @@ function readSizes(demo: DemoData): Sizes {
   };
 }
 
-/** The install command. The package is not on npm before the 0.1 release. */
-export const INSTALL_COMMAND = 'pnpm add idlip';
-
 export interface LandingContext {
   base: string;
   /** The address of the first page of the guide. */
@@ -44,27 +43,17 @@ export interface LandingContext {
   benchmarks: Benchmarks;
 }
 
-/** The install command with its copy button. */
-function renderInstall(): string {
-  return `<div class="install"><code>${escape(INSTALL_COMMAND)}</code><button class="code-copy" type="button" data-copy="${escape(INSTALL_COMMAND)}" aria-label="Copy the install command">Copy</button></div>`;
-}
-
-function renderHero(base: string, start: string, benchmarks: Benchmarks, demo: DemoData): string {
-  const headline = writeHeadline(benchmarks, readSizes(demo));
-  const conditions =
-    headline.conditions === ''
-      ? ''
-      : `<p class="hero-note">${escape(headline.conditions)} <a href="#benchmarks">Benchmarks</a></p>`;
+function renderHero(base: string, start: string, demo: DemoData): string {
   return `<section class="tile tile-ink hero">
-  <h1 class="display">${escape(headline.before)}<em>${escape(headline.value)}</em>${escape(headline.after)}</h1>
-  <div>
-    <p class="lead">idlip is a UI framework for TypeScript apps that the server renders. No view code runs on load. A click loads one handler and the bindings it changed.</p>
+  <div class="hero-copy">
+    <h1 class="display">Only the code you <em>click</em> loads.</h1>
+    <p class="lead">idlip is a UI framework for server-rendered apps. No component code runs on load.</p>
+    ${renderInstall('hero')}
     <div class="actions">
       <a class="button primary" href="${base}${start}">Read the guide${ICON.arrow}</a>
-      ${renderInstall()}
     </div>
-    ${conditions}
   </div>
+  ${renderHeroStage(demo)}
 </section>`;
 }
 
@@ -84,32 +73,29 @@ function renderSample(demo: DemoData): string {
     <div class="tile chunks-tile">
       <p class="chunks-title">What the todo demo loads</p>
       <ul class="chunks">
-        <li><code>${escape(demo.loader.name)}</code><span>${formatBytes(demo.loader.gzip)}, loads with the page</span></li>
+        <li><code>${escape(demo.loader.name)}</code><span>${formatBytes(demo.loader.gzip)}, with the page</span></li>
         <li><code>inline listener</code><span>${formatBytes(demo.listener.gzip)}, in the HTML</span></li>
-        <li><code>${escape(demo.handler.name)}</code><span>${formatBytes(demo.handler.gzip)}, the first click on a checkbox</span></li>
-        <li><code>${escape(demo.binding.name)}</code><span>${formatBytes(demo.binding.gzip)}, the same click</span></li>
-        <li><code>${rest} more chunks</code><span>The event that needs each one</span></li>
+        <li><code>${escape(demo.handler.name)}</code><span>${formatBytes(demo.handler.gzip)}, first click</span></li>
+        <li><code>${escape(demo.binding.name)}</code><span>${formatBytes(demo.binding.gzip)}, same click</span></li>
+        <li><code>${rest} more chunks</code><span>One per event</span></li>
       </ul>
-      <p class="chunks-foot">The loader grows with the optional features an app uses: ${escape(readSizes(demo).loaderMin)} with none, ${escape(readSizes(demo).loaderMax)} with all of them and <code>skew</code> on. This demo uses none. The chart counts the benchmark dashboard, which uses some. Sizes are gzip -9.</p>
+      <p class="chunks-foot">Sizes are gzip.</p>
     </div>
   </div>
 </section>`;
 }
 
 /** Facts that stop a visitor from starting. Every line is in the docs or the package. */
-const OBJECTIONS: { term: string; text: string }[] = [
-  { term: 'License', text: 'MIT.' },
-  {
-    term: 'Maturity',
-    text: 'Pre-release, version 0.x. The package is not on npm before the 0.1 release, and the API can change between 0.x versions.',
-  },
-  { term: 'Runtime', text: 'Node 22 or later. The Vite plugin needs Vite 7 or later.' },
-  { term: 'Language', text: 'TypeScript. Views are TSX function components.' },
+const FACTS: { term: string; text: string }[] = [
+  { term: 'License', text: 'MIT' },
+  { term: 'Version', text: '0.x, not on npm before 0.1' },
+  { term: 'Runtime', text: 'Node 22, Vite 7' },
+  { term: 'Language', text: 'TypeScript, TSX' },
 ];
 
-function renderObjections(): string {
+function renderFacts(): string {
   let items = '';
-  for (const item of OBJECTIONS) {
+  for (const item of FACTS) {
     items += `<div><dt>${escape(item.term)}</dt><dd>${escape(item.text)}</dd></div>`;
   }
   return `<section aria-labelledby="facts-title">
@@ -121,12 +107,11 @@ function renderObjections(): string {
 function renderFinal(base: string, start: string): string {
   return `<section class="tile tile-ink final" aria-labelledby="final-title">
   <h2 class="display" id="final-title">Start with one command.</h2>
-  <div>
+  <div class="final-copy">
+    ${renderInstall('final')}
     <div class="actions">
       <a class="button primary" href="${base}${start}">Read the guide${ICON.arrow}</a>
-      ${renderInstall()}
     </div>
-    <p class="hero-note">MIT license. <a href="${REPOSITORY}" target="_blank" rel="noreferrer">Source on GitHub</a></p>
   </div>
 </section>`;
 }
@@ -151,12 +136,12 @@ ${renderHead(base, 'idlip', description, true)}
 <a class="skip" href="#content">Skip to the content</a>
 ${renderHeader(base, start)}
 <main id="content" class="landing">
-  ${renderHero(base, start, benchmarks, demo)}
+  ${renderHero(base, start, demo)}
   ${renderResume(demo)}
   ${renderFeatures(pages, base)}
   ${renderBenchmarks(benchmarks, findBenchmarksLink(pages, base, benchmarks.source), readSizes(demo))}
   ${renderSample(demo)}
-  ${renderObjections()}
+  ${renderFacts()}
   ${renderFinal(base, start)}
 </main>
 ${renderFooter()}

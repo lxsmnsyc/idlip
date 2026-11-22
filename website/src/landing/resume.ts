@@ -44,10 +44,10 @@ function code(text: string): string {
  */
 function renderSays(data: DemoData, live: boolean): string {
   const lines = [
-    'The server runs the component and sends HTML. The page is on screen before any script runs.',
-    `To make the page respond, hydration downloads the code and runs every component again. Resumption runs nothing: a ${formatBytes(data.listener.gzip)} listener waits for an event.`,
-    'You check the second todo. Resumption reads which handler to run from the HTML. It fetches that handler and the code of the one path the handler writes, nothing else.',
-    `${code(data.handlerName)} changed ${code(data.writes.join(', '))}. Only the code of that path runs, and it patches the row and the count. The rest of the page never ran code.`,
+    'The server sends HTML. The page shows before any script runs.',
+    `Hydration downloads and reruns every component. Resumption waits behind a ${formatBytes(data.listener.gzip)} listener.`,
+    'You check the second todo. Resumption fetches one handler and one binding.',
+    `${code(data.handlerName)} changed ${code(data.writes.join(', '))}. Only that path's code runs.`,
   ];
   const hidden = live ? ' aria-hidden="true"' : '';
   let says = '';
@@ -58,30 +58,6 @@ function renderSays(data: DemoData, live: boolean): string {
     ? `<p class="visually-hidden" aria-live="polite" data-says-live>${lines[0]}</p>`
     : '';
   return `<div class="resume-says">${says}${announce}</div>`;
-}
-
-/** The notes of one lane, one per step. */
-function renderNotes(data: DemoData, lane: Lane): string {
-  const rows = data.todos.length;
-  const notes =
-    lane === 'hydrate'
-      ? [
-          'Runs TodoApp and writes the HTML.',
-          `Loads all ${data.chunks.length} component chunks, runs TodoApp and its ${rows} rows again, and attaches listeners.`,
-          `The handler is already loaded. ${code(data.handlerName)} runs.`,
-          'Updates the nodes that read the change. Every node already ran code on load.',
-        ]
-      : [
-          `Runs TodoApp, marks each binding in the HTML and writes the model into ${code('<script i-state>')}.`,
-          'Loads the loader. No component code runs, and the state stays encoded.',
-          `The listener reads ${code(data.token)} from the checkbox. The loader fetches the handler and the binding chunk of ${code(data.writes.join(', '))}, decodes the state and runs ${code(data.handlerName)}.`,
-          `The model changed at ${code(data.writes.join(', '))}, so that binding chunk runs. It patches the row class and the count text.`,
-        ];
-  let html = '';
-  for (const [index, note] of notes.entries()) {
-    html += `<p data-at="${index + 1}">${note}</p>`;
-  }
-  return `<div class="lane-notes">${html}</div>`;
 }
 
 function renderRequest(file: DemoFile, label: string, from: number): string {
@@ -173,16 +149,14 @@ function renderMini(data: DemoData, lane: Lane): string {
 
 function renderLane(data: DemoData, lane: Lane, counts: Counts, step: number): string {
   const name = lane === 'hydrate' ? 'Hydration' : 'Resumption';
-  const what =
-    lane === 'hydrate' ? 'How most frameworks start a server page' : 'How idlip starts it';
+  const what = lane === 'hydrate' ? 'Most frameworks' : 'idlip';
   return `<div class="lane lane-${lane}">
   <div class="lane-head"><div><h3>${name}</h3><p>${what}</p></div>${renderCounters(counts, step)}</div>
   <div class="stations">
-    <div class="station station-server"><h4>Server</h4><p>Runs ${code('TodoApp')} and sends ${formatBytes(data.document.gzip)} of HTML</p></div>
+    <div class="station station-server"><h4>Server</h4><p>${formatBytes(data.document.gzip)} of HTML</p></div>
     <div class="station station-net"><h4>Network</h4>${renderNetwork(data, lane)}</div>
     <div class="station station-browser"><h4>Browser</h4>${renderMini(data, lane)}</div>
   </div>
-  ${renderNotes(data, lane)}
 </div>`;
 }
 
@@ -264,7 +238,7 @@ function renderCode(data: DemoData): string {
   ];
 
   return `<div class="tile resume-code">
-  <h3 class="resume-code-head">What the server sent for the second todo</h3>
+  <h3 class="resume-code-head">The HTML of the second todo</h3>
   <pre tabindex="0" role="group" aria-label="Server HTML"><code>${markText(row, rowMarks)}\n\n${markText(stateText, stateMarks)}</code></pre>
 </div>`;
 }
@@ -291,7 +265,7 @@ function renderStage(data: DemoData, step: number, controls: string): string {
     ${renderLane(data, 'resume', counts.resume, step)}
   </div>
   ${renderLegend()}
-  <p class="resume-note">The hydration lane is a model, not a measurement: idlip has no hydration build.</p>
+  <p class="resume-note">Hydration is modeled, not measured.</p>
 </figure>`;
 }
 
@@ -321,7 +295,7 @@ export function renderResume(data: DemoData): string {
   }
   return `<section class="resume" aria-labelledby="resume-title">
   <h2 class="row-title" id="resume-title">Hydration and resumption</h2>
-  <p class="row-lead">A server-rendered page is HTML: it shows, but nothing responds to a click yet. Both lanes start the same todo app. Step through them to see what each one loads and runs.</p>
+  <p class="row-lead">Same todo app, two ways to make it respond.</p>
   <div class="resume-track" data-resume>${renderStage(data, 1, renderControls())}</div>
   <ol class="resume-sequence">${sequence}</ol>
 </section>`;
