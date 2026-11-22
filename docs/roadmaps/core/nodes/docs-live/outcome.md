@@ -4,7 +4,7 @@
 
 Code samples on the docs pages and the landing page run in the page. A reader sees each result as a static page the build wrote, which resumes on a click. Editing the code reruns it 400 ms after typing stops, with no trip to the REPL.
 
-- **Live samples.** 41 on 15 docs pages, plus the landing counter. Pages: `views` (8), `reference/idlip` (8), `reference/syntax` (4), `forms` (3), `svg-and-html` (3), `components` (2), `dynamic-paths` (2), `effects` (2), `head` (2), `subscriptions` (2), `editor`, `errors`, `getting-started`, `global-events`, `refs` (1 each).
+- **Live samples.** 42 on 15 docs pages, plus the landing counter. Pages: `views` (8), `reference/idlip` (8), `reference/syntax` (4), `forms` (3), `svg-and-html` (3), `components` (3), `dynamic-paths` (2), `effects` (2), `head` (2), `subscriptions` (2), `editor`, `errors`, `getting-started`, `global-events`, `refs` (1 each).
 - **Each sample** has file tabs, a status in its bar, a REPL icon button, a Copy button, the code, a problem list, and Result and Compiled tabs.
 - **Compiled tab.** It lists the server module and each client chunk with its gzip size and when it loads. A row opens to show the code. Before an edit, the tab is the file the build wrote. After an edit, it shows the run.
 - **Props.** 15 samples that read props got a `props.json` tab with example values. Editing `props.json` reruns the sample (landing: `"start": 41` shows `41` and `Double: 82`).
@@ -13,6 +13,14 @@ Code samples on the docs pages and the landing page run in the page. A reader se
   - A sample of several files links to `/repl/`. The page adds the `#files=` hash on hover or focus, and the REPL waits for Run. Page HTML holds no base64 files.
   - The landing sample has no REPL button.
 - **Code from the address.** A docs page never runs code from its URL or hash. A sample runs the code the build put in the page, or the reader's own edits.
+
+## Several components in one file
+
+Rebased onto `batch/core` at `25f491a` (`multi-component-files`, `differential-children`, `for-key-callback`). Every live sample compiles and renders under the new rules (`key={(t) => t.id}`, named components).
+
+- `repl/chunks.ts` `listFileChunks` serves the chunks of every component of a file. A named component's chunk id is `/src/panel.tsx?idlip-Counter.handler=increment&lang.js`, and its file is `panel.Counter.handler.increment.js`, as the Vite plugin names it. Before this, the REPL and live samples served only the default export's chunks.
+- The REPL's JS tab and the Compiled tab list them too. A `view` chunk reads "loads for a new child".
+- `components.md`'s "Several components in one file" sample (`Panel` with two `Counter`s) is live, by its fence line only. In Chromium, a click on a `Counter` in the static frame loads `panel.Counter.handler.increment.js` and `panel.Counter.binding.count.js`. After an edit (`start={20}`), the run renders `120` and a click gives `121`.
 
 ## Markup
 
@@ -79,16 +87,16 @@ Checked in Chromium with Playwright against `vite preview` on port 48800 (stoppe
 
 ## Checks
 
-| Check                                 | Result                                                                                                 |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `pnpm --filter website build`         | pass, 28 pages, 42 static frames                                                                       |
-| `pnpm --filter website test`          | 108 tests in 9 files pass                                                                              |
-| `pnpm --filter website check:samples` | 47 samples, 41 live, 0 problems                                                                        |
-| `pnpm --filter website typecheck`     | pass                                                                                                   |
-| `pnpm --filter e2e typecheck`         | pass                                                                                                   |
-| `e2e/tests/website-live.spec.ts`      | 4 passed (`E2E_TARGET=fixture`, `--project chromium`)                                                  |
-| `rtk proxy pnpm lint`                 | no finding in `website/` or `e2e/`                                                                     |
-| `pnpm exec oxfmt --check .`           | only `docs/roadmaps/core/nodes/landing-trim/outcome.md`, which was unformatted on `batch/core` already |
+| Check                                 | Result                                                |
+| ------------------------------------- | ----------------------------------------------------- |
+| `pnpm --filter website build`         | pass, 28 pages, 43 static frames                      |
+| `pnpm --filter website test`          | 109 tests in 9 files pass                             |
+| `pnpm --filter website check:samples` | 49 samples, 42 live, 0 problems                       |
+| `pnpm --filter website typecheck`     | pass                                                  |
+| `pnpm --filter e2e typecheck`         | pass                                                  |
+| `e2e/tests/website-live.spec.ts`      | 4 passed (`E2E_TARGET=fixture`, `--project chromium`) |
+| `rtk proxy pnpm lint`                 | no finding in `website/` or `e2e/`                    |
+| `pnpm exec oxfmt --check .`           | clean                                                 |
 
 Tests:
 
@@ -116,7 +124,7 @@ Tests:
 
 ## Not done
 
-- **Static samples left.** `nesting.md` (2) and `reference/syntax.md`'s `Board` need a sibling `counter.tsx` file, and `nesting.md` belongs to another worker. `components.md`'s `Counter` and `Cart` need a `props.json` fence, which is more than a fence info edit. The `index.md` fragment stays static.
+- **Static samples left.** `nesting.md`'s `Counter` and `Board` and `reference/syntax.md`'s `Board` import a sibling `counter.tsx` from another fence. `nesting.md`'s `Dashboard` (several components in one file) reads `items`, so it needs a `props.json` fence. `components.md`'s `Counter` and `Cart` need one too. These are more than fence info edits on pages another worker owns. The `index.md` fragment stays static.
 - **The e2e spec skips in CI** until CI builds the website (see Checks).
 - **Reader bytes** are 27.4 kB of scripts and styles on `/docs/views/`, above the 17 kB the review named. The loader (9.1 kB) is the largest part.
 - **`search/index.ts`** still drops `<a class="code-repl">`, which no page has now. Harmless.
