@@ -14,7 +14,7 @@ import type {
   Scope,
 } from '../../../src/core/format.ts';
 import { patchList } from '../../../src/client/list/index.ts';
-import { onBlock, parseHtml } from '../../../src/client/patch/index.ts';
+import { addBlock, onBlock, parseHtml } from '../../../src/client/patch/index.ts';
 import type { Namespace } from '../../../src/client/patch/dom.ts';
 import { createContext, text } from '../../fixtures/reference.ts';
 import todoManifest from '../../fixtures/todo/expected/manifest.json' with { type: 'json' };
@@ -489,6 +489,8 @@ describe('nested lists', () => {
       }
       marker.data = 'c5:1';
       marker.after(document.createTextNode('empty'));
+      // A swap adds its block, as `setBranch$` does.
+      addBlock(marker);
     };
     const l2 = vi.fn(({ rows }: Scope) => (rows[0].item as Branch).kids);
     const tree = [{ id: 'b', kids: [leaf('k', [x])], leaves: [] }];

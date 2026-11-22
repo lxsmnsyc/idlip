@@ -6,21 +6,33 @@ type BlockHook = (start: Comment) => void;
 const addHooks: BlockHook[] = [];
 const removeHooks: BlockHook[] = [];
 
-/** The number of hooks that act on blocks inside list rows. */
+/** The number of hooks that may act on blocks inside list rows. */
 // oxlint-disable-next-line import/no-mutable-exports
 export let rowHooks = 0;
 
 /**
- * Registers code that runs when a condition or list block is added or removed.
- * Hooks are synchronous, and nothing awaits what they start. `outside` marks hooks that do
- * nothing for blocks inside rows, so removed rows need no walk for them.
+ * The number of blocks added so far. A row's cached nodes are good while it stays the same,
+ * since every branch swap and region swap adds its block.
  */
-export function onBlock(add: BlockHook, remove: BlockHook, outside?: true): void {
+// oxlint-disable-next-line import/no-mutable-exports
+export let addCount = 0;
+
+/**
+ * Registers a hook that does nothing for blocks inside list rows, so removed rows need no walk
+ * for it. Internal: `onBlock` is the public form.
+ */
+export function onPageBlock(add: BlockHook, remove: BlockHook): void {
   addHooks.push(add);
   removeHooks.push(remove);
-  if (!outside) {
-    rowHooks++;
-  }
+}
+
+/**
+ * Registers code that runs when a condition or list block is added or removed.
+ * Hooks are synchronous, and nothing awaits what they start.
+ */
+export function onBlock(add: BlockHook, remove: BlockHook): void {
+  onPageBlock(add, remove);
+  rowHooks++;
 }
 
 /**
@@ -31,6 +43,7 @@ export const added: Set<Comment> = new Set();
 
 /** Calls the add hooks for a block whose markup is in the page. */
 export function addBlock(start: Comment): void {
+  addCount++;
   if (HAS_INNER_LISTS) {
     added.add(start);
   }

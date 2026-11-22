@@ -1,5 +1,5 @@
 import { HAS_CHILDREN } from '../features.ts';
-import { onBlock } from './blocks.ts';
+import { onPageBlock } from './blocks.ts';
 import { isComment, isElement, matchMarker } from './guards.ts';
 
 type Index = Map<string, Node>;
@@ -37,7 +37,7 @@ function forgetNodes(start: Comment): void {
   }
 }
 
-onBlock(forgetNodes, forgetNodes, true);
+onPageBlock(forgetNodes, forgetNodes);
 
 /** Moves the walker from a start boundary comment to its end comment. */
 function skipChild(walker: TreeWalker): void {

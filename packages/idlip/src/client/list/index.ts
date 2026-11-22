@@ -1,18 +1,25 @@
 // oxlint-disable import/prefer-default-export
-import type { ListBinding, ListChunk, NodeBinding, PropBinding, Scope } from '../../core/format.ts';
+import type {
+  ListBinding,
+  ListChunk,
+  ListContext,
+  NodeBinding,
+  PropBinding,
+  Scope,
+} from '../../core/format.ts';
 import { failRegion } from '../errors.ts';
 import { HAS_CHILDREN, HAS_ERRORS, HAS_INNER_LISTS, HAS_KEY_FN } from '../features.ts';
 import { isComment, isElement, matchMarker } from '../patch/guards.ts';
-import { added, rowHooks } from '../patch/blocks.ts';
-import type { RowContext } from '../patch/patch.ts';
+import { addCount, added, rowHooks } from '../patch/blocks.ts';
 import { addBlock, findInnerBlocks, readField, removeBlock } from '../patch/index.ts';
 
 /**
- * The start marker of a row. It keeps the nodes of the row found so far, since a row stays in
- * the page between patches and is walked once.
+ * The start marker of a row. It keeps the nodes of the row found by its last walk, and the
+ * number of blocks added then, since a row stays in the page between patches.
  */
 interface RowStart extends Comment {
   rowNodes?: Map<string, Node>;
+  rowCount?: number;
 }
 
 interface Range {
@@ -92,10 +99,17 @@ function readRows(start: Comment): { rows: Range[]; end: Comment } {
     if (depth === 0 && data === '/l') {
       return { rows, end: node };
     }
-    if (data === 'i' && depth++ === 0) {
-      first = node;
-    } else if (data === '/i' && --depth === 0) {
-      rows.push({ start: first, end: node });
+    if (data === 'i') {
+      if (depth === 0) {
+        first = node;
+      }
+      depth++;
+    } else if (data === '/i' && depth > 0) {
+      // A stray end marker outside a row is skipped.
+      depth--;
+      if (depth === 0) {
+        rows.push({ start: first, end: node });
+      }
     }
   }
   throw new Error('A list has no end marker');
@@ -134,22 +148,22 @@ function getRowScope(scope: Scope, item: unknown, index: number): Scope {
   return { ...scope, rows: [...scope.rows, { item, index }] };
 }
 
-// Returns the node of a binding in a row. A node that left the page, such as one in a branch an
-// earlier binding swapped out, makes the row be walked again.
+// Returns the node of a binding in a row. The row is walked again only after a block was added
+// anywhere: every branch swap and region swap adds its block through the hooks, so a cached node
+// is in the page until then. A binding absent from an inactive branch costs no walk.
 function findRowNode(range: Range, name: string): Node | undefined {
   const { start } = range;
-  let node = start.rowNodes?.get(name);
-  if (!node?.isConnected) {
+  if (start.rowCount !== addCount) {
     start.rowNodes = findNodes(range);
-    node = start.rowNodes.get(name);
+    start.rowCount = addCount;
   }
-  return node;
+  return start.rowNodes!.get(name);
 }
 
 // Runs the chosen bindings of a kept row.
 async function patchRow(
   range: Range,
-  context: RowContext,
+  context: ListContext,
   prev: Scope,
   next: Scope,
 ): Promise<void> {
@@ -203,7 +217,7 @@ export async function patchList(
   start: Comment,
   prev: readonly unknown[],
   next: readonly unknown[],
-  context: RowContext,
+  context: ListContext,
 ): Promise<void> {
   const { list, page } = context;
   // A branch that swapped earlier in this patch rendered the list from the new model.
@@ -303,11 +317,11 @@ export async function patchList(
     before = row.start;
   }
 
-  // A kept row whose item is the same reference is left as it is when the bindings read nothing
-  // else that changed.
+  // A chosen row binding runs on every kept row: its paths may include state outside the list,
+  // and a path under `<list>.*` may read another item (`rows[i]`, a `find`), not the row's own.
   for (let j = 0; j < next.length; j++) {
     const old = olds[j];
-    if (old >= 0 && !(context.items && prev[old] === next[j])) {
+    if (old >= 0) {
       const prevScope = getRowScope(context.prev, prev[old], old);
       const nextScope = getRowScope(context.next, next[j], j);
       await patchRow(placed[j], context, prevScope, nextScope);
