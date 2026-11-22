@@ -21,19 +21,6 @@ import { buildSearchIndex } from './search/index.ts';
 const SEARCH_INDEX = 'search-index.json';
 
 const DOCS = fileURLToPath(new URL('../docs/', import.meta.url));
-const TODO_SOURCE = fileURLToPath(
-  new URL('../../examples/todo/src/todo.idlip.tsx', import.meta.url),
-);
-
-/** Drops the comment lines at the top of a file: they are notes for the repo, not for readers. */
-function dropLeadingComments(source: string): string {
-  const lines = source.split('\n');
-  let start = 0;
-  while (start < lines.length && lines[start].startsWith('//')) {
-    start += 1;
-  }
-  return lines.slice(start).join('\n');
-}
 
 export interface Page extends FrontMatter {
   /** The path of the Markdown file inside `docs`, such as `guide/state.md`. */
@@ -170,19 +157,12 @@ export function renderSite(
     return files;
   }
   files.set('repl/index.html', renderRepl({ base, start: flat[0]?.url ?? 'docs/' }));
-  let example = '';
-  try {
-    example = dropLeadingComments(readFileSync(TODO_SOURCE, 'utf8'));
-  } catch {
-    // The landing page shows no sample when the example is missing.
-  }
   files.set(
     'index.html',
     renderLanding({
       base,
       start: flat[0]?.url ?? 'docs/',
       pages,
-      example,
       demo,
       benchmarks: readBenchmarks(),
     }),

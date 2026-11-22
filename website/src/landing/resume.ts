@@ -266,7 +266,7 @@ function renderStage(data: DemoData, step: number, controls: string): string {
     ${renderLane(data, 'resume', counts.resume, step)}
   </div>
   ${renderLegend()}
-  <p class="resume-note">Hydration lane: this same build with every component chunk loaded and run at start. idlip has no hydration build, so its numbers are a model, not a measurement. Sizes are gzip -9.</p>
+  <p class="resume-note">The hydration lane is a model, not a measurement: idlip has no hydration build.</p>
 </figure>`;
 }
 

@@ -1,9 +1,14 @@
+import { existsSync } from 'node:fs';
+import { compile } from 'idlip/compiler';
 import { describe, expect, it } from 'vitest';
 import benchmarks from '../src/benchmarks.json' with { type: 'json' };
 import type { DemoData, DemoFile } from '../src/demo/data.ts';
-import { isBenchmarks, readGrowth } from '../src/landing/benchmarks.ts';
+import { isBenchmarks, readGrowth, writeHeadline } from '../src/landing/benchmarks.ts';
 import type { Benchmarks } from '../src/landing/benchmarks.ts';
 import { FEATURES } from '../src/landing/features.ts';
+import { INSTALL_COMMAND } from '../src/landing/index.ts';
+import { SAMPLE_SOURCE } from '../src/landing/sample.ts';
+import { EXAMPLES } from '../src/repl/examples.ts';
 import { loadPages, renderSite } from '../src/site.ts';
 
 function makeFile(name: string, gzip: number): DemoFile {
@@ -49,6 +54,8 @@ describe('the landing page', () => {
       'id="features-title"',
       'id="benchmarks"',
       'id="sample-title"',
+      'id="facts-title"',
+      'id="final-title"',
     ];
     let last = -1;
     for (const marker of order) {
@@ -56,6 +63,75 @@ describe('the landing page', () => {
       expect(at, marker).toBeGreaterThan(last);
       last = at;
     }
+  });
+
+  it('leads with the flat JavaScript cost from the data', () => {
+    const growth = readGrowth(benchmarksData);
+    const own = growth.rows[0].values.at(-1) ?? 0;
+    const value = `${String(Number(own.toFixed(1)))} kB`;
+    expect(landing).toContain(
+      `<h1 class="display">Pages ready on <em>${value}</em> of JavaScript, at any size.</h1>`,
+    );
+    expect(landing).toContain('before the load event');
+    expect(landing).toContain('Server renders, browser resumes.');
+  });
+
+  it('falls back to a plain headline when the cost grows', () => {
+    const grown = structuredClone(benchmarksData);
+    for (const group of grown.groups) {
+      if (group.name === grown.headline) {
+        group.metrics[group.metrics.length - 1].values.idlip = 50;
+      }
+    }
+    const headline = writeHeadline(grown);
+    expect(headline.conditions).toBe('');
+    expect(headline.before + headline.value + headline.after).toBe(
+      'Pages that run no view code on load.',
+    );
+    expect(writeHeadline(benchmarksData).value).toMatch(/kB$/);
+  });
+
+  it('has the install command with a copy button in the hero and at the end', () => {
+    expect(INSTALL_COMMAND).toBe('pnpm add idlip');
+    expect(landing.match(/data-copy="pnpm add idlip"/g)).toHaveLength(2);
+    const hero = landing.slice(0, landing.indexOf('id="resume-title"'));
+    expect(hero).toContain('data-copy="pnpm add idlip"');
+    const final = landing.slice(landing.indexOf('id="final-title"'));
+    expect(final).toContain('class="button primary"');
+    expect(final).toContain('data-copy="pnpm add idlip"');
+  });
+
+  it('answers the main objections with facts', () => {
+    const facts = landing.slice(
+      landing.indexOf('id="facts-title"'),
+      landing.indexOf('id="final-title"'),
+    );
+    for (const word of ['MIT', '0.x', 'Node 22', 'Vite 7', 'TypeScript', 'browsers']) {
+      expect(facts, word).toContain(word);
+    }
+  });
+
+  it('sets the Open Graph and Twitter tags', () => {
+    for (const tag of ['og:title', 'og:description', 'og:type', 'og:image']) {
+      expect(landing, tag).toContain(`property="${tag}"`);
+    }
+    expect(landing).toMatch(/property="og:image" content="[^"]*og\.png"/);
+    expect(landing).toContain('name="twitter:card"');
+    expect(existsSync(new URL('../public/og.png', import.meta.url))).toBe(true);
+  });
+
+  it('shows the sample in one container and sends no one to the REPL', () => {
+    expect(landing.match(/class="landing-sample /g)).toHaveLength(1);
+    expect(landing).toContain('Double:');
+    expect(landing.slice(landing.indexOf('<main'))).not.toContain('/repl/');
+    expect(landing).not.toContain('Open in REPL');
+  });
+
+  it('labels every bar with its app, so shade is not the only key', () => {
+    const growth = readGrowth(benchmarksData);
+    expect(landing.match(/class="grow-app"/g)).toHaveLength(
+      growth.rows.length * growth.apps.length,
+    );
   });
 
   it('shows the diagram as a stepper and as four static steps', () => {
@@ -92,6 +168,18 @@ describe('the landing page', () => {
     for (const [, href] of links) {
       expect(urls.has(href), href).toBe(true);
     }
+  });
+});
+
+describe('the landing sample', () => {
+  it('compiles with no diagnostics', () => {
+    const result = compile(SAMPLE_SOURCE, '/sample.idlip.tsx');
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  it('is the counter of the REPL', () => {
+    const counter = EXAMPLES.find((example) => example.id === 'counter');
+    expect(counter?.files[0].source).toBe(SAMPLE_SOURCE);
   });
 });
 

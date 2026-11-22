@@ -15,9 +15,10 @@ document.addEventListener('click', (event) => {
     return;
   }
   const copy = event.target.closest<HTMLButtonElement>('.code-copy');
-  const code = copy?.parentElement?.querySelector('pre');
-  if (copy && code) {
-    navigator.clipboard.writeText(code.textContent).then(
+  // A button with `data-copy` carries its own text, such as the install command.
+  const text = copy?.dataset.copy ?? copy?.parentElement?.querySelector('pre')?.textContent;
+  if (copy && text !== undefined) {
+    navigator.clipboard.writeText(text).then(
       () => {
         showLabel(copy, 'Copied', true);
       },

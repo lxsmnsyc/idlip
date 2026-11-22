@@ -150,7 +150,7 @@ function renderGrowthRow(
   let bars = '';
   for (const [index, value] of row.values.entries()) {
     const width = Math.max((value / max) * 100, 1).toFixed(1);
-    bars += `<li class="grow-bar grow-bar-${index}"><span class="grow-fill" style="width:${width}%"></span><span class="grow-value">${formatValue(value, growth.unit)}</span><span class="visually-hidden"> on ${escape(growth.apps[index])}</span></li>`;
+    bars += `<li class="grow-bar grow-bar-${index}" style="--i:${index}"><span class="grow-app">${escape(growth.apps[index])}</span><span class="grow-track"><span class="grow-fill" style="width:${width}%"></span><span class="grow-value">${formatValue(value, growth.unit)}</span></span></li>`;
   }
   const first = row.values[0];
   const last = row.values.at(-1) ?? first;
@@ -167,13 +167,11 @@ function joinNames(names: readonly string[]): string {
   return `${names.slice(0, -1).join(', ')} and ${names.at(-1) ?? ''}`;
 }
 
-/**
- * The lead under the heading, from the data: when idlip's cost stays within 10% from the smallest
- * app to the largest, it names that cost and both app sizes.
- */
-function writeLead(growth: Growth, own: string): string {
-  const fallback =
-    'idlip runs no component code on load. Code arrives with the first click that needs it.';
+/** idlip's cost when it stays within 10% from the smallest app to the largest, else `undefined`. */
+function readFlatCost(
+  growth: Growth,
+  own: string,
+): { value: number; small: string; large: string } | undefined {
   let mine: number[] = [];
   for (const row of growth.rows) {
     if (row.name === own) {
@@ -183,11 +181,45 @@ function writeLead(growth: Growth, own: string): string {
   const first = mine[0];
   const last = mine.at(-1);
   if (first === undefined || last === undefined || last > first * 1.1) {
-    return fallback;
+    return undefined;
   }
-  const small = growth.apps[0];
-  const large = growth.apps.at(-1) ?? small;
-  return `With ${escape(small)} or ${escape(large)}, idlip loads the same ${formatValue(last, growth.unit)} of JavaScript before the page is ready. The code of each widget arrives with the first click that needs it.`;
+  return { value: last, small: growth.apps[0], large: growth.apps.at(-1) ?? growth.apps[0] };
+}
+
+export interface Headline {
+  before: string;
+  /** The highlighted part: the number, or the fallback's key words. */
+  value: string;
+  after: string;
+  /** The conditions of the number, or an empty string for the fallback. */
+  conditions: string;
+}
+
+/** The hero headline: the flat cost as a number, or a plain headline when the data is not flat. */
+export function writeHeadline(data: Benchmarks): Headline {
+  const growth = readGrowth(data);
+  const flat = readFlatCost(growth, data.frameworks[0]);
+  if (flat === undefined) {
+    return { before: 'Pages that run no view code ', value: 'on load', after: '.', conditions: '' };
+  }
+  return {
+    before: 'Pages ready on ',
+    value: formatValue(flat.value, growth.unit),
+    after: ' of JavaScript, at any size.',
+    conditions: `From ${flat.small} to ${flat.large}, gzip, before the load event.`,
+  };
+}
+
+/**
+ * The lead under the heading, from the data: when idlip's cost stays within 10% from the smallest
+ * app to the largest, it names that cost and both app sizes.
+ */
+function writeLead(growth: Growth, own: string): string {
+  const flat = readFlatCost(growth, own);
+  if (flat === undefined) {
+    return 'idlip runs no component code on load. Code arrives with the first click that needs it.';
+  }
+  return `With ${escape(flat.small)} or ${escape(flat.large)}, idlip loads the same ${formatValue(flat.value, growth.unit)} of JavaScript before the page is ready. The code of each widget arrives with the first click that needs it.`;
 }
 
 /** The startup chart: how much JavaScript each framework loads as the app grows. */
@@ -204,10 +236,6 @@ export function renderBenchmarks(data: Benchmarks, link: string): string {
   for (const row of growth.rows) {
     rows += renderGrowthRow(row, growth, max, row.name === own);
   }
-  let legend = '';
-  for (const [index, app] of growth.apps.entries()) {
-    legend += `<li class="grow-key grow-key-${index}">${escape(app)}</li>`;
-  }
   let notes = '';
   if (growth.absent.length > 0) {
     notes += ` ${escape(joinNames(growth.absent))} ${growth.absent.length === 1 ? 'was' : 'were'} not run.`;
@@ -219,7 +247,6 @@ export function renderBenchmarks(data: Benchmarks, link: string): string {
   <h2 class="row-title" id="benchmarks">Your app grows. Its startup doesn't.</h2>
   <p class="row-lead">${writeLead(growth, own)}</p>
   <div class="tile grow-tile">
-    <ul class="grow-legend" aria-label="Apps">${legend}<li class="grow-key grow-key-delta">Growth</li></ul>
     <div class="grow-chart" role="list" aria-label="JavaScript before the page is ready, gzip, per framework">${rows}</div>
     <p class="tile-foot">JavaScript loaded before the <code>load</code> event, gzip. Run on ${escape(data.date)}, ${escape(data.machine)}.${notes} <a href="${link}">All results and how they were measured</a></p>
   </div>

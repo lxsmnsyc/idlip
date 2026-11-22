@@ -72,14 +72,49 @@ export function renderHeader(base: string, start: string, current?: string): str
 </header>`;
 }
 
+/** The share image, in `public/`. */
+export const SHARE_IMAGE = 'og.png';
+
+/**
+ * The origin of the deployed site, for the absolute address a share image needs. Empty when
+ * neither variable is set, which leaves a path from the site root.
+ */
+function readOrigin(): string {
+  const site = process.env.SITE_URL;
+  if (site !== undefined && site !== '') {
+    return site.replace(/\/$/, '');
+  }
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  return vercel !== undefined && vercel !== '' ? `https://${vercel}` : '';
+}
+
+/** The Open Graph and Twitter tags of the landing page. */
+function renderShareTags(base: string, title: string, description: string): string {
+  const image = `${readOrigin()}${base}${SHARE_IMAGE}`;
+  return `<meta property="og:title" content="${escape(title)}">
+<meta property="og:description" content="${escape(description)}">
+<meta property="og:type" content="website">
+<meta property="og:image" content="${escape(image)}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="A chart of the JavaScript each framework loads before the page is ready, as the app grows.">
+<meta name="twitter:card" content="summary_large_image">
+`;
+}
+
 /** The `<head>` of every page: the theme script, the stylesheet, the one script and the fonts. */
-export function renderHead(base: string, title: string, description: string): string {
+export function renderHead(
+  base: string,
+  title: string,
+  description: string,
+  share = false,
+): string {
   return `<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escape(title)}</title>
 <meta name="description" content="${escape(description)}">
-${THEME_SCRIPT}
+${share ? renderShareTags(base, title, description) : ''}${THEME_SCRIPT}
 <link rel="preload" href="${base}fonts/bricolage-grotesque.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="${base}assets/site.css">
 <script type="module" src="${base}assets/site.js"></script>

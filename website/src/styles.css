@@ -1214,7 +1214,7 @@ svg {
   font-variant-numeric: tabular-nums;
 }
 
-/* Features: seven tiles, three wide then four narrow. */
+/* Benefit cards: six tiles, three to a row. */
 
 .features {
   display: grid;
@@ -1227,10 +1227,6 @@ svg {
 
 .feature {
   grid-column: span 4;
-}
-
-.feature:nth-child(n + 4) {
-  grid-column: span 3;
 }
 
 .feature a {
@@ -1260,23 +1256,11 @@ svg {
 }
 
 .feature h3 {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
   margin: 0;
   font-size: var(--text-xl);
   font-weight: 600;
   line-height: 1.1;
   letter-spacing: -0.03em;
-}
-
-.feature h3 svg {
-  transition: transform var(--duration) var(--ease);
-}
-
-.feature a:hover h3 svg {
-  transform: translateX(3px);
 }
 
 .feature p {
@@ -1298,69 +1282,18 @@ svg {
 .feature-code {
   align-self: start;
   max-width: 100%;
-  overflow: hidden;
   padding: 0.35rem 0.75rem;
   border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--text);
   font-size: var(--text-xs);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 /* Benchmarks. */
 
 .grow-tile {
   padding: var(--pad) 0;
-}
-
-.grow-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1.25rem;
-  margin: 0 var(--pad) 1.5rem;
-  padding: 0;
-  color: var(--muted);
-  font-size: var(--text-sm);
-  list-style: none;
-}
-
-.grow-key::before {
-  display: inline-block;
-  width: 0.75rem;
-  height: 0.75rem;
-  margin-inline-end: 0.4rem;
-  border-radius: 3px;
-  vertical-align: -0.05em;
-  content: '';
-}
-
-.grow-key-0::before,
-.grow-bar-0 .grow-fill {
-  background: color-mix(in srgb, var(--text) 25%, transparent);
-}
-
-.grow-key-1::before,
-.grow-bar-1 .grow-fill {
-  background: color-mix(in srgb, var(--text) 45%, transparent);
-}
-
-.grow-key-2::before,
-.grow-bar-2 .grow-fill {
-  background: color-mix(in srgb, var(--text) 70%, transparent);
-}
-
-.grow-key-3::before,
-.grow-bar-3 .grow-fill {
-  background: var(--text);
-}
-
-.grow-key-delta::before {
-  display: none;
-}
-
-.grow-key-delta {
-  margin-inline-start: auto;
 }
 
 .grow-chart {
@@ -1411,6 +1344,22 @@ svg {
 
 .grow-bar {
   display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  min-width: 0;
+}
+
+.grow-app {
+  flex: none;
+  width: 6.5rem;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  text-align: end;
+}
+
+.grow-track {
+  display: flex;
+  flex: 1;
   gap: 0.5rem;
   align-items: center;
   min-width: 0;
@@ -1419,8 +1368,30 @@ svg {
 .grow-fill {
   height: 0.85rem;
   border-radius: 4px;
+  background: color-mix(in srgb, var(--text) 45%, transparent);
   transform-origin: left;
-  animation: grow-in 600ms var(--ease-out) both;
+}
+
+.grow-bar-0 .grow-fill {
+  background: color-mix(in srgb, var(--text) 25%, transparent);
+}
+
+.grow-bar-2 .grow-fill {
+  background: color-mix(in srgb, var(--text) 70%, transparent);
+}
+
+.grow-bar-3 .grow-fill {
+  background: var(--text);
+}
+
+/* With the script, the bars start empty and grow once, 220ms each, when the chart is on screen. */
+.grow-chart.is-armed .grow-fill {
+  transform: scaleX(0);
+}
+
+.grow-chart.is-armed.is-in .grow-fill {
+  transform: none;
+  transition: transform 220ms var(--ease-out) calc(var(--i) * 70ms);
 }
 
 .grow-row.is-own .grow-bar:last-child .grow-fill {
@@ -1433,12 +1404,6 @@ svg {
   color: var(--muted);
   font-family: var(--mono);
   font-size: var(--text-xs);
-}
-
-@keyframes grow-in {
-  from {
-    transform: scaleX(0);
-  }
 }
 
 @media (max-width: 48rem) {
@@ -1501,6 +1466,105 @@ svg {
   color: var(--muted);
 }
 
+.chunks-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.chunks-tile .chunks {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+}
+
+.chunks-title {
+  margin: 0;
+  font-weight: 800;
+}
+
+.chunks-foot {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+/* Hero and final call to action: the headline is a sentence, so it is smaller than a display word. */
+
+.hero .display,
+.final .display {
+  font-size: clamp(2.5rem, 6vw, 5.25rem);
+  line-height: 0.98;
+}
+
+.final {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  align-items: end;
+  gap: 3rem;
+  margin-top: var(--gap);
+  padding: 3rem;
+}
+
+.actions {
+  align-items: center;
+}
+
+.hero-note {
+  margin: 1.25rem 0 0;
+  color: var(--on-ink-muted);
+  font-size: var(--text-sm);
+}
+
+.hero-note a {
+  color: inherit;
+}
+
+.install {
+  display: inline-flex;
+  gap: 0.75rem;
+  align-items: center;
+  min-height: 3rem;
+  padding: 0 0.5rem 0 1.25rem;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--on-ink) 14%, transparent);
+  color: var(--on-ink);
+}
+
+.install code {
+  background: none;
+  font-size: var(--text-sm);
+}
+
+.install .code-copy {
+  position: static;
+  background: var(--on-ink);
+  color: var(--ink);
+}
+
+.install .code-copy.is-done {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+}
+
+/* Facts before you start. */
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1.5rem 2rem;
+  margin: 0;
+}
+
+.facts dt {
+  font-weight: 800;
+}
+
+.facts dd {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+}
+
 .site-footer {
   display: flex;
   flex-wrap: wrap;
@@ -1559,6 +1623,19 @@ svg {
 
 .code-copy:active {
   transform: scale(0.94);
+}
+
+/* The visible button stays small. On touch, an invisible layer grows the hit target to 44px. */
+@media (pointer: coarse) {
+  .code-copy::after {
+    position: absolute;
+    inset: -0.7rem -0.35rem;
+    content: '';
+  }
+
+  .install .code-copy {
+    position: relative;
+  }
 }
 
 .code-copy.is-done {
@@ -1881,7 +1958,8 @@ svg {
 /* Narrow screens. */
 
 @media (max-width: 70rem) {
-  .hero {
+  .hero,
+  .final {
     grid-template-columns: minmax(0, 1fr);
     gap: 2rem;
   }
@@ -1891,8 +1969,7 @@ svg {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .feature,
-  .feature:nth-child(n + 4) {
+  .feature {
     grid-column: span 6;
   }
 
@@ -1934,12 +2011,12 @@ svg {
     padding-inline: 0.5rem;
   }
 
-  .hero {
+  .hero,
+  .final {
     padding: 2.5rem 1.5rem 1.5rem;
   }
 
-  .feature,
-  .feature:nth-child(n + 4) {
+  .feature {
     grid-column: span 12;
   }
 
