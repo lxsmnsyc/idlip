@@ -26,6 +26,9 @@ shared: []
 reserves: []
 provides: []
 depends_on:
+  - on: for-key-callback
+    kind: hard
+    why: the <For> API changes before the first release
   - on: plain-tsx
     kind: hard
     why: the file convention changes before the first release

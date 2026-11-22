@@ -1,7 +1,7 @@
 ---
 id: website-landing
 title: Make the landing page sell the benefit, from the final review
-status: todo
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-22
-spent:
+spent: 754000
 owns:
   - website/src/landing/**
   - website/src/client/**
