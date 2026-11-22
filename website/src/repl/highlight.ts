@@ -17,10 +17,10 @@ export function highlight(code: string, language: Language): string {
   if (language === 'plain') {
     return escapeHtml(code);
   }
-  const html = LANGUAGES[language](code);
-  const start = html.indexOf('<code>') + '<code>'.length;
-  const end = html.lastIndexOf('</code>');
-  return html.slice(start, end);
+  const rendered = LANGUAGES[language](code);
+  const start = rendered.indexOf('<code>') + '<code>'.length;
+  const end = rendered.lastIndexOf('</code>');
+  return rendered.slice(start, end);
 }
 
 /** The language of a file of the REPL, by its name. */

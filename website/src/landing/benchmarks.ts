@@ -178,7 +178,7 @@ function readFlatCost(
       mine = row.values;
     }
   }
-  const first = mine[0];
+  const first = mine.at(0);
   const last = mine.at(-1);
   if (first === undefined || last === undefined || last > first * 1.1) {
     return undefined;

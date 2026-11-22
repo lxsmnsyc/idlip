@@ -207,11 +207,11 @@ function highlight(text: string): string {
   const language = core.startsWith('<') ? 'html' : 'js';
   const env: RenderEnv = { headings: [], lead: '', link: (href) => href };
   const block = renderer.render(`\`\`\`${language}\n${core}\n\`\`\`\n`, env);
-  const code = /<code[^>]*>([\s\S]*)<\/code>/.exec(block)?.[1];
-  if (code === undefined) {
+  const inner = /<code[^>]*>([\s\S]*)<\/code>/.exec(block)?.[1];
+  if (inner === undefined) {
     return escape(text);
   }
-  return `${escape(text.slice(0, start))}${code.replace(/\n$/, '')}${escape(text.slice(start + core.length))}`;
+  return `${escape(text.slice(0, start))}${inner.replace(/\n$/, '')}${escape(text.slice(start + core.length))}`;
 }
 
 /** Highlights text and wraps each mark, found in order, in a `<mark>` lit at its steps. */

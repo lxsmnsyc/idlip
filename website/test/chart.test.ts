@@ -7,7 +7,14 @@ interface FakeChart {
 
 function makeChart(): FakeChart {
   const added: string[] = [];
-  return { added, classList: { add: (name) => added.push(name) } };
+  return {
+    added,
+    classList: {
+      add: (name) => {
+        added.push(name);
+      },
+    },
+  };
 }
 
 type Callback = (entries: { isIntersecting: boolean }[]) => void;
@@ -17,12 +24,10 @@ async function load(chart: FakeChart | null, observer: boolean): Promise<Callbac
   const callbacks: Callback[] = [];
   const window: Record<string, unknown> = {};
   if (observer) {
-    window.IntersectionObserver = class {
-      constructor(callback: Callback) {
-        callbacks.push(callback);
-      }
-      observe(): void {}
-      disconnect(): void {}
+    // A constructor that returns an object: `new` yields the object, with no class methods.
+    window.IntersectionObserver = function IntersectionObserver(callback: Callback) {
+      callbacks.push(callback);
+      return { observe: () => undefined, disconnect: () => undefined };
     };
   }
   vi.stubGlobal('window', window);
