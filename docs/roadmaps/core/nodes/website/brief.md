@@ -39,6 +39,12 @@ depends_on:
   - on: docs-live
     kind: hard
     why: samples run in place before the site goes public
+  - on: hero-animation
+    kind: hard
+    why: the public site ships the chosen hero
+  - on: docs-animations
+    kind: hard
+    why: the docs figures go public with the site
   - on: landing-trim
     kind: hard
     why: the trimmed landing page goes public
