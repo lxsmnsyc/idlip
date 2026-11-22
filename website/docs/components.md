@@ -240,5 +240,6 @@ A component is a function declaration whose name starts with a capital letter. A
 | `component-export`    | A component exported under another name, or exported both as default and by name.                                        |
 | `component-duplicate` | Two components whose names differ only in case. Their chunk files would collide.                                         |
 | `component-unused`    | A warning. A component with state that is not exported and that no exported component renders.                           |
+| `component-name`      | An exported function returns JSX, but its name does not start with a capital letter. Rename `counter` to `Counter`.      |
 
 [Views](./views.md) lists the errors of the view.

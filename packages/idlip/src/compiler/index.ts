@@ -116,6 +116,20 @@ export function compile(source: string, id: string, options: CompileOptions = {}
   // Analyze once and share the IR. Pick the components once for the handlers and the view.
   const ir = analyze(id, source);
   const selection = selectComponents(ir, source, id, options);
+  const empty = (diagnostics: CompileDiagnostic[]): CompileResult => ({
+    server: '',
+    client: [],
+    manifest: { module: id, events: [], handlers: {}, groups: {}, lists: {} },
+    diagnostics,
+  });
+  // A rule about the components already says what is wrong, so the view adds nothing.
+  for (const diagnostic of selection.diagnostics) {
+    if (diagnostic.severity === 'error') {
+      const diagnostics = [...ir.diagnostics];
+      addDiagnostics(diagnostics, selection.diagnostics);
+      return empty(diagnostics);
+    }
+  }
   const view = generate(ir, source, id, { ...options, selected: selection.selected });
   const diagnostics = [...view.diagnostics];
   addDiagnostics(diagnostics, selection.diagnostics);
@@ -129,12 +143,7 @@ export function compile(source: string, id: string, options: CompileOptions = {}
   }
   for (const diagnostic of diagnostics) {
     if (diagnostic.severity === 'error') {
-      return {
-        server: '',
-        client: [],
-        manifest: { module: id, events: [], handlers: {}, groups: {}, lists: {} },
-        diagnostics,
-      };
+      return empty(diagnostics);
     }
   }
 

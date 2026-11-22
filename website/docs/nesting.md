@@ -222,4 +222,4 @@ A component must keep its name when it is exported. `export { Counter as Tally }
 - **A dynamic hole inside a child** binds with its static paths. The read-tracking fallback of the root does not run in a child.
 - **A child's model is dropped when its block is removed.** When the block returns, the child starts again from its props. A condition that turns false and then true again does this.
 - **On a hot update**, a remounted child keeps its model. Its props come from the fresh render.
-- **A child is found only through an idlip module** that renders it in JSX: a component of the same file, or one that imports it. The plugin's `modules` option (default `src/**/*.tsx`) must match that parent and the child. A child in a `.tsx` file that the option misses is a build error that names the option.
+- **Finding a child.** The plugin finds a child only through an idlip module that renders it in JSX. That module is a component of the same file, or one that imports it. The plugin's `modules` option (default `src/**/*.tsx`) must match that parent and the child. A child in a `.tsx` file that the option misses is a build error that names the option.

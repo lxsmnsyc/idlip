@@ -116,6 +116,12 @@ export default function Board() {
     const module: unknown = await import(/* @vite-ignore */ url);
     expect(module).toHaveProperty('chunks', urls);
     expect(() => replaceChunkUrls('export const manifest = {};', urls)).toThrow(/chunks/);
+    // Only a generated record `$Name = { manifest, chunks, default: Name }` has its map replaced.
+    const author = "const $x = { chunks: { 'a': 'a' } };\n";
+    const record = "const $Row = { manifest: {}, chunks: { 'a': 'a' }, default: Row };\n";
+    const replaced = replaceChunkUrls(`${author}${record}`, { a: '/assets/a.js' });
+    expect(replaced).toContain(author);
+    expect(replaced).toContain('"a": "/assets/a.js"');
   });
 });
 

@@ -90,6 +90,30 @@ function readKeys(node: ObjectExpression): string[] {
 }
 
 /**
+ * Whether a declaration is a module record the compiler generates: `$Name = { manifest, chunks,
+ * default: Name }`, where the record's name is `$` and the name of its render function.
+ */
+function isRecord(name: string, init: ObjectExpression): boolean {
+  let manifest = false;
+  let render = false;
+  for (const property of init.properties) {
+    if (property.type !== 'Property' || property.key.type !== 'Identifier') {
+      continue;
+    }
+    if (property.key.name === 'manifest') {
+      manifest = true;
+    } else if (
+      property.key.name === 'default' &&
+      property.value.type === 'Identifier' &&
+      `$${property.value.name}` === name
+    ) {
+      render = true;
+    }
+  }
+  return manifest && render;
+}
+
+/**
  * Lists the chunk maps of a compiled server module: the value of `export const chunks = {…}`
  * and the `chunks` field of each module record `const $Name = { …, chunks: {…} }`.
  */
@@ -107,7 +131,7 @@ function findChunkMaps(program: Program): ObjectExpression[] {
       }
       if (declarator.id.name === 'chunks' && statement.type === 'ExportNamedDeclaration') {
         maps.push(declarator.init);
-      } else if (declarator.id.name.startsWith('$')) {
+      } else if (isRecord(declarator.id.name, declarator.init)) {
         for (const property of declarator.init.properties) {
           if (
             property.type === 'Property' &&

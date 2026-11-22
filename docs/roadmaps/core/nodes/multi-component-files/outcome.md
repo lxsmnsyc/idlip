@@ -18,9 +18,9 @@
 - **Compiler API.** `CompileResult.components?` (`CompiledComponent[]`), `listCompiled(result)` and `splitModule(module)` in `core/format.ts`. `compile` option `children` names the named components another file renders. `listChildImports(source, id)` returns `{ source, imported }`.
 - **Vite plugin.** `buildStart`, `load`, chunk URLs, `replaceChunkUrls`, feature detection and `classifyEdit` read every component. `findChildren` records the imported names per file.
 - **`idlip/testing`.** `mount` serves the chunks of every component, records a named component's chunk as `Counter.handler=increment`, and its check renders children from their slot models.
-- **Diagnostics.** `component-form` (arrow, function expression or unnamed default that holds JSX), `component-export` (export alias, or default and named export of one component), `component-duplicate` (names that differ only in case), `component-unused` (warning: a private stateful component nothing renders), and `module-reserved-name` for an author name equal to a record name. `codegen-unsupported` now allows components of the file and named imports.
+- **Diagnostics.** `component-form` (arrow, function expression or unnamed default that holds JSX), `component-export` (export alias, or default and named export of one component), `component-duplicate` (names that differ only in case), `component-unused` (warning: a private stateful component nothing renders), `component-name` (an exported function that returns JSX under a name without a capital letter, such as `counter` or `$B`), each at the declaration's span, and `module-reserved-name` for an author name equal to a record name. `codegen-unsupported` now allows components of the file and named imports.
 - **Docs.** `website/docs/components.md` ("Several components in one file" and the error table) and `website/docs/nesting.md` ("Several components in one file": a parent with a named and a private child, the chunk names, a named import).
-- **Tests.** Fixture `packages/idlip/test/fixtures/widgets/widgets.tsx` (default `Dashboard`, named `Counter`, private `Row`). `test/compiler/compile/components.test.ts` (14 tests: shape, mount with a click in each component, named imports, diagnostics). `test/vite/components.test.ts` (6 tests: build file names, chunk map, built server render of the page and of `Counter` as a root, dev serving, hot edits).
+- **Tests.** Fixture `packages/idlip/test/fixtures/widgets/widgets.tsx` (default `Dashboard`, named `Counter`, private `Row`). `test/compiler/compile/components.test.ts` (22 tests: shape, mount with a click in each component, named imports, diagnostics and their spans, a named-only file, a child of the same file inside a condition, `#` in paths). `test/vite/components.test.ts` (9 tests: build file names, chunk map, built server render of the page and of `Counter` as a root, dev serving, hot edits, a named-only file with a named and a private child inside conditions). `test/vite/condition-child.test.ts` (a child from another file inside a condition builds).
 
 ## Deviations
 
@@ -35,8 +35,9 @@
 
 ## Gotchas
 
-- Loader size: `getChunkId` adds 21 B with gzip. The todo loader is 4000 B against the 4096 B budget.
-- A stateful child inside a condition (`{open ? <Counter /> : null}`) compiles, and its branch chunk imports the child's view. `checkChunkImports` in the plugin allows a view import only from a list or view chunk, so such a build fails. This is older than this node and holds for children from other files too. The docs samples avoid it.
+- Loader size: `getChunkId` adds 28 B with gzip. The todo loader is 4007 B against the 4096 B budget. A version anchored on `[\w$]` saves 2 B but breaks non-ASCII component names.
+- A child inside a condition failed the build before this node (`checkChunkImports` allowed a view import only from list and view chunks). The `fix:` commit `5b28081` also allows binding and try chunks. It applies to `batch/core` on its own, with a one-line conflict in the regex name.
+- A file with named exports and no default export has no main component. Its server module has no `default`, and `CompileResult.manifest` is its first named component.
 - A stateless named export also gets a record and a render function, so it can be a page root. Where its file renders it, it is inlined as before.
 - `compileHandlers(file, source, ir, component)` takes the component now. Without it, it picks the first stateful component, as before.
 
@@ -47,7 +48,7 @@
 
 ## Verification
 
-- `pnpm --filter idlip build` ok. `pnpm --filter idlip test`: 62 files, 693 tests passed (673 before, 20 new).
+- `pnpm --filter idlip build` ok. `pnpm --filter idlip test`: 63 files, 705 tests passed (673 before, 32 new).
 - `pnpm --filter website build`: 28 pages. `check:samples`: 49 samples, 0 problems. `pnpm --filter website test`: 66 passed.
 - `E2E_PORT=48621 E2E_COUNTERS_PORT=48622 E2E_SUBS_PORT=48623 E2E_HOT_PORT=48624 pnpm -C e2e test`: 18 passed, including the loader budget.
 - `pnpm -C benchmarks/idlip build`, `build:rows`, `build:dashboard`, `build:scale`: all exit 0.

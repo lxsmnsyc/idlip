@@ -293,9 +293,11 @@ export function generate(
 
   // A module-level name that codegen also generates would be declared twice in a chunk.
   const moduleSource = new ModuleSource(ir.file, source);
+  // Every component other than the main one has a record `$<Name>`. The main one gets a record
+  // too when another component of the file renders it.
   const reserved = new Set(HELPER_NAMES);
-  if (selected.length > 1) {
-    for (const item of selected) {
+  for (const item of selected) {
+    if (!item.main || selected.length > 1) {
       reserved.add(`$${item.component.name}`);
     }
   }

@@ -32,6 +32,8 @@ interface Exports {
   main: string | undefined;
   /** The local names of the components exported by name. */
   named: Set<string>;
+  /** Every module-level function declaration by name. */
+  nodes: Map<string, AstNode>;
 }
 
 function isAstNode(value: unknown): value is AstNode {
@@ -72,16 +74,42 @@ function readExports(
   components: ReadonlySet<string>,
   report: (rule: string, message: string, node: AstNode) => void,
 ): Exports {
-  const exports: Exports = { main: undefined, named: new Set() };
+  const exports: Exports = { main: undefined, named: new Set(), nodes: new Map() };
   const formMessage = (name: string): string =>
     `${name} is a function value. Write the component as a function declaration: \`function ${name}(props) { … }\``;
+  // An exported function that returns JSX under a name that is not capitalized.
+  const checkName = (node: AstNode & { id: { name: string } | null }): boolean => {
+    const name = node.id?.name ?? '';
+    if (/^[A-Z]/.test(name) || !hasJsx(node)) {
+      return true;
+    }
+    const bare = name.replace(/^[^A-Za-z]+/, '');
+    const fixed = bare === '' ? 'App' : `${bare.slice(0, 1).toUpperCase()}${bare.slice(1)}`;
+    report(
+      'component-name',
+      `${name} returns JSX, but a component name starts with a capital letter. Rename it, such as \`${fixed}\``,
+      node,
+    );
+    return false;
+  };
 
   for (const statement of program.body) {
+    // Each function declaration by name, for the spans of the diagnostics.
+    const inner =
+      statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
+        ? statement.declaration
+        : statement;
+    if (inner?.type === 'FunctionDeclaration' && inner.id !== null) {
+      exports.nodes.set(inner.id.name, inner);
+    }
+
     // `export default function App`, `export default App`, and an anonymous default.
     if (statement.type === 'ExportDefaultDeclaration') {
       const declaration = statement.declaration;
       if (declaration.type === 'FunctionDeclaration' && declaration.id !== null) {
-        exports.main = declaration.id.name;
+        if (checkName(declaration)) {
+          exports.main = declaration.id.name;
+        }
       } else if (declaration.type === 'Identifier' && components.has(declaration.name)) {
         exports.main = declaration.name;
       } else if (
@@ -104,6 +132,8 @@ function readExports(
       if (declaration?.type === 'FunctionDeclaration' && declaration.id !== null) {
         if (components.has(declaration.id.name)) {
           exports.named.add(declaration.id.name);
+        } else {
+          checkName(declaration);
         }
       }
       if (statement.source === null) {
@@ -209,6 +239,10 @@ export function selectComponents(
   }
   const program = parseSync(ir.file, source, { lang: 'tsx' }).program;
   const exports = readExports(program, new Set(byName.keys()), report);
+  const findSpan = (name: string): { start: number; end: number } => {
+    const node = exports.nodes.get(name);
+    return node === undefined ? { start: 0, end: 0 } : { start: node.start, end: node.end };
+  };
 
   // Two names that differ only in case would give chunk files that differ only in case.
   const lower = new Map<string, string>();
@@ -223,7 +257,7 @@ export function selectComponents(
           other === component.name
             ? `The file declares the component ${other} twice`
             : `The components ${other} and ${component.name} differ only in case, so their chunk files would collide on a case-insensitive file system`,
-        span: { start: 0, end: 0 },
+        span: findSpan(component.name),
       });
     }
     lower.set(key, component.name);
@@ -233,7 +267,7 @@ export function selectComponents(
       rule: 'component-export',
       severity: 'error',
       message: `${exports.main} is both the default export and a named export. Export it once`,
-      span: { start: 0, end: 0 },
+      span: findSpan(exports.main),
     });
   }
   if (diagnostics.length > 0) {
@@ -274,7 +308,7 @@ export function selectComponents(
           rule: 'component-unused',
           severity: 'warning',
           message: `${component.name} is neither exported nor rendered by an exported component, so it is not compiled`,
-          span: { start: 0, end: 0 },
+          span: findSpan(component.name),
         });
       }
       continue;

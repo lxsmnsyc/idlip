@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { compile } from '../../../src/compiler/index.ts';
-import { getChunkFile, getChunkId, listCompiled } from '../../../src/core/format.ts';
+import { getChunkFile, getChunkId, listCompiled, splitModule } from '../../../src/core/format.ts';
 import type { CompileResult } from '../../../src/core/format.ts';
 import { mount } from '../../../src/testing/index.ts';
 import type { MountedPage } from '../../../src/testing/index.ts';
@@ -227,5 +227,132 @@ export function Panel() { return <p>{$Panel}</p>; }
 export default function App() { return <i />; }
 `;
     expect(listErrors(compile(source, '/src/a.tsx'))).toContain('error:module-reserved-name');
+  });
+
+  it('rejects a record name in a file whose only component is named', () => {
+    const source = `const $Counter = 1;
+export function Counter() { let n = $Counter; function inc() { n = n + 1; } return <p on:click={inc}>{n}</p>; }
+`;
+    expect(listErrors(compile(source, '/src/a.tsx'))).toEqual(['error:module-reserved-name']);
+  });
+
+  it('names a function that returns JSX without a capital letter', () => {
+    const lower = compile('export function counter() {\n  return <p />;\n}\n', '/src/a.tsx');
+    expect(listErrors(lower)).toEqual(['error:component-name']);
+    expect(lower.diagnostics[0].message).toContain('`Counter`');
+    const dollar = compile('export function $B() {\n  return <p />;\n}\n', '/src/b.tsx');
+    expect(listErrors(dollar)).toEqual(['error:component-name']);
+    const plain = compile(
+      'export function format(n: number) { return n.toFixed(1); }\nexport default function App() { return <p />; }\n',
+      '/src/c.tsx',
+    );
+    expect(listErrors(plain)).toEqual([]);
+  });
+
+  it('points each component diagnostic at the declaration', () => {
+    const duplicate = `export function Panel() { return <p />; }
+export function PANEL() { return <b />; }
+export default function App() { return <i />; }
+`;
+    const [first] = compile(duplicate, '/src/a.tsx').diagnostics;
+    expect(first.span.start).toBe(duplicate.indexOf('function PANEL'));
+
+    const both = 'export function App() { return <p />; }\nexport default App;\n';
+    const [twice] = compile(both, '/src/b.tsx').diagnostics;
+    expect(twice.rule).toBe('component-export');
+    expect(twice.span.start).toBe(both.indexOf('function App'));
+
+    const unused = `function Unused() { let n = 0; function inc() { n = n + 1; } return <p on:click={inc}>{n}</p>; }
+export default function App() { return <p />; }
+`;
+    const [warning] = compile(unused, '/src/c.tsx').diagnostics;
+    expect(warning.span).toEqual({ start: 0, end: unused.indexOf('\n') });
+  });
+});
+
+describe('a file with named components and no default export', () => {
+  const TOOLS = `import type { JSX } from 'idlip/jsx-runtime';
+export function Clock(props: { at: number }): JSX.Element {
+  let at = props.at;
+  function tick() { at = at + 1; }
+  return <time on:click={tick}>{at}</time>;
+}
+export function Toggle(): JSX.Element {
+  let on = false;
+  function flip() { on = !on; }
+  return <button on:click={flip}>{on ? 'on' : 'off'}</button>;
+}
+`;
+
+  it('puts the first named component in the manifest and the others in components', () => {
+    const result = compile(TOOLS, '/src/tools.tsx');
+    expect(listErrors(result)).toEqual([]);
+    expect(result.manifest.module).toBe('/src/tools.tsx#Clock');
+    expect(result.client[0].chunk).toBe('handler=tick');
+    expect(result.components?.map((item) => item.manifest.module)).toEqual([
+      '/src/tools.tsx#Toggle',
+    ]);
+  });
+
+  it('exports a record and a render function per component and no default', () => {
+    const { server } = compile(TOOLS, '/src/tools.tsx');
+    expect(server).not.toContain('export default');
+    expect(server).not.toContain('export const manifest');
+    expect(server).not.toContain('export const chunks');
+    expect(server).toContain('export const $Clock = {');
+    expect(server).toContain('export function Toggle(props, context, model)');
+  });
+
+  it('renders and resumes a named component as the page root', async () => {
+    // `mount` renders the default export, so the test wraps the named one in it.
+    const source = `${TOOLS}export default function Page(): JSX.Element { return <main><Toggle /></main>; }\n`;
+    page = await mount(source, {}, { id: '/src/tools.tsx' });
+    page.click('button');
+    await page.settled();
+    expect(page.text('button')).toBe('on');
+    expect(page.loaded().toSorted()).toEqual(['Toggle.binding=on', 'Toggle.handler=flip']);
+  });
+});
+
+describe('a child inside a condition', () => {
+  it('adds a component of the same file when the condition turns true', async () => {
+    const source = `import type { JSX } from 'idlip/jsx-runtime';
+function Counter(props: { start: number }): JSX.Element {
+  let count = props.start;
+  function increment() { count = count + 1; }
+  return <output on:click={increment}>{count}</output>;
+}
+export default function Panel(): JSX.Element {
+  let open = false;
+  function show() { open = !open; }
+  return <main><button on:click={show}>Show</button>{open ? <Counter start={1} /> : null}</main>;
+}
+`;
+    page = await mount(source, {}, { id: '/src/panel.tsx' });
+    expect(page.root.querySelector('output')).toBeNull();
+    page.click('button');
+    await page.settled();
+    expect(page.text('output')).toBe('1');
+    expect(page.loaded()).toContain('Counter.view');
+    page.click('output');
+    await page.settled();
+    expect(page.text('output')).toBe('2');
+    expect(page.loaded().slice(-2).toSorted()).toEqual([
+      'Counter.binding=count',
+      'Counter.handler=increment',
+    ]);
+  });
+});
+
+describe('module ids with a # in the path', () => {
+  it('keeps a # in a folder or file name as part of the file', () => {
+    expect(getChunkId('/src/a#b/c.tsx', 'handler=x')).toBe(
+      '/src/a#b/c.tsx?idlip-handler=x&lang.js',
+    );
+    expect(getChunkId('/src/A#B/c.tsx#Row', 'view')).toBe('/src/A#B/c.tsx?idlip-Row.view&lang.js');
+    expect(getChunkId('/src/x#Y.tsx', 'list=1')).toBe('/src/x#Y.tsx?idlip-list=1&lang.js');
+    expect(splitModule('/src/a#b/c.tsx')).toEqual({ file: '/src/a#b/c.tsx', name: undefined });
+    expect(splitModule('/src/A#B/c.tsx#Row')).toEqual({ file: '/src/A#B/c.tsx', name: 'Row' });
+    expect(splitModule('/src/x#Y.tsx')).toEqual({ file: '/src/x#Y.tsx', name: undefined });
   });
 });

@@ -375,16 +375,21 @@ export function listCompiled(result: CompileResult): CompiledComponent[] {
   return [{ manifest: result.manifest, client: result.client }, ...(result.components ?? [])];
 }
 
+/** The `#<Name>` at the end of the module id of a component other than the default export. */
+const COMPONENT_SUFFIX = /#([A-Z][^#?/.]*)$/;
+
 /**
  * Splits a module id into its file and the name of the component. The default export of a
  * file has the file's id, `/src/todo.tsx`. Any other component adds `#` and its name,
  * `/src/widgets.tsx#Counter`.
  */
 export function splitModule(module: string): { file: string; name: string | undefined } {
-  const at = module.lastIndexOf('#');
-  return at === -1
+  // Only a final `#` and a capitalized name with no `/`, `.` or `?` names a component, so a
+  // folder such as `/src/a#b/` stays part of the file.
+  const match = COMPONENT_SUFFIX.exec(module);
+  return match === null
     ? { file: module, name: undefined }
-    : { file: module.slice(0, at), name: module.slice(at + 1) };
+    : { file: module.slice(0, match.index), name: match[1] };
 }
 
 /** `idlip/compiler`. */
@@ -410,6 +415,7 @@ export function getChunkFile(chunk: string): string {
  * for the module `/src/widgets.tsx#Counter`.
  */
 export function getChunkId(module: string, chunk: string): string {
-  // The replace costs the loader 18 B with gzip, a branch on `lastIndexOf` 32 B.
-  return `${module}?idlip-${chunk}&lang.js`.replace(/#([^#?]*)\?idlip-/, '?idlip-$1.');
+  // The name is a capital letter and no `#`, `?`, `/` or `.`, as in `splitModule`, so a `#` in a
+  // folder or file name stays. The replace costs the loader less than a branch.
+  return `${module}?idlip-${chunk}&lang.js`.replace(/#([A-Z][^#?/.]*)\?idlip-/, '?idlip-$1.');
 }

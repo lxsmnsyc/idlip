@@ -195,3 +195,83 @@ describe('a file with several components in a build', () => {
     }
   }, 60_000);
 });
+
+// Named components only, one of which shows a private child and a named one inside conditions.
+const TOOLS = `import type { JSX } from 'idlip/jsx-runtime';
+function Badge(props: { label: string }): JSX.Element {
+  let seen = false;
+  function see() { seen = true; }
+  return <b on:click={see}>{seen ? props.label : '?'}</b>;
+}
+export function Clock(props: { at: number }): JSX.Element {
+  let at = props.at;
+  function tick() { at = at + 1; }
+  return <time on:click={tick}>{at}</time>;
+}
+export function Panel(): JSX.Element {
+  let open = false;
+  function show() { open = !open; }
+  return <main><button on:click={show}>Show</button>{open ? <Badge label="new" /> : null}{open ? <Clock at={1} /> : null}</main>;
+}
+`;
+
+const TOOLS_ENTRY = `import { render as renderHtml } from 'idlip/server';
+import { Panel } from './tools.tsx';
+export function render(): Promise<string> {
+  return renderHtml(Panel, {});
+}
+`;
+
+describe('a file with named components only in a build', () => {
+  let root = '';
+
+  beforeAll(async () => {
+    root = createApp({ 'src/tools.tsx': TOOLS, 'src/entry-server.ts': TOOLS_ENTRY });
+    await build(root);
+  }, 60_000);
+
+  afterAll(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('names every chunk after its component', () => {
+    const urls = readChunkUrls(path.join(root, 'dist/.idlip/chunks.json'));
+    expect(urls['/src/tools.tsx?idlip-Panel.handler=show&lang.js']).toMatch(
+      /^\/assets\/tools\.Panel\.handler\.show/,
+    );
+    expect(urls['/src/tools.tsx?idlip-Clock.view&lang.js']).toMatch(
+      /^\/assets\/tools\.Clock\.view/,
+    );
+    expect(urls['/src/tools.tsx?idlip-Badge.view&lang.js']).toMatch(
+      /^\/assets\/tools\.Badge\.view/,
+    );
+    // No chunk has the file's id alone, since the file has no default export.
+    for (const id of Object.keys(urls)) {
+      expect(id === 'build' || /\?idlip-[A-Z]/.test(id)).toBe(true);
+    }
+  });
+
+  it('builds a branch that adds a named and a private child of the same file', () => {
+    const urls = readChunkUrls(path.join(root, 'dist/.idlip/chunks.json'));
+    const code = readFileSync(
+      path.join(root, 'dist/client', urls['/src/tools.tsx?idlip-Panel.binding=open&lang.js']),
+      'utf8',
+    );
+    expect(code).toContain('/src/tools.tsx#Badge');
+    expect(code).toContain('/src/tools.tsx#Clock');
+  });
+
+  it('renders the named root with its built chunk URLs', async () => {
+    const entry: unknown = await import(
+      pathToFileURL(path.join(root, 'dist/server/entry-server.mjs')).href
+    );
+    const render: unknown = Reflect.get(Object(entry), 'render');
+    if (!isRender(render)) {
+      throw new Error('The server entry has no render function');
+    }
+    const html = await render();
+    expect(html).toContain('<button on:click=');
+    expect(html).toMatch(/\/assets\/tools\.Panel\.handler\.show[^"]*\.js/);
+    expect(html).toContain('/src/tools.tsx#Clock');
+  });
+});
