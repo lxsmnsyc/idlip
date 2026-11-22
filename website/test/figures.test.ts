@@ -279,13 +279,15 @@ describe('the figure player', () => {
     expect(root.dataset.step).toBe('press');
   });
 
-  it('plays the click from the row, ignores clicks while it runs, and undoes after', () => {
+  it('plays the click from the row, ignores clicks while it runs, and replays it cached after', () => {
     const root = start(false);
     see(1);
     const toggle = getToggle(root);
+    const live = root.querySelector('[data-figure-live]');
     toggle.click();
     expect(root.dataset.step).toBe('press');
     expect(root.classList.contains('is-hands')).toBe(true);
+    expect(root.classList.contains('is-cached')).toBe(false);
     expect(toggle.checked).toBe(false);
     vi.advanceTimersByTime(300);
     toggle.click();
@@ -293,14 +295,41 @@ describe('the figure player', () => {
     expect(toggle.checked).toBe(false);
     vi.advanceTimersByTime(5000);
     expect(root.dataset.step).toBe('patch');
+    expect(toggle.checked).toBe(true);
+
+    // A later click replays Update, Model and the patch with the chunks cached. The row goes back.
     toggle.click();
-    expect(root.dataset.step).toBe('start');
-    expect(toggle.checked).toBe(false);
-    expect(root.querySelector('[data-figure-live]')?.textContent).toBe(
-      'Two <b> is not done again.',
-    );
+    expect(root.dataset.step).toBe('press');
+    expect(root.classList.contains('is-cached')).toBe(true);
+    expect(root.classList.contains('is-flipped')).toBe(true);
+    expect(toggle.checked).toBe(true);
     vi.advanceTimersByTime(5000);
-    expect(root.dataset.step).toBe('start');
+    expect(root.dataset.step).toBe('patch');
+    expect(toggle.checked).toBe(false);
+    expect(live?.textContent).toBe('Already loaded. Two <b> is marked not done.');
+
+    // The next one changes it again.
+    toggle.click();
+    expect(root.classList.contains('is-flipped')).toBe(false);
+    expect(root.classList.contains('is-cached')).toBe(true);
+    vi.advanceTimersByTime(5000);
+    expect(toggle.checked).toBe(true);
+    expect(live?.textContent).toBe('Already loaded. Two <b> is marked done.');
+  });
+
+  it('clears the live line before it repeats the same text', () => {
+    const root = start(false, 'mvu-loop');
+    const live = root.querySelector('[data-figure-live]');
+    see(1);
+    vi.advanceTimersByTime(20_000);
+    const loaded = live?.textContent;
+    expect(loaded).toMatch(/^Loaded /);
+    root.querySelector<HTMLButtonElement>('[data-figure-replay]')?.click();
+    vi.advanceTimersByTime(6900);
+    expect(root.dataset.step).toBe('patch');
+    expect(live?.textContent).toBe('');
+    vi.advanceTimersByTime(100);
+    expect(live?.textContent).toBe(loaded);
   });
 
   it('replays from the first step', () => {
@@ -311,6 +340,7 @@ describe('the figure player', () => {
     root.querySelector<HTMLButtonElement>('[data-figure-replay]')?.click();
     expect(root.dataset.step).toBe('start');
     expect(root.classList.contains('on-render')).toBe(false);
+    expect(root.classList.contains('is-cached')).toBe(false);
     vi.advanceTimersByTime(20_000);
     expect(root.dataset.step).toBe('patch');
   });
@@ -322,7 +352,8 @@ describe('the figure player', () => {
     const toggle = getToggle(root);
     expect(toggle.disabled).toBe(false);
     toggle.click();
-    expect(root.dataset.step).toBe('ship');
+    expect(root.dataset.step).toBe('patch');
+    expect(root.classList.contains('is-flipped')).toBe(true);
     expect(toggle.checked).toBe(false);
     toggle.click();
     expect(root.dataset.step).toBe('patch');

@@ -3,6 +3,7 @@
 // class `on-<id>` of every step up to n, so CSS transitions draw each change and reverse when a
 // step is left. The server wrote the last step, which stays with reduced motion. The story starts
 // when the figure is in view, pauses off screen and in a hidden tab, and stops at the last step.
+// A later click on the row replays the click with the code already loaded, and turns the row back.
 import type { Step, Story } from './parts.ts';
 
 type Phase =
@@ -15,6 +16,16 @@ type Phase =
   // At the last step, or where a click on the row put it.
   | { kind: 'stopped' };
 
+type Run =
+  // The click that loads the code: the story, or the visitor's click before it reached the press.
+  | { kind: 'first' }
+  // A click after the row changed. The chunks are cached. `back` puts the row back as the server
+  // rendered it, and the next later click changes it again.
+  | { kind: 'later'; back: boolean };
+
+/** How long the live line stays empty before it repeats the same text, in milliseconds. */
+const REPEAT_MS = 100;
+
 /** How much of the figure shows before it counts as in view. */
 const IN_VIEW = 0.4;
 
@@ -25,7 +36,6 @@ function isStory(value: unknown): value is Story {
     Array.isArray(Reflect.get(value, 'steps')) &&
     typeof Reflect.get(value, 'press') === 'string' &&
     typeof Reflect.get(value, 'patch') === 'string' &&
-    typeof Reflect.get(value, 'back') === 'string' &&
     typeof Reflect.get(value, 'live') === 'object'
   );
 }
@@ -49,7 +59,6 @@ export function startFigure(root: HTMLElement): void {
   const last = steps.length - 1;
   const press = findStep(steps, story.press);
   const patch = findStep(steps, story.patch);
-  const back = findStep(steps, story.back);
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const live = root.querySelector<HTMLElement>('[data-figure-live]');
   const replay = root.querySelector<HTMLButtonElement>('[data-figure-replay]');
@@ -64,6 +73,7 @@ export function startFigure(root: HTMLElement): void {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let due = 0;
   let inView = false;
+  let run: Run = { kind: 'first' };
 
   /** Shows step `n`: its classes, its name, and the checkbox. */
   function apply(n: number): void {
@@ -72,15 +82,42 @@ export function startFigure(root: HTMLElement): void {
       root.classList.toggle(`on-${step.id}`, k <= n);
     }
     root.dataset.step = steps[n].id;
+    // After the patch the row shows `now`, or `was` when a later click puts it back.
+    const back = run.kind === 'later' && run.back;
+    const patched = n >= patch;
     if (toggle) {
-      toggle.checked = n >= patch ? now : was;
+      toggle.checked = patched === back ? was : now;
     }
   }
 
+  /** Sets the run and its classes: `is-cached` for a later click, `is-flipped` when it goes back. */
+  function setRun(next: Run): void {
+    run = next;
+    root.classList.toggle('is-cached', run.kind === 'later');
+    root.classList.toggle('is-flipped', run.kind === 'later' && run.back);
+  }
+
+  /** Says a line. The same line again is cleared first, so a screen reader reads it again. */
   function announce(text: string): void {
-    if (live) {
-      live.textContent = text;
+    if (!live) {
+      return;
     }
+    if (live.textContent === text) {
+      live.textContent = '';
+      setTimeout(() => {
+        live.textContent = text;
+      }, REPEAT_MS);
+      return;
+    }
+    live.textContent = text;
+  }
+
+  /** The line of the patch: what loaded, or, for a later click, how the row is marked. */
+  function sayPatch(): string {
+    if (run.kind === 'first') {
+      return story.live.loaded;
+    }
+    return run.back ? story.live.before : story.live.after;
   }
 
   /** Waits `ms`, then moves to the next step, while the figure is in view and the tab shows. */
@@ -98,7 +135,7 @@ export function startFigure(root: HTMLElement): void {
   function advance(): void {
     apply(index + 1);
     if (index === patch) {
-      announce(story.live.done);
+      announce(sayPatch());
     }
     if (index >= last) {
       phase = { kind: 'stopped' };
@@ -111,7 +148,7 @@ export function startFigure(root: HTMLElement): void {
   function playFrom(n: number): void {
     if (reduced) {
       apply(last);
-      announce(story.live.done);
+      announce(sayPatch());
       phase = { kind: 'stopped' };
       return;
     }
@@ -139,7 +176,8 @@ export function startFigure(root: HTMLElement): void {
   }
 
   // A click on the row before the press plays the click from there, without the pointer. While
-  // the click runs, the row takes no other. After it, a click puts the row back as it was.
+  // the click runs, the row takes no other. After it, a click replays the loop with the code
+  // cached, and the row goes back, then forth.
   toggle?.addEventListener('click', (event) => {
     if (index >= press && index < patch) {
       event.preventDefault();
@@ -147,17 +185,17 @@ export function startFigure(root: HTMLElement): void {
     }
     clearTimeout(timer);
     root.classList.add('is-hands');
-    if (index < press) {
-      playFrom(press);
-      return;
+    if (index >= patch) {
+      setRun(
+        run.kind === 'later' ? { kind: 'later', back: !run.back } : { kind: 'later', back: true },
+      );
     }
-    apply(back);
-    phase = { kind: 'stopped' };
-    announce(story.live.undone);
+    playFrom(press);
   });
   replay?.addEventListener('click', () => {
     clearTimeout(timer);
     root.classList.remove('is-hands');
+    setRun({ kind: 'first' });
     playFrom(0);
   });
 

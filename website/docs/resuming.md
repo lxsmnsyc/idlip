@@ -5,7 +5,7 @@ section: Guide
 description: What the server sends, what the browser loads before the first event, and what the first click loads.
 ---
 
-The browser does not run view code to start the page. The server sends the HTML, the model and a small listener. A click loads the handler it names and the binding chunks of the model paths that changed. The numbers on this page come from the e2e tests of `examples/todo` (`pnpm --filter e2e test`).
+The browser does not run view code to start the page. The server sends the HTML, the model and a small listener. A click loads the handler it names and the binding chunks of the model paths that changed. The sizes on this page come from the site's build of `examples/todo`: `pnpm --filter website build` measures them into `website/dist/demo-server/demo.json`. They were measured on 2026-11-22. A change to the loader or the compiler changes them, and they are updated by hand.
 
 ## What the server sends
 
@@ -24,7 +24,7 @@ The browser does not run view code to start the page. The server sends the HTML,
 
 The `<head>` holds two scripts:
 
-- **The listener** from `renderListener()`, inline. It listens for the event types of the page and queues each event. It is 1660 B, or 962 B with gzip.
+- **The listener** from `renderListener()`, inline. It listens for the event types of the page and queues each event. It is 1698 B, or 991 B with gzip.
 - **The loader**, `idlip/client`, one module script. It starts at the first event.
 
 ## Before the first event
@@ -33,9 +33,9 @@ The page loads the document and the loader, and nothing else. The state is not d
 
 | Request                        | Raw     | gzip -9 |
 | ------------------------------ | ------- | ------- |
-| `GET /` (document)             | 4514 B  | 1984 B  |
-| `GET /assets/loader.<hash>.js` | 9880 B  | 3901 B  |
-| Total                          | 14394 B | 5885 B  |
+| `GET /` (document)             | 4787 B  | 2089 B  |
+| `GET /assets/loader.<hash>.js` | 10001 B | 3986 B  |
+| Total                          | 14788 B | 6075 B  |
 
 The e2e test records every request from the navigation on, and fails if any other request appears. Moving the pointer and focusing an element are not handled events and load nothing.
 
@@ -45,23 +45,24 @@ A click on the second checkbox runs these steps:
 
 1. The listener reads `["toggle",["a2"]]` from the checkbox and queues the message `toggle("a2")`.
 2. The loader decodes the state script, once for the page.
-3. The loader imports the `toggle` handler chunk and runs it on the model. The result is the next model.
-4. The manifest says `toggle` writes `todos.*.done`. The loader imports the binding chunk of that path only.
+3. The loader imports the `toggle` handler chunk, and with it the helpers module the chunks share. It runs the handler on the model. The result is the next model.
+4. The manifest says `toggle` writes `todos.*.done`. The loader imports the binding chunk of that path only. It asks for all three files before any arrives, so the click costs one round trip.
 5. The binding chunk patches the checkbox, the `done` class of the row and the `0 left` count, since `countLeft(todos)` reads `todos.*.done`.
 
 ```figure message-trace
 
 ```
 
-The click makes two requests:
+The click makes three requests:
 
 | Request                                           | Raw    | gzip -9 |
 | ------------------------------------------------- | ------ | ------- |
 | `GET /assets/todo.handler.toggle.<hash>.js`       | 118 B  | 119 B   |
-| `GET /assets/todo.binding.todos._.done.<hash>.js` | 940 B  | 505 B   |
-| Total                                             | 1058 B | 624 B   |
+| `GET /assets/_idlip-helpers.<hash>.js`            | 1962 B | 967 B   |
+| `GET /assets/todo.binding.todos._.done.<hash>.js` | 342 B  | 236 B   |
+| Total                                             | 2422 B | 1322 B  |
 
-A built chunk file is named `<module>.<kind>.<name>.<hash>.js`, and a `_` segment stands for `*` in the path. The bindings of `todos.*.text`, `todos.*.id` and `draft`, the list chunk and the other three handlers stay on the server.
+A built chunk file is named `<module>.<kind>.<name>.<hash>.js`, and a `_` segment stands for `*` in the path. `_idlip-helpers.<hash>.js` holds the DOM and render helpers every chunk of the build imports. It loads once, with the first chunks. The bindings of `todos.*.text`, `todos.*.id` and `draft`, the list chunk and the other three handlers stay on the server.
 
 A second click on any checkbox loads nothing. The chunks are already in the page, and the state was decoded once.
 

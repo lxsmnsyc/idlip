@@ -19,13 +19,13 @@ export interface Story {
   press: string;
   /** The step where the row changes. The live line speaks here. */
   patch: string;
-  /** The step a click after the patch goes back to: the row as the server rendered it. */
-  back: string;
   live: {
-    /** Said when the row changes. */
-    done: string;
-    /** Said when a click undoes the change. */
-    undone: string;
+    /** Said when the first click loads the code and the row changes. */
+    loaded: string;
+    /** Said when a later click puts the row back as the server rendered it. */
+    before: string;
+    /** Said when a later click changes the row again. */
+    after: string;
   };
 }
 
@@ -111,7 +111,7 @@ function joinList(items: string[]): string {
 }
 
 /** The live line when the row changes: the files the click loaded and their total. */
-export function sayLoaded(click: Click): string {
+function sayLoaded(click: Click): string {
   const said: string[] = [];
   for (const file of [...click.update, click.binding]) {
     said.push(`${file.name}, ${formatBytes(file.gzip)}`);
@@ -119,9 +119,18 @@ export function sayLoaded(click: Click): string {
   return `Loaded ${joinList(said)}: ${click.totalBytes}. One row and the count changed.`;
 }
 
-/** The live line when a click undoes the change. */
-export function sayUndone(click: Click): string {
-  return `${click.text} is ${click.before ? 'done' : 'not done'} again.`;
+/** The live line when a later click leaves the row `done` or not. The code is already loaded. */
+export function sayMarked(click: Click, done: boolean): string {
+  return `Already loaded. ${click.text} is marked ${done ? 'done' : 'not done'}.`;
+}
+
+/** The live lines of a story. */
+export function sayStory(click: Click): Story['live'] {
+  return {
+    loaded: sayLoaded(click),
+    before: sayMarked(click, click.before),
+    after: sayMarked(click, !click.before),
+  };
 }
 
 /** Highlights strings in code such as `["toggle",["a2"]]` with the string color. */
@@ -185,26 +194,29 @@ export function renderTodoApp(
   demo: DemoData,
   click: Click,
   patch: string,
-  title = '<span class="hero-app-title">Todos</span>',
+  title = '<span class="fig-app-title">Todos</span>',
 ): string {
   let rows = '';
   for (const [index, todo] of demo.todos.entries()) {
     if (index === click.index) {
       const now = !todo.done;
-      rows += `<label class="hero-row fig-row" data-target style="--was:${todo.done ? 1 : 0};--now:${now ? 1 : 0}"><input class="visually-hidden" type="checkbox"${now ? ' checked' : ''} disabled data-figure-toggle><span class="hero-box">${ICON.check}</span><span class="hero-text">${escape(todo.text)}</span><i class="fig-flash"></i><span class="fig-pointer" aria-hidden="true">${ICON.pointer}</span></label>`;
+      rows += `<label class="fig-row" data-target style="--was:${todo.done ? 1 : 0};--now:${now ? 1 : 0}"><input class="visually-hidden" type="checkbox"${now ? ' checked' : ''} disabled data-figure-toggle><span class="fig-box">${ICON.check}</span><span class="fig-text">${escape(todo.text)}</span><i class="fig-flash"></i><span class="fig-pointer" aria-hidden="true">${ICON.pointer}</span></label>`;
     } else {
-      rows += `<span class="hero-row fig-row is-still" style="--done:${todo.done ? 1 : 0}" aria-hidden="true"><span class="hero-box">${ICON.check}</span><span class="hero-text">${escape(todo.text)}</span></span>`;
+      rows += `<span class="fig-row is-still" style="--done:${todo.done ? 1 : 0}" aria-hidden="true"><span class="fig-box">${ICON.check}</span><span class="fig-text">${escape(todo.text)}</span></span>`;
     }
   }
   return `<div class="fig-app">
-    <div class="hero-app-head" aria-hidden="true">${title}<span class="hero-count fig-count">${renderSwap(`<b>${click.left.before}</b>`, `<b>${click.left.after}</b>`, patch)} left<i class="fig-flash"></i></span></div>
+    <div class="fig-app-head" aria-hidden="true">${title}<span class="fig-count">${renderSwap(`<b>${click.left.before}</b>`, `<b>${click.left.after}</b>`, patch)} left<i class="fig-flash"></i></span></div>
     ${rows}
   </div>`;
 }
 
-/** The code the click loaded: 0 B, then the handler step, then with the binding. */
+/**
+ * The code the click loaded: 0 B, then the handler step, then with the binding. A later click
+ * keeps the total and shows "cached".
+ */
 export function renderMeter(click: Click): string {
-  return `<div class="fig-meter" aria-hidden="true"><span class="fig-meter-label">Code loaded on click</span><span class="fig-meter-value"><span class="fig-v0">0 B</span><span class="fig-v1">${click.updateBytes}</span><span class="fig-v2">${click.totalBytes}</span></span></div>`;
+  return `<div class="fig-meter" aria-hidden="true"><span class="fig-meter-label">Code loaded on click</span><span class="fig-meter-end"><i class="fig-cached">cached</i><span class="fig-meter-value"><span class="fig-v0">0 B</span><span class="fig-v1">${click.updateBytes}</span><span class="fig-v2">${click.totalBytes}</span></span></span></div>`;
 }
 
 export interface FigureFrame {

@@ -20,8 +20,8 @@ export function renderFigure(name: FigureName, demo: DemoData): string {
  * names and sizes, not text to search.
  */
 export function stripFigures(html: string): string {
-  return html.replaceAll(
-    /<figure class="fig\b[\s\S]*?<figcaption>([\s\S]*?)<\/figcaption>[\s\S]*?<\/figure>/g,
-    '<p>$1</p>',
-  );
+  return html.replaceAll(/<figure class="fig\b[\s\S]*?<\/figure>/g, (figure) => {
+    const caption = /<figcaption>([\s\S]*?)<\/figcaption>/.exec(figure);
+    return caption ? `<p>${caption[1]}</p>` : '';
+  });
 }

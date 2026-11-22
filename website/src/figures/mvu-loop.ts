@@ -14,8 +14,7 @@ import {
   renderMeter,
   renderSwap,
   renderTodoApp,
-  sayLoaded,
-  sayUndone,
+  sayStory,
 } from './parts.ts';
 import type { Story } from './parts.ts';
 
@@ -41,8 +40,7 @@ export function renderMvuLoop(demo: DemoData): string {
     steps: STEPS,
     press: 'press',
     patch: 'patch',
-    back: 'ship',
-    live: { done: sayLoaded(click), undone: sayUndone(click) },
+    live: sayStory(click),
   };
 
   // The model: one line per todo, and the clicked one changes at Model.
