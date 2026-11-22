@@ -1,7 +1,7 @@
 ---
 id: docs-live
 title: Run and edit code samples in place on the docs pages and the landing page
-status: todo
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-22
-spent:
+spent: 1203000
 owns:
   - website/src/repl/**
   - website/src/live/**
