@@ -25,6 +25,9 @@ owns:
   - benchmarks/harness/**
   - benchmarks/*/scale/**
   - benchmarks/README.md
+  - benchmarks/.gitignore
+  - benchmarks/*/adapter.js
+  - benchmarks/*/package.json
   - website/src/benchmarks.json
 shared:
   - pnpm-lock.yaml
