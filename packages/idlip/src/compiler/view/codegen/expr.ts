@@ -34,8 +34,16 @@ export interface Usage {
   views: Map<string, string>;
   /** Whether the code reads the model path of the component it renders. */
   path: boolean;
-  /** Module-level cloned templates by name, such as `templateL3$`, with their declaration. */
-  templates: Map<string, string>;
+  /** Module-level cloned templates by name, such as `templateL3$`. */
+  templates: Map<string, TemplateUse>;
+}
+
+/** A cloned template a chunk renders. */
+export interface TemplateUse {
+  /** The hash of its namespace and markup, which names it in the shared templates module. */
+  hash: string;
+  /** The object literal: `{ h: '...', n: 2 }`. */
+  init: string;
 }
 
 export function createUsage(): Usage {

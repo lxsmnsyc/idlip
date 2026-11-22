@@ -1,4 +1,4 @@
-import { HELPERS_KEY, getChunkId } from '../core/format.ts';
+import { HELPERS_KEY, TEMPLATES_KEY, getChunkId } from '../core/format.ts';
 import type { ChunkUrls, Manifest } from '../core/format.ts';
 
 export interface PreloadOptions {
@@ -33,7 +33,7 @@ function escapeTarget(value: string): string {
  * manifests in the given order, then the handler names of that event in sorted order. For each
  * handler it takes the handler chunk and then the binding chunks of its `bindings`. It stops
  * at `max`, so the earliest events and handlers win. When it names any chunk, the shared
- * helpers module (`chunks.helpers`) comes first, outside `max`, since the chunks import it.
+ * helpers and templates modules (`chunks.helpers`, `chunks.templates`) come first, outside `max`, since the chunks import it.
  */
 function findUrls(
   chunks: ChunkUrls,
@@ -67,11 +67,17 @@ function findUrls(
       }
     }
   }
-  // The chunks import the helpers module, so a preload of a chunk without it saves no trip.
-  if (urls.size > 0 && Object.hasOwn(chunks, HELPERS_KEY)) {
-    return [chunks[HELPERS_KEY], ...urls];
+  // The chunks import the helpers and templates modules, so a preload of a chunk without them
+  // saves no trip.
+  const shared: string[] = [];
+  if (urls.size > 0) {
+    for (const key of [HELPERS_KEY, TEMPLATES_KEY]) {
+      if (Object.hasOwn(chunks, key)) {
+        shared.push(chunks[key]);
+      }
+    }
   }
-  return [...urls];
+  return [...shared, ...urls];
 }
 
 /**

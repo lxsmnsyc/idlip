@@ -2,7 +2,8 @@
 // body of a client chunk clones a template (`template.ts`).
 import { HELPERS_MODULE } from '../../../core/helpers.ts';
 import type { Component, Expr } from '../analyze/index.ts';
-import type { Module } from '../../../core/format.ts';
+import { TEMPLATES_MODULE, TEMPLATE_PREFIX } from '../../../core/format.ts';
+import type { Module, ModuleTemplate } from '../../../core/format.ts';
 import { printSlot } from './child.ts';
 import { emitHeadBody } from './head.ts';
 import { printHtmlBody } from './raw.ts';
@@ -23,6 +24,8 @@ export interface ChunkContext {
   byId: Map<number, Binding>;
   source: ModuleSource;
   report: Report;
+  /** The hashes of templates that the shared templates module holds, not the chunk. */
+  shared?: ReadonlySet<string>;
 }
 
 export interface Emitted {
@@ -219,7 +222,7 @@ export function emitGroupChunk(
   }
   addListExports(group, groups, emitted, context, sections, usage);
   return {
-    module: { chunk: `binding=${group.key}`, code: assemble(usage, sections, context) },
+    module: { chunk: `binding=${group.key}`, ...assemble(usage, sections, context) },
     usage,
   };
 }
@@ -263,7 +266,11 @@ function addListExports(
  * Joins the loader import, the helpers import, the module's imports, the module's helpers and
  * the code into a chunk.
  */
-function assemble(usage: Usage, sections: string[], context: ChunkContext): string {
+function assemble(
+  usage: Usage,
+  sections: string[],
+  context: ChunkContext,
+): Pick<Module, 'code' | 'templates'> {
   const collected = context.source.collect(usage.modules, usage.imports);
   const imports: string[] = [];
   if (usage.loader.size > 0) {
@@ -286,6 +293,24 @@ function assemble(usage: Usage, sections: string[], context: ChunkContext): stri
     views.push(`const ${name} = { init: $init_${name}, render: $render_${name} };`);
   }
   imports.push(...collected.imports);
+  // Cloned templates, once each: two bindings of a chunk may render the same block. A template
+  // that more than one chunk renders is imported from the shared templates module.
+  const templates: string[] = [];
+  const imported: string[] = [];
+  const found: ModuleTemplate[] = [];
+  for (const [name, use] of usage.templates) {
+    if (context.shared?.has(use.hash) === true) {
+      imported.push(`${TEMPLATE_PREFIX}${use.hash} as ${name}`);
+    } else {
+      templates.push(`const ${name} = ${use.init};`);
+    }
+    if (!found.some((item) => item.hash === use.hash)) {
+      found.push({ hash: use.hash, init: use.init });
+    }
+  }
+  if (imported.length > 0) {
+    imports.push(`import { ${imported.join(', ')} } from '${TEMPLATES_MODULE}';`);
+  }
   const blocks: string[] = [];
   if (imports.length > 0) {
     blocks.push(imports.join('\n'));
@@ -293,12 +318,11 @@ function assemble(usage: Usage, sections: string[], context: ChunkContext): stri
   if (views.length > 0) {
     blocks.push(views.join('\n'));
   }
-  // Cloned templates, once each: two bindings of a chunk may render the same block.
-  if (usage.templates.size > 0) {
-    blocks.push([...usage.templates.values()].join('\n'));
+  if (templates.length > 0) {
+    blocks.push(templates.join('\n'));
   }
   blocks.push(...collected.code, ...sections);
-  return `${blocks.join('\n\n')}\n`;
+  return { code: `${blocks.join('\n\n')}\n`, templates: found };
 }
 
 /** Emits every binding once, so groups that cover each other share the printed code. */
@@ -383,7 +407,7 @@ export function emitListChunk(info: ListInfo, context: ChunkContext): GroupChunk
     sections.push('export const blocks = true;');
   }
   return {
-    module: { chunk: `list=${info.id}`, code: assemble(usage, sections, context) },
+    module: { chunk: `list=${info.id}`, ...assemble(usage, sections, context) },
     usage,
   };
 }
@@ -432,7 +456,7 @@ export function emitTryChunk(
     );
   }
   return {
-    module: { chunk: `try=${info.id}`, code: assemble(usage, sections, context) },
+    module: { chunk: `try=${info.id}`, ...assemble(usage, sections, context) },
     usage,
   };
 }
@@ -601,6 +625,6 @@ export function emitViewChunk(context: ChunkContext): GroupChunk {
   let parameter = printScope(usage, true);
   parameter = `${parameter === '' ? '$scope' : parameter}, $doc`;
   const render = `// The whole view without the boundary markers, which the parent's template writes.\nexport function render(${parameter}) {\n${lines.join('\n')}\n}`;
-  const chunk: Module = { chunk: 'view', code: assemble(usage, [init, render], context) };
+  const chunk: Module = { chunk: 'view', ...assemble(usage, [init, render], context) };
   return { module: chunk, usage };
 }

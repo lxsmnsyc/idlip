@@ -160,6 +160,34 @@ export type ChunkUrls = Readonly<Record<string, string>>;
  */
 export const HELPERS_KEY = 'helpers';
 
+/**
+ * The key of the shared templates module in a built chunk map (`idlip/templates`). It holds the
+ * templates that more than one chunk renders, and the loader loads it with the helpers module.
+ */
+export const TEMPLATES_KEY = 'templates';
+
+/** The module a chunk imports the templates of more than one chunk from. */
+export const TEMPLATES_MODULE = 'idlip/templates';
+
+/** The export name of a shared template is this and the hash of its markup. */
+export const TEMPLATE_PREFIX = 't';
+
+/** A cloned template of a chunk, by the hash of its namespace and markup. */
+export interface ModuleTemplate {
+  readonly hash: string;
+  /** The object literal that the chunk declares: `{ h: '<li>', n: 1 }`. */
+  readonly init: string;
+}
+
+/** Prints the shared templates module: one export per hash, in hash order. */
+export function printTemplatesModule(templates: ReadonlyMap<string, string>): string {
+  const lines: string[] = [];
+  for (const hash of [...templates.keys()].toSorted()) {
+    lines.push(`export const ${TEMPLATE_PREFIX}${hash} = ${templates.get(hash)};`);
+  }
+  return `${lines.join('\n')}\n`;
+}
+
 /** What a state script pushes: its event types, separated by spaces, and its state. */
 export type StateRecord = readonly [events: string, state: () => PageState];
 
@@ -358,6 +386,8 @@ export interface Module {
   /** The chunk name, such as `handler=toggle` or `binding=todos.*.done`. */
   readonly chunk: string;
   readonly code: string;
+  /** The cloned templates the chunk renders, shared ones included. */
+  readonly templates?: readonly ModuleTemplate[];
 }
 
 export interface CompileDiagnostic {

@@ -1,6 +1,6 @@
 import { parseSync } from 'oxc-parser';
 import type { ObjectExpression, Program } from '@oxc-project/types';
-import { HELPERS_KEY } from '../core/format.ts';
+import { HELPERS_KEY, TEMPLATES_KEY } from '../core/format.ts';
 import type { ChunkUrls, Manifest } from '../core/format.ts';
 import { BUILD_KEY } from './skew.ts';
 
@@ -151,7 +151,7 @@ function findChunkMaps(program: Program): ObjectExpression[] {
 
 /**
  * Replaces the chunk maps in a compiled server module with the URLs of the given map. Each map
- * keeps its own chunk ids, and takes the build id and the helpers URL of the map when there are.
+ * keeps its own chunk ids, and takes the build id and the helpers and templates URLs of the map when there are.
  */
 export function replaceChunkUrls(code: string, urls: ChunkUrls): string {
   const program = parseSync('server.js', code, { lang: 'js', sourceType: 'module' }).program;
@@ -167,7 +167,7 @@ export function replaceChunkUrls(code: string, urls: ChunkUrls): string {
     for (const key of readKeys(map)) {
       own[key] = Object.hasOwn(urls, key) ? urls[key] : key;
     }
-    for (const key of [BUILD_KEY, HELPERS_KEY]) {
+    for (const key of [BUILD_KEY, HELPERS_KEY, TEMPLATES_KEY]) {
       if (Object.hasOwn(urls, key)) {
         own[key] = urls[key];
       }

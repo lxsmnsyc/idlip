@@ -14,12 +14,21 @@ import type {
 import * as compiler from '../compiler/index.ts';
 import { HELPERS_MODULE, printHelpersModule } from '../core/helpers.ts';
 import type { CompileOptions } from '../compiler/index.ts';
-import type { ChunkUrls, Compile, CompileDiagnostic, CompileResult } from '../core/format.ts';
+import type {
+  ChunkUrls,
+  Compile,
+  CompileDiagnostic,
+  CompileResult,
+  Module,
+} from '../core/format.ts';
 import {
   HELPERS_KEY,
+  TEMPLATES_KEY,
+  TEMPLATES_MODULE,
   getChunkFile,
   getChunkId,
   listCompiled,
+  printTemplatesModule,
   splitModule,
 } from '../core/format.ts';
 import { getDefines, getFeatures, replaceFeatures } from './features.ts';
@@ -55,6 +64,8 @@ const DEV_LOADER_URL = '/@id/idlip/client';
 
 /** The module chunks import their helpers from (`idlip/helpers`), written by `printHelpersModule`. */
 const HELPERS_ID = '\0idlip-helpers';
+/** The module chunks import the templates of more than one chunk from (`idlip/templates`). */
+const TEMPLATES_ID = '\0idlip-templates';
 /** The default `modules` globs. */
 const DEFAULT_MODULES = ['src/**/*.tsx'];
 /** The id of a child's view chunk, with the component's name for a named component. */
@@ -200,7 +211,7 @@ function checkChunkImports(
   reporter: Reporter,
   bundle: Rolldown.OutputBundle,
   chunkFiles: ReadonlySet<string>,
-  helpersFile: string | undefined,
+  sharedFiles: readonly string[],
 ): void {
   const items: Partial<Rolldown.OutputBundle> = bundle;
   // Walk the static imports from every entry that is not an idlip chunk.
@@ -230,12 +241,12 @@ function checkChunkImports(
     }
   }
   // Every static import of an idlip chunk must already be loaded. The exceptions are the helpers
-  // module, which the loader loads with the first chunk in the same round trip, and a view
+  // and templates modules, which the loader loads with the first chunk in the same round trip, and a view
   // reached from a chunk that can add a child in the browser: a list row, a condition branch in
-  // a binding chunk, a `<Try>` region, or another view. The helpers module itself may import
-  // only what the loader holds.
+  // a binding chunk, a `<Try>` region, or another view. The helpers and templates modules
+  // themselves may import only what the loader holds.
   const errors: string[] = [];
-  const checked = helpersFile === undefined ? [...chunkFiles] : [...chunkFiles, helpersFile];
+  const checked = [...chunkFiles, ...sharedFiles];
   for (const file of checked) {
     const item = items[file];
     if (item?.type !== 'chunk') {
@@ -246,7 +257,7 @@ function checkChunkImports(
     for (const imported of item.imports) {
       if (
         !loaded.has(imported) &&
-        imported !== helpersFile &&
+        !sharedFiles.includes(imported) &&
         !(addsChild && views.has(imported))
       ) {
         errors.push(`${file} imports ${imported}, which the loader does not import`);
@@ -261,16 +272,48 @@ function checkChunkImports(
 }
 
 /**
- * Returns the file of the shared helpers module (`idlip/helpers`) in a client bundle. It is
- * `undefined` when no chunk imports a helper, or when one chunk alone does and holds them.
+ * Returns the file of a shared module (`idlip/helpers` or `idlip/templates`) in a client bundle.
+ * It is `undefined` when no chunk imports it, or when one chunk alone does and holds it.
  */
-function findHelpersFile(bundle: Rolldown.OutputBundle): string | undefined {
+function findSharedFile(bundle: Rolldown.OutputBundle, module: string): string | undefined {
   for (const item of Object.values(bundle)) {
-    if (item.type === 'chunk' && !item.isEntry && item.moduleIds.includes(HELPERS_ID)) {
+    if (item.type === 'chunk' && !item.isEntry && item.moduleIds.includes(module)) {
       return item.fileName;
     }
   }
   return undefined;
+}
+
+/**
+ * Finds the templates that more than one chunk of the compiled modules renders: the hash to the
+ * declaration. Two different declarations under one hash stay in their chunks.
+ */
+function findSharedTemplates(results: readonly CompileResult[]): Map<string, string> {
+  const chunks = new Map<string, number>();
+  const inits = new Map<string, string>();
+  const clashes = new Set<string>();
+  const modules: Module[] = [];
+  for (const result of results) {
+    for (const { client } of listCompiled(result)) {
+      modules.push(...client);
+    }
+  }
+  for (const module of modules) {
+    for (const { hash, init } of module.templates ?? []) {
+      chunks.set(hash, (chunks.get(hash) ?? 0) + 1);
+      if (inits.has(hash) && inits.get(hash) !== init) {
+        clashes.add(hash);
+      }
+      inits.set(hash, init);
+    }
+  }
+  const found = new Map<string, string>();
+  for (const [hash, count] of chunks) {
+    if (count > 1 && !clashes.has(hash)) {
+      found.set(hash, inits.get(hash)!);
+    }
+  }
+  return found;
 }
 
 /**
@@ -321,7 +364,13 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
   /** Compiled modules by file, with the source they came from. */
   const cache = new Map<
     string,
-    { source: string; key: string; rendered: readonly string[]; result: CompileResult }
+    {
+      source: string;
+      key: string;
+      rendered: readonly string[];
+      result: CompileResult;
+      shared: Map<string, string> | undefined;
+    }
   >();
   /** Files already warned about, so each warns once. */
   const warned = new Set<string>();
@@ -335,6 +384,8 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
   let defines: Map<string, string> | undefined;
   /** The files of the client build, relative to its folder. */
   let buildFiles: string[] = [];
+  /** The templates that more than one chunk of the client build renders, by hash. */
+  let shared: Map<string, string> | undefined;
 
   function getModuleId(file: string): string {
     return `/${path.relative(root, file).split(path.sep).join('/')}`;
@@ -413,7 +464,7 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
     const rendered = known ?? listRendered(file);
     const key = rendered.join(',');
     const cached = cache.get(file);
-    if (cached?.source === source && cached.key === key) {
+    if (cached?.source === source && cached.key === key && cached.shared === shared) {
       return cached.result;
     }
     compile ??= getDefaultCompile();
@@ -427,9 +478,10 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       child: rendered.includes('default'),
       ...(named.length === 0 ? {} : { children: named }),
       resolve: resolveModule,
+      ...(shared === undefined ? {} : { shared: new Set(shared.keys()) }),
     });
     reportDiagnostics(reporter, getModuleId(file), source, result.diagnostics);
-    cache.set(file, { source, key, rendered, result });
+    cache.set(file, { source, key, rendered, result, shared });
     return result;
   }
 
@@ -521,7 +573,7 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
     }
     // The server writes the build id on the state script and drops it from the chunk map. The
     // helpers URL stays in the map, for the loader.
-    for (const key of [BUILD_KEY, HELPERS_KEY]) {
+    for (const key of [BUILD_KEY, HELPERS_KEY, TEMPLATES_KEY]) {
       if (all !== undefined && Object.hasOwn(all, key)) {
         urls[key] = all[key];
       }
@@ -568,13 +620,27 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
         return;
       }
       emitted.clear();
+      shared = undefined;
       built = undefined;
       children = undefined;
       await findChildren(this);
-      const results: CompileResult[] = [];
+      let results: CompileResult[] = [];
       for (const file of findModules()) {
-        const result = compileFile(this, file);
-        results.push(result);
+        results.push(compileFile(this, file));
+      }
+      // A template that more than one chunk renders moves to the shared templates module, so
+      // its markup is downloaded and parsed once. The chunks compile again to import it.
+      shared = findSharedTemplates(results);
+      if (shared.size > 0) {
+        results = [];
+        for (const file of findModules()) {
+          results.push(compileFile(this, file));
+        }
+      } else {
+        shared = undefined;
+      }
+      for (const [index, file] of findModules().entries()) {
+        const result = results[index];
         // A named component adds its name: `widgets.Counter.handler.add.js`.
         const stem = path.basename(file, '.tsx');
         for (const { manifest } of listCompiled(result)) {
@@ -603,6 +669,9 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       if (source === HELPERS_MODULE) {
         return HELPERS_ID;
       }
+      if (source === TEMPLATES_MODULE) {
+        return TEMPLATES_ID;
+      }
       return source === DEV_LOADER ? DEV_LOADER : undefined;
     },
 
@@ -612,6 +681,9 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       }
       if (id === HELPERS_ID) {
         return { code: printHelpersModule(), moduleType: 'js' };
+      }
+      if (id === TEMPLATES_ID) {
+        return { code: printTemplatesModule(shared ?? new Map()), moduleType: 'js' };
       }
       const parsed = parseChunkId(id);
       if (parsed === undefined) {
@@ -689,11 +761,22 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
         files.add(file);
         urls[key] = `${base}${file}`;
       }
-      const helpersFile = findHelpersFile(bundle);
+      const helpersFile = findSharedFile(bundle, HELPERS_ID);
       if (helpersFile !== undefined) {
         urls[HELPERS_KEY] = `${base}${helpersFile}`;
       }
-      checkChunkImports(this, bundle, files, helpersFile);
+      // The bundler may put the templates in the helpers file, which the loader loads already.
+      const templatesFile = findSharedFile(bundle, TEMPLATES_ID);
+      if (templatesFile !== undefined && templatesFile !== helpersFile) {
+        urls[TEMPLATES_KEY] = `${base}${templatesFile}`;
+      }
+      const sharedFiles: string[] = [];
+      for (const file of [helpersFile, templatesFile]) {
+        if (file !== undefined) {
+          sharedFiles.push(file);
+        }
+      }
+      checkChunkImports(this, bundle, files, sharedFiles);
       if (options.skew !== false) {
         const id = getBuildId(Object.keys(bundle));
         urls[BUILD_KEY] = id;

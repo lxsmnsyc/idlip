@@ -47,6 +47,19 @@ describe('renderPreload', () => {
     expect(renderPreload(shared, manifest, { events: ['wheel'] })).toBe('');
   });
 
+  it('names the shared templates module after the helpers module', () => {
+    const shared: ChunkUrls = {
+      ...chunks,
+      helpers: '/assets/_idlip-helpers.g.js',
+      templates: '/assets/_idlip-templates.t.js',
+    };
+    expect(renderPreload(shared, manifest, { max: 1 })).toBe(
+      '<link rel="modulepreload" href="/assets/_idlip-helpers.g.js">' +
+        '<link rel="modulepreload" href="/assets/_idlip-templates.t.js">' +
+        '<link rel="modulepreload" href="/assets/toggle.a.js">',
+    );
+  });
+
   it('follows the events option', () => {
     const out = renderPreload(chunks, manifest, { events: ['input'] });
     expect(out).toContain('/assets/set-draft.c.js');

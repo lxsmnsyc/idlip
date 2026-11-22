@@ -40,6 +40,24 @@ const TEXT_TAGS = new Set(['script', 'style', 'textarea', 'title']);
 /** HTML elements whose parser drops a newline right after the start tag. */
 const NEWLINE_TAGS = new Set(['pre', 'listing', 'textarea']);
 
+/**
+ * Hashes a template's namespace and markup to 14 hex digits (cyrb53), the name of the template
+ * in the shared templates module. Equal markup in any component gives the same name.
+ */
+export function hashTemplate(namespace: string, html: string): string {
+  const text = `${namespace}\0${html}`;
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let index = 0; index < text.length; index++) {
+    const code = text.charCodeAt(index);
+    h1 = Math.imul(h1 ^ code, 2654435761);
+    h2 = Math.imul(h2 ^ code, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (2097151 & h2).toString(16).padStart(6, '0') + (h1 >>> 0).toString(16).padStart(8, '0');
+}
+
 /** Drops the newline that the parser drops at the start of a `pre`, `listing` or `textarea`. */
 function printDropNewline(value: string): string {
   return `String(${value}).replace(/^\\n/, '')`;
@@ -626,10 +644,10 @@ export function buildBody(
   }
   const html = row ? `<!--i-->${builder.html}<!--/i-->` : builder.html;
   const namespaceField = namespace === 'html' ? '' : `, s: ${quote(namespace)}`;
-  usage.templates.set(
-    name,
-    `const ${name} = { h: ${quote(html)}, n: ${builder.marks}${namespaceField} };`,
-  );
+  usage.templates.set(name, {
+    hash: hashTemplate(namespace, html),
+    init: `{ h: ${quote(html)}, n: ${builder.marks}${namespaceField} }`,
+  });
   usage.helpers.add('clone');
   if (builder.writes.length === 0) {
     return { pre: [], expr: `clone$(${name}, $doc)[0]`, blocks: builder.blocks };

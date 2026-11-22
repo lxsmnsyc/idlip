@@ -64,6 +64,11 @@ export interface GenerateOptions extends SelectOptions {
    * a relative specifier is resolved against the id of the importer.
    */
   resolve?: (specifier: string, importer: string) => string;
+  /**
+   * The hashes of the templates that more than one chunk renders. A chunk imports them from
+   * `idlip/templates` (`TEMPLATES_MODULE`) and declares the rest itself.
+   */
+  shared?: ReadonlySet<string>;
 }
 
 /** The manifest of a module that a parent renders: `view` is in compiled-format v10. */
@@ -315,7 +320,7 @@ export function generate(
   // Emit the chunks, manifest and server code of each component.
   const emitted: Emitted[] = [];
   for (const { selected: item, plan } of planned) {
-    emitted.push(emitComponent(item, plan, ir, source, moduleSource, report));
+    emitted.push(emitComponent(item, plan, ir, source, moduleSource, report, options.shared));
   }
   const first = emitted[0];
   for (const diagnostic of diagnostics) {
@@ -345,6 +350,7 @@ function emitComponent(
   source: string,
   moduleSource: ModuleSource,
   report: ChunkContext['report'],
+  shared: ReadonlySet<string> | undefined,
 ): Emitted {
   const { component, module: id, child } = selected;
 
@@ -366,7 +372,7 @@ function emitComponent(
   for (const binding of plan.bindings) {
     byId.set(binding.id, binding);
   }
-  const context: ChunkContext = { component, plan, byId, source: moduleSource, report };
+  const context: ChunkContext = { component, plan, byId, source: moduleSource, report, shared };
 
   // Client chunks.
   const client: Module[] = [];
