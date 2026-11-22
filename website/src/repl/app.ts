@@ -484,7 +484,7 @@ export function startRepl(root: HTMLElement, watch: typeof watchFrame): void {
     let result: RunResult;
     try {
       const { runFiles } = await loading;
-      result = await runFiles(copyFiles(files), css, trusted);
+      result = await runFiles(copyFiles(files), `<style>${css}</style>`, trusted);
     } catch (error) {
       if (run === runs) {
         fail(error instanceof Error ? error.message : String(error));

@@ -9,5 +9,5 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const base = process.env.BASE ?? '/';
 
 await build({ root, logLevel: 'warn' });
-const pages = writeSite(fileURLToPath(new URL('../dist/client/', import.meta.url)), base);
+const pages = await writeSite(fileURLToPath(new URL('../dist/client/', import.meta.url)), base);
 console.log(`${pages.length} pages written to dist/client`);

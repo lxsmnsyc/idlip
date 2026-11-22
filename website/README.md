@@ -5,7 +5,7 @@ The documentation site of idlip. A static build: Markdown files in `docs/` becom
 ```sh
 pnpm --filter website build          # writes dist/client
 pnpm --filter website preview        # serves dist/client
-pnpm --filter website check:samples  # compiles every tsx block of the docs
+pnpm --filter website check:samples  # compiles every tsx block, renders the live ones
 pnpm --filter website test
 ```
 
@@ -32,5 +32,32 @@ description: Optional. The first paragraph is used without it.
 - `tsx fragment`: only the view, wrapped in `export default function Sample() { return (...) }` with `For`, `Try`, `Head` and `Subscribe` imported.
 - `tsx no-check`: highlighted, not compiled. Use it for partial code, config and code that is not a module.
 - `ts`, `css`, `bash`, `json`: highlighted only.
+
+## Live samples
+
+A `tsx live` fence is a sample the reader can run and edit in the page:
+
+````md
+```tsx live
+export default function Counter(props: { start: number }) {
+  let count = props.start;
+  function increment() {
+    count = count + 1;
+  }
+  return <button on:click={increment}>{count}</button>;
+}
+```
+
+```json live props.json
+{ "start": 0 }
+```
+````
+
+- **Files.** The first fence is the page the sample renders. Its file is named after the default export (`TodoApp` gives `todo-app.tsx`), or `app.tsx`. `tsx live name.tsx` sets the name.
+- **More files.** A fence right after it with a name is one more file of the sample: `tsx live part.tsx` for a child, `json live props.json` for the props. Blank lines between them are fine.
+- **Checks.** The build compiles each sample and fails on an error. `check:samples` also renders each one on the server side.
+- **Static frame.** The build writes `dist/client/live/<page>-<n>/` for each sample: the server render as a page, its chunks, and the Compiled tab. A reader who never edits loads that page, the loader and the chunks of their clicks. No compiler and no service worker.
+- **Edits.** The editor loads on the first focus or key in the code. The compiler, the render worker and the service worker load with the first edit. The edit then runs as in the REPL.
+- **Code from the address.** A docs page never runs code from its URL or hash. A sample runs the code the build put in the page, or the reader's own edits. Its REPL button opens a sample of one file by id (`#sample=`), which runs. An edited sample, or one of several files, opens with its files in the hash (`#files=`), where the REPL waits for Run.
 
 See [DESIGN.md](./DESIGN.md) for the tokens. `vercel.json` is not here; the deployment is set up by hand.

@@ -42,8 +42,14 @@ document.addEventListener('click', (event) => {
     return;
   }
   const copy = event.target.closest<HTMLButtonElement>('.code-copy');
-  // A button with `data-copy` carries its own text, such as the install command.
-  const text = copy?.dataset.copy ?? copy?.parentElement?.querySelector('pre')?.textContent;
+  // A button with `data-copy` carries its own text, such as the install command, or the file a
+  // live sample shows. Before a live sample starts, its first file is the text of its markup,
+  // which ends with one newline more than the source.
+  const live = copy?.closest('[data-live-sample]')?.querySelector('[data-live-source]');
+  const text =
+    copy?.dataset.copy ??
+    live?.textContent.slice(0, -1) ??
+    copy?.parentElement?.querySelector('pre')?.textContent;
   if (copy && text !== undefined) {
     navigator.clipboard.writeText(text).then(
       () => {

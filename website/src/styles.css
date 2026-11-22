@@ -2077,6 +2077,12 @@ html:not(.js) .install-tabs {
   animation: live-spin 0.8s linear infinite;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .live-spinner {
+    animation: none;
+  }
+}
+
 @keyframes live-spin {
   to {
     transform: rotate(1turn);
@@ -2135,8 +2141,9 @@ html:not(.js) .install-tabs {
   pointer-events: none;
 }
 
-/* With script, only the first file shows until the editor takes over. */
-.js .live-highlight + .live-highlight {
+/* With script, one file shows: the first until the sample starts, then the chosen one. */
+.js .live:not(.is-live) .live-highlight + .live-highlight,
+.is-live .live-highlight:not(.is-shown) {
   display: none;
 }
 
@@ -2275,7 +2282,6 @@ html:not(.js) .live-bar .code-copy {
   display: none;
 }
 
-.live[data-status='loading'] .live-frame,
 .live[data-status='running'] .live-frame,
 .live[data-status='blocked'] .live-frame {
   opacity: 0.45;
@@ -2382,7 +2388,8 @@ html:not(.js) .live-bar .code-copy {
 @media (pointer: coarse) {
   .live-file,
   .live-tab,
-  .live-bar .icon-button {
+  .live-bar .icon-button,
+  .live-bar .code-copy {
     min-width: 2.75rem;
     min-height: 2.75rem;
   }

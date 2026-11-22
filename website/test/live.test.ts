@@ -6,7 +6,6 @@ import { findLiveSamples, nameEntry, parseLiveInfo } from '../src/live/fence.ts'
 import { renderLiveSample } from '../src/live/markup.ts';
 import { createRenderer } from '../src/markdown.ts';
 import type { RenderEnv } from '../src/markdown.ts';
-import { decodeFiles } from '../src/repl/files.ts';
 import { loadPages } from '../src/site.ts';
 
 const parser = new MarkdownIt();
@@ -38,7 +37,7 @@ function readText(html: string): string {
 }
 
 function renderMarkdown(markdown: string, link?: string): string {
-  const renderer = createRenderer({ liveLink: () => link });
+  const renderer = createRenderer({ live: () => ({ repl: link, frame: '/live/x-1/' }) });
   const env: RenderEnv = { headings: [], lead: '', link: (href) => href };
   return renderer.render(markdown, env);
 }
@@ -137,6 +136,13 @@ describe('live markup', () => {
     expect(html).toContain('data-live-tab="compiled"');
   });
 
+  it('puts the static frame in the markup, loaded when it nears the viewport', () => {
+    const html = renderLiveSample([{ name: 'a.tsx', source: COUNTER }], { frame: '/live/a-1/' });
+    expect(html).toContain(
+      '<iframe class="live-frame" src="/live/a-1/" title="Result of a.tsx" loading="lazy" data-live-frame>',
+    );
+  });
+
   it('has no REPL button without a link', () => {
     expect(renderLiveSample([{ name: 'a.tsx', source: COUNTER }])).not.toContain('data-live-repl');
   });
@@ -175,22 +181,24 @@ describe('the live samples of the docs', () => {
     expect(await renderLiveSamples(live)).toEqual([]);
   });
 
-  it('links a sample of several files with its files, and one file by id', () => {
+  it('links one file by id, and puts no files in the HTML of the page', () => {
     let views = '';
     for (const page of pages) {
       if (page.file === 'views.md') {
         views = page.html;
       }
     }
-    const hash = /href="\/repl\/(#files=[^"]+)"/.exec(views)?.[1] ?? '';
-    const files = decodeFiles(hash);
-    expect(files?.map((file) => file.name)).toEqual(['profile.tsx', 'props.json']);
     expect(views).toContain('href="/repl/#sample=views-2"');
+    // A sample of several files links to the REPL with no hash. The page adds it on hover.
+    expect(views).toContain('href="/repl/" data-live-repl');
+    expect(views).not.toContain('#files=');
+    expect(views).toContain('src="/live/views-1/"');
   });
 
   it('reports a sample that does not compile', () => {
     const broken: PageSample = {
       file: 'docs/x.md',
+      id: 'x-1',
       files: [{ name: 'a.tsx', source: 'export default function A() { return <p>; }' }],
     };
     expect(checkLiveSamples([broken])[0]).toMatch(/^docs\/x\.md: a\.tsx:1:/);

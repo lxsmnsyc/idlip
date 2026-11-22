@@ -1,5 +1,5 @@
 // Checks the live samples of the docs in Node. The site build compiles them and fails on an
-// error. `check:samples` also renders each one on the server side, as the page does.
+// error. `check:samples` also renders each one on the server side, as the site build does.
 import { listChunks } from '../repl/chunks.ts';
 import type { ReplFile } from '../repl/files.ts';
 import { compileProject } from '../repl/project.ts';
@@ -9,6 +9,8 @@ import { createDataUrl, renderProject } from '../repl/render.ts';
 export interface PageSample {
   /** The Markdown file, such as `docs/views.md`. */
   file: string;
+  /** The page and the place of the sample on it, such as `views-3`. */
+  id: string;
   files: ReplFile[];
 }
 

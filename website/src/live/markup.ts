@@ -6,8 +6,13 @@ import { escapeHtml, getLanguage, highlight } from '../repl/highlight.ts';
 import REPL_ICON from '../repl/icons.ts';
 
 export interface LiveOptions {
-  /** The address that opens the sample in the REPL. No REPL button without it. */
+  /**
+   * The address that opens the sample in the REPL. No REPL button without it. A sample of
+   * several files links to `/repl/`, and the page adds the files to the hash on hover or focus.
+   */
   repl?: string;
+  /** The address of the static frame the site build writes for the sample. */
+  frame?: string;
 }
 
 function escapeAttribute(text: string): string {
@@ -38,11 +43,17 @@ export function renderLiveSample(files: readonly ReplFile[], options: LiveOption
       ? ''
       : `<a class="icon-button live-repl" href="${escapeAttribute(options.repl)}" data-live-repl aria-label="Open this code in the REPL" title="Open this code in the REPL">${REPL_ICON.external}</a>`;
 
+  const title = escapeAttribute(`Result of ${files[0]?.name ?? ''}`);
+  const frame =
+    options.frame === undefined
+      ? ''
+      : `<iframe class="live-frame" src="${escapeAttribute(options.frame)}" title="${title}" loading="lazy" data-live-frame></iframe>`;
+
   return `<figure class="live" data-live-sample aria-label="Live sample ${escapeAttribute(files[0]?.name ?? '')}">
 <div class="live-bar"><div class="live-files" role="tablist" aria-label="Files">${tabs}</div><p class="live-status" data-live-status role="status"></p>${repl}<button class="code-copy" type="button" aria-label="Copy the code" data-live-copy>Copy</button></div>
 <div class="live-code" data-live-code>${sources}</div>
 <ul class="live-problems" data-live-problems hidden></ul>
-<div class="live-output"><div class="live-tabs" role="tablist" aria-label="Output"><button class="live-tab" type="button" role="tab" aria-selected="true" data-live-tab="result">Result</button><button class="live-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-live-tab="compiled">Compiled</button></div><div class="live-result" role="tabpanel" data-live-result></div><div class="live-compiled" role="tabpanel" data-live-compiled hidden></div></div>
+<div class="live-output"><div class="live-tabs" role="tablist" aria-label="Output"><button class="live-tab" type="button" role="tab" aria-selected="true" data-live-tab="result">Result</button><button class="live-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-live-tab="compiled">Compiled</button></div><div class="live-result" role="tabpanel" data-live-result>${frame}</div><div class="live-compiled" role="tabpanel" data-live-compiled hidden></div></div>
 </figure>
 `;
 }

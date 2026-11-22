@@ -3,6 +3,7 @@
 import type { DemoData } from '../demo/data.ts';
 import { ICON, REPOSITORY, escape, renderFooter, renderHead, renderHeader } from '../layout.ts';
 import { renderLiveSample } from '../live/markup.ts';
+import { getFrameUrl } from '../live/prebuild.ts';
 import { PROPS_FILE } from '../repl/files.ts';
 import type { ReplFile } from '../repl/files.ts';
 import type { Page } from '../site.ts';
@@ -56,22 +57,25 @@ function renderHero(base: string, start: string, demo: DemoData): string {
 </section>`;
 }
 
-/** The files of the landing sample: the counter and the props it starts from. */
-const SAMPLE_FILES: ReplFile[] = [
-  { name: SAMPLE_FILE, source: SAMPLE_SOURCE },
-  { name: PROPS_FILE, source: '{\n  "start": 0\n}\n' },
-];
+/** The landing sample: the counter and the props it starts from. The site build writes its frame. */
+export const LANDING_SAMPLE: { id: string; files: ReplFile[] } = {
+  id: 'landing-1',
+  files: [
+    { name: SAMPLE_FILE, source: SAMPLE_SOURCE },
+    { name: PROPS_FILE, source: '{\n  "start": 0\n}\n' },
+  ],
+};
 
 /**
  * The smallest working code beside the chunks of the todo demo above, as a live sample that runs
  * and takes edits. It has no REPL button: the landing page sends no one to the REPL.
  */
-function renderSample(demo: DemoData): string {
+function renderSample(base: string, demo: DemoData): string {
   const rest = demo.chunks.length - 2;
   return `<section aria-labelledby="sample-title">
   <h2 class="row-title" id="sample-title">The code <code>${escape(SAMPLE_FILE)}</code></h2>
   <div class="landing-sample sample">
-    <div class="tile tile-code">${renderLiveSample(SAMPLE_FILES)}</div>
+    <div class="tile tile-code">${renderLiveSample(LANDING_SAMPLE.files, { frame: getFrameUrl(base, LANDING_SAMPLE.id) })}</div>
     <div class="tile chunks-tile">
       <p class="chunks-title">What the todo demo loads</p>
       <ul class="chunks">
@@ -142,7 +146,7 @@ ${renderHeader(base, start)}
   ${renderResume(demo)}
   ${renderFeatures(pages, base)}
   ${renderBenchmarks(benchmarks, findBenchmarksLink(pages, base, benchmarks.source), readSizes(demo))}
-  ${renderSample(demo)}
+  ${renderSample(base, demo)}
   ${renderFacts()}
   ${renderFinal(base, start)}
 </main>

@@ -10,11 +10,13 @@ import { DEMO_DATA } from './demo/data.ts';
 import type { DemoData } from './demo/data.ts';
 import { isBenchmarks } from './landing/benchmarks.ts';
 import type { Benchmarks } from './landing/benchmarks.ts';
-import { renderLanding } from './landing/index.ts';
+import { LANDING_SAMPLE, renderLanding } from './landing/index.ts';
 import { renderPage } from './layout.ts';
 import { checkLiveSamples } from './live/check.ts';
+import type { LiveOptions } from './live/markup.ts';
+import { LIVE_FOLDER, getFrameUrl, prebuildLiveSamples } from './live/prebuild.ts';
 import type { PageSample } from './live/check.ts';
-import { encodeFiles, getSampleLink } from './repl/files.ts';
+import { getSampleLink } from './repl/files.ts';
 import type { ReplFile } from './repl/files.ts';
 import { readFrameStyles, renderRepl } from './repl/page.ts';
 import { buildSearchIndex } from './search/index.ts';
@@ -65,8 +67,8 @@ export function pageUrl(file: string): string {
 /** The file the REPL reads the docs samples from, by the id in a live sample's REPL link. */
 const REPL_SAMPLES = 'repl/samples.json';
 
-/** The stylesheet of the frames of live samples, fetched by the first sample that runs. */
-const LIVE_FRAME_CSS = 'live/frame.css';
+/** The stylesheet of the frames of live samples. Every frame links it. */
+const LIVE_FRAME_CSS = `${LIVE_FOLDER}frame.css`;
 
 /**
  * Reads and renders every page under `docs`. `samples` gets the source of each live sample of
@@ -82,19 +84,20 @@ export function loadPages(
   let page = '';
   let file = '';
   let count = 0;
-  function linkSample(files: readonly ReplFile[]): string {
+  function linkSample(files: readonly ReplFile[]): LiveOptions {
     count += 1;
-    live.push({ file, files: [...files] });
-    // A sample of one file opens by id and runs at once. A sample of several files travels in
-    // the link, so the REPL waits for the reader to choose Run.
-    if (files.length > 1) {
-      return `${base}repl/${encodeFiles(files)}`;
-    }
     const id = `${page}-${count}`;
+    live.push({ file, id, files: [...files] });
+    const frame = getFrameUrl(base, id);
+    // A sample of one file opens by id and runs at once. A sample of several files carries its
+    // files in the hash, which the page adds on hover or focus, so the REPL waits for Run.
+    if (files.length > 1) {
+      return { repl: `${base}repl/`, frame };
+    }
     samples.set(id, files[0].source);
-    return getSampleLink(base, id);
+    return { repl: getSampleLink(base, id), frame };
   }
-  const renderer = createRenderer({ liveLink: linkSample });
+  const renderer = createRenderer({ live: linkSample });
   const pages: Page[] = [];
   for (const name of listMarkdown(folder)) {
     page = name.slice(0, -'.md'.length).replaceAll('/', '-');
@@ -217,11 +220,29 @@ export function readDemo(file = DEMO_DATA): DemoData {
   return value;
 }
 
-/** Writes the pages into a folder. The Vite build has already put the assets and the demo there. */
-export function writeSite(outDir: string, base = '/'): string[] {
+/** The loader module that Vite built for the frames, found by its name in `assets/`. */
+function findRuntime(outDir: string, base: string): string {
+  const found: string[] = [];
+  for (const name of readdirSync(path.join(outDir, 'assets'))) {
+    if (/^runtime-[\w-]+\.js$/.test(name)) {
+      found.push(name);
+    }
+  }
+  if (found.length !== 1) {
+    throw new Error(`${outDir}assets has ${found.length} runtime-*.js files, not one`);
+  }
+  return `${base}assets/${found[0]}`;
+}
+
+/**
+ * Writes the pages into a folder. The Vite build has already put the assets and the demo there.
+ * Also writes the static frame of every live sample.
+ */
+export async function writeSite(outDir: string, base = '/'): Promise<string[]> {
   const samples = new Map<string, string>();
   const live: PageSample[] = [];
   const pages = loadPages(DOCS, base, samples, live);
+  live.push({ file: 'src/landing/index.ts', ...LANDING_SAMPLE });
   // A live sample that does not compile fails the build, as it would fail in the page.
   const problems = checkLiveSamples(live);
   if (problems.length > 0) {
@@ -242,5 +263,6 @@ export function writeSite(outDir: string, base = '/'): string[] {
   writeFileSync(path.join(outDir, REPL_SAMPLES), JSON.stringify(Object.fromEntries(samples)));
   mkdirSync(path.join(outDir, path.dirname(LIVE_FRAME_CSS)), { recursive: true });
   writeFileSync(path.join(outDir, LIVE_FRAME_CSS), readFrameStyles(base, true));
+  await prebuildLiveSamples(live, { outDir, base, runtime: findRuntime(outDir, base) });
   return [...files.keys()];
 }

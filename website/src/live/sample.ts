@@ -1,46 +1,60 @@
 // oxlint-disable import/prefer-default-export
-// A live sample in the page. The code becomes an editor, and the sample runs through the REPL
-// pipeline: the page compiles, the REPL worker renders on the server side, and a frame of its
-// own resumes the result. An edit runs it again once typing stops. `client/live.ts` loads this
-// chunk when the first sample nears the viewport, and this chunk loads the compiler.
-import { createEditor } from '../repl/editor.ts';
-import { encodeFiles } from '../repl/files.ts';
+// A live sample for a reader. The result is the static frame the site build wrote, so reading
+// costs the loader and the sample's chunks. The code takes edits at once, as plain text. The
+// editor, the highlighter and the compiler load on the first focus or key in the code (and start
+// loading on hover), in `session.ts`, which runs the edits.
 import type { ReplFile } from '../repl/files.ts';
-import { escapeHtml, highlight } from '../repl/highlight.ts';
 import REPL_ICON from '../repl/icons.ts';
-import type { Problem } from '../repl/project.ts';
-import type * as RunModule from '../repl/run.ts';
-import type { RunResult, Runner } from '../repl/run.ts';
+import type * as SessionModule from './session.ts';
 
 /** What a sample is doing. One state at a time, shown in its bar. */
-type Status =
+export type Status =
+  /** The static frame or the last run shows the code as it is. */
+  | { kind: 'ready' }
   | { kind: 'loading' }
   | { kind: 'running' }
-  | { kind: 'ran' }
   | { kind: 'blocked'; errors: number }
   | { kind: 'failed'; message: string };
 
-/** The wait after the last key before the sample runs again. */
-const DELAY = 400;
+/** The parts of a sample that the session takes over. */
+export interface SampleView {
+  root: HTMLElement;
+  code: HTMLElement;
+  input: HTMLTextAreaElement;
+  fileList: HTMLElement;
+  problemList: HTMLElement;
+  compiledPanel: HTMLElement;
+  frame: HTMLIFrameElement;
+  copy: HTMLButtonElement;
+  /** The files as the editor shows them, and as the page shipped them. */
+  files: ReplFile[];
+  original: readonly ReplFile[];
+  active: () => number;
+  /** The address of the frame stylesheet, for the frames of runs. */
+  styles: string;
+  setStatus: (next: Status) => void;
+  showError: (message: string) => void;
+  clearErrors: () => void;
+  /** Set when the session runs, so the Compiled tab shows the runs from then on. */
+  markCompiled: () => void;
+  /** Called after a file tab is chosen. The session sets it. */
+  onFile?: (index: number) => void;
+}
 
-/** The compiler, the render worker and the service worker, loaded once for every sample. */
-let pipeline: Promise<typeof RunModule> | undefined;
-/** The stylesheet of the frames, which the site build writes next to the pages. */
-let frameCss: Promise<string> | undefined;
+/** The message a sample shows when its code does not load. */
+export const LOAD_FAILED = 'Could not load the compiler. Check the connection.';
+
+/** The editing session, loaded once for every sample of the page. A failed load is tried again. */
+let session: Promise<typeof SessionModule> | undefined;
 /** Gives each sample its own ids for the tab panels. */
 let samples = 0;
 
-async function loadFrameCss(): Promise<string> {
-  // This chunk is in `assets/`, and the stylesheet in `live/` next to it. A `new URL()` with a
-  // literal path would make Vite bundle the source file instead.
-  const url = import.meta.url.replace(/assets\/[^/]*$/, 'live/frame.css');
-  frameCss ??= fetch(url).then(async (response) => {
-    if (!response.ok) {
-      throw new Error(`The frame styles did not load: ${response.status}`);
-    }
-    return response.text();
+async function loadSession(): Promise<typeof SessionModule> {
+  session ??= import('./session.ts').catch((error: unknown) => {
+    session = undefined;
+    throw error;
   });
-  return frameCss;
+  return session;
 }
 
 function query<T extends Element>(root: ParentNode, selector: string, type: new () => T): T {
@@ -49,40 +63,6 @@ function query<T extends Element>(root: ParentNode, selector: string, type: new 
     throw new TypeError(`The live sample has no ${selector}`);
   }
   return element;
-}
-
-function getMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-/** The size of a text in gzip, as a server would send it. */
-async function measureGzip(text: string): Promise<number> {
-  const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'));
-  const compressed = await new Response(stream).arrayBuffer();
-  return compressed.byteLength;
-}
-
-function formatBytes(bytes: number): string {
-  return bytes < 1000 ? `${bytes} B` : `${(bytes / 1000).toFixed(1)} kB`;
-}
-
-function countErrors(problems: readonly Problem[]): number {
-  let errors = 0;
-  for (const problem of problems) {
-    if (problem.severity === 'error') {
-      errors++;
-    }
-  }
-  return errors;
-}
-
-function isSameFiles(a: readonly ReplFile[], b: readonly ReplFile[]): boolean {
-  for (const [index, file] of a.entries()) {
-    if (file.source !== b[index]?.source) {
-      return false;
-    }
-  }
-  return a.length === b.length;
 }
 
 /** Gives the frame the theme the page shows, chosen or from the system. */
@@ -125,14 +105,23 @@ function moveFocus(list: HTMLElement, event: KeyboardEvent): void {
 }
 
 /** Marks one tab of a list as selected and gives it the roving tab stop. */
-function selectTab(list: HTMLElement, selected: HTMLElement): void {
+export function selectTab(list: HTMLElement, selected: HTMLElement): void {
   for (const tab of list.querySelectorAll<HTMLElement>('[role="tab"]')) {
     tab.setAttribute('aria-selected', String(tab === selected));
     tab.tabIndex = tab === selected ? 0 : -1;
   }
 }
 
-/** Turns the server markup of a live sample into an editor, and runs the sample. */
+function isSameFiles(a: readonly ReplFile[], b: readonly ReplFile[]): boolean {
+  for (const [index, file] of a.entries()) {
+    if (file.source !== b[index]?.source) {
+      return false;
+    }
+  }
+  return a.length === b.length;
+}
+
+/** Turns the server markup of a live sample into one that takes edits. */
 export function startSample(root: HTMLElement): void {
   const id = `live-${++samples}`;
   const fileList = query(root, '.live-files', HTMLElement);
@@ -142,9 +131,10 @@ export function startSample(root: HTMLElement): void {
   const outputTabs = query(root, '.live-tabs', HTMLElement);
   const resultPanel = query(root, '[data-live-result]', HTMLElement);
   const compiledPanel = query(root, '[data-live-compiled]', HTMLElement);
-  const replLink = root.querySelector<HTMLAnchorElement>('[data-live-repl]');
+  const frame = query(root, '[data-live-frame]', HTMLIFrameElement);
   const copy = query(root, '[data-live-copy]', HTMLButtonElement);
-  const originalLink = replLink?.href ?? '';
+  const replLink = root.querySelector<HTMLAnchorElement>('[data-live-repl]');
+  const staticFrame = frame.src;
 
   // The files come from the highlighted code: its text is the source and one newline.
   const original: ReplFile[] = [];
@@ -157,20 +147,10 @@ export function startSample(root: HTMLElement): void {
   }
   const files = structuredClone(original);
   let active = 0;
-  let problems: Problem[] = [];
-  let status: Status = { kind: 'loading' };
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  let runner: Runner | undefined;
-  // Counts the runs, so the answer of an older run is dropped.
-  let runs = 0;
+  let editing: 'none' | 'loading' | 'on' = 'none';
+  let compiledFrom: 'none' | 'static' | 'runs' = 'none';
 
-  // One highlight layer stays for the editor. The others were only for the page without script.
-  const layer = sources[0];
-  for (const source of sources.slice(1)) {
-    source.remove();
-  }
-  layer.dataset.replHighlight = '';
-  layer.setAttribute('aria-hidden', 'true');
+  // The textarea goes over the highlighted code of the file shown.
   const marks = document.createElement('div');
   marks.className = 'live-layer live-marks';
   marks.dataset.replMarks = '';
@@ -186,17 +166,16 @@ export function startSample(root: HTMLElement): void {
   input.setAttribute('autocapitalize', 'off');
   input.setAttribute('autocomplete', 'off');
   input.setAttribute('aria-describedby', hint.id);
+  input.setAttribute('aria-label', `Code of ${files[0].name}`);
+  input.value = files[0].source;
   code.append(marks, input, hint);
+  for (const source of sources) {
+    source.setAttribute('aria-hidden', 'true');
+  }
   root.classList.add('is-live');
-
-  const editor = createEditor(code, (source) => {
-    files[active].source = source;
-    copy.dataset.copy = source;
-    changed();
-  });
+  copy.dataset.copy = files[0].source;
 
   // The output panels get ids, so each tab names the panel it controls.
-  const panels = { result: resultPanel, compiled: compiledPanel };
   for (const tab of outputTabs.querySelectorAll<HTMLElement>('[data-live-tab]')) {
     const panel = tab.dataset.liveTab === 'compiled' ? compiledPanel : resultPanel;
     panel.id = `${id}-${tab.dataset.liveTab}`;
@@ -205,29 +184,24 @@ export function startSample(root: HTMLElement): void {
     panel.setAttribute('aria-labelledby', tab.id);
   }
 
-  const frame = document.createElement('iframe');
-  frame.className = 'live-frame';
-  frame.title = `Result of ${files[0].name}`;
-  frame.hidden = true;
   const errorBox = document.createElement('div');
   errorBox.className = 'live-error';
   errorBox.hidden = true;
-  resultPanel.append(frame, errorBox);
+  resultPanel.append(errorBox);
 
   function setStatus(next: Status): void {
-    status = next;
     root.dataset.status = next.kind;
     switch (next.kind) {
+      case 'ready': {
+        statusLine.textContent = '';
+        break;
+      }
       case 'loading': {
         statusLine.innerHTML = '<span class="live-spinner" aria-hidden="true"></span>Loading';
         break;
       }
       case 'running': {
         statusLine.innerHTML = '<span class="live-spinner" aria-hidden="true"></span>Running';
-        break;
-      }
-      case 'ran': {
-        statusLine.textContent = '';
         break;
       }
       case 'blocked': {
@@ -253,181 +227,122 @@ export function startSample(root: HTMLElement): void {
     errorBox.hidden = true;
   }
 
-  function getFileProblems(): Problem[] {
-    const own: Problem[] = [];
-    for (const problem of problems) {
-      if (problem.file === files[active].name) {
-        own.push(problem);
-      }
-    }
-    return own;
-  }
-
-  function renderProblems(): void {
-    const items: HTMLLIElement[] = [];
-    for (const problem of problems) {
-      const item = document.createElement('li');
-      item.className = `live-problem is-${problem.severity}`;
-      const button = document.createElement('button');
-      button.type = 'button';
-      const place = document.createElement('span');
-      place.className = 'live-problem-place';
-      place.textContent =
-        files.length > 1
-          ? `${problem.file}:${problem.line}:${problem.column}`
-          : `${problem.line}:${problem.column}`;
-      const text = document.createElement('span');
-      text.textContent = problem.message;
-      button.innerHTML = REPL_ICON.alert;
-      button.append(place, text);
-      button.addEventListener('click', () => {
-        openFile(findFile(problem.file));
-        editor.select(problem.start, Math.max(problem.end, problem.start));
-      });
-      item.append(button);
-      items.push(item);
-    }
-    problemList.replaceChildren(...items);
-    problemList.hidden = items.length === 0;
-    editor.mark(getFileProblems());
-  }
-
-  /** The index of a file by name, or the first file. */
-  function findFile(name: string): number {
-    for (const [index, file] of files.entries()) {
-      if (file.name === name) {
-        return index;
-      }
-    }
-    return 0;
-  }
-
-  function openFile(index: number): void {
+  /** Shows a file: its highlighted code before the editor loads, and its text in the textarea. */
+  function showFile(index: number): void {
     active = index;
-    const tabs = fileList.querySelectorAll<HTMLElement>('[role="tab"]');
-    selectTab(fileList, tabs[index]);
-    editor.show(files[index].name, files[index].source);
-    editor.mark(getFileProblems());
-    // `client/copy.ts` copies the text of `data-copy`: the file the editor shows.
+    selectTab(fileList, fileList.querySelectorAll<HTMLElement>('[role="tab"]')[index]);
     copy.dataset.copy = files[index].source;
+    if (editing === 'on') {
+      return;
+    }
+    for (const [at, source] of sources.entries()) {
+      source.classList.toggle('is-shown', at === index);
+    }
+    input.value = files[index].source;
+    input.setAttribute('aria-label', `Code of ${files[index].name}`);
   }
 
-  /** The compiled modules with their gzip sizes: none of them loads before an event needs it. */
-  async function renderCompiled(result: RunResult): Promise<void> {
-    const paths = new Map<string, string>();
-    if (result.kind === 'served') {
-      for (const chunk of result.chunks) {
-        paths.set(`${chunk.file}\0${chunk.chunk}`, chunk.path);
-      }
+  const view: SampleView = {
+    root,
+    code,
+    input,
+    fileList,
+    problemList,
+    compiledPanel,
+    frame,
+    copy,
+    files,
+    original,
+    active: () => active,
+    styles: `<link rel="stylesheet" href="${new URL('../frame.css', staticFrame).href}">`,
+    setStatus,
+    showError,
+    clearErrors,
+    markCompiled: () => {
+      compiledFrom = 'runs';
+    },
+  };
+
+  /** Loads the session and gives it the sample. A failed load is tried again on the next key. */
+  function startEditing(): void {
+    if (editing !== 'none') {
+      return;
     }
-    const rows: { title: string; note: string; code: string }[] = [];
-    for (const file of result.project.files) {
-      if (file.result.server !== '') {
-        rows.push({
-          title: `${file.name}, server`,
-          note: 'renders the HTML',
-          code: file.result.server,
-        });
-      }
-      for (const chunk of file.result.client) {
-        rows.push({
-          title: paths.get(`${file.name}\0${chunk.chunk}`) ?? `${file.name} ${chunk.chunk}`,
-          note: chunk.chunk.startsWith('handler')
-            ? 'loads on its event'
-            : 'loads when its value changes',
-          code: chunk.code,
-        });
-      }
-    }
-    const sizes: Promise<number>[] = [];
-    for (const row of rows) {
-      sizes.push(measureGzip(row.code));
-    }
-    const measured = await Promise.all(sizes);
-    let html = '';
-    for (const [index, row] of rows.entries()) {
-      html += `<details class="live-module"><summary>${REPL_ICON.chevron}<span class="live-module-name">${escapeHtml(row.title)}</span><span class="live-module-note">${escapeHtml(row.note)}</span><span class="live-module-size">${formatBytes(measured[index])}</span></summary><pre class="live-module-code" tabindex="0">${highlight(row.code, 'ts')}</pre></details>`;
-    }
-    compiledPanel.innerHTML =
-      html === ''
-        ? '<p class="live-empty">Nothing compiled.</p>'
-        : `<p class="live-compiled-head"><span>Module</span><span>gzip</span></p>${html}`;
+    editing = 'loading';
+    setStatus({ kind: 'loading' });
+    loadSession().then(
+      (module) => {
+        editing = 'on';
+        module.attachSession(view);
+      },
+      () => {
+        editing = 'none';
+        setStatus({ kind: 'failed', message: LOAD_FAILED });
+        clearErrors();
+        showError(LOAD_FAILED);
+      },
+    );
   }
+
+  // Before the editor loads, a key shows as plain text, so typing never waits on the network.
+  input.addEventListener('input', () => {
+    if (editing === 'on') {
+      return;
+    }
+    files[active].source = input.value;
+    copy.dataset.copy = input.value;
+    sources[active].textContent = `${input.value}\n`;
+    startEditing();
+  });
+  input.addEventListener('focusin', startEditing);
+  // Hover starts the download, so the editor is often ready by the time of the first key.
+  code.addEventListener(
+    'pointerenter',
+    () => {
+      loadSession().catch(() => undefined);
+    },
+    { once: true },
+  );
 
   /** The REPL link opens the code as the editor shows it. */
   function updateLink(): void {
     if (replLink === null) {
       return;
     }
-    if (isSameFiles(files, original)) {
-      replLink.href = originalLink;
+    if (files.length === 1 && isSameFiles(files, original)) {
       return;
     }
-    const url = new URL(originalLink);
-    url.hash = encodeFiles(files);
-    replLink.href = url.href;
+    import('../repl/files.ts').then(
+      (module) => {
+        const url = new URL(replLink.href);
+        url.hash = module.encodeFiles(files);
+        replLink.href = url.href;
+      },
+      () => undefined,
+    );
   }
+  replLink?.addEventListener('pointerenter', updateLink);
+  replLink?.addEventListener('focus', updateLink);
 
-  function changed(): void {
-    updateLink();
-    // The status changes at once, so the frame never looks current for code it does not run.
-    setStatus({ kind: 'running' });
-    clearTimeout(timer);
-    timer = setTimeout(() => {
-      run().catch(fail);
-    }, DELAY);
-  }
-
-  function fail(error: unknown): void {
-    clearErrors();
-    showError(getMessage(error));
-    setStatus({ kind: 'failed', message: getMessage(error) });
-  }
-
-  async function run(): Promise<void> {
-    clearTimeout(timer);
-    const current = ++runs;
-    if (runner === undefined) {
-      setStatus({ kind: 'loading' });
-    }
-    pipeline ??= import('../repl/run.ts');
-    const [module, css] = await Promise.all([pipeline, loadFrameCss()]);
-    runner ??= module.createRunner();
-    if (current !== runs) {
-      return;
-    }
-    setStatus({ kind: 'running' });
-    const result = await runner(structuredClone(files), css, true);
-    if (current !== runs) {
-      return;
-    }
-    problems = result.project.problems;
-    renderProblems();
-    renderCompiled(result).catch(fail);
-    if (!result.project.ok) {
-      setStatus({ kind: 'blocked', errors: countErrors(problems) });
-      return;
-    }
-    if (result.kind === 'failed') {
-      fail(result.message);
-      return;
-    }
-    if (result.kind === 'served') {
-      clearErrors();
-      frame.hidden = false;
-      frame.src = result.url;
+  /** The height of the frame's body, read at once: the frame may have loaded before this script. */
+  function readHeight(): void {
+    const body = frame.contentDocument?.body;
+    if (body) {
+      frame.style.height = `${Math.ceil(body.getBoundingClientRect().height)}px`;
     }
   }
 
   frame.addEventListener('load', () => {
-    if (frame.contentWindow?.location.href === 'about:blank') {
-      return;
-    }
     syncTheme(frame);
-    if (status.kind === 'running') {
-      setStatus({ kind: 'ran' });
-    }
+    readHeight();
   });
+  if (
+    frame.contentDocument?.readyState === 'complete' &&
+    frame.contentWindow?.location.href !== 'about:blank'
+  ) {
+    syncTheme(frame);
+    readHeight();
+  }
 
   window.addEventListener('message', (event) => {
     const data: unknown = event.data;
@@ -449,16 +364,50 @@ export function startSample(root: HTMLElement): void {
     syncTheme(frame);
   }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
+  function isShowingStatic(): boolean {
+    return compiledFrom === 'static';
+  }
+
+  /** The Compiled tab of the code as the page shipped it, which the site build wrote. */
+  async function loadCompiled(): Promise<void> {
+    if (compiledFrom !== 'none') {
+      return;
+    }
+    compiledFrom = 'static';
+    compiledPanel.innerHTML = '<p class="live-empty">Loading</p>';
+    let html: string | undefined;
+    try {
+      const response = await fetch(new URL('compiled.html', staticFrame));
+      html = response.ok ? await response.text() : undefined;
+    } catch {
+      html = undefined;
+    }
+    // A run may have filled the tab meanwhile.
+    if (!isShowingStatic()) {
+      return;
+    }
+    if (html === undefined) {
+      // The next time the tab opens, it tries again.
+      compiledFrom = 'none';
+      html = '<p class="live-empty">Could not load. Open the tab again.</p>';
+    }
+    compiledPanel.innerHTML = html;
+  }
+
   for (const [index, tab] of fileList.querySelectorAll<HTMLElement>('[role="tab"]').entries()) {
     tab.addEventListener('click', () => {
-      openFile(index);
+      showFile(index);
+      view.onFile?.(index);
     });
   }
   for (const tab of outputTabs.querySelectorAll<HTMLElement>('[data-live-tab]')) {
     tab.addEventListener('click', () => {
       selectTab(outputTabs, tab);
-      for (const [name, panel] of Object.entries(panels)) {
-        panel.hidden = name !== tab.dataset.liveTab;
+      const compiled = tab.dataset.liveTab === 'compiled';
+      resultPanel.hidden = compiled;
+      compiledPanel.hidden = !compiled;
+      if (compiled) {
+        loadCompiled().catch(() => undefined);
       }
     });
   }
@@ -468,6 +417,6 @@ export function startSample(root: HTMLElement): void {
     });
   }
 
-  openFile(0);
-  run().catch(fail);
+  showFile(0);
+  setStatus({ kind: 'ready' });
 }

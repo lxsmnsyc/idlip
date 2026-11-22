@@ -14,4 +14,6 @@ export interface ToWorker {
 
 export type FromWorker =
   | { kind: 'rendered'; id: number; rendered: Rendered }
-  | { kind: 'failed'; id: number; message: string };
+  | { kind: 'failed'; id: number; message: string }
+  /** A module URL the worker made for the request. The page revokes it if it ends the worker. */
+  | { kind: 'blob'; id: number; url: string };

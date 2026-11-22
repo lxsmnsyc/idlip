@@ -9,6 +9,7 @@ import { language as typescript } from '@twinkleplop/typescript';
 import MarkdownIt from 'markdown-it';
 import { findLiveSamples } from './live/fence.ts';
 import { renderLiveSample } from './live/markup.ts';
+import type { LiveOptions } from './live/markup.ts';
 import type { ReplFile } from './repl/files.ts';
 
 export interface Heading {
@@ -50,8 +51,8 @@ export function slugify(text: string): string {
 }
 
 export interface RendererOptions {
-  /** The address that opens a live sample in the REPL, from its files. No REPL button without it. */
-  liveLink?: (files: readonly ReplFile[]) => string | undefined;
+  /** The REPL link and the static frame of a live sample, from its files. */
+  live?: (files: readonly ReplFile[]) => LiveOptions;
 }
 
 /** The token type that stands for the fences of one live sample. */
@@ -96,7 +97,7 @@ export function createRenderer(settings: RendererOptions = {}): MarkdownIt {
     // The meta of a live token is always the files `findLiveSamples` read.
     // oxlint-disable-next-line typescript/no-unsafe-assignment
     const files: ReplFile[] = tokens[index].meta;
-    return renderLiveSample(files, { repl: settings.liveLink?.(files) });
+    return renderLiveSample(files, settings.live?.(files));
   };
   parser.renderer.rules.table_open = () =>
     '<div class="table-scroll" role="group" aria-label="Table" tabindex="0">\n<table>\n';
