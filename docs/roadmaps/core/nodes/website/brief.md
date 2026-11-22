@@ -27,6 +27,9 @@ shared: []
 reserves: []
 provides: []
 depends_on:
+  - on: website-polish
+    kind: hard
+    why: the site goes public with its own identity and the full landing page
   - on: website-scaffold
     kind: hard
     why: the site builds and checks its samples

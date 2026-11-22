@@ -23,10 +23,14 @@ added: 2026-11-21
 spent:
 owns:
   - website/docs/benchmarks.md
+  - website/src/benchmarks.json
 shared: []
 reserves: []
 provides: []
 depends_on:
+  - on: website-polish
+    kind: hard
+    why: website-polish creates website/src/benchmarks.json and the landing section that reads it
   - on: website-scaffold
     kind: hard
     why: adds a Markdown page that the scaffold's build and sidebar process
@@ -78,3 +82,7 @@ S: one page. The only cost is a benchmark run.
 
 - Columns: idlip, brumate latest (`benchmarks/brumate`), brumate 0.3.0, Marko 6, Qwik 1, Qwik 2 for todos; idlip, brumate, Marko for rows and dashboard (`bench-rows`).
 - Use the run recorded after `perf-from-bench`, and copy its "Where idlip loses" list.
+
+## Landing numbers (2026-11-22)
+
+Also update `website/src/benchmarks.json`, the data file the landing page reads (`website-polish`), with the same numbers and run date as the page.
