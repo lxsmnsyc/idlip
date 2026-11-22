@@ -36,6 +36,9 @@ depends_on:
   - on: website-polish
     kind: hard
     why: the site goes public with its own identity and the full landing page
+  - on: docs-live
+    kind: hard
+    why: samples run in place before the site goes public
   - on: website-landing
     kind: hard
     why: the landing page sells the benefit before the site goes public
