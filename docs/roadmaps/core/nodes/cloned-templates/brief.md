@@ -1,7 +1,7 @@
 ---
 id: cloned-templates
 title: Clone a <template> for new branches and rows instead of parsing HTML strings
-status: todo
+status: done
 priority: must
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: [benchmark]
 fulfilled_by:
 gate: false
 added: 2026-11-22
-spent:
+spent: 943000
 owns:
   - packages/idlip/src/compiler/view/codegen/**
   - packages/idlip/src/client/list/**
