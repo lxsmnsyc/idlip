@@ -12,3 +12,11 @@
 - `.prose :not(pre) > code` gave the figure's code the inline code fill. Reset under `.prose .fig-well code`, so the caption keeps it.
 - Lint: `prefer-default-export` disabled per file as in `landing/hero.ts`, `no-loop-func` fixed by moving the start function out of the observer loop as in `client/live.ts`.
 - Happy-dom tests cannot import `site.ts` (`fileURLToPath` on a non-file URL), so the DemoData test renders the docs Markdown with `createRenderer` directly.
+
+## 2026-11-22, review fixes
+
+- Rebased onto `batch/core` at `6918353` (fix-string-length). The loader grew from 9953 B to 10001 B, and the click chunks from 1319 B to 1322 B gzip.
+- A later click replays the loop with `is-cached` and `is-flipped` on the root. The player keeps one `Run` union (`first`, or `later` with `back`).
+- `resuming.md` 505 B: written on 2026-11-21, when the helpers were copied into each chunk (`ef63cb1`). The shared helpers module came on 2026-11-22. The e2e tests check the request names, not sizes.
+- A test that compared the resuming tables with `demo.json` failed right after the rebase. Removed it, so loader changes in other nodes do not fail the website tests. The tables are kept by hand.
+- The figures have their own row, box, text, app head and count classes. No hero rule is shared.
