@@ -1,7 +1,7 @@
 ---
 id: entry-setup
 title: The whole document renders from an idlip component
-status: todo
+status: done
 priority: must
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-23
-spent:
+spent: 1100000
 owns:
   - packages/idlip/src/vite/**
   - packages/idlip/test/vite/**
@@ -61,3 +61,5 @@ Read first: brumate `website/docs/routing.md` (`_layout.brm` renders `<html>`, `
 - A test renders a document component and checks the doctype, the framework scripts in `<head>`, the state script in `<body>`, and the nonce on each script.
 - Differential test covers a document component.
 - Docs show the new setup; the website builds.
+
+Landed as 76aabe3..2534cdf on `batch/core` after the user approved the proposal and one fresh review round. Decision 14 (a separate `app.tsx`) was dropped: a stateful child puts the todo loader over budget, and the user chose to keep the root rendering the document, since layouts arrive with routing (2026-11-23).
