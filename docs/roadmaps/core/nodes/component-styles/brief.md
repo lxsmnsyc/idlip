@@ -1,7 +1,7 @@
 ---
 id: component-styles
 title: Stylesheets imported by components reach the page
-status: todo
+status: done
 priority: must
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-23
-spent:
+spent: 434000
 owns:
   - packages/idlip/src/server/styles.ts
   - packages/idlip/test/styles/**
@@ -67,3 +67,5 @@ Read first: `packages/idlip/src/vite/plugin.ts` and `chunks.ts` (how the chunk m
 - A test shows a stylesheet imported only by a child that renders after a click is linked on first load.
 - The loader stays under 4096 B gzip, and its size does not change.
 - `pnpm check` passes and `pnpm --filter website build` passes.
+
+Landed 2026-11-23 on batch/core: imported stylesheets and CSS Modules are linked in import order from the root component, in build and dev; `RenderResult.styles` added; `csp: true` adds `style-src`. Reviewed, one fix round. Style objects (`style={{}}`) are not supported by the compiler; open question for the user.
