@@ -1,4 +1,4 @@
-import { renderListener, render, renderPreload } from 'idlip/server';
+import { renderToResponse } from 'idlip/server';
 import Dashboard from './widgets/Dashboard.tsx';
 
 /**
@@ -7,12 +7,10 @@ import Dashboard from './widgets/Dashboard.tsx';
  * row of 4 widgets above the fold, 5 chunks each.
  */
 export async function page(loader: string, preload = true): Promise<string> {
-  const { body, chunks, manifests } = await render(Dashboard, {});
-  return (
-    `<!doctype html><html><head><meta charset="utf-8"><title>bench</title>` +
-    renderListener() +
-    (preload ? renderPreload(chunks, manifests, { max: 20 }) : '') +
-    `<script type="module" async src="${loader}"></script>` +
-    `</head><body>${body}</body></html>`
+  const response = await renderToResponse(
+    Dashboard,
+    {},
+    { loader, preload: preload ? { max: 20 } : false },
   );
+  return response.text();
 }

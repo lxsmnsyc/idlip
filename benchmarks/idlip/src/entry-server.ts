@@ -1,4 +1,4 @@
-import { renderListener, render, renderPreload } from 'idlip/server';
+import { renderToResponse } from 'idlip/server';
 import App from './app.tsx';
 
 export function todos(n: number) {
@@ -14,12 +14,10 @@ export function todos(n: number) {
  * `preload` (the default) the head preloads the chunks of the first click.
  */
 export async function page(n: number, loader: string, preload = true): Promise<string> {
-  const { body, chunks, manifests } = await render(App, { initial: todos(n) });
-  return (
-    `<!doctype html><html><head><meta charset="utf-8"><title>bench</title>` +
-    renderListener() +
-    (preload ? renderPreload(chunks, manifests) : '') +
-    `<script type="module" async src="${loader}"></script>` +
-    `</head><body>${body}</body></html>`
+  const response = await renderToResponse(
+    App,
+    { initial: todos(n) },
+    { loader, preload: preload ? {} : false },
   );
+  return response.text();
 }

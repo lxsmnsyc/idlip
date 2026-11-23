@@ -1,17 +1,10 @@
-import { render as renderApp, renderListener, renderPreload } from 'idlip/server';
+import { renderToResponse } from 'idlip/server';
 import TodoApp from './todo.tsx';
 
 interface Todo {
   id: string;
   text: string;
   done: boolean;
-}
-
-export interface PageOptions {
-  /** The URL of the loader module. Default: `idlip/client` through the dev server. */
-  loader?: string;
-  /** Written on every script of the page. */
-  nonce?: string;
 }
 
 const initial: Todo[] = [
@@ -32,47 +25,30 @@ function isTodo(value: unknown): value is Todo {
 /**
  * Reads the props from `?props=<json>`, such as `{"initial":[...]}`, or returns the default todos.
  */
-function readProps(url: string): { initial: Todo[] } {
-  const given = new URL(url, 'http://localhost').searchParams.get('props');
+function readProps(url: URL): { initial: Todo[] } {
+  const given = url.searchParams.get('props');
   if (given === null) {
     return { initial };
   }
   const parsed: unknown = JSON.parse(given);
   const list: unknown =
     typeof parsed === 'object' && parsed !== null ? Reflect.get(parsed, 'initial') : undefined;
-  const todos: Todo[] = [];
-  if (!Array.isArray(list)) {
+  if (!Array.isArray(list) || !list.every(isTodo)) {
     throw new TypeError('props.initial must be an array of todos');
   }
-  for (const item of list) {
-    if (!isTodo(item)) {
-      throw new TypeError('props.initial must be an array of todos');
-    }
-    todos.push({ id: item.id, text: item.text, done: item.done });
-  }
-  return { initial: todos };
+  return { initial: list.map((todo) => ({ id: todo.id, text: todo.text, done: todo.done })) };
 }
 
-function writeNonce(nonce: string | undefined): string {
-  return nonce === undefined ? '' : ` nonce="${nonce}"`;
-}
+const server = {
+  // Nitro calls `fetch` for each request that is not a file of the build. `?preload=off` leaves
+  // the preload links out, so the first click loads its chunks.
+  async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+    return renderToResponse(TodoApp, readProps(url), {
+      csp: true,
+      preload: url.searchParams.get('preload') === 'off' ? false : {},
+    });
+  },
+};
 
-/**
- * Renders the todo page for a request URL. The head preloads the chunks of the first click, so
- * the click makes no request. `?preload=off` leaves the links out, and the first click loads
- * its chunks.
- */
-export async function render(url: string, options: PageOptions = {}): Promise<string> {
-  const { nonce } = options;
-  const page = await renderApp(TodoApp, readProps(url), { nonce });
-  const loader = options.loader ?? '/@id/idlip/client';
-  const preload = new URL(url, 'http://localhost').searchParams.get('preload') !== 'off';
-  return (
-    `<!doctype html><html lang="en"><head><meta charset="utf-8">` +
-    `<meta name="viewport" content="width=device-width, initial-scale=1"><title>todo</title>` +
-    renderListener({ nonce }) +
-    (preload ? renderPreload(page.chunks, page.manifests, { nonce }) : '') +
-    `<script type="module" src="${loader}"${writeNonce(nonce)}></script>` +
-    `</head><body>${page.body}</body></html>`
-  );
-}
+export default server;
