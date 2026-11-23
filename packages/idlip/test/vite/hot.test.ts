@@ -22,13 +22,18 @@ import { createConfig } from './app.ts';
 const PACKAGE = path.resolve(import.meta.dirname, '../..');
 const CLIENT = path.join(PACKAGE, 'src/client/index.ts');
 const COUNTER = readFileSync(path.join(PACKAGE, 'test/fixtures/counter/counter.tsx'), 'utf8');
-const ENTRY = `import { render as renderComponent, renderListener } from 'idlip/server';
+// The test page wraps the counter in a document by hand, since the counter is a fragment and
+// the HMR messages are what the tests read.
+const ENTRY = `import { render, renderListener } from 'idlip/server';
 import Counter from './counter.tsx';
 
-export async function render() {
-  const { body } = await renderComponent(Counter, { start: 4 });
-  return '<!doctype html><html><head>' + renderListener() + '</head><body>' + body + '</body></html>';
-}
+export default {
+  async fetch() {
+    const { body } = await render(Counter, { start: 4 });
+    const html = '<!doctype html><html><head>' + renderListener() + '</head><body>' + body + '</body></html>';
+    return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+  },
+};
 `;
 const HANDLER = '/src/counter.tsx?idlip-handler=increment&lang.js';
 

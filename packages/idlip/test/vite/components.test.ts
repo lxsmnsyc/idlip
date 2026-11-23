@@ -259,7 +259,7 @@ describe('a file with named components only in a build', () => {
     );
     // No chunk has the file's id alone, since the file has no default export.
     for (const id of Object.keys(urls)) {
-      expect(id === 'build' || id === 'helpers' || /\?idlip-[A-Z]/.test(id)).toBe(true);
+      expect(['build', 'helpers', 'loader'].includes(id) || /\?idlip-[A-Z]/.test(id)).toBe(true);
     }
   });
 

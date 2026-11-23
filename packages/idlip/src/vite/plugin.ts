@@ -1,5 +1,7 @@
 import { globSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import type { ServerResponse } from 'node:http';
+import { Readable } from 'node:stream';
+import type { ReadableStream as NodeStream } from 'node:stream/web';
 import path from 'node:path';
 import { isRunnableDevEnvironment } from 'vite';
 import type {
@@ -17,6 +19,7 @@ import type { CompileOptions } from '../compiler/index.ts';
 import type { ChunkUrls, Compile, CompileDiagnostic, CompileResult } from '../core/format.ts';
 import {
   HELPERS_KEY,
+  LOADER_KEY,
   TEMPLATES_KEY,
   TEMPLATES_MODULE,
   getChunkFile,
@@ -60,6 +63,8 @@ const DEV_LOADER_URL = '/@id/idlip/client';
 const HELPERS_ID = '\0idlip-helpers';
 /** The module chunks import the templates of more than one chunk from (`idlip/templates`). */
 const TEMPLATES_ID = '\0idlip-templates';
+/** The name of the plugin that Nitro's Vite integration registers. */
+const NITRO_PLUGIN = 'nitro:main';
 /** The default `modules` globs. */
 const DEFAULT_MODULES = ['src/**/*.tsx'];
 /** The id of a child's view chunk, with the component's name for a named component. */
@@ -74,11 +79,18 @@ export interface IdlipOptions {
   /** Globs of the idlip modules, relative to the root. Default: `src/**\/*.tsx`. */
   modules?: string | readonly string[];
   /**
-   * The server entry `vite dev` renders pages with, such as `/src/entry-server.ts`. It
-   * exports `render(url)`, which returns the page HTML. It is also the input of the ssr build
-   * when the config sets none.
+   * The server entry, such as `/src/entry-server.ts`. Its default export is `{ fetch(request) }`,
+   * which returns the page as a `Response`: Nitro calls it, and so does the dev middleware of
+   * this plugin when Nitro is not there. It is also the input of the ssr build when the config
+   * sets none.
    */
   entry?: string;
+  /**
+   * `false` keeps the plugin's dev middleware off, for a project whose own server renders the
+   * pages. The middleware is off already when the config has Nitro (`nitro()` from
+   * `nitro/vite`), which calls the entry itself.
+   */
+  server?: false;
   /**
    * The input of the client build: the loader. Default: `idlip/client`. Every module an idlip
    * chunk imports must be in its static graph, so a click loads no shared chunk.
@@ -323,8 +335,38 @@ function findSharedTemplates(results: readonly CompileResult[]): Map<string, str
   return found;
 }
 
+/** Reads the `fetch` of the default export of the server entry. */
+function readFetch(module: unknown, entry: string): (request: Request) => unknown {
+  const exported: unknown =
+    typeof module === 'object' && module !== null ? Reflect.get(module, 'default') : undefined;
+  const handler: unknown =
+    typeof exported === 'object' && exported !== null ? Reflect.get(exported, 'fetch') : undefined;
+  if (typeof handler !== 'function') {
+    throw new TypeError(`${entry} has no default export { fetch(request) }`);
+  }
+  return (request): unknown => Reflect.apply(handler, exported, [request]) as unknown;
+}
+
+/** Makes the web request of a Node request. */
+function toRequest(request: Connect.IncomingMessage): Request {
+  const url = new URL(
+    request.originalUrl ?? request.url ?? '/',
+    `http://${request.headers.host ?? 'localhost'}`,
+  );
+  const headers = new Headers();
+  for (const [name, value] of Object.entries(request.headers)) {
+    if (typeof value === 'string') {
+      headers.set(name, value);
+    } else if (value !== undefined) {
+      headers.set(name, value.join(', '));
+    }
+  }
+  return new Request(url, { method: request.method, headers });
+}
+
 /**
- * Renders a page with the server entry, for `vite dev`.
+ * Renders a page with the server entry, for `vite dev` without Nitro: calls the `fetch` of its
+ * default export and sends the response.
  */
 async function servePage(
   server: ViteDevServer,
@@ -332,25 +374,25 @@ async function servePage(
   request: Connect.IncomingMessage,
   response: ServerResponse,
 ): Promise<void> {
-  const url = request.originalUrl ?? request.url ?? '/';
   const environment = server.environments.ssr;
   if (!isRunnableDevEnvironment(environment)) {
     throw new Error('idlip needs a runnable ssr environment to render pages in dev');
   }
   const module: unknown = await environment.runner.import(entry);
-  const render: unknown =
-    typeof module === 'object' && module !== null ? Reflect.get(module, 'render') : undefined;
-  if (typeof render !== 'function') {
-    throw new TypeError(`${entry} exports no render(url)`);
+  const answer: unknown = await readFetch(module, entry)(toRequest(request));
+  if (!(answer instanceof Response)) {
+    throw new TypeError(`fetch(request) in ${entry} returned no Response`);
   }
-  const html: unknown = await Reflect.apply(render, undefined, [url]);
-  if (typeof html !== 'string') {
-    throw new TypeError(`render(url) in ${entry} returned no string`);
+  response.statusCode = answer.status;
+  for (const [name, value] of answer.headers) {
+    response.setHeader(name, value);
   }
-  const page = await server.transformIndexHtml(url, html, request.originalUrl);
-  response.statusCode = 200;
-  response.setHeader('Content-Type', 'text/html; charset=utf-8');
-  response.end(page);
+  if (answer.body === null) {
+    response.end();
+  } else {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+    Readable.fromWeb(answer.body as NodeStream).pipe(response);
+  }
 }
 
 /**
@@ -368,6 +410,8 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
   let root = '';
   let base = '/';
   let isServe = false;
+  /** True when the config has Nitro, which serves the pages, or the `server` option is off. */
+  let standAside = options.server === false;
   /** Compiled modules by file, with the source they came from. */
   const cache = new Map<
     string,
@@ -561,9 +605,6 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
    * under the base in dev.
    */
   function getChunkUrls(result: CompileResult): ChunkUrls | undefined {
-    if (isServe && base === '/') {
-      return undefined;
-    }
     const all = isServe ? undefined : readBuilt();
     const urls: Record<string, string> = {};
     for (const { manifest } of listCompiled(result)) {
@@ -580,10 +621,14 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
     }
     // The server writes the build id on the state script and drops it from the chunk map. The
     // helpers URL stays in the map, for the loader.
-    for (const key of [BUILD_KEY, HELPERS_KEY, TEMPLATES_KEY]) {
+    for (const key of [BUILD_KEY, HELPERS_KEY, TEMPLATES_KEY, LOADER_KEY]) {
       if (all !== undefined && Object.hasOwn(all, key)) {
         urls[key] = all[key];
       }
+    }
+    // The page's loader script: the built file, or the dev loader under the base.
+    if (all === undefined) {
+      urls[LOADER_KEY] = `${base}${DEV_LOADER_URL.slice(1)}`;
     }
     return urls;
   }
@@ -606,6 +651,7 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       root = realpathSync(config.root);
       base = config.base;
       isServe = config.command === 'serve';
+      standAside ||= config.plugins.some((plugin) => plugin.name === NITRO_PLUGIN);
       chunksFile = path.resolve(root, outDir, CHUNKS_FILE);
     },
 
@@ -684,7 +730,8 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
 
     async load(id) {
       if (id === DEV_LOADER) {
-        return { code: "import 'idlip/client';\n", moduleType: 'js' };
+        // The dev server's client rides with the loader, so a page needs no markup for it.
+        return { code: "import '/@vite/client';\nimport 'idlip/client';\n", moduleType: 'js' };
       }
       if (id === HELPERS_ID) {
         return { code: printHelpersModule(), moduleType: 'js' };
@@ -784,6 +831,8 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
         }
       }
       checkChunkImports(this, bundle, files, sharedFiles);
+      // The page names the loader by this URL, so the server needs no read of the client manifest.
+      urls[LOADER_KEY] = `${base}${findLoaderFile(bundle, files)}`;
       if (options.skew !== false) {
         const id = getBuildId(Object.keys(bundle));
         urls[BUILD_KEY] = id;
@@ -835,6 +884,7 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       // The edit is a chunk swap when the markup and the manifest stay, and a remount otherwise.
       const before = cache.get(file)?.result;
       let message: ReturnType<typeof classifyEdit>;
+      let isDocument = false;
       try {
         const after = compileFile(
           {
@@ -848,8 +898,17 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
           cache.get(file)?.rendered,
         );
         message = classifyEdit(before, after, base, timestamp);
+        for (const { manifest } of listCompiled(after)) {
+          isDocument ||= manifest.document === true;
+        }
       } catch {
         // A module that does not compile: the page loads again and shows the server's error.
+        this.environment.hot.send({ type: 'full-reload' });
+        return [];
+      }
+      // A remount swaps `<body>` only, so a document edit that changes the markup, which may
+      // be `<html>` or the head, loads the page again.
+      if (isDocument && message?.kind === 'remount') {
         this.environment.hot.send({ type: 'full-reload' });
         return [];
       }
@@ -874,7 +933,8 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
         }
         next();
       });
-      if (entry === undefined) {
+      // Nitro renders the pages in its own worker, so the plugin leaves the route to it.
+      if (entry === undefined || standAside) {
         return;
       }
       server.middlewares.use((request, response, next) => {

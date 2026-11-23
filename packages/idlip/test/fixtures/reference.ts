@@ -217,9 +217,11 @@ export function createContext(): { context: NestedContext; writeState: () => str
         events.add(event);
       }
     }
+    // The server keeps the loader URL for the document's script tag, so the state leaves it out.
+    const { loader: _loader, ...rootChunks } = root.chunks;
     const state: Record<string, unknown> = {
       manifest: root.manifest,
-      chunks: { ...root.chunks, ...chunks },
+      chunks: { ...rootChunks, ...chunks },
       model: root.model,
       props: root.props,
     };

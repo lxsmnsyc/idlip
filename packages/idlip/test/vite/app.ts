@@ -141,6 +141,13 @@ export function render(url) {
   const body = url === '/counter' ? Counter(props.counter, context) : TodoApp(props.todo, context);
   return '<!doctype html><html><head></head><body>' + body + writeState() + '</body></html>';
 }
+
+export default {
+  fetch(request) {
+    const html = render(new URL(request.url).pathname);
+    return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+  },
+};
 `,
   );
   return root;
