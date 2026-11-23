@@ -2074,6 +2074,13 @@ class Analyzer {
           'The <head> of a document holds elements only',
           node.openingElement,
         );
+      } else if (child.tag === 'script') {
+        // The server writes a nonce on its own scripts only, so the policy blocks this one.
+        this.reportError(
+          'document-head-script',
+          'A <script> in the document head cannot run under the content security policy: it gets no nonce. The loader starts the page, and an effect or a handler runs code',
+          node.openingElement,
+        );
       } else if (child.tag === 'title') {
         titles++;
         if (titles > 1) {

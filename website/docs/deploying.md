@@ -92,6 +92,7 @@ default-src 'none'; script-src 'nonce-…' 'strict-dynamic'; base-uri 'none'; ob
 
 `default-src 'none'` blocks styles, images and requests, so a page with a stylesheet adds its sources: `csp: { extend: { 'style-src': ["'self'"], 'img-src': ['https:'] } }`. Sources are added to a directive of that name, or the directive is added. The script directives (`script-src`, `script-src-elem`, `script-src-attr`) and the Trusted Types directives (`trusted-types`, `require-trusted-types-for`) cannot be extended. A host that makes its own nonce passes it as `nonce`, and `csp` uses it.
 
+- **A static `<style>` in the head has no nonce.** The policy blocks it. Add `style-src` with `extend`, or load the styles with a `<link rel="stylesheet">`. A `<script>` in the document head is a compile error for the same reason.
 - **No header in development.** The policy would block Vite's HMR socket and error overlay. The nonce is still written, so the markup is the same.
 - **The page and its assets are not the same response.** Nitro serves the files of `.output/public` itself, and the policy applies to the page.
 

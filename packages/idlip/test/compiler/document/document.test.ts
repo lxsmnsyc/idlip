@@ -165,6 +165,21 @@ describe('document component', () => {
     ).toContain('codegen-unsupported');
   });
 
+  it('rejects a script in the document head, inline or with a src, and keeps a style', () => {
+    for (const script of ['<script>x</script>', '<script src="/a.js"></script>']) {
+      expect(
+        rules(`export default function App() {
+  return <html><head>${script}</head><body>b</body></html>;
+}`),
+      ).toContain('document-head-script');
+    }
+    expect(
+      rules(`export default function App() {
+  return <html><head><style>a</style></head><body>b</body></html>;
+}`),
+    ).toEqual([]);
+  });
+
   it('still rejects a title outside the document head', () => {
     expect(
       rules(`export default function App() {
