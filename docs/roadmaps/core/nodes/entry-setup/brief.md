@@ -1,6 +1,6 @@
 ---
 id: entry-setup
-title: A proper server entry, without hand-built documents
+title: The whole document renders from an idlip component
 status: todo
 priority: must
 type: feature
@@ -39,20 +39,23 @@ depends_on:
     why: the entry returns its stream
 ---
 
-# A proper server entry, without hand-built documents
+# The whole document renders from an idlip component
 
-User request (2026-11-23). Today every entry builds the document as a string: `<!doctype html>`, `renderListener()`, a loader `<script>` whose URL is `/@id/idlip/client` in dev, and in production a URL that `website/docs/deploying.md` reads by hand from `.vite/manifest.json`. Preload links and the nonce are wired by hand too.
+User decision (2026-11-23): the current entry form is unacceptable. Every entry builds the document as a string (`<!doctype html>`, `<html>`, `<head>`, `renderListener()`, a loader `<script>` with `/@id/idlip/client` in dev or a URL read by hand from `.vite/manifest.json` in production) and only the body comes from idlip. The entire document must render through an idlip component, not partially.
 
-Read first: brumate `website/docs/getting-started.md` ("Serve pages in development"), `deploying.md`, `reference-plugin.md` (how the plugin hands client bundles to the server: `.brumate/hints.json`, `setClientBundles`), and `examples/todos/server.ts`.
+Read first: brumate `website/docs/routing.md` (`_layout.brm` renders `<html>`, `<head>`, `<body>`; "The server adds the doctype, the head of the components and the scripts"), `page-metadata.md` (`<title>` inside a document component's `<head>`), `reference-server.md` (render options), `reference-plugin.md` (how the plugin hands client bundles to the server: `.brumate/hints.json`, `setClientBundles`), and `examples/todos/server.ts`. Then idlip's `server/render.ts`, `<Head>` (`website/docs/head.md`) and `website/docs/deploying.md`.
 
 ## Do
 
-- The server learns the loader URL and chunk map from the client build without user code (the plugin writes them, the server reads them at start), and uses the dev URL under `vite dev`.
-- One call answers a request: for example `handle(request, { Component, props, nonce })` returning a `Response` whose body is the `renderToStream` stream, with the CSP nonce and preload links applied. Users keep control of the document shell (title, lang, extra head) through options or a small template, not string concatenation.
-- Dev server: the plugin's existing middleware uses the same path, so dev and production render the same document.
-- Update `examples/*`, the benchmark apps, `website/src/demo/build.ts`, getting started, deploying (Node and Vercel) to the new entry; the hand-written manifest parsing disappears from the docs.
+- A root component may render `<html>`, `<head>` and `<body>` in TSX. The server adds only what the framework owns: the doctype, the listener, the loader script, preload links and `<Head>` output in `<head>`, and the state script at the end of `<body>`. No `start`/`end` strings, no document template, no string concatenation in user code.
+- The compiler accepts `html`, `head` and `body` in a view (today it may reject or mis-place them): static attributes, bound attributes (`lang={...}`) and a static `<title>`/`<meta>` in the document's `<head>`. Decide what may be dynamic, and how `<Head>` and the document `<head>` combine, in a view-ir change request.
+- The server learns the loader URL and chunk map from the client build without user code (the plugin writes them, the server reads them), and uses the dev URL under `vite dev`. The nonce applies to every script it adds.
+- An entry is one call: `renderToStream(App, props, { nonce })` (from `render-stream`), or a `handle(request, ...)` that returns a `Response`. The plugin's dev middleware uses the same path, so dev and production send the same document.
+- Update `examples/*`, the benchmark apps, `website/src/demo/build.ts`, getting started, components, head, deploying (Node and Vercel) and the README to the new form.
 
 ## Acceptance
 
-- `examples/todo` entry is under 20 lines with no document string and no manifest read; e2e passes in dev and on the production server.
-- Getting started and deploying show the new setup; the website builds.
+- `examples/todo` has an `App` component that renders the whole document, and an entry with no HTML string and no manifest read; e2e passes in dev and on the production server.
+- A test renders a document component and checks the doctype, the framework scripts in `<head>`, the state script in `<body>`, and the nonce on each script.
+- Differential test covers a document component.
+- Docs show the new setup; the website builds.
