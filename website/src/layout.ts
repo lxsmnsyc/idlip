@@ -62,7 +62,7 @@ export function renderHeader(base: string, start: string, current?: string): str
   }
   return `<header class="site-header">
   <div class="header-inner">
-    <a class="brand" href="${base}">idlip</a>
+    <a class="brand" href="${base}"><img src="${base}icon.svg" width="28" height="28" alt="">idlip</a>
     <div class="header-slot">
       <button class="search-trigger" type="button" aria-haspopup="dialog" aria-keyshortcuts="Control+K Meta+K /" aria-label="Search the documentation">${SEARCH_ICONS.search}<span class="search-trigger-text">Search</span><kbd>Ctrl K</kbd></button>
     </div>
@@ -117,6 +117,8 @@ export function renderHead(
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escape(title)}</title>
 <meta name="description" content="${escape(description)}">
+<link rel="icon" href="${base}icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="${base}apple-touch-icon.png">
 ${share ? renderShareTags(base, title, description) : ''}${THEME_SCRIPT}
 <link rel="preload" href="${base}fonts/bricolage-grotesque.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="${base}assets/site.css">

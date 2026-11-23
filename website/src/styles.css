@@ -228,6 +228,9 @@ svg {
 }
 
 .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   color: var(--text);
   font-size: 1.6rem;
   font-weight: 800;
