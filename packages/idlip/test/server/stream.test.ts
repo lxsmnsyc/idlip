@@ -3,8 +3,8 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { Manifest, PageState, RenderContext } from '../../src/core/format.ts';
 import {
+  render,
   renderListener,
-  renderPage,
   renderPreload,
   renderToStream,
   streamParts,
@@ -88,11 +88,11 @@ describe('renderToStream', () => {
     expect(first.endsWith('</script></body></html>')).toBe(true);
   });
 
-  it('joins to the document of renderPage', async () => {
+  it('joins to the document of render', async () => {
     const options = { loader: '/l.js', nonce: 'n1' };
     const component = makeComponent('<title>x</title>');
     const html = (await readChunks(renderToStream(component, {}, options))).join('');
-    const page = await renderPage(component, {}, { nonce: 'n1' });
+    const page = await render(component, {}, { nonce: 'n1' });
     expect(html).toBe(
       `<!doctype html><html><head>${renderListener({ nonce: 'n1' })}` +
         `<script type="module" async src="/l.js" nonce="n1"></script>` +
@@ -107,7 +107,7 @@ describe('renderToStream', () => {
   });
 
   for (const name of ['counter', 'todo', 'try', 'effects']) {
-    it(`joins to the document of renderPage for fixture ${name}`, async () => {
+    it(`joins to the document of render for fixture ${name}`, async () => {
       const dir = join(FIXTURES, name);
       const input: unknown = JSON.parse(readFileSync(join(dir, 'input.json'), 'utf8'));
       const props: unknown = Reflect.get(Object(input), 'props');
@@ -116,7 +116,7 @@ describe('renderToStream', () => {
       if (!isComponent(component)) {
         throw new TypeError('bad module');
       }
-      const page = await renderPage(component, props);
+      const page = await render(component, props);
       const html = (await readChunks(renderToStream(component, props))).join('');
       expect(html).toBe(
         `<!doctype html><html><head>${renderListener()}` +
@@ -143,8 +143,8 @@ describe('renderToStream', () => {
 });
 
 describe('streamParts', () => {
-  it('streams what renderPage returned', async () => {
-    const page = await renderPage(makeComponent(), {});
+  it('streams what render returned', async () => {
+    const page = await render(makeComponent(), {});
     const parts = await readChunks(streamParts(page, { loader: '/l.js' }));
     expect(parts).toHaveLength(1);
     const whole = (await readChunks(renderToStream(makeComponent(), {}, { loader: '/l.js' }))).join(
@@ -166,7 +166,7 @@ describe('pending chunks', () => {
   }
 
   it('come after the first chunk and before the end of the body', async () => {
-    const page = await renderPage(makeComponent(), {});
+    const page = await render(makeComponent(), {});
     const log: string[] = [];
     const out = await readChunks(streamParts({ ...page, pending: later(log) }));
     expect(out).toHaveLength(4);
@@ -176,7 +176,7 @@ describe('pending chunks', () => {
   });
 
   it('stop when the reader leaves while a chunk is in flight', async () => {
-    const page = await renderPage(makeComponent(), {});
+    const page = await render(makeComponent(), {});
     const log: string[] = [];
     let aborted: unknown;
     // A generator that awaits a chunk that never arrives, until the signal aborts. Its `return()`
@@ -211,7 +211,7 @@ describe('pending chunks', () => {
   });
 
   it('stop when the reader leaves', async () => {
-    const page = await renderPage(makeComponent(), {});
+    const page = await render(makeComponent(), {});
     expect(page.pending).toBeDefined();
     const log: string[] = [];
     const reader = streamParts({ ...page, pending: later(log) }).getReader();

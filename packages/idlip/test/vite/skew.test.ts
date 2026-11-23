@@ -84,7 +84,7 @@ describe('the state script', () => {
       context?.state({ manifest, chunks, model: {}, props: {} });
       return '<p></p>';
     }
-    return render(component, {});
+    return (await render(component, {})).body;
   }
 
   it('carries the build id as i-build and not in the chunk map', async () => {

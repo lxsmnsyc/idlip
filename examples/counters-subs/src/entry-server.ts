@@ -63,7 +63,7 @@ function writeNonce(nonce: string | undefined): string {
  */
 export async function render(url: string, options: PageOptions = {}): Promise<string> {
   const { nonce } = options;
-  const body = await renderComponent(Board, readProps(url), { nonce });
+  const { body } = await renderComponent(Board, readProps(url), { nonce });
   const loader = options.loader ?? '/@id/idlip/client';
   return (
     `<!doctype html><html lang="en"><head><meta charset="utf-8">` +

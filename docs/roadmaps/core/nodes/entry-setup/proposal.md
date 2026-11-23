@@ -21,14 +21,14 @@ Revision 2 (2026-11-23): the user chose Nitro 3 as the default server, as brumat
 
 Probed on `batch/core` (f3005fb) by compiling small modules and reading the server output. The probe is deleted.
 
-| View                                                                                | Result today                                                                                                                  |
-| ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `<html lang="en"><head><meta charset="utf-8"/></head><body>..`                      | Compiles. The server string holds the three elements as written.                                                              |
-| `<html lang={lang}>`, `<body class={...}>`                                          | Compiles. The server writes `attr$('lang', lang)` and an `i-a` mark on the element. The client side was not probed.          |
-| `<title>` inside `<head>`                                                           | Error `title-outside-head`. This blocks the document: the title belongs there. The compiler must allow it.                    |
-| `<Head>` inside `<body>`                                                            | Compiles. It writes a `<template i-head>` marker in the body and the elements through `context.head`.                         |
-| A child component inside `<body>`                                                   | Compiles (`<Todo initial={props.initial} />`).                                                                                |
-| `{a && <html><body>b</body></html>}`, `<div><body>..</body></div>`, a root `<head>` | Compiles with no diagnostic. A client template would drop these tags, so they break at run time. They need an error.          |
+| View                                                                                | Result today                                                                                                         |
+| ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `<html lang="en"><head><meta charset="utf-8"/></head><body>..`                      | Compiles. The server string holds the three elements as written.                                                     |
+| `<html lang={lang}>`, `<body class={...}>`                                          | Compiles. The server writes `attr$('lang', lang)` and an `i-a` mark on the element. The client side was not probed.  |
+| `<title>` inside `<head>`                                                           | Error `title-outside-head`. This blocks the document: the title belongs there. The compiler must allow it.           |
+| `<Head>` inside `<body>`                                                            | Compiles. It writes a `<template i-head>` marker in the body and the elements through `context.head`.                |
+| A child component inside `<body>`                                                   | Compiles (`<Todo initial={props.initial} />`).                                                                       |
+| `{a && <html><body>b</body></html>}`, `<div><body>..</body></div>`, a root `<head>` | Compiles with no diagnostic. A client template would drop these tags, so they break at run time. They need an error. |
 
 What else breaks:
 
@@ -300,7 +300,8 @@ interface RenderResult {
 default-src 'none'; script-src 'nonce-NONCE' 'strict-dynamic'; base-uri 'none'; object-src 'none'; require-trusted-types-for 'script'; trusted-types idlip
 ```
 
-  `{ extend }` appends sources to a directive of that name, or adds the directive. `default-src 'none'` blocks styles, images and fetches, so a page with a stylesheet needs `{ extend: { 'style-src': ["'self'"] } }`. `script-src` and `trusted-types` cannot be extended: an entry for them throws. `streamParts`, `renderToStream` and `render` take `nonce` only. They set no header, since they return no headers.
+`{ extend }` appends sources to a directive of that name, or adds the directive. `default-src 'none'` blocks styles, images and fetches, so a page with a stylesheet needs `{ extend: { 'style-src': ["'self'"] } }`. `script-src` and `trusted-types` cannot be extended: an entry for them throws. `streamParts`, `renderToStream` and `render` take `nonce` only. They set no header, since they return no headers.
+
 - The entry contract, read by Nitro, by the plugin's fallback and by any host:
 
 ```ts
@@ -335,13 +336,18 @@ For `App` above, the response reads (line breaks added):
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>todo</title>
-    <script nonce="N">/* listener */</script>
-    <link rel="modulepreload" href="/assets/…" nonce="N" />  <!-- one per preloaded chunk -->
+    <script nonce="N">
+      /* listener */
+    </script>
+    <link rel="modulepreload" href="/assets/…" nonce="N" />
+    <!-- one per preloaded chunk -->
     <script type="module" async src="/assets/loader.….js" nonce="N"></script>
   </head>
   <body>
     …the todo markup…
-    <script i-state i-build="…" nonce="N">(self.$idlip||=[]).push(…)</script>
+    <script i-state i-build="…" nonce="N">
+      (self.$idlip||=[]).push(…)
+    </script>
   </body>
 </html>
 ```
@@ -424,24 +430,24 @@ Dropped from the first revision: the Node adapter (Nitro is the adapter), `vite 
 
 ## Where brumate does the same or differently
 
-| Topic                        | Brumate                                                                                                  | This proposal                                                              | Why                                                                                    |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Document                     | `_layout.brm` renders `<html>`. The server adds the doctype, the head of the components and the scripts. | Same. The root component renders `<html>`.                                 | The user asked for it.                                                                 |
-| Title                        | `<title>` in `#head`, or in the `<head>` of a document component.                                        | `<title>` in the document head, which is the first `<Head>` block.         | One rule for every head element.                                                       |
-| Server                       | Nitro 3 (`nitro/vite`), pinned `3.0.260903-beta`. Hand-written Node server also documented.              | Nitro 3, same pin. No hand-written server in the docs.                     | The user chose it. Nitro is the adapter, so no `toRequest` or `send`.                  |
-| Entry                        | `export default { fetch }` that calls `handleCall`, then `handle(request, { scripts, address })`.        | `export default { fetch }` that calls `renderToResponse`.                  | The same shape. Idlip has no server functions or routes yet.                           |
-| Entry convention for Nitro   | `src/entry-server.ts`, found by Nitro.                                                                   | `idlip({ entry })` sets the ssr input; Nitro serves it. Measured.          | Dev answered 404 until the ssr input was set.                                          |
-| Client input in the config   | `client: { build: { rollupOptions: { input: 'src/client.ts' } } }`, read in the entry with `?assets=client`. | Default `idlip/client`; the loader URL rides in the chunk map.        | Idlip's loader has no user file. The server gets the URL with no import.               |
-| `render`                     | `render(Root, props, options)` returns `{ html, head, state, pending, headers, status }`.                | `render` returns `{ head, body, pending, … }`.                             | The same split: parts first, then a stream. Idlip has no event, so no `headers`, `status`. |
-| Stream                       | `renderToStream`, `streamParts`.                                                                         | The same names, built by `render-stream`.                                  | -                                                                                      |
-| A component without `<html>` | `start` and `end` strings in `DocumentOptions`.                                                          | Rejected.                                                                  | The user's rule: no HTML strings in user code.                                         |
-| Extra markup                 | `scripts` and `head` strings. The entry writes `/@vite/client` when `import.meta.env.DEV`.               | None. The plugin and `<Head>` supply them. The dev loader imports `/@vite/client`. | Same rule.                                                                     |
-| Client bundles               | The client build writes `.brumate/hints.json`. The server reads it and calls `setClientBundles`.         | A `loader` key in the chunk map baked into the server modules.             | The chunk map is already baked in. No file and no global.                              |
-| Dev without Nitro            | `vite.ssrLoadModule` in the user's `server.ts`, with `scripts` naming `/@vite/client` and `/src/client.ts`. | The plugin's fallback middleware calls `fetch`. It stands aside for Nitro. | The user wrote no dev server.                                                      |
-| Request in the render        | `request` option and `getEvent()`.                                                                       | The entry derives props from `request`. No request context in components.   | Routing and data loading are non-goals of this roadmap.                                |
-| CSP                          | `nonce` in the render options; the host writes the policy. Prerendered pages use hashes.                 | `csp: true` makes the nonce, sets the header and uses idlip's policy.      | The user decision: user files hold no policy code.                                     |
-| Skew files                   | `skew: { keep: 2 }` keeps old builds in `dist/client`.                                                   | `skew` as today. Under Nitro the previous build is not kept (measured).    | Nitro empties `.output/public`.                                                        |
-| Hints                        | `earlyHints` callback, `Link` headers.                                                                   | Unchanged: `renderPreload(..., { format: 'header' })` stays.               | Outside this node.                                                                     |
+| Topic                        | Brumate                                                                                                      | This proposal                                                                      | Why                                                                                        |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Document                     | `_layout.brm` renders `<html>`. The server adds the doctype, the head of the components and the scripts.     | Same. The root component renders `<html>`.                                         | The user asked for it.                                                                     |
+| Title                        | `<title>` in `#head`, or in the `<head>` of a document component.                                            | `<title>` in the document head, which is the first `<Head>` block.                 | One rule for every head element.                                                           |
+| Server                       | Nitro 3 (`nitro/vite`), pinned `3.0.260903-beta`. Hand-written Node server also documented.                  | Nitro 3, same pin. No hand-written server in the docs.                             | The user chose it. Nitro is the adapter, so no `toRequest` or `send`.                      |
+| Entry                        | `export default { fetch }` that calls `handleCall`, then `handle(request, { scripts, address })`.            | `export default { fetch }` that calls `renderToResponse`.                          | The same shape. Idlip has no server functions or routes yet.                               |
+| Entry convention for Nitro   | `src/entry-server.ts`, found by Nitro.                                                                       | `idlip({ entry })` sets the ssr input; Nitro serves it. Measured.                  | Dev answered 404 until the ssr input was set.                                              |
+| Client input in the config   | `client: { build: { rollupOptions: { input: 'src/client.ts' } } }`, read in the entry with `?assets=client`. | Default `idlip/client`; the loader URL rides in the chunk map.                     | Idlip's loader has no user file. The server gets the URL with no import.                   |
+| `render`                     | `render(Root, props, options)` returns `{ html, head, state, pending, headers, status }`.                    | `render` returns `{ head, body, pending, … }`.                                     | The same split: parts first, then a stream. Idlip has no event, so no `headers`, `status`. |
+| Stream                       | `renderToStream`, `streamParts`.                                                                             | The same names, built by `render-stream`.                                          | -                                                                                          |
+| A component without `<html>` | `start` and `end` strings in `DocumentOptions`.                                                              | Rejected.                                                                          | The user's rule: no HTML strings in user code.                                             |
+| Extra markup                 | `scripts` and `head` strings. The entry writes `/@vite/client` when `import.meta.env.DEV`.                   | None. The plugin and `<Head>` supply them. The dev loader imports `/@vite/client`. | Same rule.                                                                                 |
+| Client bundles               | The client build writes `.brumate/hints.json`. The server reads it and calls `setClientBundles`.             | A `loader` key in the chunk map baked into the server modules.                     | The chunk map is already baked in. No file and no global.                                  |
+| Dev without Nitro            | `vite.ssrLoadModule` in the user's `server.ts`, with `scripts` naming `/@vite/client` and `/src/client.ts`.  | The plugin's fallback middleware calls `fetch`. It stands aside for Nitro.         | The user wrote no dev server.                                                              |
+| Request in the render        | `request` option and `getEvent()`.                                                                           | The entry derives props from `request`. No request context in components.          | Routing and data loading are non-goals of this roadmap.                                    |
+| CSP                          | `nonce` in the render options; the host writes the policy. Prerendered pages use hashes.                     | `csp: true` makes the nonce, sets the header and uses idlip's policy.              | The user decision: user files hold no policy code.                                         |
+| Skew files                   | `skew: { keep: 2 }` keeps old builds in `dist/client`.                                                       | `skew` as today. Under Nitro the previous build is not kept (measured).            | Nitro empties `.output/public`.                                                            |
+| Hints                        | `earlyHints` callback, `Link` headers.                                                                       | Unchanged: `renderPreload(..., { format: 'header' })` stays.                       | Outside this node.                                                                         |
 
 ## Work after approval
 

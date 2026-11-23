@@ -68,12 +68,12 @@ import Fifth from './fifth.tsx';
 import Outer from './outer.tsx';
 export async function render(): Promise<string> {
   const pages = [
-    await renderHtml(First, {}),
-    await renderHtml(Second, {}),
-    await renderHtml(Third, {}),
-    await renderHtml(Fourth, {}),
-    await renderHtml(Fifth, {}),
-    await renderHtml(Outer, {}),
+    (await renderHtml(First, {})).body,
+    (await renderHtml(Second, {})).body,
+    (await renderHtml(Third, {})).body,
+    (await renderHtml(Fourth, {})).body,
+    (await renderHtml(Fifth, {})).body,
+    (await renderHtml(Outer, {})).body,
   ];
   return pages.join('');
 }

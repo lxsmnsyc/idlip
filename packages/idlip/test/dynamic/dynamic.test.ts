@@ -36,7 +36,7 @@ async function renderBoard(source: string, props: Record<string, unknown>): Prom
     const server = (await import(/* @vite-ignore */ toDataUrl(code))) as {
       default: (props: unknown) => unknown;
     };
-    return await render(server.default, props);
+    return (await render(server.default, props)).body;
   } finally {
     Reflect.deleteProperty(globalThis, key);
   }

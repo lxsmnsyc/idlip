@@ -9,7 +9,6 @@ import type {
   PageState,
   Props,
 } from '../core/format.ts';
-import { DEV } from '../core/dev.ts';
 import { attr } from './helpers.ts';
 
 export interface RenderOptions {
@@ -66,7 +65,7 @@ interface NestedContext {
   headRollback(mark: number): void;
 }
 
-/** What `renderPage` returns: the markup for `<head>`, and the body markup with the state script. */
+/** What `render` returns: the markup for `<head>`, and the body markup with the state script. */
 export interface RenderResult {
   /** The elements of every `<Head>`. The title of the last block is first. */
   head: string;
@@ -126,9 +125,9 @@ interface StaticPart {
   readonly urls: Record<string, string>;
   /** The manifests of the child modules. */
   readonly modules: ReadonlyMap<string, Manifest>;
-  /** A frozen copy of `urls`, which `renderPage` returns to every caller. */
+  /** A frozen copy of `urls`, which `render` returns to every caller. */
   readonly pageChunks: ChunkUrls;
-  /** The root's manifest, then the child manifests, frozen, which `renderPage` returns. */
+  /** The root's manifest, then the child manifests, frozen, which `render` returns. */
   readonly manifests: readonly Manifest[];
   /** `manifest` and `chunks` as seroval wrote them, without the braces. Undefined if not plain. */
   readonly head: string | undefined;
@@ -458,33 +457,14 @@ export function renderSync(
 }
 
 /**
- * Renders a compiled component to HTML: its markup, then its state script. The elements of a
- * `<Head>` are not in the result: use `renderPage` to get them.
+ * Renders a compiled component and returns the parts of its page: the markup for `<head>`, the
+ * body markup with the state script, and `pending` for what resolves later. `renderToStream` and
+ * `streamParts` write them as a document. `chunks` and `manifests` are what `renderPreload`
+ * reads: `renderPreload(page.chunks, page.manifests)`.
  */
 // A promise executor turns a thrown error into a rejection without an `await`.
 // oxlint-disable-next-line typescript/promise-function-async
 export function render<P>(
-  component: (props: P) => unknown,
-  props: P,
-  options: RenderOptions = {},
-): Promise<string> {
-  return new Promise((resolve) => {
-    const { head, body } = renderSync(component, props, options.nonce);
-    if (DEV && head !== '') {
-      // oxlint-disable-next-line no-console
-      console.warn('idlip: render() drops the <Head> output of the page. Use renderPage().');
-    }
-    resolve(body);
-  });
-}
-
-/**
- * Renders a compiled component and returns the markup for `<head>` next to the body markup.
- * The host writes `head` inside `<head>` and `body` in `<body>`. `chunks` and `manifests` are
- * what `renderPreload` reads: `renderPreload(page.chunks, page.manifests)`.
- */
-// oxlint-disable-next-line typescript/promise-function-async
-export function renderPage<P>(
   component: (props: P) => unknown,
   props: P,
   options: RenderOptions = {},

@@ -31,11 +31,11 @@ export default function Board(props: { items: { id: string; label: string }[] })
 const ENTRY = `import { render as renderHtml } from 'idlip/server';
 import Board from './board.tsx';
 import { Counter } from './widgets.tsx';
-export function render(): Promise<string> {
-  return renderHtml(Board, { items: [{ id: 'a1', label: 'One' }] });
+export async function render(): Promise<string> {
+  return (await renderHtml(Board, { items: [{ id: 'a1', label: 'One' }] })).body;
 }
-export function renderCounter(): Promise<string> {
-  return renderHtml(Counter, { start: 3 });
+export async function renderCounter(): Promise<string> {
+  return (await renderHtml(Counter, { start: 3 })).body;
 }
 `;
 
@@ -229,8 +229,8 @@ export function Panel(): JSX.Element {
 
 const TOOLS_ENTRY = `import { render as renderHtml } from 'idlip/server';
 import { Panel } from './tools.tsx';
-export function render(): Promise<string> {
-  return renderHtml(Panel, {});
+export async function render(): Promise<string> {
+  return (await renderHtml(Panel, {})).body;
 }
 `;
 

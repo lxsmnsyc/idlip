@@ -251,7 +251,7 @@ describe('nested behavior', () => {
       { text$: text, on$: on, slot$: slot, Counter: loadCounter() },
       `${body}\nreturn { Board };`,
     );
-    const html = await render(
+    const { body: html } = await render(
       (props: unknown, ...rest: unknown[]) => call(exports, 'Board', props, ...rest),
       readProps('board'),
     );

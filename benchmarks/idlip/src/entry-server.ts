@@ -1,4 +1,4 @@
-import { renderListener, renderPage, renderPreload } from 'idlip/server';
+import { renderListener, render, renderPreload } from 'idlip/server';
 import App from './app.tsx';
 
 export function todos(n: number) {
@@ -14,7 +14,7 @@ export function todos(n: number) {
  * `preload` (the default) the head preloads the chunks of the first click.
  */
 export async function page(n: number, loader: string, preload = true): Promise<string> {
-  const { body, chunks, manifests } = await renderPage(App, { initial: todos(n) });
+  const { body, chunks, manifests } = await render(App, { initial: todos(n) });
   return (
     `<!doctype html><html><head><meta charset="utf-8"><title>bench</title>` +
     renderListener() +

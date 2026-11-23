@@ -24,7 +24,7 @@ import { resume } from '../client/loader/resume.ts';
 import { addChild, setProp } from '../client/nesting.ts';
 import { restartSub } from '../client/subs/index.ts';
 import * as clientExports from '../client/patch/index.ts';
-import { renderPage } from '../server/render.ts';
+import { render } from '../server/render.ts';
 import * as serverExports from '../server/index.ts';
 import { compareTrees } from './compare.ts';
 import { bindImports, importHelpers, toDataUrl } from './modules.ts';
@@ -244,7 +244,7 @@ async function start(
   const server = (await importCode(bindModules(compiled.server))) as ServerModule;
   // `render` passes the context itself.
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-  const rendered = await renderPage(server.default as (props: Props) => unknown, props, { nonce });
+  const rendered = await render(server.default as (props: Props) => unknown, props, { nonce });
   const { body: html } = rendered;
   // The elements of a `<Head>` go in the document head, which `stop` clears again.
   const headRoot = document.createElement('div');

@@ -3,7 +3,7 @@
  * compiled server modules import.
  */
 export { attr, on, safeUrl, slot, text, track } from './helpers.ts';
-export { render, renderPage } from './render.ts';
+export { render } from './render.ts';
 export { renderToStream, streamParts } from './stream.ts';
 export type { StreamOptions } from './stream.ts';
 export type { RenderOptions, RenderResult } from './render.ts';

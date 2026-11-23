@@ -26,7 +26,7 @@ const ENTRY = `import { render as renderComponent, renderListener } from 'idlip/
 import Counter from './counter.tsx';
 
 export async function render() {
-  const body = await renderComponent(Counter, { start: 4 });
+  const { body } = await renderComponent(Counter, { start: 4 });
   return '<!doctype html><html><head>' + renderListener() + '</head><body>' + body + '</body></html>';
 }
 `;

@@ -1,4 +1,4 @@
-import { renderListener, renderPage, renderPreload } from 'idlip/server';
+import { renderListener, render, renderPreload } from 'idlip/server';
 import { build } from '../../../harness/rows.mjs';
 import App from './app.tsx';
 
@@ -7,7 +7,7 @@ import App from './app.tsx';
  * `preload` (the default) the head preloads the chunks of the first click.
  */
 export async function page(n: number, loader: string, preload = true): Promise<string> {
-  const { body, chunks, manifests } = await renderPage(App, { initial: build(1, n) });
+  const { body, chunks, manifests } = await render(App, { initial: build(1, n) });
   return (
     `<!doctype html><html><head><meta charset="utf-8"><title>bench</title>` +
     // The same stylesheet in every app, so that selecting a row paints it.

@@ -1,4 +1,4 @@
-import { renderListener, renderPage, renderPreload } from 'idlip/server';
+import { render as renderApp, renderListener, renderPreload } from 'idlip/server';
 import TodoApp from './todo.tsx';
 
 interface Todo {
@@ -64,7 +64,7 @@ function writeNonce(nonce: string | undefined): string {
  */
 export async function render(url: string, options: PageOptions = {}): Promise<string> {
   const { nonce } = options;
-  const page = await renderPage(TodoApp, readProps(url), { nonce });
+  const page = await renderApp(TodoApp, readProps(url), { nonce });
   const loader = options.loader ?? '/@id/idlip/client';
   const preload = new URL(url, 'http://localhost').searchParams.get('preload') !== 'off';
   return (
