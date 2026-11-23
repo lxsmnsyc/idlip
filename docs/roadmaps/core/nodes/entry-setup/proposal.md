@@ -1,6 +1,8 @@
 # Proposal: the whole document renders from an idlip component
 
-Phase 1 of `entry-setup`. No code has landed. The user approves or changes this API first.
+**Approved by the user on 2026-11-23.** Every decision follows its recommendation. The user confirmed two in particular: decision 3 (a root that does not render `<html>` is rejected, over brumate's `start` and `end` strings and over wrapping), and decision 13 (the config carries the `build.js` `no-store` route rule, and the docs say that retaining the previous build needs a persistent client folder). Phase 2 implements it. Where the build forced a change, `outcome.md` lists it under Deviations.
+
+Phase 1 of `entry-setup`. No code had landed when this was written.
 
 Revision 2 (2026-11-23): the user chose Nitro 3 as the default server, as brumate does. The entry is Nitro's `export default { fetch }`, `renderToResponse` owns the nonce and the policy, and the hand-written Node server and the Vercel function are gone.
 
