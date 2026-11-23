@@ -1,7 +1,7 @@
 ---
 id: server-only-code
 title: Fail the build when server-only code reaches a client chunk
-status: todo
+status: done
 priority: must
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-23
-spent:
+spent: 322000
 owns:
   - packages/idlip/src/vite/server-only.ts
   - packages/idlip/test/server-only/**
@@ -54,3 +54,5 @@ Read first: brumate `website/docs/what-runs-where.md` and `environment.md`, the 
 
 - Tests: a handler, a binding and a derived const that reach a `node:` import, each failing with the chain; the same for a private env key; a server-only import used only in the server render passes.
 - `pnpm test`, the e2e tests and the website build pass. The loader is unchanged.
+
+Landed 2026-11-23 on main (487d030..45528e8): the build fails when a client chunk keeps a Node built-in (read from the bundle, so npm packages and CommonJS count) or a private env key; vite dev warns. Reviewed, two fix rounds.
