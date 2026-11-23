@@ -63,6 +63,20 @@ type AttrExpression = JSXAttributeValue | JSXExpression;
 /** A function declaration, function expression or arrow function. */
 type FunctionLike = FunctionNode | ArrowFunctionExpression;
 
+/** Whether the expression is a function, arrow or `function`, through type assertions and parentheses. */
+function isFunctionValue(node: AstNode): boolean {
+  let current = node;
+  while (
+    current.type === 'TSAsExpression' ||
+    current.type === 'TSSatisfiesExpression' ||
+    current.type === 'TSNonNullExpression' ||
+    current.type === 'ParenthesizedExpression'
+  ) {
+    current = current.expression;
+  }
+  return current.type === 'ArrowFunctionExpression' || current.type === 'FunctionExpression';
+}
+
 const BLOCKS = new Set(['For', 'Try', 'Head', 'Subscribe']);
 
 /** The elements of a document skeleton. */
@@ -464,6 +478,13 @@ class Analyzer {
         return this.lowerCall(node, scope);
       case 'ArrowFunctionExpression':
       case 'FunctionExpression':
+        if (this.position === 'init') {
+          return this.reportError(
+            'let-function',
+            'A function cannot be state, since state is serialized. Declare a handler with a function declaration',
+            node,
+          );
+        }
         return this.reportError('hole-closure', 'A closure is not allowed in a hole', node);
       case 'JSXElement':
       case 'JSXFragment':
@@ -3432,6 +3453,18 @@ class Analyzer {
         }
         case 'AssignmentExpression':
           checkWrite(node.left);
+          if (
+            node.left.type === 'Identifier' &&
+            resolveLocal(node.left.name) === undefined &&
+            lookupBinding(scope, node.left.name)?.binding.kind === 'state' &&
+            isFunctionValue(node.right)
+          ) {
+            this.reportError(
+              'let-function',
+              `${name} assigns a function to the state field ${node.left.name}, but state is serialized. Declare a handler with a function declaration`,
+              node.right,
+            );
+          }
           if (node.operator === '=' && node.left.type === 'Identifier') {
             // `let t; t = items[0];`
             addAliases(node.left, node.right);
