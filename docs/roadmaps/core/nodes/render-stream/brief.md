@@ -1,7 +1,7 @@
 ---
 id: render-stream
 title: renderToStream, a page as a ReadableStream
-status: todo
+status: done
 priority: must
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-23
-spent:
+spent: 360000
 owns:
   - packages/idlip/src/server/**
   - packages/idlip/test/server/**
@@ -55,3 +55,5 @@ Read first: brumate `website/docs/reference-server.md` (`renderToStream`, `rende
 - A test reads the stream and finds the head chunk before the body chunk; the joined stream equals `renderPage` output for the fixtures (differential test unaffected).
 - Docs: `reference/server.md`, `deploying.md` (Node and Vercel pipe the stream).
 - Server render throughput for the dashboard within noise of `render`.
+
+Landed as c467a3b..b7404ea on `batch/core` after one fresh review round (cancel aborts pending work through a signal; the `head` option was dropped).
