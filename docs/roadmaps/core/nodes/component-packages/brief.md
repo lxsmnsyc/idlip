@@ -1,7 +1,7 @@
 ---
 id: component-packages
 title: Compile idlip components from npm packages
-status: todo
+status: done
 priority: must
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-23
-spent:
+spent: 444000
 owns:
   - packages/idlip/src/vite/packages.ts
   - packages/idlip/test/packages/**
@@ -73,3 +73,5 @@ Read first: brumate `docs/packages.md` and its plugin code for the dependency sc
 - A test: an unknown format version fails with the message above.
 - A test: two packages with the same file name build without a chunk name collision.
 - `pnpm check` passes.
+
+Landed 2026-11-23 on batch/core (1bb7420, 2f1502e, ec5e6e8): packages with an `idlip` field compile from node_modules and workspace links; startup errors for format version, dir outside the package and clashing chunk slugs. Reviewed, one fix round, which also made a CSS Module view one file again.
