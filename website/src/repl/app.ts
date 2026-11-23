@@ -158,10 +158,28 @@ function renderModule(title: string, file: string, code: string): string {
 }
 
 /**
+ * Removes what an earlier version left in the browser: a service worker under `repl-run/` and
+ * the cache it answered from. The runs no longer use either.
+ */
+async function cleanOldRuns(): Promise<void> {
+  if ('serviceWorker' in navigator) {
+    for (const registration of await navigator.serviceWorker.getRegistrations()) {
+      if (registration.scope.includes('/repl-run/')) {
+        await registration.unregister();
+      }
+    }
+  }
+  if ('caches' in globalThis) {
+    await caches.delete('idlip-repl');
+  }
+}
+
+/**
  * Starts the REPL in its page. `watch` is the network panel of the site script, passed in so the
  * site script and this chunk share no module, and docs pages load one script.
  */
 export function startRepl(root: HTMLElement, watch: typeof createMessagePanel): void {
+  cleanOldRuns().catch(logError);
   const fileTabs = query(root, '[data-repl-files]', HTMLElement);
   const addForm = query(root, '[data-repl-add]', HTMLFormElement);
   const addInput = query(addForm, 'input', HTMLInputElement);

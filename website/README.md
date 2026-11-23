@@ -79,10 +79,12 @@ See [DESIGN.md](./DESIGN.md) for the tokens. `vercel.json` is not here; the depl
 
 ## Isolation
 
-Code of a reader runs in a frame with `sandbox="allow-scripts"` and no `allow-same-origin`, so the frame has an opaque origin. It cannot read the page (`parent.document` throws), the site's `localStorage` or cookies, or navigate the page. This covers the REPL frame and the frame of a live sample after an edit.
+Code of a reader runs only in frames and workers with an opaque origin. That covers the REPL frame, the frame of a live sample after an edit, and the render step (top-level code, components and server modules). None of them can read the page (`parent.document` throws), the site's `localStorage`, cookies, IndexedDB or caches, or fetch the site with its credentials, or navigate the page.
 
-- The page writes the whole frame document and gives it as `srcdoc` (`src/repl/frame-document.ts`, `writeSandboxDocument`). The document holds the loader and the client chunks. The frame makes blob URLs from them and an import map points each chunk URL at its blob, so the frame needs no request to the site.
-- The page and the frame talk by `postMessage` only: theme and a height request go in, errors, height and chunk reports come out. The page accepts a message only from the frame's window and, for an opaque frame, only from origin `null`. The frame sends to the page's origin.
-- The static frame of a live sample runs only the site's own build, so it stays on the site's origin without a sandbox. The `sandbox` attribute is set on the first edit, before the new document loads.
-- Limits: the frame cannot use `localStorage`, cookies, forms, popups or modals, and the site's web fonts do not load in it (fonts need CORS headers the host does not send), so it falls back to system fonts.
-- Proof: `e2e/tests/website-repl.spec.ts` runs a hostile click handler in both frames.
+- **Run frames.** `sandbox="allow-scripts"`, no `allow-same-origin`. The page writes the whole frame document and gives it as `srcdoc` (`src/repl/frame-document.ts`, `writeSandboxDocument`). The document holds the loader and the client chunks. The frame makes blob URLs and an import map points each chunk URL at its blob, so the frame needs no request to the site.
+- **Render worker.** A worker made by the page has the site's origin. So the page starts a hidden sandboxed frame (`src/repl/render-host.ts`), sends it the worker bundle's code, and the frame makes a classic worker from a blob. A module worker cannot load a blob without an origin, and the bundle has no imports. The page ends the worker by removing the frame.
+- **Messages.** The page and each frame talk by `postMessage` only. The page accepts a message only from the frame's window and, for a sandboxed frame, only from origin `null`. Frames send only to the page's origin. A live sample's static frame has the site's origin until its first edit, and the page checks for the origin that fits the frame's state. Heights from a frame are clamped to 0 to 4000 px.
+- **Static frames.** The static frame of a live sample runs only the site's own build, so it has no sandbox until the first edit, which sets the attribute before the new document loads. The landing demo frame is the same.
+- **Limits.** Reader code cannot use `localStorage`, cookies, forms, popups or modals, and the site's web fonts do not load in the run frame (they need CORS headers the host does not send), so it falls back to system fonts.
+- **Old runs.** The REPL page removes the service worker under `repl-run/` and the `idlip-repl` cache that earlier versions left in a returning visitor's browser.
+- **Proof.** `e2e/tests/website-repl.spec.ts` runs hostile code in the frame and in the render step.

@@ -77,6 +77,9 @@ function syncTheme(frame: HTMLIFrameElement): void {
   );
 }
 
+/** The tallest a live sample frame can grow, in pixels. */
+const MAX_HEIGHT = 4000;
+
 /** Moves the focus between the tabs of a tab list with the arrow keys, Home and End. */
 function moveFocus(list: HTMLElement, event: KeyboardEvent): void {
   const tabs = [...list.querySelectorAll<HTMLElement>('[role="tab"]')];
@@ -333,10 +336,10 @@ export function startSample(root: HTMLElement): void {
 
   window.addEventListener('message', (event) => {
     const data: unknown = event.data;
-    // The static frame has the site's origin. The frame of an edit has none, so `null`.
-    const known = event.origin === location.origin || event.origin === 'null';
+    // The static frame has the site's origin. The frame of an edit is sandboxed and has none.
+    const expected = frame.hasAttribute('sandbox') ? 'null' : location.origin;
     if (
-      !known ||
+      event.origin !== expected ||
       event.source !== frame.contentWindow ||
       typeof data !== 'object' ||
       data === null
@@ -345,7 +348,10 @@ export function startSample(root: HTMLElement): void {
     }
     const height: unknown = Reflect.get(data, 'idlipHeight');
     if (typeof height === 'number') {
-      frame.style.height = `${height}px`;
+      // The frame is not trusted: a finite size in a sane range only.
+      if (Number.isFinite(height)) {
+        frame.style.height = `${Math.min(Math.max(height, 0), MAX_HEIGHT)}px`;
+      }
       return;
     }
     const message: unknown = Reflect.get(data, 'message');

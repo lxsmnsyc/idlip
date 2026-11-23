@@ -93,6 +93,27 @@ const PROBE = `export default function Probe() {
 }
 `;
 
+/**
+ * Code that runs while the REPL renders: module top level and the component body. It tries a
+ * credentialed fetch of the site, its storage databases and its caches. On the site's origin
+ * the fetch answers 200 and both stores exist.
+ */
+const RENDER_PROBE = `const fetched = await fetch('/repl/', { credentials: 'include' }).then(
+  (response) => 'status:' + response.status,
+  () => 'fetch:blocked',
+);
+
+function describe(): string {
+  const stores = typeof globalThis.indexedDB + '/' + typeof globalThis.caches;
+  return fetched + ' origin:' + String(globalThis.origin) + ' stores:' + stores;
+}
+
+export default function Render() {
+  const text = describe();
+  return <p>{text}</p>;
+}
+`;
+
 const BLOCKED = 'document:blocked storage:blocked cookie:blocked top:blocked origin:null';
 
 /** Gives the site a secret in its storage and cookies, which the probe must not read. */
@@ -170,4 +191,15 @@ test('a live sample frame runs edits without an origin, and the static frame doe
   await expect(frame.getByRole('button')).toHaveText(BLOCKED);
   // A frame without an origin reports its height by message.
   await expect.poll(async () => frameElement.evaluate((node) => node.style.height)).not.toBe('');
+});
+
+test('the render step runs without an origin too', async ({ page }) => {
+  await plantSecrets(page);
+  await page.goto(`${origin}/repl/${getShareHash(RENDER_PROBE)}`);
+  await page.reload();
+  await page.locator('[data-repl-run]').click();
+  const text = await getReplFrame(page).locator('p').textContent({ timeout: 30_000 });
+  expect(text).toContain('fetch:blocked');
+  expect(text).toContain('origin:null');
+  expect(text).not.toContain('status:');
 });
