@@ -187,6 +187,42 @@ For the todo page it writes three `<link rel="modulepreload">` tags: the shared 
 
 See [idlip/server](./reference/server.md#renderpreload) for the options.
 
+## Stream the page
+
+`renderToStream` from `idlip/server` returns the whole document as a `ReadableStream<string>`. The first chunk is the whole first render: the head with the listener, the loader script and the preload links, the body and the state script. Chunks for data that resolves later follow it.
+
+```ts
+import { renderToStream } from 'idlip/server';
+import TodoApp from './todo.tsx';
+
+export function streamDocument(loader: string, nonce: string): ReadableStream<string> {
+  return renderToStream(
+    TodoApp,
+    {},
+    { loader, nonce, head: '<meta charset="utf-8"><title>todo</title>' },
+  );
+}
+```
+
+On Node, pipe the stream into the response:
+
+```js
+import { Readable } from 'node:stream';
+
+export default async function handlePage(request, response) {
+  const nonce = randomBytes(16).toString('base64');
+  response.writeHead(200, {
+    'content-type': 'text/html; charset=utf-8',
+    'content-security-policy': getPolicy(nonce),
+  });
+  Readable.fromWeb(streamDocument(loader, nonce).pipeThrough(new TextEncoderStream())).pipe(
+    response,
+  );
+}
+```
+
+On Vercel, return a `Response` with the stream: `new Response(stream.pipeThrough(new TextEncoderStream()), { headers })`. A component that throws fails the stream before it sends a byte, and cancelling the response stops the pending work. To answer 500 with an error page, call `renderPage` first and pass its result to `streamParts`.
+
 ## The dev server
 
 `vite` with the plugin's `entry` option renders pages through the server entry. When you save a `*.tsx` file, the page updates and keeps its model:

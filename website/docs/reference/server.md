@@ -47,6 +47,43 @@ function renderPage<P>(
 
 Renders a compiled component and returns the markup for `<head>` next to the body markup. Write `head` inside `<head>` and `body` in `<body>`.
 
+### `renderToStream`
+
+```ts
+function renderToStream<P>(
+  component: (props: P) => unknown,
+  props: P,
+  options?: StreamOptions,
+): ReadableStream<string>;
+```
+
+Renders a compiled component as a stream of the whole document. The first chunk is the whole first render: `<!doctype html><html><head>`, `options.head`, the listener script, the loader script, the preload links and the `<Head>` output, then `</head><body>` with the markup and the state script. The pending chunks of the page follow (see `RenderResult.pending`), and `</body></html>` ends the document, in the first chunk when nothing is pending.
+
+A render error fails the stream before it sends a byte. When the reader cancels, the stream stops the pending work. For a status page, call `renderPage`, then `streamParts`.
+
+### `streamParts`
+
+```ts
+function streamParts(parts: RenderResult, options?: StreamOptions): ReadableStream<string>;
+```
+
+Streams what `renderPage` returned, as `renderToStream` does. Use it when the server needs the parts before it sends headers, such as the `chunks` for a `Link` header or the error of a render.
+
+### `StreamOptions`
+
+```ts
+interface StreamOptions extends RenderOptions {
+  /** The URL of the loader module, written as an async module script in `<head>`. */
+  loader?: string;
+  /** Options of `renderPreload` for the links in `<head>`, or `false` for none. */
+  preload?: PreloadOptions | false;
+  /** Markup at the start of `<head>`, such as `<meta charset>` and `<title>`. */
+  head?: string;
+}
+```
+
+`nonce` is written on the state script, the listener, the loader script and the preload links.
+
 ### `RenderOptions`
 
 ```ts
@@ -67,6 +104,8 @@ interface RenderResult {
   chunks: ChunkUrls;
   /** The manifests of the root and of the child modules: the second argument of `renderPreload`. */
   manifests: readonly Manifest[];
+  /** Chunks of HTML for `<body>` that follow the first render, as data resolves. Empty for now. */
+  pending: AsyncIterable<string>;
 }
 ```
 

@@ -81,7 +81,20 @@ export interface RenderResult {
    * `renderPreload`. The array is frozen and shared; treat the manifests as read-only too.
    */
   manifests: readonly Manifest[];
+  /**
+   * Chunks for what resolves after the first render, in order. Each chunk is a complete piece of
+   * HTML that goes inside `<body>`, such as a `<script>`. It is empty until `stream-model` adds
+   * data. `renderToStream` and `streamParts` write the chunks after the first one and close the
+   * document after the last.
+   */
+  pending: AsyncIterable<string>;
 }
+
+/** The `pending` of a render that has nothing to send later. `streamParts` compares by identity. */
+export const NOTHING_PENDING: AsyncIterable<string> = Object.freeze({
+  // oxlint-disable-next-line require-yield
+  async *[Symbol.asyncIterator]() {},
+});
 
 /** The slots a render recorded, by path. */
 type Slots = Record<string, Slot>;
@@ -347,7 +360,8 @@ function writeState(
   return `<script i-state${attr('i-build', part.build)}${attr('nonce', nonce)}>${script}</script>`;
 }
 
-function renderSync(
+/** Renders a compiled component, and returns the parts of its page. */
+export function renderSync(
   component: (props: never) => unknown,
   props: unknown,
   nonce?: string,
@@ -415,6 +429,7 @@ function renderSync(
     body: markup + writeState(part, root, children, nonce),
     chunks: part.pageChunks,
     manifests: part.manifests,
+    pending: NOTHING_PENDING,
   };
 }
 
