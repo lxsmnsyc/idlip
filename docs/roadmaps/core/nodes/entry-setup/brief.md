@@ -47,6 +47,8 @@ Read first: brumate `website/docs/routing.md` (`_layout.brm` renders `<html>`, `
 
 ## Do
 
+- User decision (2026-11-23): `render()` returns the parts of the first render plus `pending` (today's `renderPage` result), as brumate's `render` does, and `renderPage` goes away. Update every caller.
+
 - A root component may render `<html>`, `<head>` and `<body>` in TSX. The server adds only what the framework owns: the doctype, the listener, the loader script, preload links and `<Head>` output in `<head>`, and the state script at the end of `<body>`. No `start`/`end` strings, no document template, no string concatenation in user code.
 - The compiler accepts `html`, `head` and `body` in a view (today it may reject or mis-place them): static attributes, bound attributes (`lang={...}`) and a static `<title>`/`<meta>` in the document's `<head>`. Decide what may be dynamic, and how `<Head>` and the document `<head>` combine, in a view-ir change request.
 - The server learns the loader URL and chunk map from the client build without user code (the plugin writes them, the server reads them), and uses the dev URL under `vite dev`. The nonce applies to every script it adds.
