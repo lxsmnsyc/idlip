@@ -66,10 +66,11 @@ The object is a plain value. Use it in the view, in a hole or in a handler. The 
 
 ## A value in a stylesheet
 
-A stylesheet reads a model value through a custom property. Set it with `style`:
+A stylesheet reads a model value through a custom property. Set it with `style`, as text or as an object:
 
 ```tsx fragment
 <div class="bar" style={`--size: ${size}px`} />
+<div class="bar" style={{ '--size': `${size}px` }} />
 ```
 
 ```css
@@ -77,6 +78,8 @@ A stylesheet reads a model value through a custom property. Set it with `style`:
   width: var(--size);
 }
 ```
+
+An object becomes CSS text. A key that starts with `--` is written as given. Any other key goes from camelCase to kebab-case, so `backgroundColor` is `background-color`. A `null`, `undefined` or `false` value is dropped. A number is written as it is, with no `px`, so write `{ width: '10px' }` and not `{ width: 10 }`. An object of literals is folded to text when the page is compiled, and an object with a model value is converted on the server and again when a click patches it.
 
 ## Where the links go
 

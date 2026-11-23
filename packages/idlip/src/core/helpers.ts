@@ -61,6 +61,17 @@ function joinClass$(value: object): string {
   return names.join(' ');
 }
 
+function joinStyle$(value: object): string {
+  const rules: string[] = [];
+  for (const [key, item] of Object.entries(value)) {
+    if (item !== null && item !== undefined && typeof item !== 'boolean') {
+      const name = key.startsWith('--') ? key : key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
+      rules.push(`${name}:${item}`);
+    }
+  }
+  return rules.join(';');
+}
+
 function encode$(part: string): string {
   return encodeURIComponent(part).replaceAll('-', '%2D');
 }
@@ -148,8 +159,8 @@ export function attr$(name: string, value: unknown): string {
   if (value === true) {
     return ` ${name}`;
   }
-  if (name === 'class' && typeof value === 'object') {
-    const names = joinClass$(value);
+  if ((name === 'class' || name === 'style') && typeof value === 'object') {
+    const names = name === 'style' ? joinStyle$(value) : joinClass$(value);
     return names === '' ? '' : ` ${name}="${escapeAttr$(names)}"`;
   }
   return ` ${name}="${escapeAttr$(getText$(value))}"`;
@@ -196,7 +207,7 @@ export function setAttr$(el: Element, name: string, value: unknown): void {
   if (value === false || value === null || value === undefined) {
     el.removeAttribute(name);
   } else if (typeof value === 'object') {
-    const names = joinClass$(value);
+    const names = name === 'style' ? joinStyle$(value) : joinClass$(value);
     if (names === '') {
       el.removeAttribute(name);
     } else {
@@ -341,8 +352,8 @@ export function putAttr$(el: Element, name: string, value: unknown): void {
   }
   if (value === true) {
     el.setAttribute(name, '');
-  } else if (name === 'class' && typeof value === 'object') {
-    const names = joinClass$(value);
+  } else if ((name === 'class' || name === 'style') && typeof value === 'object') {
+    const names = name === 'style' ? joinStyle$(value) : joinClass$(value);
     if (names !== '') {
       el.setAttribute(name, names);
     }
@@ -436,6 +447,7 @@ const HELPERS: Record<string, Source | undefined> = {
   escapeText$,
   escapeAttr$,
   joinClass$,
+  joinStyle$,
   encode$,
   findEnd$,
   getRows$,

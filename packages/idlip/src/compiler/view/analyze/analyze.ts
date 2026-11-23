@@ -1977,6 +1977,11 @@ class Analyzer {
       } else if (value.type === 'JSXExpressionContainer') {
         if (value.expression.type === 'Literal' && typeof value.expression.value === 'string') {
           attrs.push({ name: attrName, value: { kind: 'static', value: value.expression.value } });
+        } else if (attrName === 'style' && foldStyle(value.expression) !== undefined) {
+          const text = foldStyle(value.expression)!;
+          if (text !== '') {
+            attrs.push({ name: attrName, value: { kind: 'static', value: text } });
+          }
         } else if (namespace === 'html' && attrName === 'srcdoc') {
           // A document written into a frame runs scripts, so a bound one must be trusted(...).
           const hole = this.lowerTrusted(value.expression, scope);
@@ -4023,6 +4028,39 @@ function readKeyName(key: PropertyKey): string {
     return String(key.value);
   }
   return '';
+}
+
+/**
+ * Returns the CSS text of a style object whose keys and values are all literals, or undefined
+ * when any is not. The rules match `joinStyle$` in `core/helpers.ts`.
+ */
+function foldStyle(node: AstNode): string | undefined {
+  if (node.type !== 'ObjectExpression') {
+    return undefined;
+  }
+  const rules: string[] = [];
+  for (const property of node.properties) {
+    if (
+      property.type !== 'Property' ||
+      property.computed ||
+      property.method ||
+      property.kind !== 'init' ||
+      (property.key.type !== 'Identifier' && property.key.type !== 'Literal') ||
+      property.value.type !== 'Literal'
+    ) {
+      return undefined;
+    }
+    const item: unknown = property.value.value;
+    if (typeof item !== 'string' && typeof item !== 'number' && item !== null && item !== false) {
+      return undefined;
+    }
+    if (item !== null && item !== false) {
+      const key = readKeyName(property.key);
+      const name = key.startsWith('--') ? key : key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
+      rules.push(`${name}:${item}`);
+    }
+  }
+  return rules.join(';');
 }
 
 /** Tells whether a value read from an AST field is a node. */

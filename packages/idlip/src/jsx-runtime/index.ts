@@ -16,4 +16,4 @@ export declare namespace JSX {
 }
 
 export type { EventFor, EventProp } from '../core/events.ts';
-export type { ClassValue } from '../jsx/elements.ts';
+export type { ClassValue, StyleValue } from '../jsx/elements.ts';

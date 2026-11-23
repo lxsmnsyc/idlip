@@ -29,6 +29,13 @@ export type EventProps<El extends EventTarget, Map> = OnProps<El, Map> & LatestP
 export type ClassValue = string | Record<string, boolean | null | undefined>;
 
 /**
+ * A style is CSS text, or a record of CSS values. Keys that start with `--` are written as
+ * given, other keys go from camelCase to kebab-case, and `null`, `undefined` and `false` values
+ * are dropped. Numbers get no unit.
+ */
+export type StyleValue = string | Record<string, string | number | null | undefined | false>;
+
+/**
  * Attributes on every element. `html` takes only `TrustedHtml`.
  */
 export interface CommonAttributes {
@@ -40,7 +47,7 @@ export interface CommonAttributes {
   hidden?: boolean;
   tabindex?: number;
   role?: string;
-  style?: string;
+  style?: StyleValue;
   slot?: string;
   draggable?: boolean;
   contenteditable?: boolean | 'true' | 'false' | 'plaintext-only';
