@@ -159,7 +159,7 @@ export default {
  */
 export function createConfig(
   root: string,
-  options: { compile?: Compile; client?: string } = {},
+  options: { compile?: Compile; client?: string; server?: false } = {},
 ): InlineConfig {
   return {
     configFile: false,
@@ -169,6 +169,7 @@ export function createConfig(
     plugins: [
       idlip({
         entry: '/src/entry-server.js',
+        ...(options.server === false ? { server: false as const } : {}),
         compile: options.compile ?? createCheckedCompile(root).compile,
         client: options.client ?? CLIENT_STUB,
       }),

@@ -17,12 +17,16 @@ interface Dev {
 }
 
 /** Starts a dev server of the fixture app, with the plugins and the idlip options given. */
-async function startDev(extra: { plugins?: Plugin[]; entry?: string }): Promise<Dev> {
+async function startDev(extra: {
+  plugins?: Plugin[];
+  entry?: string;
+  server?: false;
+}): Promise<Dev> {
   const root = createApp();
   if (extra.entry !== undefined) {
     writeFileSync(path.join(root, 'src/entry-server.js'), extra.entry);
   }
-  const config = createConfig(root);
+  const config = createConfig(root, extra.server === false ? { server: false } : {});
   const vite = await createServer({
     ...config,
     plugins: [...(extra.plugins ?? []), ...(config.plugins ?? [])],
@@ -77,6 +81,19 @@ describe('the dev middleware of the plugin', () => {
       const response = await fetch(`${dev.origin}/`, { headers: { accept: 'text/html' } });
       expect(await response.text()).not.toContain('<main><form');
       // The proxy of the dev loader stays: Nitro does not serve it.
+      const loader = await fetch(`${dev.origin}/@id/idlip/client`);
+      expect(loader.status).toBe(200);
+    } finally {
+      await dev.close();
+    }
+  }, 60_000);
+
+  it('stands aside with the server option off', async () => {
+    const dev = await startDev({ server: false });
+    try {
+      const response = await fetch(`${dev.origin}/`, { headers: { accept: 'text/html' } });
+      expect(await response.text()).not.toContain('<main><form');
+      // The proxy of the dev loader stays.
       const loader = await fetch(`${dev.origin}/@id/idlip/client`);
       expect(loader.status).toBe(200);
     } finally {
@@ -174,7 +191,7 @@ describe('the dev middleware of the plugin with a streaming entry', () => {
       expect((await reader?.read())?.done).toBe(false);
       controller.abort();
       await expect
-        .poll(() => Reflect.get(globalThis, 'idlipCancelled'), { timeout: 5000 })
+        .poll(() => Reflect.get(globalThis, 'idlipCancelled') === true, { timeout: 5000 })
         .toBe(true);
     } finally {
       await dev.close();
