@@ -23,14 +23,29 @@ function dropLeadingComments(source: string): string {
 }
 
 /**
- * The REPL serves no stylesheet, so a file that imports one runs without it. The todo app
- * styles its count with a CSS Module: the REPL keeps the class names and drops the imports.
+ * The REPL serves no stylesheet, so the todo app runs without its two stylesheets. The REPL
+ * drops their imports and writes the CSS Module names of the count as plain class names, which
+ * the REPL frame does not style. Any other use of a stylesheet throws, so a change to the todo
+ * app fails the site build instead of shipping a REPL example that does not compile.
  */
 function dropStyles(source: string): string {
-  return source
-    .replace(/^import '[^']+\.css';\n/gm, '')
-    .replace(/^import styles from '[^']+\.module\.css';\n/m, '')
-    .replaceAll(/\bstyles\.(\w+)/g, "'$1'");
+  const replacements: [string, string][] = [
+    ["import './todo.css';\n", ''],
+    ["import styles from './todo.module.css';\n", ''],
+    ['styles.clear', "'clear'"],
+    ['styles.left', "'left'"],
+  ];
+  let result = source;
+  for (const [from, to] of replacements) {
+    if (!result.includes(from)) {
+      throw new Error(`the todo example no longer contains ${JSON.stringify(from)}`);
+    }
+    result = result.replaceAll(from, to);
+  }
+  if (/\.css['"]|\bstyles\b/.test(result)) {
+    throw new Error('the todo example uses a stylesheet the REPL does not know how to drop');
+  }
+  return result;
 }
 
 function writeProps(props: unknown): ReplFile {
