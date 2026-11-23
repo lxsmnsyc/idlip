@@ -66,16 +66,21 @@ function isComponent(value: unknown): value is (props: unknown) => unknown {
 }
 
 describe('renderToStream', () => {
+  it('renders when it is constructed, before the reader reads', async () => {
+    const rendered = vi.fn(makeComponent());
+    renderToStream(rendered, {});
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+    expect(rendered).toHaveBeenCalledOnce();
+  });
+
   it('sends the head, the body and the state in the first chunk', async () => {
-    const stream = renderToStream(
-      makeComponent(),
-      {},
-      { loader: '/l.js', head: '<title>t</title>' },
-    );
+    const stream = renderToStream(makeComponent(), {}, { loader: '/l.js' });
     const out = await readChunks(stream);
     expect(out).toHaveLength(1);
     const [first = ''] = out;
-    expect(first).toContain('<!doctype html><html><head><title>t</title>');
+    expect(first).toContain('<!doctype html><html><head>');
     expect(first).toContain(renderListener());
     expect(first).toContain('<script type="module" async src="/l.js"></script>');
     expect(first.indexOf('</head>')).toBeLessThan(first.indexOf('<body>'));
@@ -84,12 +89,12 @@ describe('renderToStream', () => {
   });
 
   it('joins to the document of renderPage', async () => {
-    const options = { loader: '/l.js', head: '<meta charset="utf-8">', nonce: 'n1' };
+    const options = { loader: '/l.js', nonce: 'n1' };
     const component = makeComponent('<title>x</title>');
     const html = (await readChunks(renderToStream(component, {}, options))).join('');
     const page = await renderPage(component, {}, { nonce: 'n1' });
     expect(html).toBe(
-      `<!doctype html><html><head><meta charset="utf-8">${renderListener({ nonce: 'n1' })}` +
+      `<!doctype html><html><head>${renderListener({ nonce: 'n1' })}` +
         `<script type="module" async src="/l.js" nonce="n1"></script>` +
         `${renderPreload(page.chunks, page.manifests, { nonce: 'n1' })}${page.head}` +
         `</head><body>${page.body}</body></html>`,
@@ -168,6 +173,41 @@ describe('pending chunks', () => {
     expect(out[0]).toContain('<body><p>hi</p><script i-state');
     expect(out[0]).not.toContain('</body>');
     expect(out.slice(1)).toEqual(['<script>1</script>', '<script>2</script>', '</body></html>']);
+  });
+
+  it('stop when the reader leaves while a chunk is in flight', async () => {
+    const page = await renderPage(makeComponent(), {});
+    const log: string[] = [];
+    let aborted: unknown;
+    // A generator that awaits a chunk that never arrives, until the signal aborts. Its `return()`
+    // queues behind that `next()`, as a real loader's does.
+    async function* stuck(): AsyncGenerator<string> {
+      try {
+        await new Promise<void>((resolve) => {
+          page.signal.addEventListener('abort', () => {
+            aborted = page.signal.reason;
+            resolve();
+          });
+        });
+        yield '<script>never</script>';
+      } finally {
+        log.push('finally');
+      }
+    }
+    const reader = streamParts({ ...page, pending: stuck() }).getReader();
+    await reader.read();
+    // The next read starts the chunk that never arrives.
+    const read = reader.read();
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+    await reader.cancel('gone');
+    expect(aborted).toBe('gone');
+    expect((await read).done).toBe(true);
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+    expect(log).toEqual(['finally']);
   });
 
   it('stop when the reader leaves', async () => {

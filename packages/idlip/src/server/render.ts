@@ -88,6 +88,14 @@ export interface RenderResult {
    * document after the last.
    */
   pending: AsyncIterable<string>;
+  /**
+   * Aborts when the reader of the stream cancels, so the work behind `pending` stops. It is
+   * created on first use, and a signal read after the abort is already aborted. `stream-model`
+   * wires its loaders to this signal.
+   */
+  readonly signal: AbortSignal;
+  /** Aborts `signal`. `renderToStream` and `streamParts` call it when the reader cancels. */
+  abort(reason?: unknown): void;
 }
 
 /** The `pending` of a render that has nothing to send later. `streamParts` compares by identity. */
@@ -424,7 +432,23 @@ export function renderSync(
   // The last title is the one that wins, so it goes first. The others follow, for the client.
   head.unshift(...titles.slice(-1), ...titles.slice(0, -1));
   const part = getPart(root, children);
+  // The controller exists only when something reads the signal, so a render pays nothing for it.
+  let controller: AbortController | undefined;
+  let aborted: { reason: unknown } | undefined;
   return {
+    get signal(): AbortSignal {
+      if (controller === undefined) {
+        controller = new AbortController();
+        if (aborted !== undefined) {
+          controller.abort(aborted.reason);
+        }
+      }
+      return controller.signal;
+    },
+    abort(reason?: unknown): void {
+      aborted ??= { reason };
+      controller?.abort(reason);
+    },
     head: head.join(''),
     body: markup + writeState(part, root, children, nonce),
     chunks: part.pageChunks,

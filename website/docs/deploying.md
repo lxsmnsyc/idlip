@@ -196,24 +196,25 @@ import { renderToStream } from 'idlip/server';
 import TodoApp from './todo.tsx';
 
 export function streamDocument(loader: string, nonce: string): ReadableStream<string> {
-  return renderToStream(
-    TodoApp,
-    {},
-    { loader, nonce, head: '<meta charset="utf-8"><title>todo</title>' },
-  );
+  return renderToStream(TodoApp, {}, { loader, nonce });
 }
 ```
 
-On Node, pipe the stream into the response:
+`loader` is the built URL of the loader module, as in the `page.js` above. On Node, pipe the stream into the response:
 
 ```js
+import { randomBytes } from 'node:crypto';
 import { Readable } from 'node:stream';
+import { streamDocument } from './dist/server/entry-server.js';
+
+// The built URL of the loader, read from the client manifest as in `page.js` above.
+const loader = '/assets/loader.js';
 
 export default async function handlePage(request, response) {
   const nonce = randomBytes(16).toString('base64');
   response.writeHead(200, {
     'content-type': 'text/html; charset=utf-8',
-    'content-security-policy': getPolicy(nonce),
+    'content-security-policy': `script-src 'nonce-${nonce}' 'strict-dynamic'`,
   });
   Readable.fromWeb(streamDocument(loader, nonce).pipeThrough(new TextEncoderStream())).pipe(
     response,
@@ -221,7 +222,11 @@ export default async function handlePage(request, response) {
 }
 ```
 
-On Vercel, return a `Response` with the stream: `new Response(stream.pipeThrough(new TextEncoderStream()), { headers })`. A component that throws fails the stream before it sends a byte, and cancelling the response stops the pending work. To answer 500 with an error page, call `renderPage` first and pass its result to `streamParts`.
+On Vercel, return a `Response` with the stream: `new Response(stream.pipeThrough(new TextEncoderStream()), { headers })`.
+
+- **The component renders when the stream is constructed**, before the reader reads. A component that throws fails the stream before it sends a byte, so call `streamDocument` and read its first chunk before you write the headers if you want to answer 500.
+- **Cancelling the response stops the pending work.** The stream aborts the `signal` of the render and closes the pending chunks.
+- **`pending` is single-use.** A second `streamParts` on the same `renderPage` result streams the first render again, with no pending chunks, since the first stream consumed them.
 
 ## The dev server
 

@@ -57,9 +57,9 @@ function renderToStream<P>(
 ): ReadableStream<string>;
 ```
 
-Renders a compiled component as a stream of the whole document. The first chunk is the whole first render: `<!doctype html><html><head>`, `options.head`, the listener script, the loader script, the preload links and the `<Head>` output, then `</head><body>` with the markup and the state script. The pending chunks of the page follow (see `RenderResult.pending`), and `</body></html>` ends the document, in the first chunk when nothing is pending.
+Renders a compiled component as a stream of the whole document. The first chunk is the whole first render: `<!doctype html><html><head>`, the listener script, the loader script, the preload links and the `<Head>` output, then `</head><body>` with the markup and the state script. The pending chunks of the page follow (see `RenderResult.pending`), and `</body></html>` ends the document, in the first chunk when nothing is pending.
 
-A render error fails the stream before it sends a byte. When the reader cancels, the stream stops the pending work. For a status page, call `renderPage`, then `streamParts`.
+The component renders as soon as the stream is constructed, before the reader reads. A render error fails the stream before it sends a byte. When the reader cancels, the stream aborts `signal` of the result and stops the pending work. For a status page, call `renderPage`, then `streamParts`.
 
 ### `streamParts`
 
@@ -67,7 +67,7 @@ A render error fails the stream before it sends a byte. When the reader cancels,
 function streamParts(parts: RenderResult, options?: StreamOptions): ReadableStream<string>;
 ```
 
-Streams what `renderPage` returned, as `renderToStream` does. Use it when the server needs the parts before it sends headers, such as the `chunks` for a `Link` header or the error of a render.
+Streams what `renderPage` returned, as `renderToStream` does. Use it when the server needs the parts before it sends headers, such as the `chunks` for a `Link` header or the error of a render. `pending` is single-use: a second `streamParts` on the same result streams no pending chunks.
 
 ### `StreamOptions`
 
@@ -77,8 +77,6 @@ interface StreamOptions extends RenderOptions {
   loader?: string;
   /** Options of `renderPreload` for the links in `<head>`, or `false` for none. */
   preload?: PreloadOptions | false;
-  /** Markup at the start of `<head>`, such as `<meta charset>` and `<title>`. */
-  head?: string;
 }
 ```
 
@@ -106,6 +104,10 @@ interface RenderResult {
   manifests: readonly Manifest[];
   /** Chunks of HTML for `<body>` that follow the first render, as data resolves. Empty for now. */
   pending: AsyncIterable<string>;
+  /** Aborts when the reader of a stream cancels, so the work behind `pending` stops. */
+  readonly signal: AbortSignal;
+  /** Aborts `signal`. The stream calls it on cancel. */
+  abort(reason?: unknown): void;
 }
 ```
 
