@@ -1,6 +1,6 @@
 import { on, text } from 'idlip/server';
 
-export const manifest = { module: '/src/counter.tsx', events: ['click'], listens: {click: ['increment']}, handlers: { increment: { chunk: 'handler=increment', writes: ['count'], bindings: ['count'] } }, sites: { $e0: { chunk: 'handler=increment', bindings: ['count'], tags: ['increment'] } }, groups: { 'props.label': { paths: ['props.label'], chunk: 'binding=props.label', bindings: ['a0'], covers: [] }, 'props.onRemove': { paths: ['props.onRemove'], chunk: 'binding=props.onRemove', bindings: ['a2'], covers: [] }, count: { paths: ['count'], chunk: 'binding=count', bindings: ['a1'], covers: [] } }, lists: {}, view: { chunk: 'view' } };
+export const manifest = { module: '/src/counter.tsx', events: ['click'], listens: {click: ['increment']}, handlers: { increment: { chunk: 'handler=increment', writes: ['count'], bindings: ['count'] }, $e0: { chunk: 'handler=increment', bindings: ['count'], tags: ['increment'] } }, groups: { 'props.label': { paths: ['props.label'], chunk: 'binding=props.label', bindings: ['a0'], covers: [] }, 'props.onRemove': { paths: ['props.onRemove'], chunk: 'binding=props.onRemove', bindings: ['a2'], covers: [] }, count: { paths: ['count'], chunk: 'binding=count', bindings: ['a1'], covers: [] } }, lists: {}, view: { chunk: 'view' } };
 
 // `vite-plugin` replaces the URLs in a build.
 export const chunks = {

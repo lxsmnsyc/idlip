@@ -17,9 +17,7 @@
       "bindings": [
         "count"
       ]
-    }
-  },
-  "sites": {
+    },
     "$e0": {
       "chunk": "handler=increment",
       "bindings": [

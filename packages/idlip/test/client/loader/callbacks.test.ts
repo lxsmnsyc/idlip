@@ -47,6 +47,12 @@ describe('event arrows with steps', () => {
     expect(server).toMatch(/on:keydown="\$e\d+ prevent:ArrowDown prevent:ArrowUp"/);
   });
 
+  it('lists an event function as a handler that names every handler it may send', () => {
+    const { manifest } = compile(SOURCE, '/src/app.tsx');
+    expect(manifest.handlers.$e2).toMatchObject({ chunk: 'handler=pick', tags: ['pick', 'note'] });
+    expect(manifest.handlers.$e2.bindings).toEqual(expect.arrayContaining(['items']));
+  });
+
   it('sends the messages of two calls in order', async () => {
     page = await mount(SOURCE, PROPS);
     // `pick('a2')` then `note('Two')`.

@@ -8,7 +8,6 @@ import type {
   ListEntry,
   Manifest,
   Module,
-  SiteEntry,
 } from '../../../core/format.ts';
 import { HELPER_NAMES } from '../../../core/helpers.ts';
 import { listWrites, meetsPath } from '../../update/writes.ts';
@@ -152,7 +151,6 @@ function buildManifest(
   }
   // An event function lives in the chunk of the first handler it sends. The groups to start
   // with it are those of every handler it may send.
-  const sites: Record<string, SiteEntry> = {};
   for (const site of plan.sites) {
     const home = handlers[site.tags[0]];
     const bindings: string[] = [];
@@ -166,7 +164,7 @@ function buildManifest(
         }
       }
     }
-    sites[site.name] = {
+    handlers[site.name] = {
       chunk: home.chunk,
       ...(known ? { bindings } : {}),
       tags: site.tags,
@@ -211,7 +209,6 @@ function buildManifest(
     events: plan.events,
     ...(plan.listens.size === 0 ? {} : { listens: Object.fromEntries(plan.listens) }),
     handlers,
-    ...(plan.sites.length === 0 ? {} : { sites }),
     ...(Object.keys(tasks).length === 0 ? {} : { tasks }),
     ...(plan.sources.size === 0 ? {} : { sources: [...plan.sources.keys()] }),
     ...(plan.tries.length === 0 ? {} : { fallback }),

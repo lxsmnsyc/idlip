@@ -26,7 +26,6 @@ import type {
   After,
   Boot,
   HandlerChunk,
-  HandlerEntry,
   Message,
   Model,
   Page,
@@ -306,13 +305,9 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
 
   // Loads the chunk that exports a handler or an event function, with what starts beside it.
   // `entries` is the manifest table that holds the name.
-  async function getUpdate(
-    root: Unit,
-    tag: string,
-    entries: Readonly<Record<string, HandlerEntry>> | undefined,
-  ): Promise<Update> {
+  async function getUpdate(root: Unit, tag: string): Promise<Update> {
     const { manifest, chunks } = root.state;
-    const entry = entries !== undefined && Object.hasOwn(entries, tag) ? entries[tag] : undefined;
+    const entry = Object.hasOwn(manifest.handlers, tag) ? manifest.handlers[tag] : undefined;
     const url = entry === undefined ? undefined : chunks[getChunkId(manifest.module, entry.chunk)];
     if (url === undefined) {
       throw new DropError(`idlip: no chunk for ${tag}`);
@@ -327,6 +322,10 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
     for (const key of entry?.bindings ?? []) {
       load(chunks[getChunkId(manifest.module, manifest.groups[key].chunk)]).catch(() => {});
     }
+    // An event function starts the chunks of the other handlers it may send too.
+    for (const other of entry?.tags ?? []) {
+      load(chunks[getChunkId(manifest.module, manifest.handlers[other].chunk)]).catch(() => {});
+    }
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion
     const module = (await load(url)) as HandlerChunk;
     if (!Object.hasOwn(module, tag) || typeof module[tag] !== 'function') {
@@ -336,17 +335,16 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
   }
 
   async function loadUpdate(item: Pending): Promise<void> {
-    const { site } = item.event;
-    // An event function lives in a handler chunk too, and the manifest lists it under `sites`.
-    if (site !== undefined) {
-      item.update = await getUpdate(item.unit, site, item.unit.state.manifest.sites);
+    // An event function is an export of a handler chunk, and the manifest lists it as a handler.
+    if (item.event.site !== undefined) {
+      item.update = await getUpdate(item.unit, item.event.site);
       return;
     }
     // A reset has no handler chunk: it keeps the model and renders a region in `runBatch`.
     item.update =
       HAS_ERRORS && item.event.message.t === RESET
         ? keepModel
-        : await getUpdate(item.unit, item.event.message.t, item.unit.state.manifest.handlers);
+        : await getUpdate(item.unit, item.event.message.t);
   }
 
   // Loads the chunks of the waiting events. An event that cannot run is dropped, and an event
@@ -467,9 +465,14 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
           // An event function takes the event and the scope, not the model and a payload.
           // oxlint-disable-next-line typescript/no-unsafe-type-assertion
           const sent = (update as unknown as Site)(event.event, event.current, unit);
+          // Every chunk loads before the first message runs, so a failed load drops the event whole.
+          for (const [t] of sent) {
+            // oxlint-disable-next-line no-await-in-loop
+            await getUpdate(unit, t);
+          }
           for (const [t, p] of sent) {
             // oxlint-disable-next-line no-await-in-loop
-            await apply(unit, await getUpdate(unit, t, unit.state.manifest.handlers), { t, p });
+            await apply(unit, await getUpdate(unit, t), { t, p });
           }
         } else if (HAS_ERRORS && event.message.t === RESET) {
           await resetRegion(unit.page, unit.model, event.target, event.message.p[0]);

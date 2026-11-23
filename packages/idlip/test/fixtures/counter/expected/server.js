@@ -1,6 +1,6 @@
 import { attr as attr$, text as text$ } from 'idlip/server';
 
-export const manifest = { module: '/src/counter.tsx', events: ['click'], listens: { click: ['add', 'increment', 'reset'] }, handlers: { increment: { chunk: 'handler=increment', writes: ['count'], bindings: ['count'] }, add: { chunk: 'handler=add', writes: ['count'], bindings: ['count'] }, reset: { chunk: 'handler=reset', writes: ['count'], bindings: ['count'] } }, sites: { $e0: { chunk: 'handler=increment', bindings: ['count'], tags: ['increment'] }, $e1: { chunk: 'handler=add', bindings: ['count'], tags: ['add'] }, $e2: { chunk: 'handler=reset', bindings: ['count'], tags: ['reset'] } }, groups: { count: { paths: ['count'], chunk: 'binding=count', bindings: ['a0', 'a1', 'c2'], covers: [] } }, lists: {} };
+export const manifest = { module: '/src/counter.tsx', events: ['click'], listens: { click: ['add', 'increment', 'reset'] }, handlers: { increment: { chunk: 'handler=increment', writes: ['count'], bindings: ['count'] }, add: { chunk: 'handler=add', writes: ['count'], bindings: ['count'] }, reset: { chunk: 'handler=reset', writes: ['count'], bindings: ['count'] }, $e0: { chunk: 'handler=increment', bindings: ['count'], tags: ['increment'] }, $e1: { chunk: 'handler=add', bindings: ['count'], tags: ['add'] }, $e2: { chunk: 'handler=reset', bindings: ['count'], tags: ['reset'] } }, groups: { count: { paths: ['count'], chunk: 'binding=count', bindings: ['a0', 'a1', 'c2'], covers: [] } }, lists: {} };
 
 // `vite-plugin` replaces the URLs in a build.
 export const chunks = {

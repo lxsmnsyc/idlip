@@ -12,7 +12,7 @@
 Design:
 
 - **Attribute.** `on:click="$e3"`, `on:submit="$e0 prevent"`, `on:keydown="$e5 prevent:ArrowDown prevent:ArrowUp"`. A value that starts with `[` is the old JSON message, without placeholders, for data built at render: a message prop of a stateful child, a forwarded message prop and a `<Try>` reset.
-- **Function.** `export function $e3($e, $c, { model, rendered, page: { props } })` in the handler chunk of the first handler the arrow calls. It returns `[tag, payload]` pairs. `$e` is the event (or a subscription value), `$c` the element, which the listener records because the browser clears `currentTarget`. `manifest.sites` maps the name to its chunk, the groups to start with it and the handlers it may send.
+- **Function.** `export function $e3($e, $c, { model, rendered, page: { props } })` in the handler chunk of the first handler the arrow calls. It returns `[tag, payload]` pairs. `$e` is the event (or a subscription value), `$c` the element, which the listener records because the browser clears `currentTarget`. The function is an entry of `manifest.handlers` under its name, with `bindings` (the union over its tags) and `tags`. The loader starts the chunks of every tag together with the function's chunk.
 - **Row values.** `getRows$($c, rendered, lists)` reads the rows around the element from the markers and the model the DOM shows, so a row removed earlier in the same batch does not move the clicked row. `lists` holds a model path per list, or a function of the scope when `each` is not a path.
 - **Loader.** `QueuedEvent` is `QueuedMessage | QueuedCall`. A call loads `manifest.sites[site]`, runs the function when its turn comes, then applies each returned message.
 - **Source forms.** Leading `e.preventDefault()` and `e.stopPropagation()`; leading `if (<key test>) e.preventDefault();` for a conditional prevent (`prevent:<filter>` tokens, one per `||` alternative); a sole key `if` still filters in the listener; then handler calls, `if`/`else` on any view expression and `const`.
@@ -48,7 +48,7 @@ Reading: rows HTML falls 11% (27% gzip) because a row repeats no payload. The da
 ## Deviations
 
 - Steps 2 and 3 are one commit (see Built).
-- The loader is 95 B larger and fits the budget with 10 B to spare. It does not preload the handlers other than the first one of an arrow (`listens` covers them for server preload).
+- The loader is 91 B larger and fits the budget with 9 B to spare. A cold click on an arrow with several handlers loads all their chunks in one round trip, and the loader loads every update before it runs the first message, so a chunk that fails drops the event whole.
 - Edited `e2e/fixture/stub/listener.js`, `docs/roadmaps/core/nodes/event-callbacks/` and docs outside the owned paths, as the brief lists.
 
 ## Stubs left

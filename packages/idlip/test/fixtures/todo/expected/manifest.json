@@ -60,9 +60,7 @@
       "bindings": [
         "todos.*.done"
       ]
-    }
-  },
-  "sites": {
+    },
     "$e0": {
       "chunk": "handler=add",
       "bindings": [

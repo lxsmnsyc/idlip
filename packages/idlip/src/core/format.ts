@@ -41,13 +41,11 @@ export interface Manifest {
    * reads it to preload chunks without the markup. Absent when no element dispatches a handler.
    */
   readonly listens?: Readonly<Record<string, readonly string[]>>;
-  /** Message tag to its update chunk. Continuation tags have entries too. */
-  readonly handlers: Readonly<Record<string, HandlerEntry>>;
   /**
-   * Event function name (`$e3`) to where it lives. The function is an export of the handler
-   * chunk of the first handler it sends. Absent when no event arrow has a function.
+   * Message tag to its update chunk. Continuation tags have entries too, and so has each event
+   * function (`$e3`), whose export lives in the chunk of the first handler it sends.
    */
-  readonly sites?: Readonly<Record<string, SiteEntry>>;
+  readonly handlers: Readonly<Record<string, HandlerEntry>>;
   /**
    * Continuation tag to the chunk that runs its awaited call: `task=<tag>`, or the handler's
    * own chunk for a built-in such as `Random.id`, which exports `task$<tag>`. Absent when no
@@ -78,19 +76,14 @@ export interface Manifest {
   readonly view?: { readonly chunk: string };
 }
 
-/** An event function: its chunk, the group keys to start with it and the handlers it may send. */
-export interface SiteEntry {
-  readonly chunk: string;
-  readonly bindings?: readonly string[];
-  readonly tags: readonly string[];
-}
-
 export interface HandlerEntry {
   readonly chunk: string;
   /** The model paths the handler can change, such as `todos.*.done`. Absent: diff every path. */
   readonly writes?: readonly string[];
   /** The group keys the loader starts with the chunk: groups that meet `writes`, minus covered ones. */
   readonly bindings?: readonly string[];
+  /** For an event function: every handler it may send, the first one holds its chunk. */
+  readonly tags?: readonly string[];
 }
 
 export interface BindingGroup {

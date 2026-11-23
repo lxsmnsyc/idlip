@@ -21,3 +21,8 @@
 - `latest` and queued `input` events: the old test `keeps every queued input` expected `a,ab,`. The function reads the field when it runs, so it is `ab,ab,`. Behavior change, in the change request.
 - The dashboard state script grows 7.5 kB raw (state gzip 4828 to 4913 B, +85 B): the props that handlers read are now in the state, since the functions read them at event time, where before each event attribute repeated the values.
 - Handler chunks now import the helpers module for `getRows$`. The helpers module gets `getRows$` in any app with an event in a row (+525 B raw on the todo).
+
+## Review fixes
+
+- `getRows$` stops at the `<!--n:...-->` marker of the component (a sibling `<!--/n-->` ... `<!--n:-->` pair is skipped), so a child's list is not matched with the lists of its parent. Test: a child with a `<For>` inside a parent `<For>`.
+- `manifest.sites` is gone: a function is a `handlers` entry with `tags`. `getUpdate` lost its table parameter, and the loader starts each tag's chunk with the function's chunk and loads all updates before running the first message. Loader 4087 B.

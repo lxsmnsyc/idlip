@@ -27,9 +27,7 @@
       "bindings": [
         "shown"
       ]
-    }
-  },
-  "sites": {
+    },
     "$e0": {
       "chunk": "handler=add",
       "bindings": [
