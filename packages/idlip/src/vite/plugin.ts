@@ -7,6 +7,7 @@ import { isRunnableDevEnvironment } from 'vite';
 import type {
   BuildEnvironment,
   Connect,
+  Logger,
   EnvironmentOptions,
   Plugin,
   Rolldown,
@@ -471,6 +472,8 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
   let outDir = 'dist';
   let chunksFile = '';
   let envPrefixes: string[] = [];
+  let logger: Logger | undefined;
+  const warnedServerOnly = new Set<string>();
   const scanCache: ScanCache = new Map();
   let compile = options.compile;
   let root = '';
@@ -536,12 +539,23 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       read: readSource,
     };
     const label = getModuleId(file) + module.slice(file.length);
-    await checkServerOnly(
-      host,
-      { file, chunk, code, label, prefixes: envPrefixes },
-      scanCache,
-      getModuleId,
-    );
+    try {
+      await checkServerOnly(
+        host,
+        { file, chunk, code, label, prefixes: envPrefixes },
+        scanCache,
+        getModuleId,
+      );
+    } catch (error) {
+      // Dev cannot tree-shake, so it warns once and serves the chunk. The build is the gate.
+      const message = error instanceof Error ? error.message : String(error);
+      if (!warnedServerOnly.has(message)) {
+        warnedServerOnly.add(message);
+        logger?.warn(
+          `${message} (vite dev warns only: a build fails when the code stays in the chunk.)`,
+        );
+      }
+    }
   }
 
   /** The file of a module id. */
@@ -959,6 +973,7 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       }
       base = config.base;
       isServe = config.command === 'serve';
+      logger = config.logger;
       standAside ||= config.plugins.some((plugin) => plugin.name === NITRO_PLUGIN);
       chunksFile = path.resolve(root, outDir, CHUNKS_FILE);
       envPrefixes = [config.envPrefix ?? 'VITE_'].flat();

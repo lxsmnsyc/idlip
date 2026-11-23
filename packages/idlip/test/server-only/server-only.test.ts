@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { createBuilder, createServer } from 'vite';
+import { createBuilder, createLogger, createServer } from 'vite';
 import { afterAll, describe, expect, it } from 'vitest';
 import { idlip } from '../../src/vite/index.ts';
 import { isNodeSpecifier, isPublicKey, scanModule } from '../../src/vite/server-only.ts';
@@ -307,7 +307,7 @@ export function srv() { return readFileSync('x', 'utf8') + import.meta.env.SECRE
 });
 
 describe('server-only code in vite dev', () => {
-  it('fails a chunk request with the chain and keeps the server up', async () => {
+  it('warns once with the chain and still serves the chunk', async () => {
     const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'idlip-server-only-dev-')));
     roots.push(root);
     writeFileSync(`${root}/package.json`, JSON.stringify({ name: 'app', type: 'module' }));
@@ -327,10 +327,15 @@ export default { fetch() { return renderToResponse(App, {}, { preload: false });
       mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
       writeFileSync(path.join(root, file), source);
     }
+    const warnings: string[] = [];
+    const customLogger = createLogger('warn');
+    customLogger.warn = (message) => {
+      warnings.push(message);
+    };
     const server = await createServer({
       configFile: false,
       root,
-      logLevel: 'silent',
+      customLogger,
       cacheDir: path.join(root, '.vite'),
       server: { middlewareMode: true, ws: false },
       plugins: [idlip({ entry: '/src/entry-server.js', client: CLIENT })],
@@ -343,14 +348,17 @@ export default { fetch() { return renderToResponse(App, {}, { preload: false });
     });
     try {
       const client = server.environments.client;
-      await expect(
-        client.transformRequest('/src/app.tsx?idlip-handler=add&lang.js'),
-      ).rejects.toThrow(
+      const add = await client.transformRequest('/src/app.tsx?idlip-handler=add&lang.js');
+      expect(add?.code).toContain('add');
+      await client.transformRequest('/src/app.tsx?idlip-handler=add&lang.js');
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain(
         'idlip: the client chunk handler=add of /src/app.tsx imports a Node.js module: /src/app.tsx > handler=add > /src/db.ts > node:fs.',
       );
       // The chunk that does not reach it still loads.
       const reset = await client.transformRequest('/src/app.tsx?idlip-handler=reset&lang.js');
       expect(reset?.code).toContain('reset');
+      expect(warnings).toHaveLength(1);
     } finally {
       await server.close();
     }

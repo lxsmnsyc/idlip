@@ -32,7 +32,7 @@ The only way a value gets from the server to the browser is the model, which hol
 
 ## What fails the build
 
-The build fails in two cases. `vite dev` fails when the chunk is first requested.
+The build fails in two cases. `vite dev` only warns, when the chunk is first requested, and still serves it.
 
 - A client chunk reaches a Node.js module, whether in your own files or in a package: a `node:` import, or a bare name such as `fs` that Vite resolves to its browser stub. A bare name that resolves to an installed package, such as `events` or `buffer`, is fine.
 - A client chunk reads `import.meta.env.KEY` where `KEY` does not start with the `envPrefix` of Vite (`VITE_` by default). `MODE`, `DEV`, `PROD`, `SSR` and `BASE_URL` are allowed. In the browser such a key is `undefined`, so this catches a bug: the value never ships.
@@ -45,7 +45,7 @@ idlip: the client chunk handler=add of /src/app.tsx imports a Node.js module: /s
 
 Code that only the server render reaches is not checked: the body of a component outside its handlers and bindings, and the entry. A component may import `node:fs` and read a file there.
 
-A build checks the code that stays in the chunk after unused code is removed, so a server-only function in a shared file that no chunk calls passes. `vite dev` has no such step. It follows the imports of your own files, so it can report an import that a build would remove, and it does not look into packages. Run a build to be sure.
+A build checks the code that stays in the chunk after unused code is removed, so a server-only function in a shared file that no chunk calls passes. `vite dev` has no such step. It follows the imports of your own files and does not look into packages, so it can warn about an import that a build removes, and miss one in a package. The build is the gate.
 
 ## Server functions
 
