@@ -1,6 +1,6 @@
 import { globSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import type { ServerResponse } from 'node:http';
-import { Readable } from 'node:stream';
+import { Readable, pipeline } from 'node:stream';
 import type { ReadableStream as NodeStream } from 'node:stream/web';
 import path from 'node:path';
 import { isRunnableDevEnvironment } from 'vite';
@@ -390,8 +390,12 @@ async function servePage(
   if (answer.body === null) {
     response.end();
   } else {
+    // `pipeline` cancels the web stream when the client leaves, so the render stops its pending
+    // work, and it ends the response when the stream fails, since an error here would crash `vite`.
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-    Readable.fromWeb(answer.body as NodeStream).pipe(response);
+    pipeline(Readable.fromWeb(answer.body as NodeStream), response, () => {
+      response.destroy();
+    });
   }
 }
 
