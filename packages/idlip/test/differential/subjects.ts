@@ -33,7 +33,13 @@ export const SUBJECTS: readonly Subject[] = [
     // The first row throws, and the next model makes it valid.
     pairs: (initial) => [[initial, { ...initial, items: [{ id: 1, n: 4 }] }]],
   },
-  { name: 'example-todo', source: read(EXAMPLES, 'todo/src/todo.tsx'), props: { initial: TODOS } },
+  {
+    // The example renders its own document.
+    name: 'example-todo',
+    source: read(EXAMPLES, 'todo/src/todo.tsx'),
+    props: { initial: TODOS },
+    document: true,
+  },
   {
     // A document: `<html lang>`, a bound `<body class>` and a head with a bound meta and title.
     name: 'document',

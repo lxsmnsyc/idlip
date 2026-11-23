@@ -79,8 +79,7 @@ export interface MountedPage {
   stop: () => void;
 }
 
-const STATE_SCRIPT = /<script i-state[^>]*>[\s\S]*<\/script>$/;
-const STATE_BODY = /^<script i-state[^>]*>([\s\S]*)<\/script>$/;
+const STATE_SCRIPT = /<script i-state[^>]*>([\s\S]*?)<\/script>/;
 
 let mounts = 0;
 
@@ -250,9 +249,19 @@ async function start(
   const headRoot = document.createElement('div');
   headRoot.innerHTML = rendered.head;
   const headElements = [...headRoot.children];
+  const ownHead: Element[] = [];
   document.head.append(...headElements);
-  const markup = html.replace(STATE_SCRIPT, '');
-  const stateScript = STATE_BODY.exec(html.slice(markup.length))?.[1] ?? '';
+  let markup = html.replace(STATE_SCRIPT, '');
+  const stateScript = STATE_SCRIPT.exec(html)?.[1] ?? '';
+  if (rendered.document) {
+    // A document's `<head>` elements go in the document head, and its `<body>` is the root. The
+    // attributes of `<html>` and `<body>` stay out, since the root is a `<div>`.
+    const parsed = new DOMParser().parseFromString(markup, 'text/html');
+    const own = [...parsed.head.children];
+    document.head.append(...own);
+    ownHead.push(...own);
+    markup = parsed.body.innerHTML;
+  }
 
   // 2. Put the markup and the state script in the document, behind the early listener.
   const root = document.createElement('div');
@@ -402,7 +411,11 @@ async function start(
       head() {},
       slots,
     };
-    fresh.innerHTML = server.default(props, context, patched);
+    const page = server.default(props, context, patched);
+    // A document's body is the root, as at the mount.
+    fresh.innerHTML = rendered.document
+      ? new DOMParser().parseFromString(page, 'text/html').body.innerHTML
+      : page;
     const difference = compareTrees(root, fresh, (node) => node instanceof HTMLScriptElement);
     if (difference !== undefined) {
       throw new Error(`The patched page differs from a server render of its model. ${difference}`);
@@ -442,6 +455,10 @@ async function start(
         listeners.stop();
         root.remove();
         for (const element of document.head.querySelectorAll('[i-head]')) {
+          element.remove();
+        }
+        // The static head of a document component has no mark.
+        for (const element of ownHead) {
           element.remove();
         }
         Reflect.deleteProperty(globalThis, key);

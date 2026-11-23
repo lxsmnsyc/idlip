@@ -11,6 +11,37 @@ function getUrl(base: string, module: string, chunk: string): string {
 }
 
 /**
+ * Returns the shell of each document in the server module: the render code from `<html` to
+ * the `<body` tag, which holds the attributes of `<html>` and the static head.
+ */
+function readShells(result: CompileResult): string[] {
+  const shells: string[] = [];
+  const { server } = result;
+  for (
+    let start = server.indexOf('<html');
+    start !== -1;
+    start = server.indexOf('<html', start + 1)
+  ) {
+    const end = server.indexOf('<body', start);
+    shells.push(end === -1 ? server.slice(start) : server.slice(start, end));
+  }
+  return shells;
+}
+
+/**
+ * Tells whether an edit changed the shell of a document component: `<html>`, its attributes or
+ * its head. A remount swaps `<body>` only, so such an edit loads the page again.
+ */
+export function changesShell(before: CompileResult | undefined, after: CompileResult): boolean {
+  const next = readShells(after);
+  if (before === undefined || next.length === 0) {
+    return false;
+  }
+  const old = readShells(before);
+  return old.length !== next.length || old.some((shell, index) => shell !== next[index]);
+}
+
+/**
  * Compares the compile output of a module before and after an edit. The server module holds
  * the markup, the manifests and the chunk ids of every component of the file, so when it is
  * the same the page keeps its markup, groups and handler names, and only the chunks whose code

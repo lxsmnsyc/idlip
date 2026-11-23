@@ -29,7 +29,7 @@ import {
   splitModule,
 } from '../core/format.ts';
 import { getDefines, getFeatures, replaceFeatures } from './features.ts';
-import { HOT_EVENT, classifyEdit } from './hot.ts';
+import { HOT_EVENT, changesShell, classifyEdit } from './hot.ts';
 import {
   BUILDS_FILE,
   BUILD_FILE,
@@ -884,7 +884,7 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       // The edit is a chunk swap when the markup and the manifest stay, and a remount otherwise.
       const before = cache.get(file)?.result;
       let message: ReturnType<typeof classifyEdit>;
-      let isDocument = false;
+      let reload: boolean;
       try {
         const after = compileFile(
           {
@@ -898,17 +898,14 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
           cache.get(file)?.rendered,
         );
         message = classifyEdit(before, after, base, timestamp);
-        for (const { manifest } of listCompiled(after)) {
-          isDocument ||= manifest.document === true;
-        }
+        reload = changesShell(before, after);
       } catch {
         // A module that does not compile: the page loads again and shows the server's error.
         this.environment.hot.send({ type: 'full-reload' });
         return [];
       }
-      // A remount swaps `<body>` only, so a document edit that changes the markup, which may
-      // be `<html>` or the head, loads the page again.
-      if (isDocument && message?.kind === 'remount') {
+      // A remount swaps `<body>` only, so an edit of `<html>` or of the head loads the page again.
+      if (reload && message?.kind === 'remount') {
         this.environment.hot.send({ type: 'full-reload' });
         return [];
       }
