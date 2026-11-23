@@ -59,7 +59,7 @@ The `modules` option is for the app's own files and does not list packages.
 
 ## Names
 
-A module of a package is named by the package and the path in it: `src/button.tsx` of `@acme/ui` is `@acme/ui/src/button.tsx`. The name is the same wherever the package is installed. The built chunk files carry the package name before the file name, such as `acme-ui.button.handler.press-<hash>.js`, so two packages that both have a `button.tsx` do not collide. The chunk files of the app's own files keep their names.
+A module of a package is named by the package and the path in it: `src/button.tsx` of `@acme/ui` is `@acme/ui/src/button.tsx`. The name is the same wherever the package is installed. The built chunk files carry the package name before the file name (`@acme/ui` is `acme-ui`), such as `acme-ui.button.handler.press-<hash>.js`, so two packages that both have a `button.tsx` do not collide. Two packages whose names give the same chunk name, such as `@a/b-c` and `@a-b/c`, stop `vite` at startup. The chunk files of the app's own files keep their names.
 
 ## Styles
 

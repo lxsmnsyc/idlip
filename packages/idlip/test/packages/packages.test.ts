@@ -3,6 +3,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  symlinkSync,
   realpathSync,
   rmSync,
   writeFileSync,
@@ -112,6 +113,42 @@ describe('readPackages', () => {
     expect(
       findPackage(packages, `${packages[0].dir}/src/nested/node_modules/dep/index.tsx`),
     ).toBeUndefined();
+  });
+
+  it('accepts a folder whose name starts with two dots', () => {
+    const other = createRoot();
+    writeFiles(other, {
+      'package.json': printApp(['dots']),
+      'node_modules/dots/package.json': printPackage('dots', { version: 1, dir: '..src' }),
+      'node_modules/dots/..src/button.tsx': printButton('a'),
+    });
+    expect(readPackages(other)[0].src).toMatch(/\/dots\/\.\.src$/);
+    rmSync(other, { recursive: true, force: true });
+  });
+
+  it('rejects a dir that links outside the package', () => {
+    const other = createRoot();
+    writeFiles(other, {
+      'package.json': printApp(['linked']),
+      'node_modules/linked/package.json': printPackage('linked', { version: 1, dir: 'src' }),
+      'outside/button.tsx': printButton('a'),
+    });
+    symlinkSync(path.join(other, 'outside'), path.join(other, 'node_modules/linked/src'));
+    expect(() => readPackages(other)).toThrow('linked sets idlip.dir outside the package: src.');
+    rmSync(other, { recursive: true, force: true });
+  });
+
+  it('rejects two packages whose names give the same chunk name', () => {
+    const other = createRoot();
+    writeFiles(other, {
+      'package.json': printApp(['@a/b-c', '@a-b/c']),
+      'node_modules/@a/b-c/package.json': printPackage('@a/b-c', { version: 1 }),
+      'node_modules/@a-b/c/package.json': printPackage('@a-b/c', { version: 1 }),
+    });
+    expect(() => readPackages(other)).toThrow(
+      '@a-b/c and @a/b-c both name their chunks "a-b-c". Use only one.',
+    );
+    rmSync(other, { recursive: true, force: true });
   });
 
   it('rejects a dir outside the package', () => {

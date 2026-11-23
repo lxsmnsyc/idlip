@@ -851,7 +851,10 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
     configResolved(config) {
       // The real path, since Vite names modules by it and a link would not match.
       root = realpathSync(config.root);
-      packages = readPackages(root);
+      // The real root may differ from the configured one (a link), and only then reads again.
+      if (root !== path.resolve(config.root)) {
+        packages = readPackages(root);
+      }
       base = config.base;
       isServe = config.command === 'serve';
       standAside ||= config.plugins.some((plugin) => plugin.name === NITRO_PLUGIN);

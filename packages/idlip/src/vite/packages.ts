@@ -43,6 +43,14 @@ function findDependency(root: string, name: string): string | undefined {
   }
 }
 
+function readRealpath(file: string): string {
+  try {
+    return realpathSync(file);
+  } catch {
+    return file;
+  }
+}
+
 /** Reads one `idlip` field. Returns `undefined` when the value is not an object. */
 function readField(name: string, dir: string, field: unknown): IdlipPackage | undefined {
   if (typeof field !== 'object' || field === null || Array.isArray(field)) {
@@ -55,9 +63,10 @@ function readField(name: string, dir: string, field: unknown): IdlipPackage | un
     );
   }
   const folder: unknown = Reflect.get(field, 'dir');
-  const src = path.resolve(dir, typeof folder === 'string' ? folder : '.');
+  // The real folder, so a `dir` that links outside the package is found too.
+  const src = readRealpath(path.resolve(dir, typeof folder === 'string' ? folder : '.'));
   const relative = path.relative(dir, src);
-  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+  if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
     throw new Error(`${name} sets idlip.dir outside the package: ${String(folder)}.`);
   }
   return { name, dir: toPosix(dir), src: toPosix(src) };
@@ -90,6 +99,16 @@ export function readPackages(root: string): IdlipPackage[] {
     if (info !== undefined) {
       found.push(info);
     }
+  }
+  // Two names can give one slug (`@a/b-c` and `@a-b/c`), which would clash in chunk file names.
+  const slugs = new Map<string, string>();
+  for (const info of found) {
+    const slug = getPackageSlug(info);
+    const other = slugs.get(slug);
+    if (other !== undefined) {
+      throw new Error(`${other} and ${info.name} both name their chunks "${slug}". Use only one.`);
+    }
+    slugs.set(slug, info.name);
   }
   return found;
 }
