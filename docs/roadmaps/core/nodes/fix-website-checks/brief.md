@@ -1,7 +1,7 @@
 ---
 id: fix-website-checks
 title: The website samples and tests pass again
-status: todo
+status: done
 priority: must
 type: fix
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-24
-spent:
+spent: 131000
 owns:
   - website/test/**
 shared:
@@ -45,3 +45,7 @@ For each failure, decide whether the sample or test is wrong or the code is. Fix
 
 - [ ] `pnpm --filter website check:samples` and `pnpm --filter website test` pass.
 - [ ] `pnpm --filter website build` passes.
+
+## Landed
+
+Landed on main 2026-11-24 (87112b9, 745027c). The REPL drops only the todo example's two known stylesheets and throws on any other stylesheet use.
