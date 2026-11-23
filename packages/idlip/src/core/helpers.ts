@@ -362,7 +362,8 @@ export function putText$(node: Node, value: unknown): void {
 }
 
 /**
- * Reads the rows around a node from the DOM: a `reset` and an event have no binding scope.
+ * Reads the rows around a node from the DOM: a `reset` and an event have no binding scope. The
+ * walk ends at the boundary of the component that holds the node.
  * `paths` maps a list id to its `each` path, or to a function of the scope for any other `each`.
  */
 export function getRows$(
@@ -381,24 +382,31 @@ export function getRows$(
     let row = false;
     let index = 0;
     let list: Node | undefined;
+    let nest = 0;
+    let stop = false;
     for (
       let item = node.previousSibling;
-      item !== null && list === undefined;
+      item !== null && list === undefined && !stop;
       item = item.previousSibling
     ) {
       const data = item.nodeType === 8 ? (item.nodeValue ?? '') : '';
-      if (data === '/i') {
+      if (data === '/n') {
+        nest++;
+      } else if (data.startsWith('n:')) {
+        stop = nest === 0;
+        nest -= nest === 0 ? 0 : 1;
+      } else if (nest === 0 && data === '/i') {
         index += row && depth === 0 ? 1 : 0;
         depth++;
-      } else if (data === 'i') {
+      } else if (nest === 0 && data === 'i') {
         row ||= depth === 0;
         depth -= depth === 0 ? 0 : 1;
-      } else if (row && depth === 0 && /^l\d/.test(data)) {
+      } else if (nest === 0 && row && depth === 0 && /^l\d/.test(data)) {
         levels.push({ id: data.slice(1), index });
         list = item;
       }
     }
-    node = list ?? node.parentNode;
+    node = stop ? null : (list ?? node.parentNode);
   }
   const rows: { item: unknown; index: number }[] = [];
   for (const { id, index } of levels.toReversed()) {

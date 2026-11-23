@@ -101,3 +101,53 @@ describe('event arrows with steps', () => {
     expect(page.text('p')).toBe('1 picked, a');
   });
 });
+
+const GROUP = `
+import { For } from 'idlip';
+export default function Group(props: { title: string; names: string[] }) {
+  let names = props.names;
+  let last = '';
+  function pick(n: string) { last = n; }
+  return (
+    <div>
+      <b>{last}</b>
+      <For each={names} key={(n) => n}>
+        {(n) => <button on:click={() => pick(n)}>{n}</button>}
+      </For>
+    </div>
+  );
+}`;
+
+const GROUPS = `
+import { For } from 'idlip';
+import Group from './group.tsx';
+export default function App(props: { groups: { id: string; names: string[] }[] }) {
+  let groups = props.groups;
+  return (
+    <main>
+      <For each={groups} key={(g) => g.id}>
+        {(g) => <Group title={g.id} names={g.names} />}
+      </For>
+    </main>
+  );
+}`;
+
+describe('rows of a child in a row of its parent', () => {
+  it('reads the rows of the child only, whatever lists the parent has', async () => {
+    page = await mount(
+      GROUPS,
+      {
+        groups: [
+          { id: 'g1', names: ['a', 'b'] },
+          { id: 'g2', names: ['c', 'd'] },
+        ],
+      },
+      { children: { './group.tsx': GROUP }, check: false },
+    );
+    const buttons = page.root.querySelectorAll('button');
+    buttons[3].click();
+    await page.settled();
+    expect(page.root.querySelectorAll('b')[1]?.textContent).toBe('d');
+    expect(page.root.querySelectorAll('b')[0]?.textContent).toBe('');
+  });
+});

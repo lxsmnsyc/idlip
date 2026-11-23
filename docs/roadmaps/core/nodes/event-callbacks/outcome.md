@@ -59,7 +59,7 @@ Reading: rows HTML falls 11% (27% gzip) because a row repeats no payload. The da
 
 - An event function reads the DOM when it runs. Two `input` events that wait for a chunk both read the last value of the field, so the old test `a,ab,` is `ab,ab,`. The model ends the same.
 - Message props of a stateful child are data built at render, so they still carry row values (`["remove",["a1"],"",""]`) and cannot read the event.
-- `getRows$` does not stop at a component boundary. An event that reads a row of its own `<For>` in a child that sits inside a parent's `<For>` reads the wrong list ids. Not covered by a test.
+- `getRows$` stops at the `<!--n:...-->` boundary of the component that holds the element, so a child's rows are never mixed with the lists of its parent (test in `callbacks.test.ts`).
 - An arrow that only cancels the event, with no handler call, is `event-no-call`.
 - A key `' '` (the space bar) cannot be a filter: the modifier list splits on spaces. This was so before.
 - Compilers that call `generate` and `compileHandlers` themselves must call `joinSites` (`src/compiler/sites.ts`).
