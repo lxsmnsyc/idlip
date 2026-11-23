@@ -100,7 +100,7 @@ function renderShareTags(base: string, title: string, description: string): stri
 <meta property="og:image" content="${escape(image)}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="A chart of the JavaScript each framework loads before the page is ready, as the app grows.">
+<meta property="og:image:alt" content="Only the code you click loads. idlip is a UI framework for server-rendered apps.">
 <meta name="twitter:card" content="summary_large_image">
 `;
 }

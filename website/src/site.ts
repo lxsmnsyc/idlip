@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { splitFrontMatter } from './front-matter.ts';
 import type { FrontMatter } from './front-matter.ts';
 import { createRenderer } from './markdown.ts';
+import { fillPlaceholders } from './placeholders.ts';
 import type { Heading, RenderEnv } from './markdown.ts';
 import benchmarks from './benchmarks.json' with { type: 'json' };
 import { DEMO_DATA } from './demo/data.ts';
@@ -116,7 +117,7 @@ export function loadPages(
       link: (href) => resolveLink(href, name, base),
       file: `docs/${name}`,
     };
-    const html = renderer.render(body, env);
+    const html = renderer.render(fillPlaceholders(body, `docs/${name}`, demo), env);
     pages.push({
       ...data,
       file: name,
