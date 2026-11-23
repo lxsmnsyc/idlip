@@ -9,34 +9,18 @@ This page builds the todo app of `examples/todo` from an empty folder. At the en
 
 You need Node 22 or later and pnpm.
 
-## Install idlip
-
-The `idlip` package on npm is a placeholder until the 0.1 release. Its `0.0.1-stage` version has none of the subpaths this page uses. Build a package file from the repository instead:
-
-```bash
-git clone https://github.com/lxsmnsyc/idlip.git
-cd idlip
-pnpm install
-pnpm --filter idlip build
-pnpm --filter idlip pack --pack-destination "$PWD/.."
-```
-
-The last command writes `idlip-0.0.0-stage.tgz` next to the `idlip` folder.
-
 ## Create the project
 
-Start in an empty folder next to the package file:
+Start in an empty folder:
 
 ```bash
 mkdir my-todo
 cd my-todo
 pnpm init
 pnpm pkg set type=module
-pnpm add ../idlip-0.0.0-stage.tgz
+pnpm add idlip
 pnpm add -D vite typescript
 ```
-
-After the 0.1 release, `pnpm add idlip` replaces the line with the package file.
 
 The project holds four files:
 
