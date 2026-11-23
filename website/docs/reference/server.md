@@ -53,7 +53,7 @@ interface ResponseOptions extends StreamOptions {
   default-src 'none'; script-src 'nonce-…' 'strict-dynamic'; base-uri 'none'; object-src 'none'; require-trusted-types-for 'script'; trusted-types idlip
   ```
 
-  `extend` adds sources to a directive, such as `{ 'style-src': ["'self'"], 'img-src': ['https:'] }`, and adds a directive the policy lacks. A source added to `default-src` replaces `'none'`. `script-src` and `trusted-types` cannot be extended, and a name or a source that holds a space, `;` or `,` throws. In development (`NODE_ENV` other than `production`) the response has no policy header, since Vite's HMR client and error overlay need more than it allows, but the nonce is still written.
+  `extend` adds sources to a directive, such as `{ 'style-src': ["'self'"], 'img-src': ['https:'] }`, and adds a directive the policy lacks. A source added to `default-src` replaces `'none'`. The script directives (`script-src`, `script-src-elem`, `script-src-attr`) and the Trusted Types directives (`trusted-types`, `require-trusted-types-for`) cannot be extended, and a name or a source that holds a space, `;` or `,` throws. In development (`NODE_ENV` other than `production`) the response has no policy header, since Vite's HMR client and error overlay need more than it allows, but the nonce is still written.
 
 - **`nonce`** (from `RenderOptions`) replaces the nonce that `csp` would make, for a host that makes its own.
 - **`status`** is 200 by default, and **`headers`** are added to the response. `content-type` is `text/html; charset=utf-8` unless `headers` has one.

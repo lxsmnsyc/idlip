@@ -137,6 +137,16 @@ describe('renderToResponse', () => {
     await expect(
       renderToResponse(documentComponent, {}, { csp: { extend: { 'trusted-types': ['x'] } } }),
     ).rejects.toThrow('trusted-types cannot be extended');
+    // `script-src-elem` and `script-src-attr` take over `script-src`, so they are locked too.
+    for (const name of ['script-src-elem', 'script-src-attr', 'require-trusted-types-for']) {
+      await expect(
+        renderToResponse(
+          documentComponent,
+          {},
+          { csp: { extend: { [name]: ["'unsafe-inline'"] } } },
+        ),
+      ).rejects.toThrow(`${name} cannot be extended`);
+    }
     await expect(
       renderToResponse(
         documentComponent,

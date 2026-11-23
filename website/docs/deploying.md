@@ -90,7 +90,7 @@ Nitro writes `.output/server/index.mjs` as a module worker, `.output/server/wran
 default-src 'none'; script-src 'nonce-…' 'strict-dynamic'; base-uri 'none'; object-src 'none'; require-trusted-types-for 'script'; trusted-types idlip
 ```
 
-`default-src 'none'` blocks styles, images and requests, so a page with a stylesheet adds its sources: `csp: { extend: { 'style-src': ["'self'"], 'img-src': ['https:'] } }`. Sources are added to a directive of that name, or the directive is added. `script-src` and `trusted-types` cannot be extended. A host that makes its own nonce passes it as `nonce`, and `csp` uses it.
+`default-src 'none'` blocks styles, images and requests, so a page with a stylesheet adds its sources: `csp: { extend: { 'style-src': ["'self'"], 'img-src': ['https:'] } }`. Sources are added to a directive of that name, or the directive is added. The script directives (`script-src`, `script-src-elem`, `script-src-attr`) and the Trusted Types directives (`trusted-types`, `require-trusted-types-for`) cannot be extended. A host that makes its own nonce passes it as `nonce`, and `csp` uses it.
 
 - **No header in development.** The policy would block Vite's HMR socket and error overlay. The nonce is still written, so the markup is the same.
 - **The page and its assets are not the same response.** Nitro serves the files of `.output/public` itself, and the policy applies to the page.

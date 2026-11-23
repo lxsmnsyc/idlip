@@ -8,7 +8,9 @@ export interface CspOptions {
   /**
    * Sources added to a directive by name, such as `{ 'style-src': ["'self'"], 'img-src': ['https:'] }`.
    * A directive that the policy lacks is added. `default-src` is `'none'`, so adding sources to it
-   * replaces `'none'`. `script-src` and `trusted-types` cannot be extended.
+   * replaces `'none'`. The script directives (`script-src`, `script-src-elem`, `script-src-attr`)
+   * and the Trusted Types directives (`trusted-types`, `require-trusted-types-for`) cannot be
+   * extended.
    */
   extend?: Readonly<Record<string, readonly string[]>>;
 }
@@ -27,8 +29,18 @@ export interface ResponseOptions extends StreamOptions {
   headers?: HeadersInit;
 }
 
-/** The directives that name the nonce or the trusted types policy, which a page cannot loosen. */
-const LOCKED = new Set(['script-src', 'trusted-types']);
+/**
+ * The directives that decide which scripts run, or require Trusted Types, which a page cannot
+ * loosen. `script-src-elem` and `script-src-attr` take over `script-src` for `<script>` elements
+ * and for inline handlers, so extending either one would drop the nonce requirement.
+ */
+const LOCKED = new Set([
+  'script-src',
+  'script-src-elem',
+  'script-src-attr',
+  'trusted-types',
+  'require-trusted-types-for',
+]);
 
 const DIRECTIVE = /^[a-z][a-z-]*$/;
 const SOURCE = /^[^\s;,]+$/;
