@@ -41,6 +41,8 @@ import {
 } from './skew.ts';
 import { isChunkUrls, listChunks, parseChunkId, replaceChunkUrls } from './chunks.ts';
 import { STYLES_KEY } from '../server/styles.ts';
+import { checkServerOnly, readSource } from './server-only.ts';
+import type { ScanCache } from './server-only.ts';
 import {
   findPackage,
   getPackageFile,
@@ -457,6 +459,8 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
   /** `build.outDir` of the user config, which holds the client and server folders. */
   let outDir = 'dist';
   let chunksFile = '';
+  let envPrefixes: string[] = [];
+  const scanCache: ScanCache = new Map();
   let compile = options.compile;
   let root = '';
   let base = '/';
@@ -500,6 +504,30 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       return getPackageId(info, toPosix(file));
     }
     return `/${path.relative(root, file).split(path.sep).join('/')}`;
+  }
+
+  /** Fails when a client chunk reaches server-only code (`server-only.ts`). */
+  async function checkChunk(
+    context: Rolldown.PluginContext,
+    file: string,
+    module: string,
+    chunk: string,
+    code: string,
+  ): Promise<void> {
+    const host = {
+      async resolve(specifier: string, importer: string): Promise<string | undefined> {
+        const found = await context.resolve(specifier, importer, { skipSelf: true });
+        return found?.external === false ? found.id : undefined;
+      },
+      read: readSource,
+    };
+    const label = getModuleId(file) + module.slice(file.length);
+    await checkServerOnly(
+      host,
+      { file, chunk, code, label, prefixes: envPrefixes },
+      scanCache,
+      getModuleId,
+    );
   }
 
   /** The file of a module id. */
@@ -919,6 +947,7 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       isServe = config.command === 'serve';
       standAside ||= config.plugins.some((plugin) => plugin.name === NITRO_PLUGIN);
       chunksFile = path.resolve(root, outDir, CHUNKS_FILE);
+      envPrefixes = [config.envPrefix ?? 'VITE_'].flat();
     },
 
     async buildApp(builder) {
@@ -1087,6 +1116,9 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
         }
         for (const module of client) {
           if (module.chunk === parsed.chunk) {
+            if (this.environment.name === 'client') {
+              await checkChunk(this, parsed.file, parsed.module, parsed.chunk, module.code);
+            }
             const code =
               isServe || this.environment.name !== 'client'
                 ? module.code
