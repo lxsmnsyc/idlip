@@ -26,6 +26,9 @@ shared: []
 reserves: []
 provides: []
 depends_on:
+  - on: server-only-code
+    kind: hard
+    why: build errors added after the release would break shipped apps (user decision 2026-11-23)
   - on: fix-style-object
     kind: hard
     why: style objects render as [object Object]
