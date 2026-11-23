@@ -20,6 +20,7 @@ declare const __IDLIP_HAS_SKEW__: boolean | undefined;
 declare const __IDLIP_HAS_DYNAMIC__: boolean | undefined;
 declare const __IDLIP_HAS_KEY_FN__: boolean | undefined;
 declare const __IDLIP_HAS_INNER_LISTS__: boolean | undefined;
+declare const __IDLIP_HAS_DOCUMENT__: boolean | undefined;
 
 /** Handlers that `await`, which the task runner serves. */
 export const HAS_TASKS: boolean = typeof __IDLIP_HAS_TASKS__ === 'undefined' || __IDLIP_HAS_TASKS__;
@@ -52,3 +53,6 @@ export const HAS_KEY_FN: boolean =
 /** A list inside a condition, a region or a row, which a patch can render fresh before its own binding runs. */
 export const HAS_INNER_LISTS: boolean =
   typeof __IDLIP_HAS_INNER_LISTS__ === 'undefined' || __IDLIP_HAS_INNER_LISTS__;
+/** A page whose `<html>` or `<body>` has a bound attribute, so its state script roots the page at `<html>`. */
+export const HAS_DOCUMENT: boolean =
+  typeof __IDLIP_HAS_DOCUMENT__ === 'undefined' || __IDLIP_HAS_DOCUMENT__;

@@ -283,6 +283,10 @@ export interface Component {
   derived: Derived[];
   handlers: Handler[];
   view: Node[];
+  /** True when the view is a document: `<html>` with one `<head>` and one `<body>`. */
+  document?: true;
+  /** True when `<html>` or `<body>` has a bound attribute: the loader roots the page at `<html>`. */
+  documentRoot?: true;
   holes: Hole[];
 }
 

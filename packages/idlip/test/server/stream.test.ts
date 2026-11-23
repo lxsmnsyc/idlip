@@ -22,11 +22,13 @@ const manifest: Manifest = {
   groups: {},
   lists: {},
   listens: { click: ['go'] },
+  document: true,
 };
 
 const chunks = {
   '/k?idlip-handler=go&lang.js': '/a/go.js',
   build: 'b1',
+  loader: '/built/loader.js',
 };
 
 /** The context of a compiled module: the render context and the head calls of `<Head>`. */
@@ -37,15 +39,22 @@ interface HeadContext extends RenderContext {
 
 type Component = (props: unknown, context?: HeadContext) => string;
 
-/** A component that records its state, and a `<Head>` block when `head` is set. */
-function makeComponent(head?: string): Component {
+/**
+ * A document component that records its state, and a `<Head>` block when `head` is set. `lang`
+ * is written on `<html>`, and `inHead` is static markup in `<head>`.
+ */
+function makeComponent(
+  head?: string,
+  extra: { lang?: string; inHead?: string; chunkMap?: Record<string, string> } = {},
+): Component {
+  const { lang = 'en', inHead = '<meta charset="utf-8">', chunkMap = chunks } = extra;
   return (_props, context) => {
-    const state: PageState = { manifest, chunks, model: { n: 1 }, props: {} };
+    const state: PageState = { manifest, chunks: chunkMap, model: { n: 1 }, props: {} };
     context?.state(state);
     if (head !== undefined && context !== undefined) {
       context.head(context.headId(), head);
     }
-    return '<p>hi</p>';
+    return `<html lang="${lang}"><head>${inHead}</head><body><p>hi</p></body></html>`;
   };
 }
 
@@ -75,39 +84,62 @@ describe('renderToStream', () => {
     expect(rendered).toHaveBeenCalledOnce();
   });
 
-  it('sends the head, the body and the state in the first chunk', async () => {
-    const stream = renderToStream(makeComponent(), {}, { loader: '/l.js' });
+  it('writes the doctype, the head scripts and the state script in the component document', async () => {
+    const stream = renderToStream(makeComponent(), {}, { nonce: 'n1' });
     const out = await readChunks(stream);
     expect(out).toHaveLength(1);
     const [first = ''] = out;
-    expect(first).toContain('<!doctype html><html><head>');
-    expect(first).toContain(renderListener());
-    expect(first).toContain('<script type="module" async src="/l.js"></script>');
-    expect(first.indexOf('</head>')).toBeLessThan(first.indexOf('<body>'));
+    expect(first.startsWith('<!doctype html><html lang="en"><head><meta charset="utf-8">')).toBe(
+      true,
+    );
+    // The listener, the links and the loader script come at the end of the head, from the chunk map.
+    expect(first).toContain(renderListener({ nonce: 'n1' }));
+    expect(first).toContain('<link rel="modulepreload" href="/a/go.js" nonce="n1">');
+    expect(first).toContain(
+      '<script type="module" async src="/built/loader.js" nonce="n1"></script></head><body>',
+    );
+    // The state script is the last child of the body, and the chunk map does not carry the loader.
     expect(first.indexOf('<body><p>hi</p>')).toBeLessThan(first.indexOf('<script i-state'));
     expect(first.endsWith('</script></body></html>')).toBe(true);
+    const inBody = first.slice(first.indexOf('<body>'));
+    expect(inBody).not.toContain('/built/loader.js');
+    // A nonce on each script and link the server adds.
+    expect(first.match(/<script/g)).toHaveLength(3);
+    expect(first.match(/<link/g)).toHaveLength(1);
+    expect(first.match(/nonce="n1"/g)).toHaveLength(4);
   });
 
-  it('joins to the document of render', async () => {
-    const options = { loader: '/l.js', nonce: 'n1' };
-    const component = makeComponent('<title>x</title>');
-    const html = (await readChunks(renderToStream(component, {}, options))).join('');
-    const page = await render(component, {}, { nonce: 'n1' });
-    expect(html).toBe(
-      `<!doctype html><html><head>${renderListener({ nonce: 'n1' })}` +
-        `<script type="module" async src="/l.js" nonce="n1"></script>` +
-        `${renderPreload(page.chunks, page.manifests, { nonce: 'n1' })}${page.head}` +
-        `</head><body>${page.body}</body></html>`,
+  it('takes the loader option over the one of the chunk map', async () => {
+    const html = (await readChunks(renderToStream(makeComponent(), {}, { loader: '/l.js' }))).join(
+      '',
     );
-    // The preload link and the `<Head>` output are in the head, the nonce on each script.
-    expect(html).toContain('<link rel="modulepreload" href="/a/go.js" nonce="n1">');
-    expect(html).toContain('<title>x</title></head>');
-    expect(html.match(/<script/g)).toHaveLength(3);
-    expect(html.match(/nonce="n1"/g)).toHaveLength(4);
+    expect(html).toContain('<script type="module" async src="/l.js"></script>');
+    expect(html).not.toContain('/built/loader.js');
   });
 
-  for (const name of ['counter', 'todo', 'try', 'effects']) {
-    it(`joins to the document of render for fixture ${name}`, async () => {
+  it('writes the head output first in the head, the winning title before the static elements', async () => {
+    const component = makeComponent('<title>x</title>');
+    const html = (await readChunks(renderToStream(component, {}))).join('');
+    const page = await render(component, {});
+    expect(html).toBe(
+      `<!doctype html><html lang="en"><head>${page.head}<meta charset="utf-8">` +
+        `${renderListener()}${renderPreload(page.chunks, page.manifests)}` +
+        `<script type="module" async src="/built/loader.js"></script></head><body>` +
+        `<p>hi</p>${page.body.slice(page.body.indexOf('<script i-state'), -'</body></html>'.length)}</body></html>`,
+    );
+    expect(html.indexOf('<title>x</title>')).toBeLessThan(html.indexOf('<meta charset'));
+  });
+
+  it('finds the head after an html tag with a quoted greater-than sign', async () => {
+    const html = (
+      await readChunks(renderToStream(makeComponent(undefined, { lang: 'a>b<head>' }), {}))
+    ).join('');
+    expect(html).toContain('<html lang="a>b<head>"><head><meta charset="utf-8">');
+    expect(html.indexOf('<script type="module"')).toBeGreaterThan(html.indexOf('<meta charset'));
+  });
+
+  it('rejects a component that does not render <html>', async () => {
+    for (const name of ['counter', 'todo', 'try', 'effects']) {
       const dir = join(FIXTURES, name);
       const input: unknown = JSON.parse(readFileSync(join(dir, 'input.json'), 'utf8'));
       const props: unknown = Reflect.get(Object(input), 'props');
@@ -116,20 +148,22 @@ describe('renderToStream', () => {
       if (!isComponent(component)) {
         throw new TypeError('bad module');
       }
+      // A fragment still renders its parts.
       const page = await render(component, props);
-      const html = (await readChunks(renderToStream(component, props))).join('');
-      expect(html).toBe(
-        `<!doctype html><html><head>${renderListener()}` +
-          `${renderPreload(page.chunks, page.manifests)}${page.head}` +
-          `</head><body>${page.body}</body></html>`,
+      expect(page.document).toBe(false);
+      await expect(readChunks(renderToStream(component, props))).rejects.toThrow(
+        'must render <html>',
       );
-    });
-  }
+    }
+  });
 
-  it('leaves out the loader and the links when asked', async () => {
-    const html = (await readChunks(renderToStream(makeComponent(), {}, { preload: false }))).join(
-      '',
-    );
+  it('leaves out the links when asked, and the loader script when none is known', async () => {
+    const { loader: _loader, ...plain } = chunks;
+    const html = (
+      await readChunks(
+        renderToStream(makeComponent(undefined, { chunkMap: plain }), {}, { preload: false }),
+      )
+    ).join('');
     expect(html).not.toContain('type="module"');
     expect(html).not.toContain('modulepreload');
   });
@@ -145,11 +179,9 @@ describe('renderToStream', () => {
 describe('streamParts', () => {
   it('streams what render returned', async () => {
     const page = await render(makeComponent(), {});
-    const parts = await readChunks(streamParts(page, { loader: '/l.js' }));
+    const parts = await readChunks(streamParts(page));
     expect(parts).toHaveLength(1);
-    const whole = (await readChunks(renderToStream(makeComponent(), {}, { loader: '/l.js' }))).join(
-      '',
-    );
+    const whole = (await readChunks(renderToStream(makeComponent(), {}))).join('');
     expect(parts.join('')).toBe(whole);
   });
 });

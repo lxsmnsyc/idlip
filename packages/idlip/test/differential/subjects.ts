@@ -35,6 +35,13 @@ export const SUBJECTS: readonly Subject[] = [
   },
   { name: 'example-todo', source: read(EXAMPLES, 'todo/src/todo.tsx'), props: { initial: TODOS } },
   {
+    // A document: `<html lang>`, a bound `<body class>` and a head with a bound meta and title.
+    name: 'document',
+    source: read(import.meta.dirname, 'subjects/document.tsx'),
+    props: { count: 2 },
+    document: true,
+  },
+  {
     // A default export with a named and a private child in the same file.
     name: 'widgets',
     source: read(FIXTURES, 'widgets/widgets.tsx'),

@@ -1,4 +1,4 @@
-import { HAS_CHILDREN } from '../features.ts';
+import { HAS_CHILDREN, HAS_DOCUMENT } from '../features.ts';
 import { onPageBlock } from './blocks.ts';
 import { isComment, isElement, matchMarker } from './guards.ts';
 
@@ -64,7 +64,12 @@ function buildIndex(root: ParentNode, from?: Comment): Index {
     // A child's bindings are between its boundary comments.
     walker.currentNode = from;
   }
-  for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+  // A page rooted at `<html>` has bindings on the root itself, which the walk would skip.
+  for (
+    let node = HAS_DOCUMENT && from === undefined ? root : walker.nextNode();
+    node !== null;
+    node = walker.nextNode()
+  ) {
     if (isElement(node)) {
       const ids = depth === 0 ? node.getAttribute('i-a') : null;
       for (const id of ids?.split(' ') ?? []) {

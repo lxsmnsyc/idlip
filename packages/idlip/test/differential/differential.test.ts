@@ -135,25 +135,29 @@ describe.each(SUBJECTS)('$name', (subject) => {
     },
   );
 
-  it('keeps the page equal to a server render after each handler', async () => {
-    const page = await mount(subject.source, subject.props, {
-      expectCaught: true,
-      children: subject.children,
-    });
-    const selector = '[on\\:click]';
-    try {
-      for (let round = 0; round < ROUNDS; round++) {
-        const count = page.root.querySelectorAll(selector).length;
-        for (let index = 0; index < count; index++) {
-          // oxlint-disable-next-line no-await-in-loop
-          const message = await clickAt(page, selector, index);
-          expect(judge(subject.name, message), message).toBeUndefined();
+  // `mount` puts the markup in a `<div>`, which cannot hold `<html>` or its attributes.
+  it.skipIf(subject.document === true)(
+    'keeps the page equal to a server render after each handler',
+    async () => {
+      const page = await mount(subject.source, subject.props, {
+        expectCaught: true,
+        children: subject.children,
+      });
+      const selector = '[on\\:click]';
+      try {
+        for (let round = 0; round < ROUNDS; round++) {
+          const count = page.root.querySelectorAll(selector).length;
+          for (let index = 0; index < count; index++) {
+            // oxlint-disable-next-line no-await-in-loop
+            const message = await clickAt(page, selector, index);
+            expect(judge(subject.name, message), message).toBeUndefined();
+          }
         }
+      } finally {
+        page.stop();
       }
-    } finally {
-      page.stop();
-    }
-  });
+    },
+  );
 });
 
 describe('accepted divergences', () => {

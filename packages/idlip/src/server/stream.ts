@@ -1,4 +1,5 @@
 import { renderListener } from '../client/loader/listener.ts';
+import { DEV } from '../core/dev.ts';
 import { attr } from './helpers.ts';
 import { renderPreload } from './preload.ts';
 import type { PreloadOptions } from './preload.ts';
@@ -7,8 +8,9 @@ import type { RenderOptions, RenderResult } from './render.ts';
 
 export interface StreamOptions extends RenderOptions {
   /**
-   * The URL of the loader module. It becomes an async module script in `<head>`, in the first
-   * chunk. Leave it out when the host writes the script.
+   * The URL of the loader module, for a host that built the page without the plugin. Default:
+   * `RenderResult.loader`, which the plugin put in the chunk map. It becomes an async module
+   * script at the end of `<head>`.
    */
   loader?: string;
   /**
@@ -33,17 +35,56 @@ type Phase =
 
 const TAIL = '</body></html>';
 
-/** The first render whole: the opening, the head of the page, the body and the state script. */
+/**
+ * Returns the index just after `<head>` in the markup of a document. The `<html>` tag ends at
+ * the first `>` outside its quoted attribute values.
+ */
+function findHeadStart(html: string): number {
+  let quote = false;
+  for (let index = 0; index < html.length; index++) {
+    const char = html[index];
+    if (char === '"') {
+      quote = !quote;
+    } else if (char === '>' && !quote) {
+      return html.startsWith('<head>', index + 1) ? index + 1 + '<head>'.length : -1;
+    }
+  }
+  return -1;
+}
+
+/**
+ * The first render whole, up to `</body>`: the doctype, the document with the head output at
+ * the start of its `<head>`, the listener, the preload links and the loader script at the end
+ * of it, and the body with the state script. The tail comes after the pending chunks.
+ */
 function writeFirst(parts: RenderResult, options: StreamOptions): string {
-  const { nonce, loader } = options;
-  let out = `<!doctype html><html><head>${renderListener({ nonce })}`;
-  if (loader !== undefined) {
-    out += `<script type="module" async${attr('src', loader)}${attr('nonce', nonce)}></script>`;
+  if (!parts.document) {
+    throw new TypeError(
+      'The root component must render <html>. Wrap it in a document component: <html><head>..</head><body>..</body></html>',
+    );
   }
+  const { nonce } = options;
+  const loader = options.loader ?? parts.loader;
+  const html = parts.body;
+  const open = findHeadStart(html);
+  const close = open < 0 ? -1 : html.indexOf('</head><body', open);
+  if (close < 0) {
+    throw new Error('The document component did not render <html><head>..</head><body>');
+  }
+  let added = renderListener({ nonce });
   if (options.preload !== false) {
-    out += renderPreload(parts.chunks, parts.manifests, { nonce, ...options.preload });
+    added += renderPreload(parts.chunks, parts.manifests, { nonce, ...options.preload });
   }
-  return `${out}${parts.head}</head><body>${parts.body}`;
+  if (loader !== undefined) {
+    added += `<script type="module" async${attr('src', loader)}${attr('nonce', nonce)}></script>`;
+  } else if (DEV) {
+    // oxlint-disable-next-line no-console
+    console.warn(
+      'idlip: the page has no loader script. Build it with the idlip() plugin, or pass `loader`.',
+    );
+  }
+  const page = `${html.slice(0, open)}${parts.head}${html.slice(open, close)}${added}${html.slice(close)}`;
+  return `<!doctype html>${page.slice(0, -TAIL.length)}`;
 }
 
 /** Stops the iterator of the pending chunks without waiting. A failure has no reader to tell. */
@@ -108,11 +149,14 @@ function createStream(
 }
 
 /**
- * Renders a compiled component as a stream of the whole document. The first chunk is the whole
- * first render: the doctype, `<head>` with the listener, the loader script, the
- * preload links and the `<Head>` output, then `<body>` with the markup and the state script.
- * The pending chunks of the page follow, and `</body></html>` ends the document (in the first
- * chunk when nothing is pending). The component renders as soon as the stream is constructed, before the reader reads. A render error fails the stream before it sends a byte. When the reader cancels, the stream aborts `signal` of the result and stops the pending work.
+ * Renders a compiled document component as a stream of the whole document. The component
+ * renders `<html>`, `<head>` and `<body>`. The first chunk is the whole first render: the
+ * doctype, the `<head>` with the `<Head>` output, the listener, the preload links and the loader
+ * script, then `<body>` with the markup and the state script. The pending chunks of the page
+ * follow, and `</body></html>` ends the document (in the first chunk when nothing is pending).
+ * A component that does not render `<html>` fails the stream with a `TypeError`, as does a
+ * render error, before the stream sends a byte. When the reader cancels, the stream aborts
+ * `signal` of the result and stops the pending work.
  */
 export function renderToStream<P>(
   component: (props: P) => unknown,
@@ -122,7 +166,7 @@ export function renderToStream<P>(
   return createStream(() => renderSync(component, props, options.nonce), options);
 }
 
-/** Streams the parts that `renderPage` returned, as `renderToStream` does. */
+/** Streams the parts that `render` returned, as `renderToStream` does. */
 export function streamParts(
   parts: RenderResult,
   options: StreamOptions = {},

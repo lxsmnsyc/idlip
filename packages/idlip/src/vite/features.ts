@@ -56,6 +56,7 @@ const DETECTORS: Readonly<Record<string, Detector>> = {
   DYNAMIC: ({ manifest }) => Object.hasOwn(manifest.groups, '$dynamic'),
   KEY_FN: hasKeyFunction,
   INNER_LISTS: hasInnerLists,
+  DOCUMENT: ({ manifest }) => manifest.documentRoot === true,
 };
 
 /** Returns the flags that the compiled modules turn on. */

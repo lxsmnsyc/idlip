@@ -213,6 +213,8 @@ function buildManifest(
     ...(plan.sources.size === 0 ? {} : { sources: [...plan.sources.keys()] }),
     ...(plan.tries.length === 0 ? {} : { fallback }),
     ...(plan.heads.size === 0 ? {} : { head: true as const }),
+    ...(component.document === true ? { document: true as const } : {}),
+    ...(component.documentRoot === true ? { documentRoot: true as const } : {}),
     groups: groupEntries,
     lists,
     ...(child ? { view: { chunk: 'view' } } : {}),

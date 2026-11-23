@@ -1,5 +1,5 @@
 import { Feature, serialize } from 'seroval';
-import { getChunkId } from '../core/format.ts';
+import { LOADER_KEY, getChunkId } from '../core/format.ts';
 import type {
   ChildManifest,
   ChunkUrls,
@@ -71,6 +71,16 @@ export interface RenderResult {
   head: string;
   body: string;
   /**
+   * True when the component rendered `<html>`. Then `body` is the whole `<html>` element, with
+   * the state script before `</body>`, and `head` goes inside its `<head>`.
+   */
+  document: boolean;
+  /**
+   * The URL of the loader module, from the chunk map of the build: the built file in a build
+   * and the dev URL under `vite dev`. Undefined for a module the plugin did not build.
+   */
+  loader: string | undefined;
+  /**
    * The chunk URLs of the page, the root's and its children's: the first argument of
    * `renderPreload`. Frozen and shared by every render of the module.
    */
@@ -103,6 +113,9 @@ export const NOTHING_PENDING: AsyncIterable<string> = Object.freeze({
   async *[Symbol.asyncIterator]() {},
 });
 
+/** What a document component's markup ends with. The state script goes before it. */
+const DOCUMENT_END = '</body></html>';
+
 /** The slots a render recorded, by path. */
 type Slots = Record<string, Slot>;
 
@@ -121,7 +134,9 @@ interface StaticPart {
   readonly events: string;
   /** The build id the plugin put in the chunk map. The state script carries it as `i-build`. */
   readonly build: string | undefined;
-  /** The chunk URLs of the state, without `build`. */
+  /** The URL of the loader module, from the chunk map. The state script does not carry it. */
+  readonly loader: string | undefined;
+  /** The chunk URLs of the state, without `build` and `loader`. */
   readonly urls: Record<string, string>;
   /** The manifests of the child modules. */
   readonly modules: ReadonlyMap<string, Manifest>;
@@ -270,6 +285,9 @@ function buildPart(root: ComponentState, children: Iterable<ComponentState> = []
   // The build id is not in the state's `chunks`: it is the `i-build` attribute.
   const build = Object.hasOwn(urls, 'build') ? urls.build : undefined;
   delete urls.build;
+  // The loader URL is for the document's script tag, so the state script leaves it out.
+  const loader = Object.hasOwn(urls, LOADER_KEY) ? urls[LOADER_KEY] : undefined;
+  delete urls.loader;
   const tail =
     modules.size === 0
       ? ''
@@ -280,6 +298,7 @@ function buildPart(root: ComponentState, children: Iterable<ComponentState> = []
     known,
     events: escapeScript(JSON.stringify([...events].toSorted().join(' '))),
     build,
+    loader,
     urls,
     modules,
     // Every render returns these objects, so a caller cannot change them for the next one. A copy,
@@ -364,7 +383,9 @@ function writeState(
     body = serializeValues(record, root, slots);
   }
   const script = `(self.$idlip||=[]).push([${part.events},()=>${body}])`;
-  return `<script i-state${attr('i-build', part.build)}${attr('nonce', nonce)}>${script}</script>`;
+  // A page whose `<html>` or `<body>` has a bound attribute roots the page at `<html>`.
+  const kind = root.manifest.documentRoot === true ? '="document"' : '';
+  return `<script i-state${kind}${attr('i-build', part.build)}${attr('nonce', nonce)}>${script}</script>`;
 }
 
 /** Renders a compiled component, and returns the parts of its page. */
@@ -431,6 +452,16 @@ export function renderSync(
   // The last title is the one that wins, so it goes first. The others follow, for the client.
   head.unshift(...titles.slice(-1), ...titles.slice(0, -1));
   const part = getPart(root, children);
+  const isDocument = root.manifest.document === true;
+  const state = writeState(part, root, children, nonce);
+  // The state script goes before `</body>`, so the parser keeps it in `<body>`.
+  let body = markup + state;
+  if (isDocument) {
+    if (!markup.endsWith(DOCUMENT_END)) {
+      throw new Error('The document component did not end with </body></html>');
+    }
+    body = markup.slice(0, -DOCUMENT_END.length) + state + DOCUMENT_END;
+  }
   // The controller exists only when something reads the signal, so a render pays nothing for it.
   let controller: AbortController | undefined;
   let aborted: { reason: unknown } | undefined;
@@ -449,7 +480,9 @@ export function renderSync(
       controller?.abort(reason);
     },
     head: head.join(''),
-    body: markup + writeState(part, root, children, nonce),
+    body,
+    document: isDocument,
+    loader: part.loader,
     chunks: part.pageChunks,
     manifests: part.manifests,
     pending: NOTHING_PENDING,

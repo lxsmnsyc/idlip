@@ -5,6 +5,7 @@ import { runAfter } from '../dom/run.ts';
 import { RESET, fireError, keepModel, resetRegion } from '../errors.ts';
 import {
   HAS_CHILDREN,
+  HAS_DOCUMENT,
   HAS_DYNAMIC,
   HAS_ERRORS,
   HAS_HEAD,
@@ -185,8 +186,15 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
     return promise;
   }
 
+  /** The node a state script roots its page at: its parent, or `<html>` for a document with a bound `<html>` or `<body>`. */
+  function getRoot(script: Element): ParentNode | null {
+    return HAS_DOCUMENT && script.getAttribute('i-state') === 'document'
+      ? document.documentElement
+      : script.parentNode;
+  }
+
   function isInside(script: Element, target: Element): boolean {
-    const parent = script.parentNode;
+    const parent = getRoot(script);
     return (
       parent !== null &&
       parent.contains(target) &&
@@ -204,7 +212,7 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
       kind: 'root',
       state,
       page: {
-        root: script.parentNode ?? document,
+        root: getRoot(script) ?? document,
         manifest: state.manifest,
         props: state.props,
         load: async (module, chunk) => load(state.chunks[getChunkId(module, chunk)]),

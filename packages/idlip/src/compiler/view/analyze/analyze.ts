@@ -65,6 +65,9 @@ type FunctionLike = FunctionNode | ArrowFunctionExpression;
 
 const BLOCKS = new Set(['For', 'Try', 'Head', 'Subscribe']);
 
+/** The elements of a document skeleton. */
+const DOCUMENT_TAGS = new Set(['html', 'head', 'body']);
+
 const GLOBALS = new Set([
   'Array',
   'Boolean',
@@ -288,6 +291,16 @@ class Analyzer {
   /** Diagnostics go here while trying to inline a helper. */
   sink: Diagnostic[] | undefined;
   holes: Hole[] = [];
+  /**
+   * The `html`, `head` and `body` elements of the document skeleton of the component being
+   * analyzed, or undefined when its view is not a document. Any other `html`, `head` or `body`
+   * is `document-element-misplaced`.
+   */
+  skeleton: Set<AstNode> | undefined;
+  /** The lowered children of the document `<head>`, held until the `<body>` is lowered. */
+  documentHead: Node[] | undefined;
+  /** Set when `<html>` or `<body>` has a bound attribute, which a root inside `<body>` cannot reach. */
+  documentBound = false;
   /** The `key` of each `<For>`, by its printed list path. Filled by the first pass. */
   listKeys = new Map<string, string>();
   /** Set when a `find` was lowered, so a second pass can use the keys. */
@@ -1873,6 +1886,18 @@ class Analyzer {
     if (tag === 'title' && !context.inHead && namespace !== 'svg') {
       this.report('title-outside-head', 'error', '<title> belongs in <Head>', node.openingElement);
     }
+    const skeleton = namespace === 'html' && DOCUMENT_TAGS.has(tag);
+    if (skeleton && this.skeleton?.has(node) !== true) {
+      this.report(
+        'document-element-misplaced',
+        'error',
+        `<${tag}> belongs to the document: a component renders <html> with one <head> and one <body> as the root of its view, and no other component renders them`,
+        node.openingElement,
+      );
+    }
+    if (skeleton && tag === 'head' && this.skeleton?.has(node) === true) {
+      return this.lowerDocumentHead(node, scope, context);
+    }
     const attrs: Attr[] = [];
     const events: Event[] = [];
     let ref: Ref | undefined;
@@ -1975,12 +2000,30 @@ class Analyzer {
       }
     }
     markUrls(tag, attrs);
+    if (skeleton && tag !== 'head') {
+      for (const attr of attrs) {
+        this.documentBound ||= attr.value.kind === 'hole';
+      }
+    }
     const inner: ViewContext = {
       ...context,
       namespace: tag === 'foreignObject' ? 'html' : namespace,
       open: [...context.open, tag],
     };
     const children = this.lowerChildren(node.children, scope, inner);
+    if (skeleton && (events.length > 0 || ref !== undefined || html !== undefined)) {
+      this.report(
+        'document-element-misplaced',
+        'error',
+        `<${tag}> of the document takes no events, ref or html`,
+        node.openingElement,
+      );
+    }
+    if (skeleton && tag === 'body' && this.documentHead !== undefined) {
+      // A document head with holes is the first `<Head>` block, ahead of the body's own.
+      children.unshift({ kind: 'head', children: this.documentHead });
+      this.documentHead = undefined;
+    }
     if (namespace === 'html') {
       this.checkRawText(tag, children, node.openingElement);
     }
@@ -2003,6 +2046,68 @@ class Analyzer {
       children,
       span: this.readSpan(node),
     };
+  }
+
+  /**
+   * Lowers the `<head>` of the document. Its children follow the `<Head>` rules. A head with no
+   * holes stays in `<head>` as plain markup, so the loader needs nothing for it. A head with a
+   * hole becomes the first `<Head>` block of the body, which the loader patches as any block.
+   */
+  lowerDocumentHead(node: JSXElement, scope: Scope, context: ViewContext): Node {
+    if (node.openingElement.attributes.length > 0) {
+      this.reportError(
+        'document-element-misplaced',
+        '<head> of the document takes no attributes',
+        node.openingElement,
+      );
+    }
+    const children = this.lowerChildren(node.children, scope, {
+      ...context,
+      open: [],
+      inHead: true,
+    });
+    let titles = 0;
+    for (const child of children) {
+      if (child.kind !== 'element') {
+        this.reportError(
+          'document-head-content',
+          'The <head> of a document holds elements only',
+          node.openingElement,
+        );
+      } else if (child.tag === 'title') {
+        titles++;
+        if (titles > 1) {
+          this.reportError(
+            'head-title-twice',
+            'The <head> of a document holds one <title>',
+            node.openingElement,
+          );
+        }
+      }
+    }
+    let dynamic = false;
+    for (const child of children) {
+      dynamic ||= hasBinding(child);
+    }
+    if (dynamic) {
+      this.documentHead = children;
+    }
+    return {
+      kind: 'element',
+      tag: 'head',
+      namespace: 'html',
+      attrs: [],
+      events: [],
+      ref: undefined,
+      html: undefined,
+      children: dynamic ? [] : children,
+      span: this.readSpan(node),
+    };
+  }
+
+  /** Whether `<html>` or `<body>` has a bound attribute. A method, since a handler of the lowering sets it. */
+  readBound(): boolean {
+    return this.documentBound;
   }
 
   /** A hole cannot sit in a raw text element, or share a `<textarea>` or `<title>` with other content. */
@@ -2886,9 +2991,13 @@ class Analyzer {
     }
 
     let view: Node[] = [];
+    this.skeleton = undefined;
+    this.documentHead = undefined;
+    this.documentBound = false;
     if (returned?.argument === null || returned?.argument === undefined) {
       this.reportError('body-return', `The component ${name} must end with return <jsx>`, fn);
     } else {
+      this.skeleton = findSkeleton(returned.argument);
       view = this.lowerBranch(returned.argument, scope, {
         open: [],
         namespace: 'html',
@@ -2896,6 +3005,9 @@ class Analyzer {
         loopDepth: 0,
       });
     }
+    const document = this.skeleton !== undefined;
+    this.skeleton = undefined;
+    this.documentHead = undefined;
     return {
       name,
       exported,
@@ -2905,6 +3017,8 @@ class Analyzer {
       derived,
       handlers,
       view,
+      ...(document ? { document: true as const } : {}),
+      ...(document && this.readBound() ? { documentRoot: true as const } : {}),
       holes: this.holes,
     };
   }
@@ -3462,6 +3576,70 @@ interface ViewContext {
 
 // ---------------------------------------------------------------------------------------------
 // Helpers
+
+/** Returns the name of a JSX element when it is a plain tag. */
+function readTag(node: JSXChild): string | undefined {
+  if (node.type !== 'JSXElement' || node.openingElement.name.type !== 'JSXIdentifier') {
+    return undefined;
+  }
+  return node.openingElement.name.name;
+}
+
+/**
+ * Finds the skeleton of a document view: the returned `<html>` with one `<head>` and then one
+ * `<body>` as its only children. Returns the three elements, or undefined when the view is not
+ * that. Text between them is ignored when it is whitespace.
+ */
+function findSkeleton(root: Expression): Set<AstNode> | undefined {
+  let node: Expression = root;
+  while (node.type === 'ParenthesizedExpression') {
+    node = node.expression;
+  }
+  if (node.type !== 'JSXElement' || readTag(node) !== 'html') {
+    return undefined;
+  }
+  const parts: JSXElement[] = [];
+  for (const child of node.children) {
+    if (child.type === 'JSXText' && normalizeJsxText(child.value) === '') {
+      continue;
+    }
+    if (child.type === 'JSXExpressionContainer' && child.expression.type === 'JSXEmptyExpression') {
+      continue;
+    }
+    if (child.type !== 'JSXElement') {
+      return undefined;
+    }
+    parts.push(child);
+  }
+  if (parts.length !== 2 || readTag(parts[0]) !== 'head' || readTag(parts[1]) !== 'body') {
+    return undefined;
+  }
+  return new Set<AstNode>([node, parts[0], parts[1]]);
+}
+
+/** True when an element tree has a hole, an event, a ref or raw HTML. */
+function hasBinding(node: Node): boolean {
+  if (node.kind === 'text-hole') {
+    return true;
+  }
+  if (node.kind !== 'element') {
+    return false;
+  }
+  for (const attr of node.attrs) {
+    if (attr.value.kind === 'hole') {
+      return true;
+    }
+  }
+  if (node.events.length > 0 || node.ref !== undefined || node.html !== undefined) {
+    return true;
+  }
+  for (const child of node.children) {
+    if (hasBinding(child)) {
+      return true;
+    }
+  }
+  return false;
+}
 
 function hasTextHole(nodes: readonly Node[]): boolean {
   for (const node of nodes) {
