@@ -26,6 +26,12 @@ shared: []
 reserves: []
 provides: []
 depends_on:
+  - on: entry-setup
+    kind: hard
+    why: 0.1 ships the whole-document entry (user decision 2026-11-23)
+  - on: render-stream
+    kind: hard
+    why: entry-setup builds on it
   - on: event-callbacks
     kind: hard
     why: ships before 0.1 (user decision 2026-11-23)
