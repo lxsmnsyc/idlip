@@ -23,6 +23,10 @@ added:
 spent:
 owns:
   - website/vercel.json
+  - website/public/og.png
+  - website/docs/resuming.md
+  - website/src/markdown.ts
+  - website/src/repl/**
 shared: []
 reserves: []
 provides: []
@@ -117,3 +121,11 @@ S: one config file. The deployment is a human step.
 ## After debate `debates/dsl` (2026-11-21)
 
 TSX stays the one source syntax. Pages and examples use `*.idlip.tsx`; no markup DSL, no `@idlip/language-core` or `@idlip/tsc`.
+
+## Updates after release 0.1.0 (2026-11-24)
+
+The user approved three fixes that ride with this node:
+
+- **Share image.** `website/public/og.png` shows an old headline. Redraw it with the current hero headline, "Only the code you click loads." (read it from the landing source, do not retype it). Reuse whatever script or source made the current image if one exists; otherwise render it from an idlip-free HTML file with Playwright at 1200x630 and keep that source in `website/scripts/`. Show the result in the outcome.
+- **Sizes in `resuming.md`.** Every byte count in the page (the listener, the two request tables) is typed by hand and drifts. Have the build fill them from measured values, the way the landing page reads `demo.*.gzip`. Keep the markdown readable: a placeholder the markdown renderer replaces, with a build error for an unknown name.
+- **Fonts in the REPL frame.** The sandboxed frame (`sandbox="allow-scripts"`, opaque origin) loads `/fonts/*.woff2` cross-origin, so the fonts are blocked without CORS. Add `Access-Control-Allow-Origin: *` for `/fonts/(.*)` in `vercel.json`, and make `vite preview` and the dev server send the same header so the fix can be checked locally. Confirm in a browser (Playwright, not the user's Chrome) that the frame renders with the site fonts.
