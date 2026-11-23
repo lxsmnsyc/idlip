@@ -1,7 +1,7 @@
 ---
 id: release-0-1
 title: Release 0.1.0
-status: todo
+status: released
 priority: should
 type: release
 story:
@@ -116,9 +116,6 @@ depends_on:
   - on: svg-and-html
     kind: hard
     why: ships in 0.1.0
-  - on: website
-    kind: hard
-    why: 0.1.0 ships with docs
   - on: example-todo
     kind: hard
     why: 0.1.0 ships the first milestone
@@ -194,3 +191,5 @@ Set `idlip` to `0.1.0`, set up npm trusted publishing (`npm trust github idlip -
 ## After debate `debates/dsl` (2026-11-21)
 
 TSX stays the one source syntax. Pages and examples use `*.idlip.tsx`; no markup DSL, no `@idlip/language-core` or `@idlip/tsc`.
+
+Released 2026-11-23: PR #4 merged (1e908c3); the Release workflow published idlip@0.1.0 with provenance and created the GitHub release `idlip@0.1.0`.
