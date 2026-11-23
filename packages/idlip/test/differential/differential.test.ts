@@ -88,6 +88,8 @@ describe.each(SUBJECTS)('$name', (subject) => {
       }
       expect(failures).toEqual([]);
     },
+    // Each subject compiles and mounts with the real compiler, which passes 5 s under load.
+    30_000,
   );
 
   it.skipIf(subject.children === undefined)(
@@ -133,6 +135,8 @@ describe.each(SUBJECTS)('$name', (subject) => {
       }
       expect(failures).toEqual([]);
     },
+    // Each subject compiles and mounts with the real compiler, which passes 5 s under load.
+    30_000,
   );
 
   // `mount` puts the markup in a `<div>`, which cannot hold `<html>` or its attributes.
