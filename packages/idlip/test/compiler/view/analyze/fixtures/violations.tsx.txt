@@ -263,38 +263,17 @@ export default function Broken({ size = 1 }: { size?: number }) {
       </For>
       {/* attr-reserved: the i- prefix belongs to the compiled format */}
       <div i-a="x" />
-      {/* event-placeholder: the event is read through a method */}
-      <input on:input={(e) => setDraft(e.currentTarget.value.trim())} />
-      {/* event-placeholder: the event is read inside an object */}
-      <input on:input={(e) => setDraft({ v: e.currentTarget.value })} />
-      {/* event-closure: prevent before an if stays a closure */}
+      {/* event-placeholder: the event is not plain data */}
+      <input on:input={(e) => setDraft(e)} />
+      {/* event-statement: a loop is not an event step */}
       <input
         on:keydown={(e) => {
-          e.preventDefault();
-          if (e.key === 'a') {
+          while (draft) {
             save();
           }
         }}
       />
-      {/* event-closure: an if with an else stays a closure */}
-      <input
-        on:keydown={(e) => {
-          if (e.key === 'a') {
-            save();
-          } else {
-            setDraft('');
-          }
-        }}
-      />
-      {/* event-closure: a test that is not a key test */}
-      <input
-        on:keydown={(e) => {
-          if (e.code === 'KeyA') {
-            save();
-          }
-        }}
-      />
-      {/* event-closure: a repeated preventDefault */}
+      {/* event-target: a repeated preventDefault is not a handler */}
       <form
         on:submit={(e) => {
           e.preventDefault();
@@ -302,11 +281,17 @@ export default function Broken({ size = 1 }: { size?: number }) {
           save();
         }}
       />
-      {/* event-closure: two calls */}
+      {/* event-no-call: an arrow that only cancels the event */}
       <form
         on:submit={(e) => {
           e.preventDefault();
-          save();
+        }}
+      />
+      {/* event-prevent-twice: a keyed prevent after an unconditional one */}
+      <input
+        on:keydown={(e) => {
+          e.preventDefault();
+          if (e.key === 'a') e.preventDefault();
           save();
         }}
       />

@@ -28,3 +28,7 @@ export function persist$1(model, [$outcome, props$step]) {
   label = 'done';
   return { ...model, save, label, saved };
 }
+
+export function $e2($e, $c, { page: { props } }) {
+return [['persist', [props.step]]];
+}

@@ -49,8 +49,8 @@ component Board (stateful, exported)
       <ul>
         for #4 key=id item=t
           <li>
-            <input type="checkbox" checked={#5} [on:click -> toggle(t.id)  render reads todos.*.id]>
-            <b [on:click -> rename(t.id, `${t.text}!`)  render reads todos.*.id, todos.*.text]>
+            <input type="checkbox" checked={#5} [on:click -> toggle(t.id)]>
+            <b [on:click -> rename(t.id, `${t.text}!`)]>
               {#6}
   holes:
     #0 summarize(stats)

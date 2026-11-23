@@ -243,21 +243,32 @@
                 {
                   "name": "input",
                   "mode": "on",
-                  "target": {
-                    "kind": "handler",
-                    "name": "setDraft"
+                  "body": {
+                    "kind": "steps",
+                    "steps": [
+                      {
+                        "kind": "send",
+                        "target": {
+                          "kind": "handler",
+                          "name": "setDraft"
+                        },
+                        "args": [
+                          {
+                            "kind": "path",
+                            "root": {
+                              "kind": "event"
+                            },
+                            "segments": ["currentTarget", "value"],
+                            "optional": false
+                          }
+                        ],
+                        "span": {
+                          "start": 1214,
+                          "end": 1245
+                        }
+                      }
+                    ]
                   },
-                  "args": [
-                    {
-                      "kind": "path",
-                      "root": {
-                        "kind": "event"
-                      },
-                      "segments": ["currentTarget", "value"],
-                      "optional": false
-                    }
-                  ],
-                  "paths": [],
                   "modifiers": [],
                   "span": {
                     "start": 1206,
@@ -317,12 +328,23 @@
                 {
                   "name": "click",
                   "mode": "on",
-                  "target": {
-                    "kind": "handler",
-                    "name": "add"
+                  "body": {
+                    "kind": "steps",
+                    "steps": [
+                      {
+                        "kind": "send",
+                        "target": {
+                          "kind": "handler",
+                          "name": "add"
+                        },
+                        "args": [],
+                        "span": {
+                          "start": 1273,
+                          "end": 1278
+                        }
+                      }
+                    ]
                   },
-                  "args": [],
-                  "paths": [],
                   "modifiers": [],
                   "span": {
                     "start": 1273,
@@ -387,12 +409,23 @@
                 {
                   "name": "click",
                   "mode": "on",
-                  "target": {
-                    "kind": "handler",
-                    "name": "persist"
+                  "body": {
+                    "kind": "steps",
+                    "steps": [
+                      {
+                        "kind": "send",
+                        "target": {
+                          "kind": "handler",
+                          "name": "persist"
+                        },
+                        "args": [],
+                        "span": {
+                          "start": 1355,
+                          "end": 1364
+                        }
+                      }
+                    ]
                   },
-                  "args": [],
-                  "paths": [],
                   "modifiers": [],
                   "span": {
                     "start": 1355,
@@ -597,34 +630,34 @@
                         {
                           "name": "click",
                           "mode": "on",
-                          "target": {
-                            "kind": "handler",
-                            "name": "toggle"
-                          },
-                          "args": [
-                            {
-                              "kind": "path",
-                              "root": {
-                                "kind": "loop",
-                                "name": "t",
-                                "index": false
-                              },
-                              "segments": ["id"],
-                              "optional": false
-                            }
-                          ],
-                          "paths": [
-                            {
-                              "root": "state",
-                              "segments": [
-                                "todos",
-                                {
-                                  "kind": "item"
+                          "body": {
+                            "kind": "steps",
+                            "steps": [
+                              {
+                                "kind": "send",
+                                "target": {
+                                  "kind": "handler",
+                                  "name": "toggle"
                                 },
-                                "id"
-                              ]
-                            }
-                          ],
+                                "args": [
+                                  {
+                                    "kind": "path",
+                                    "root": {
+                                      "kind": "loop",
+                                      "name": "t",
+                                      "index": false
+                                    },
+                                    "segments": ["id"],
+                                    "optional": false
+                                  }
+                                ],
+                                "span": {
+                                  "start": 1624,
+                                  "end": 1636
+                                }
+                              }
+                            ]
+                          },
                           "modifiers": [],
                           "span": {
                             "start": 1617,

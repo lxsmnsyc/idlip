@@ -46,6 +46,17 @@ export const SUBJECTS: readonly Subject[] = [
     },
   },
   {
+    // Arrows with two handler calls, a branch on a row, a const and a conditional prevent.
+    name: 'callbacks',
+    source: read(import.meta.dirname, 'subjects/callbacks.tsx'),
+    props: {
+      items: [
+        { id: 'a1', label: 'One', picked: false },
+        { id: 'a2', label: 'Two', picked: true },
+      ],
+    },
+  },
+  {
     name: 'rich',
     source: read(import.meta.dirname, 'subjects/rich.tsx'),
     props: { title: 'Hello' },

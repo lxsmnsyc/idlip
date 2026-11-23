@@ -67,15 +67,23 @@ describe('delegation', () => {
     expect(messages(listener.boot)).toEqual([{ t: 'go', p: [] }]);
   });
 
-  it('resolves $event paths, currentTarget and the $ literal', () => {
-    const boot = page(
-      `<input id="f" on:input='["set",[["$event","currentTarget","value"],["$event","target","id"],["$event","type"],["$","$a",1]]]'>`,
-      'input',
-    );
+  it('queues a call with the event, the element and the modifiers of a site', () => {
+    const boot = page(`<input id="f" on:input="$e1 latest"><p on:input="$e2">x</p>`, 'input');
     const el = document.querySelector('input')!;
-    el.value = 'v';
-    fire(el, new Event('input', { bubbles: true }));
-    expect(messages(boot)).toEqual([{ t: 'set', p: ['v', 'f', 'input', ['$a', 1]] }]);
+    const event = new Event('input', { bubbles: true });
+    fire(el, event);
+    const [queued] = boot.q!;
+    expect(queued).toMatchObject({ site: '$e1', event, current: el, target: el, latest: true });
+    expect(queued.message).toBeUndefined();
+  });
+
+  it('queues a message for a JSON attribute, with its owner and without placeholders', () => {
+    const boot = page(`<b on:click='["set",[["$event","type"]],"","a/1"]'>x</b>`, 'click');
+    document.querySelector('b')!.click();
+    expect(boot.q![0]).toMatchObject({
+      message: { t: 'set', p: [['$event', 'type']] },
+      owner: 'a/1',
+    });
   });
 
   it('walks outwards and fires each element, and stop ends the walk', () => {
@@ -209,20 +217,37 @@ describe('delegation', () => {
     },
   );
 
-  it('resolves currentTarget to window or document for a global template', () => {
+  it('records window as the element of a global call', () => {
     const boot = page(
-      `<template i-global="window" on:keydown='["w",[["$event","currentTarget","name"]]]'></template>`,
+      `<template i-global="window" on:keydown="$e0"></template>`,
       'keydown:window keydown:document',
     );
-    (window as { name: string }).name = 'win';
     fire(document.body, key('a'));
-    expect(messages(boot)).toEqual([{ t: 'w', p: ['win'] }]);
+    expect(boot.q![0]).toMatchObject({ site: '$e0', current: window });
   });
 
   it('adds a passive listener for a type marked passive', () => {
     const boot = page(`<div on:scroll='["s",[]]'></div>`, 'scroll:passive');
     fire(document.querySelector('div')!, new Event('scroll'));
     expect(messages(boot)).toEqual([{ t: 's', p: [] }]);
+  });
+});
+
+describe('conditional prevent', () => {
+  const CASES: [KeyboardEventInit & { key: string }, boolean][] = [
+    [{ key: 'ArrowDown' }, true],
+    [{ key: 'ArrowUp' }, true],
+    [{ key: 'Enter' }, false],
+  ];
+  it.each(CASES)('prevents only the keys of its filters: %j', (init, prevented) => {
+    const boot = page(
+      `<ul on:keydown="$e0 prevent:ArrowDown prevent:ArrowUp"><li>x</li></ul>`,
+      'keydown',
+    );
+    const event = fire(document.querySelector('li')!, key(init.key));
+    expect(event.defaultPrevented).toBe(prevented);
+    // The event still reaches the loader for every key.
+    expect(boot.q).toHaveLength(1);
   });
 });
 

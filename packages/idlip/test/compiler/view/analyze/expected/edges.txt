@@ -27,7 +27,7 @@ component Edges (stateful, exported)
       <p>
         {#3}
       for #4 key=id item=item
-        <button [on:click -> select(item.id)  render reads items, query]>
+        <button [on:click -> select(item.id)]>
           {#5}
       for #6 key=id item=item
         <span>

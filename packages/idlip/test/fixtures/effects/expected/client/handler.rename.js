@@ -30,3 +30,7 @@ export function rename$2(model, [$outcome, name, first]) {
   label = `${name}:${second}:${first}`;
   return { ...model, label };
 }
+
+export function $e3($e, $c) {
+return [['rename', ['todo']]];
+}

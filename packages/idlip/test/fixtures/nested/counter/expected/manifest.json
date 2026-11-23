@@ -19,6 +19,17 @@
       ]
     }
   },
+  "sites": {
+    "$e0": {
+      "chunk": "handler=increment",
+      "bindings": [
+        "count"
+      ],
+      "tags": [
+        "increment"
+      ]
+    }
+  },
   "groups": {
     "props.label": {
       "paths": [

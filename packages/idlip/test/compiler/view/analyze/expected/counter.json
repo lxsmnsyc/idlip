@@ -146,12 +146,23 @@
                 {
                   "name": "click",
                   "mode": "on",
-                  "target": {
-                    "kind": "handler",
-                    "name": "increment"
+                  "body": {
+                    "kind": "steps",
+                    "steps": [
+                      {
+                        "kind": "send",
+                        "target": {
+                          "kind": "handler",
+                          "name": "increment"
+                        },
+                        "args": [],
+                        "span": {
+                          "start": 344,
+                          "end": 355
+                        }
+                      }
+                    ]
                   },
-                  "args": [],
-                  "paths": [],
                   "modifiers": [],
                   "span": {
                     "start": 344,
@@ -179,17 +190,28 @@
                 {
                   "name": "click",
                   "mode": "on",
-                  "target": {
-                    "kind": "handler",
-                    "name": "add"
+                  "body": {
+                    "kind": "steps",
+                    "steps": [
+                      {
+                        "kind": "send",
+                        "target": {
+                          "kind": "handler",
+                          "name": "add"
+                        },
+                        "args": [
+                          {
+                            "kind": "literal",
+                            "value": 10
+                          }
+                        ],
+                        "span": {
+                          "start": 398,
+                          "end": 405
+                        }
+                      }
+                    ]
                   },
-                  "args": [
-                    {
-                      "kind": "literal",
-                      "value": 10
-                    }
-                  ],
-                  "paths": [],
                   "modifiers": [],
                   "span": {
                     "start": 391,
@@ -217,12 +239,23 @@
                 {
                   "name": "click",
                   "mode": "on",
-                  "target": {
-                    "kind": "handler",
-                    "name": "reset"
+                  "body": {
+                    "kind": "steps",
+                    "steps": [
+                      {
+                        "kind": "send",
+                        "target": {
+                          "kind": "handler",
+                          "name": "reset"
+                        },
+                        "args": [],
+                        "span": {
+                          "start": 443,
+                          "end": 450
+                        }
+                      }
+                    ]
                   },
-                  "args": [],
-                  "paths": [],
                   "modifiers": [],
                   "span": {
                     "start": 443,

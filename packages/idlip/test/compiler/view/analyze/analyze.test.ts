@@ -77,6 +77,9 @@ for (const rule of [
   'event-mode-twice',
   'event-message-args',
   'event-placeholder',
+  'event-statement',
+  'event-no-call',
+  'event-prevent-twice',
   'event-passive-prevent',
   'attr-reserved',
   'html-raw-text',
@@ -298,7 +301,7 @@ describe('the todo manifest', () => {
 
   it('matches the hole ids and path sets of the analysis', () => {
     const component = analyze('todo.tsx', source).components[0];
-    // Binding ids are the hole id after one letter; the event payload takes the next id.
+    // Binding ids are the hole id after one letter. An event function binds nothing.
     const paths = new Map<number, string[]>();
     for (const hole of component.holes) {
       expect(hole.paths).not.toBe('dynamic');
@@ -308,7 +311,6 @@ describe('the todo manifest', () => {
       }
       paths.set(hole.id, printed);
     }
-    paths.set(component.holes.length, ['todos.*.id']);
     let checked = 0;
     for (const group of Object.values(manifest.groups)) {
       for (const binding of group.bindings) {

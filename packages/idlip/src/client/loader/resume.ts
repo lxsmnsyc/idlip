@@ -26,12 +26,15 @@ import type {
   After,
   Boot,
   HandlerChunk,
+  HandlerEntry,
+  Message,
   Model,
   Page,
   PageState,
   Patch,
   Props,
   QueuedEvent,
+  Site,
   Step,
   Update,
 } from '../../core/format.ts';
@@ -83,6 +86,7 @@ interface Pending {
   readonly event: QueuedEvent;
   readonly root: Root;
   readonly unit: Unit;
+  /** The update of a message, or the event function of a call, once its chunk has loaded. */
   update: Update | undefined;
   /** The chunk failed to load. The item waits for the next event with its tag. */
   failed: boolean;
@@ -101,6 +105,11 @@ function importChunk(url: string): Promise<unknown> {
   // The import stays alone in its function, so the build keeps the comment. Without it Vite
   // wraps the import in its preload helper, which puts the loader over its budget.
   return import(/* @vite-ignore */ url);
+}
+
+/** The handler tag of an event, or the name of its event function. */
+function getTag(event: QueuedEvent): string {
+  return event.site ?? event.message.t;
 }
 
 function isStep(result: Model | Step): result is Step {
@@ -265,12 +274,12 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
       report(error);
     }
     if (root === undefined) {
-      report(new Error(`idlip: no state for ${event.message.t}`));
+      report(new Error(`idlip: no state for ${getTag(event)}`));
       return;
     }
     // An event for a tag whose chunk failed asks for another try.
     for (const other of queue) {
-      if (other.failed && other.root === root && other.event.message.t === event.message.t) {
+      if (other.failed && other.root === root && getTag(other.event) === getTag(event)) {
         other.failed = false;
       }
     }
@@ -295,9 +304,15 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
     queue.push(item);
   }
 
-  async function getUpdate(root: Unit, tag: string): Promise<Update> {
+  // Loads the chunk that exports a handler or an event function, with what starts beside it.
+  // `entries` is the manifest table that holds the name.
+  async function getUpdate(
+    root: Unit,
+    tag: string,
+    entries: Readonly<Record<string, HandlerEntry>> | undefined,
+  ): Promise<Update> {
     const { manifest, chunks } = root.state;
-    const entry = Object.hasOwn(manifest.handlers, tag) ? manifest.handlers[tag] : undefined;
+    const entry = entries !== undefined && Object.hasOwn(entries, tag) ? entries[tag] : undefined;
     const url = entry === undefined ? undefined : chunks[getChunkId(manifest.module, entry.chunk)];
     if (url === undefined) {
       throw new DropError(`idlip: no chunk for ${tag}`);
@@ -321,11 +336,17 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
   }
 
   async function loadUpdate(item: Pending): Promise<void> {
+    const { site } = item.event;
+    // An event function lives in a handler chunk too, and the manifest lists it under `sites`.
+    if (site !== undefined) {
+      item.update = await getUpdate(item.unit, site, item.unit.state.manifest.sites);
+      return;
+    }
     // A reset has no handler chunk: it keeps the model and renders a region in `runBatch`.
     item.update =
       HAS_ERRORS && item.event.message.t === RESET
         ? keepModel
-        : await getUpdate(item.unit, item.event.message.t);
+        : await getUpdate(item.unit, item.event.message.t, item.unit.state.manifest.handlers);
   }
 
   // Loads the chunks of the waiting events. An event that cannot run is dropped, and an event
@@ -389,7 +410,11 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
 
   // Runs one message. A built-in task settles here, so its continuation joins the batch. Any
   // other task runs on its own, and its continuation joins the queue when it settles.
-  async function apply(root: Unit, update: Update, message: QueuedEvent['message']): Promise<void> {
+  async function apply(
+    root: Unit,
+    update: Update,
+    message: Message<string, readonly unknown[]>,
+  ): Promise<void> {
     const result = update(root.model, message.p);
     if (!((HAS_TASKS || HAS_REFS) && isStep(result))) {
       // oxlint-disable-next-line typescript/no-unsafe-type-assertion
@@ -437,7 +462,16 @@ export function resume(boot: Boot, patch: Patch, onError?: (error: unknown) => v
         continue;
       }
       try {
-        if (HAS_ERRORS && event.message.t === RESET) {
+        if (event.site !== undefined) {
+          // The event function reads the rows the DOM shows, and the rest from the current model.
+          // An event function takes the event and the scope, not the model and a payload.
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+          const sent = (update as unknown as Site)(event.event, event.current, unit);
+          for (const [t, p] of sent) {
+            // oxlint-disable-next-line no-await-in-loop
+            await apply(unit, await getUpdate(unit, t, unit.state.manifest.handlers), { t, p });
+          }
+        } else if (HAS_ERRORS && event.message.t === RESET) {
           await resetRegion(unit.page, unit.model, event.target, event.message.p[0]);
         } else {
           await apply(unit, update!, event.message);

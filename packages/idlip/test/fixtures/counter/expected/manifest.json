@@ -39,6 +39,35 @@
       ]
     }
   },
+  "sites": {
+    "$e0": {
+      "chunk": "handler=increment",
+      "bindings": [
+        "count"
+      ],
+      "tags": [
+        "increment"
+      ]
+    },
+    "$e1": {
+      "chunk": "handler=add",
+      "bindings": [
+        "count"
+      ],
+      "tags": [
+        "add"
+      ]
+    },
+    "$e2": {
+      "chunk": "handler=reset",
+      "bindings": [
+        "count"
+      ],
+      "tags": [
+        "reset"
+      ]
+    }
+  },
   "groups": {
     "count": {
       "paths": [

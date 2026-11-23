@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { getChunkFile } from '../../../src/core/format.ts';
 import { analyze } from '../../../src/compiler/view/analyze/index.ts';
+import { compile as compileModule } from '../../../src/compiler/index.ts';
 import { compileHandlers } from '../../../src/compiler/update/index.ts';
 
 const FIXTURES = join(import.meta.dirname, '..', '..', 'fixtures');
@@ -28,7 +29,8 @@ function compile(source: string): { code: Record<string, string>; rules: string[
 describe('golden fixtures', () => {
   for (const name of ['counter', 'todo']) {
     it(`emits the expected handler chunks of ${name}`, () => {
-      const result = compileHandlers(`/src/${name}.tsx`, readFixture(name));
+      // The event functions of the view join the handler chunks, so the whole compile runs.
+      const result = compileModule(readFixture(name), `/src/${name}.tsx`);
       expect(result.diagnostics).toEqual([]);
       const dir = join(FIXTURES, name, 'expected', 'client');
       const expected: string[] = [];
@@ -39,6 +41,9 @@ describe('golden fixtures', () => {
       }
       const emitted: string[] = [];
       for (const module of result.client) {
+        if (!module.chunk.startsWith('handler=')) {
+          continue;
+        }
         const file = getChunkFile(module.chunk);
         emitted.push(file);
         expect(module.code, file).toBe(readFileSync(join(dir, file), 'utf8'));

@@ -8,12 +8,13 @@ import { printSlot } from './child.ts';
 import { emitHeadBody } from './head.ts';
 import { printHtmlBody } from './raw.ts';
 import { emitSubscribeBinding } from './subscribe.ts';
-import { getMessage } from './events.ts';
+import { getMessage, printEventBody } from './events.ts';
 import { printTracked } from './dynamic.ts';
 import { Emitter, createUsage, mergeUsage } from './expr.ts';
 import type { Frame, Report, ScopeName, Usage } from './expr.ts';
 import type { ModuleSource } from './module.ts';
-import type { Binding, Group, ListInfo, Plan, TryInfo } from './plan.ts';
+import { getListPath } from './plan.ts';
+import type { Binding, Group, ListInfo, Plan, Site, TryInfo } from './plan.ts';
 import { buildBody, createCloneContext } from './template.ts';
 import { getKey, getLocalName, quote } from './text.ts';
 
@@ -33,7 +34,7 @@ export interface Emitted {
   usage: Usage;
 }
 
-const SCOPE_ORDER: ScopeName[] = ['model', 'props', 'rows', 'dynamic'];
+const SCOPE_ORDER: ScopeName[] = ['model', 'props', 'rows', 'rendered', 'dynamic'];
 
 /**
  * Prints the scope as the destructured parameter, such as `{ model, rows }`, or an empty string.
@@ -494,9 +495,10 @@ function emitPropBinding(binding: Binding, context: ChunkContext): Emitted {
     const { event } = source;
     const slot = printSlot(emitter, context.plan, source.child, path);
     const message = getMessage(context.component, event, emitter, path).code;
+    const target = event.body.kind === 'message' ? event.body.target : undefined;
     comment =
-      event.target.kind === 'handler'
-        ? `// The message prop carries the path of this component as its owner, so the child's click\n// reaches \`${event.target.name}\` here and not a handler of the child.`
+      target?.kind === 'handler'
+        ? `// The message prop carries the path of this component as its owner, so the child's click\n// reaches \`${target.name}\` here and not a handler of the child.`
         : '// A message prop that the component forwards keeps the owner that its parent gave it.';
     call = `setProp(${slot}, ${quote(event.name)}, ${message});`;
   } else {
@@ -627,4 +629,96 @@ export function emitViewChunk(context: ChunkContext): GroupChunk {
   const render = `// The whole view without the boundary markers, which the parent's template writes.\nexport function render(${parameter}) {\n${lines.join('\n')}\n}`;
   const chunk: Module = { chunk: 'view', ...assemble(usage, [init, render], context) };
   return { module: chunk, usage };
+}
+
+/** An event function, ready to join the chunk of the handler it names. */
+export interface SiteModule {
+  /** The first handler the event sends. Its chunk holds the function. */
+  tag: string;
+  /** The function with its own imports and constants, as a module. */
+  code: string;
+  usage: Usage;
+}
+
+/**
+ * Prints the `lists$` record of a site: the `each` of every list around it, by list id, as a model
+ * path or, when the path does not read the model, as a function of the scope. `getRows$` reads
+ * the rows around the element from the DOM with it.
+ */
+function printSiteLists(site: Site, context: ChunkContext, usage: Usage, child: boolean): string {
+  const entries: string[] = [];
+  for (const loop of site.loops) {
+    let info: ListInfo | undefined;
+    for (const item of context.plan.lists) {
+      if (item.id === loop.each.id) {
+        info = item;
+      }
+    }
+    if (info === undefined) {
+      continue;
+    }
+    const path = getListPath(info, child);
+    if (path !== undefined && path !== 'props' && !path.startsWith('props.')) {
+      entries.push(`${quote(String(info.id))}: ${quote(path)}`);
+      continue;
+    }
+    usage.scope.add('props');
+    const inner = createUsage();
+    const emitter = new Emitter('client', inner, context.report);
+    emitter.frames = info.frames;
+    emitter.at = loop.each.span;
+    const code = emitter.expr(loop.each.expr, 1);
+    for (const name of inner.modules) {
+      usage.modules.add(name);
+    }
+    for (const name of inner.imports) {
+      usage.imports.add(name);
+    }
+    for (const name of inner.props) {
+      usage.props.add(name);
+    }
+    for (const name of inner.helpers) {
+      usage.helpers.add(name);
+    }
+    entries.push(`${quote(String(info.id))}: ({ model, props, rows }) => ${code}`);
+  }
+  return `{ ${entries.join(', ')} }`;
+}
+
+/**
+ * Emits the function of each event arrow: `export function $e3($e, $c, { model, props })`
+ * returns the messages the event sends. `$e` is the event, or the value of a subscription, and
+ * `$c` the element that holds the attribute, which the loader records at dispatch since the
+ * browser clears `currentTarget` after it. A row value is read from the rows that the DOM
+ * shows, so it is the row the user clicked even when earlier events of the batch change the model.
+ */
+export function emitSites(context: ChunkContext, child: boolean): SiteModule[] {
+  const modules: SiteModule[] = [];
+  for (const site of context.plan.sites) {
+    if (site.event.body.kind !== 'steps') {
+      continue;
+    }
+    const usage = createUsage();
+    const emitter = new Emitter('client', usage, context.report);
+    emitter.frames = site.frames;
+    const lines = printEventBody(context.component, site.event.body.steps, emitter);
+    const sections: string[] = [];
+    if (usage.scope.has('rows')) {
+      // The rows come from the DOM and the model it shows.
+      usage.scope.delete('rows');
+      usage.scope.add('rendered');
+      usage.helpers.add('getRows');
+      const name = `${site.name}_lists`;
+      sections.push(`const ${name} = ${printSiteLists(site, context, usage, child)};`);
+      const props = usage.scope.has('props') ? ', props' : '';
+      lines.unshift(`const rows = getRows$($c, rendered, ${name}${props});`);
+    }
+    // The loader passes the unit that the event belongs to, which holds the props in its page.
+    const scope = printParams(undefined, usage).replace('props', 'page: { props }');
+    sections.push(
+      `export function ${site.name}($e, $c${scope === '' ? '' : `, ${scope}`}) {\n${lines.join('\n')}\n}`,
+    );
+    modules.push({ tag: site.tags[0], code: assemble(usage, sections, context).code, usage });
+  }
+  return modules;
 }

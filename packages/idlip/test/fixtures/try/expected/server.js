@@ -7,7 +7,7 @@ function check(value) {
   return value;
 }
 
-export const manifest = { module: '/src/board.tsx', events: ['click'], listens: { click: ['add', 'toggle'] }, handlers: { add: { chunk: 'handler=add', writes: ['items'], bindings: ['items.*.n'] }, toggle: { chunk: 'handler=toggle', writes: ['shown'], bindings: ['shown'] } }, fallback: { 0: 'try=0', 1: 'try=1', 2: 'try=2' }, groups: { 'items.*.n': { paths: ['items.*.n'], chunk: 'binding=items.*.n', bindings: ['a6'], covers: ['items'] }, items: { paths: ['items'], chunk: 'binding=items', bindings: ['l5'], covers: [] }, shown: { paths: ['shown'], chunk: 'binding=shown', bindings: ['c2'], covers: [] } }, lists: { 5: { key: 'id', path: 'items', chunk: 'list=5', bindings: ['a6'] } } };
+export const manifest = { module: '/src/board.tsx', events: ['click'], listens: { click: ['add', 'toggle'] }, handlers: { add: { chunk: 'handler=add', writes: ['items'], bindings: ['items.*.n'] }, toggle: { chunk: 'handler=toggle', writes: ['shown'], bindings: ['shown'] } }, sites: { $e0: { chunk: 'handler=add', bindings: ['items.*.n'], tags: ['add'] }, $e1: { chunk: 'handler=toggle', bindings: ['shown'], tags: ['toggle'] } }, fallback: { 0: 'try=0', 1: 'try=1', 2: 'try=2' }, groups: { 'items.*.n': { paths: ['items.*.n'], chunk: 'binding=items.*.n', bindings: ['a6'], covers: ['items'] }, items: { paths: ['items'], chunk: 'binding=items', bindings: ['l5'], covers: [] }, shown: { paths: ['shown'], chunk: 'binding=shown', bindings: ['c2'], covers: [] } }, lists: { 5: { key: 'id', path: 'items', chunk: 'list=5', bindings: ['a6'] } } };
 
 // `vite-plugin` replaces the URLs in a build.
 export const chunks = {
@@ -53,5 +53,5 @@ const error = $e instanceof Error ? $e.name + ': ' + $e.message : String($e);
 $try1 = `<!--e1:1--><em>${text$(error)}</em><!--/e-->`;
 }
 return `<!--c2:0-->${$try1}<!--/c-->`;
-})() : '<!--c2:1--><i>hidden</i><!--/c-->')}<ul><!--l5-->${$rows}<!--/l--></ul><button on:click='["add",[]]'>add</button><button on:click='["toggle",[]]'>toggle</button></main>`;
+})() : '<!--c2:1--><i>hidden</i><!--/c-->')}<ul><!--l5-->${$rows}<!--/l--></ul><button on:click="$e0">add</button><button on:click="$e1">toggle</button></main>`;
 }

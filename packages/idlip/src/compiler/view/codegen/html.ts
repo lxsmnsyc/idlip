@@ -276,14 +276,26 @@ export class HtmlBuilder {
     const { emitter } = this;
     for (const event of events) {
       const region = this.catching.at(-1);
-      if (event.target.kind === 'reset' && region !== undefined) {
+      const { body } = event;
+      if (body.kind === 'steps') {
+        const site = this.plan.siteOf.get(event);
+        if (site !== undefined) {
+          const modifiers = printModifiers(event);
+          addText(
+            built,
+            ` on:${event.name}="${site.name}${modifiers === '' ? '' : ` ${escapeAttribute(modifiers)}`}"`,
+          );
+        }
+        continue;
+      }
+      if (body.target.kind === 'reset' && region !== undefined) {
         // The loader handles the reserved tag `$reset` itself: it renders the region again.
         const modifiers = printModifiers(event);
         const message = modifiers === '' ? ['$reset', [region]] : ['$reset', [region], modifiers];
         addText(built, ` on:${event.name}='${JSON.stringify(message)}'`);
         continue;
       }
-      if (event.target.kind !== 'handler' && event.target.kind !== 'prop') {
+      if (body.target.kind !== 'handler' && body.target.kind !== 'prop') {
         continue;
       }
       emitter.at = event.span;

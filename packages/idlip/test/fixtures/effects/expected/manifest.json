@@ -98,6 +98,46 @@
       ]
     }
   },
+  "sites": {
+    "$e0": {
+      "chunk": "handler=setDraft",
+      "bindings": [
+        "draft"
+      ],
+      "tags": [
+        "setDraft"
+      ]
+    },
+    "$e1": {
+      "chunk": "handler=add",
+      "bindings": [
+        "draft"
+      ],
+      "tags": [
+        "add"
+      ]
+    },
+    "$e2": {
+      "chunk": "handler=persist",
+      "bindings": [
+        "save.state",
+        "label",
+        "saved"
+      ],
+      "tags": [
+        "persist"
+      ]
+    },
+    "$e3": {
+      "chunk": "handler=rename",
+      "bindings": [
+        "label"
+      ],
+      "tags": [
+        "rename"
+      ]
+    }
+  },
   "tasks": {
     "add$1": "task=add$1",
     "persist$1": "task=persist$1",

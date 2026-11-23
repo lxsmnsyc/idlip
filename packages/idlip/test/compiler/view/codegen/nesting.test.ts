@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { runInThisContext } from 'node:vm';
 import { format } from 'oxfmt';
 import { describe, expect, it } from 'vitest';
+import { joinSites } from '../../../../src/compiler/sites.ts';
 import { compileHandlers } from '../../../../src/compiler/update/index.ts';
 import { analyze } from '../../../../src/compiler/view/analyze/index.ts';
 import { generate } from '../../../../src/compiler/view/codegen/index.ts';
@@ -61,7 +62,9 @@ function compileFixture(name: string, child: boolean): Compiled {
     child,
     resolve: (specifier) => RESOLVED[specifier] ?? specifier,
   });
-  return { ...view, chunks: [...handlers.client, ...view.client] };
+  // The event functions join the handler chunks, as `compile()` joins them.
+  const joined = joinSites(handlers.client, view.sites, view.manifest);
+  return { ...view, chunks: [...joined, ...view.client] };
 }
 
 async function normalize(code: string): Promise<string> {
@@ -187,6 +190,11 @@ describe.each([
           module.code,
         );
       }
+      writeFileSync(
+        join(NESTED, name, 'expected', 'manifest.json'),
+        `${JSON.stringify(result.manifest, null, 2)}\n`,
+      );
+      writeFileSync(join(NESTED, name, 'expected', 'server.js'), result.server);
     });
   }
 
@@ -218,6 +226,9 @@ describe('nested behavior', () => {
     const counter = compileFixture('counter', true);
     const { context, writeState } = createContext();
     const html = renderServer(counter.server, {}, readProps('counter'), context) + writeState();
+    if (process.env.UPDATE_NESTED === '1') {
+      writeFileSync(join(NESTED, 'counter', 'expected', 'page.html'), `${html}\n`);
+    }
     expect(html).toBe(readFixture('counter', 'expected', 'page.html').trimEnd());
   });
 
@@ -227,6 +238,9 @@ describe('nested behavior', () => {
     const html =
       renderServer(board.server, { Counter: loadCounter() }, readProps('board'), context) +
       writeState();
+    if (process.env.UPDATE_NESTED === '1') {
+      writeFileSync(join(NESTED, 'board', 'expected', 'page.html'), `${html}\n`);
+    }
     expect(html).toBe(readFixture('board', 'expected', 'page.html').trimEnd());
   });
 
@@ -305,7 +319,7 @@ describe('nested behavior', () => {
     const printed = printRow(call(actual, 'render', scope, document));
     expect(printed).toBe(printRow(call(golden, 'render', scope, document)));
     // The clone holds the nodes the server's HTML parses to.
-    const server = `<div><span i-a="0">${text(props.label)}</span><button on:click='["increment",[]]'>+</button><output i-a="1">0</output><button${on('click', props.onRemove)} i-a="2">Remove</button></div>`;
+    const server = `<div><span i-a="0">${text(props.label)}</span><button on:click="$e0">+</button><output i-a="1">0</output><button${on('click', props.onRemove)} i-a="2">Remove</button></div>`;
     expect(printed).toBe(printRow(server));
   });
 });

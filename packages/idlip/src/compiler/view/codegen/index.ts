@@ -8,6 +8,7 @@ import type {
   ListEntry,
   Manifest,
   Module,
+  SiteEntry,
 } from '../../../core/format.ts';
 import { HELPER_NAMES } from '../../../core/helpers.ts';
 import { listWrites, meetsPath } from '../../update/writes.ts';
@@ -16,10 +17,11 @@ import {
   emitBindings,
   emitGroupChunk,
   emitListChunk,
+  emitSites,
   emitTryChunk,
   emitViewChunk,
 } from './chunks.ts';
-import type { ChunkContext } from './chunks.ts';
+import type { ChunkContext, SiteModule } from './chunks.ts';
 import { readImports, selectComponents } from './components.ts';
 import type { SelectOptions, Selected } from './components.ts';
 import { DYNAMIC_GROUP, DYNAMIC_STORE } from './dynamic.ts';
@@ -30,9 +32,11 @@ import { ModuleSource } from './module.ts';
 import { resolveSpecifier } from './path.ts';
 import { getTaskChunk, isBuiltinTask } from '../../update/tasks.ts';
 import { emitSourceChunk } from './subscribe.ts';
-import { getStatePaths, planBindings, planGroups } from './plan.ts';
-import type { Binding, Group, ListInfo, Plan } from './plan.ts';
+import { getListPath, planBindings, planGroups } from './plan.ts';
+import type { Binding, Group, Plan } from './plan.ts';
 import { getAccessor, getKey, getLocalName, printHelperImport, quote, toLiteral } from './text.ts';
+
+export type { SiteModule };
 
 /** The manifest and view chunks of a component other than the file's first one. */
 export interface GeneratedComponent {
@@ -40,6 +44,8 @@ export interface GeneratedComponent {
   name: string;
   manifest: Manifest;
   client: Module[];
+  /** The event functions, to append to the handler chunks. */
+  sites: SiteModule[];
 }
 
 export interface GenerateResult {
@@ -47,6 +53,8 @@ export interface GenerateResult {
   server: string;
   /** Binding group chunks and list item template chunks. Handler chunks are not included. */
   client: Module[];
+  /** The event functions, to append to the handler chunks. */
+  sites: SiteModule[];
   manifest: Manifest;
   /** The other components of the file. Absent when there are none. */
   components?: GeneratedComponent[];
@@ -142,6 +150,28 @@ function buildManifest(
       }
     }
   }
+  // An event function lives in the chunk of the first handler it sends. The groups to start
+  // with it are those of every handler it may send.
+  const sites: Record<string, SiteEntry> = {};
+  for (const site of plan.sites) {
+    const home = handlers[site.tags[0]];
+    const bindings: string[] = [];
+    let known = true;
+    for (const tag of site.tags) {
+      const entry = handlers[tag];
+      known &&= entry.bindings !== undefined;
+      for (const key of entry.bindings ?? []) {
+        if (!bindings.includes(key)) {
+          bindings.push(key);
+        }
+      }
+    }
+    sites[site.name] = {
+      chunk: home.chunk,
+      ...(known ? { bindings } : {}),
+      tags: site.tags,
+    };
+  }
   const groupEntries: Record<string, BindingGroup> = {};
   for (const group of groups) {
     const bindings: string[] = [];
@@ -181,6 +211,7 @@ function buildManifest(
     events: plan.events,
     ...(plan.listens.size === 0 ? {} : { listens: Object.fromEntries(plan.listens) }),
     handlers,
+    ...(plan.sites.length === 0 ? {} : { sites }),
     ...(Object.keys(tasks).length === 0 ? {} : { tasks }),
     ...(plan.sources.size === 0 ? {} : { sources: [...plan.sources.keys()] }),
     ...(plan.tries.length === 0 ? {} : { fallback }),
@@ -189,18 +220,6 @@ function buildManifest(
     lists,
     ...(child ? { view: { chunk: 'view' } } : {}),
   };
-}
-
-/** The path of `each` when it is a plain path that reads one state path. */
-function getListPath(info: ListInfo, child: boolean): string | undefined {
-  const each = info.node.each;
-  if (each.expr.kind === 'path' && each.paths !== 'dynamic') {
-    const paths = getStatePaths(each.paths, () => {}, each.span, child);
-    if (paths.length === 1) {
-      return paths[0];
-    }
-  }
-  return undefined;
 }
 
 /** The planned parts of one component, before its chunks and server code are emitted. */
@@ -214,6 +233,7 @@ interface Emitted {
   selected: Selected;
   plan: Plan;
   client: Module[];
+  sites: SiteModule[];
   manifest: ChildManifest;
   server: ServerPart;
 }
@@ -236,6 +256,7 @@ export function generate(
   const empty = (): GenerateResult => ({
     server: '',
     client: [],
+    sites: [],
     manifest: createEmptyManifest(id),
     diagnostics,
   });
@@ -331,11 +352,17 @@ export function generate(
   const server = assembleServer(emitted, moduleSource);
   const rest: GeneratedComponent[] = [];
   for (const item of emitted.slice(1)) {
-    rest.push({ name: item.selected.component.name, manifest: item.manifest, client: item.client });
+    rest.push({
+      name: item.selected.component.name,
+      manifest: item.manifest,
+      client: item.client,
+      sites: item.sites,
+    });
   }
   return {
     server,
     client: first.client,
+    sites: first.sites,
     manifest: first.manifest,
     ...(rest.length === 0 ? {} : { components: rest }),
     diagnostics,
@@ -389,6 +416,11 @@ function emitComponent(
     mergeUsage(clientUsage, chunk.usage);
   }
 
+  const sites = emitSites(context, child);
+  for (const site of sites) {
+    mergeUsage(clientUsage, site.usage);
+  }
+
   const listPaths: Record<string, string> = {};
   for (const info of plan.lists) {
     const path = getListPath(info, child);
@@ -421,7 +453,7 @@ function emitComponent(
     child,
   );
   const server = emitServer(id, component, plan, manifest, clientUsage.props, report, child);
-  return { selected, plan, client, manifest, server };
+  return { selected, plan, client, sites, manifest, server };
 }
 
 /** The server code of one component, before the file's module is assembled. */

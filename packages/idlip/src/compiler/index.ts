@@ -9,9 +9,10 @@ import type {
   Module,
 } from '../core/format.ts';
 import { compileHandlers } from './update/index.ts';
+import { joinSites } from './sites.ts';
 import { analyze } from './view/analyze/index.ts';
 import { generate } from './view/codegen/index.ts';
-import type { GenerateOptions } from './view/codegen/index.ts';
+import type { GenerateOptions, SiteModule } from './view/codegen/index.ts';
 import { readImports, selectComponents } from './view/codegen/components.ts';
 import { planBindings } from './view/codegen/plan.ts';
 
@@ -100,10 +101,11 @@ function joinComponent(
   manifest: Manifest,
   handlers: { client: readonly Module[]; after?: true } | undefined,
   view: readonly Module[],
+  sites: readonly SiteModule[],
 ): CompiledComponent {
   return {
     manifest: handlers?.after === true ? { ...manifest, after: true } : manifest,
-    client: [...(handlers?.client ?? []), ...view],
+    client: [...joinSites(handlers?.client ?? [], sites, manifest), ...view],
   };
 }
 
@@ -150,10 +152,10 @@ export function compile(source: string, id: string, options: CompileOptions = {}
   }
 
   // Each component's handler chunks come before its view chunks.
-  const first = joinComponent(view.manifest, handlers.at(0), view.client);
+  const first = joinComponent(view.manifest, handlers.at(0), view.client, view.sites);
   const components: CompiledComponent[] = [];
   for (const [index, item] of (view.components ?? []).entries()) {
-    components.push(joinComponent(item.manifest, handlers.at(index + 1), item.client));
+    components.push(joinComponent(item.manifest, handlers.at(index + 1), item.client, item.sites));
   }
   return {
     server: view.server,

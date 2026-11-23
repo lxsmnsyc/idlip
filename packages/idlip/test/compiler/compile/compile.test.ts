@@ -144,7 +144,7 @@ describe.each(['counter', 'todo'])('compile() on the %s fixture', (name) => {
 
 /** The todo row as the server writes it, from the reference render helpers. */
 function renderServerRow(item: { id: string; text: string; done: boolean }): string {
-  return `<li${attr('class', { done: item.done })} i-a="4"><input type="checkbox"${attr('checked', item.done)}${on('click', ['toggle', [item.id]])} i-a="5 7"><!--t6-->${text(item.text)}<!--/t--></li>`;
+  return `<li${attr('class', { done: item.done })} i-a="4"><input type="checkbox"${attr('checked', item.done)} on:click="$e3" i-a="5"><!--t6-->${text(item.text)}<!--/t--></li>`;
 }
 
 describe('compile() behavior', () => {

@@ -29,6 +29,26 @@
       ]
     }
   },
+  "sites": {
+    "$e0": {
+      "chunk": "handler=add",
+      "bindings": [
+        "items.*.n"
+      ],
+      "tags": [
+        "add"
+      ]
+    },
+    "$e1": {
+      "chunk": "handler=toggle",
+      "bindings": [
+        "shown"
+      ],
+      "tags": [
+        "toggle"
+      ]
+    }
+  },
   "fallback": {
     "0": "try=0",
     "1": "try=1",

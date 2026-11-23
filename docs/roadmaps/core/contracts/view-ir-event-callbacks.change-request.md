@@ -23,7 +23,10 @@ type EventBody =
 
 type EventModifier =
   | { kind: 'prevent'; keys?: string[] } // keys: prevent only these key filters
-  | { kind: 'stop' } | { kind: 'once' } | { kind: 'capture' } | { kind: 'passive' }
+  | { kind: 'stop' }
+  | { kind: 'once' }
+  | { kind: 'capture' }
+  | { kind: 'passive' }
   | { kind: 'key'; filter: string };
 ```
 

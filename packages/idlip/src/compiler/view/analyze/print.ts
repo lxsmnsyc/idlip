@@ -1,5 +1,16 @@
 // Prints a ModuleIR as text. The contract tests compare this text with the recorded output.
-import type { Event, Expr, ModuleIR, Node, Path, Root, Segment } from './ir.ts';
+import type {
+  Event,
+  EventModifier,
+  EventStep,
+  Expr,
+  ModuleIR,
+  Node,
+  Path,
+  Root,
+  Segment,
+  Target,
+} from './ir.ts';
 
 function printSegment(segment: Segment): string {
   if (typeof segment === 'string') {
@@ -127,26 +138,63 @@ function printPaths(paths: Path[] | 'dynamic'): string {
   return parts.join(', ');
 }
 
+function printTarget(target: Target): string {
+  if (target.kind === 'handler') {
+    return target.name;
+  }
+  return target.kind === 'prop' ? `props.${target.name}` : 'reset';
+}
+
+function printCall(target: Target, args: readonly Expr[]): string {
+  const printed: string[] = [];
+  for (const arg of args) {
+    printed.push(printExpr(arg));
+  }
+  return `${printTarget(target)}(${printed.join(', ')})`;
+}
+
+function printSteps(steps: readonly EventStep[]): string {
+  const parts: string[] = [];
+  for (const step of steps) {
+    if (step.kind === 'send') {
+      parts.push(printCall(step.target, step.args));
+      continue;
+    }
+    let text = `if (${printExpr(step.test)}) { ${printSteps(step.then)} }`;
+    if (step.else.length > 0) {
+      text += ` else { ${printSteps(step.else)} }`;
+    }
+    parts.push(text);
+  }
+  return parts.join('; ');
+}
+
+function printModifier(modifier: EventModifier): string {
+  if (modifier.kind === 'key') {
+    return `key:${modifier.filter}`;
+  }
+  if (modifier.kind === 'prevent' && modifier.keys !== undefined) {
+    const names: string[] = [];
+    for (const key of modifier.keys) {
+      names.push(`prevent:${key}`);
+    }
+    return names.join(' ');
+  }
+  return modifier.kind;
+}
+
 function printEvent(event: Event): string {
-  let target: string;
-  if (event.target.kind === 'handler') {
-    target = event.target.name;
-  } else if (event.target.kind === 'prop') {
-    target = `props.${event.target.name}`;
-  } else {
-    target = 'reset';
-  }
-  const args: string[] = [];
-  for (const arg of event.args) {
-    args.push(printExpr(arg));
-  }
-  const render = event.paths.length > 0 ? `  render reads ${printPaths(event.paths)}` : '';
   const names: string[] = [];
   for (const modifier of event.modifiers) {
-    names.push(modifier.kind === 'key' ? `key:${modifier.filter}` : modifier.kind);
+    names.push(printModifier(modifier));
   }
   const modifiers = names.length > 0 ? `  modifiers ${names.join(' ')}` : '';
-  return `${event.mode}:${event.name} -> ${target}(${args.join(', ')})${render}${modifiers}`;
+  const { body } = event;
+  if (body.kind === 'steps') {
+    return `${event.mode}:${event.name} -> ${printSteps(body.steps)}${modifiers}`;
+  }
+  const render = body.paths.length > 0 ? `  render reads ${printPaths(body.paths)}` : '';
+  return `${event.mode}:${event.name} -> ${printCall(body.target, body.args)}${render}${modifiers}`;
 }
 
 function printNodes(nodes: Node[], indent: string, out: string[]): void {

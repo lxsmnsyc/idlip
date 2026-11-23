@@ -14,21 +14,15 @@ export interface Message<Tag extends string = string, Payload = unknown> {
 }
 
 /**
- * The JSON value of an `on:<event>` attribute: the tag, the payload and the
- * modifiers, separated by spaces (`"prevent"`, `"key:Escape"`).
+ * The JSON value of an `on:<event>` attribute that is data built at render (a message prop, a
+ * reset): the tag, the payload, the modifiers separated by spaces (`"prevent"`, `"key:Escape"`)
+ * and the owner. Any other `on:<event>` attribute is the name of an event function, then
+ * the modifiers: `$e3 prevent`.
  */
 export type DomMessage =
   | readonly [tag: string, payload: readonly unknown[]]
   | readonly [tag: string, payload: readonly unknown[], modifiers: string]
   | readonly [tag: string, payload: readonly unknown[], modifiers: string, owner: string];
-
-/**
- * A payload item that the listener replaces when the event fires.
- * `['$', ...items]` is a literal array whose first item starts with `$`.
- */
-export type Placeholder =
-  | readonly ['$event', ...segments: string[]]
-  | readonly ['$', ...items: unknown[]];
 
 /** The state fields of a component, by name. */
 export type Model = Readonly<Record<string, unknown>>;
@@ -49,6 +43,11 @@ export interface Manifest {
   readonly listens?: Readonly<Record<string, readonly string[]>>;
   /** Message tag to its update chunk. Continuation tags have entries too. */
   readonly handlers: Readonly<Record<string, HandlerEntry>>;
+  /**
+   * Event function name (`$e3`) to where it lives. The function is an export of the handler
+   * chunk of the first handler it sends. Absent when no event arrow has a function.
+   */
+  readonly sites?: Readonly<Record<string, SiteEntry>>;
   /**
    * Continuation tag to the chunk that runs its awaited call: `task=<tag>`, or the handler's
    * own chunk for a built-in such as `Random.id`, which exports `task$<tag>`. Absent when no
@@ -77,6 +76,13 @@ export interface Manifest {
   readonly lists: Readonly<Record<string, ListEntry>>;
   /** Present when a project module renders this module as a child. */
   readonly view?: { readonly chunk: string };
+}
+
+/** An event function: its chunk, the group keys to start with it and the handlers it may send. */
+export interface SiteEntry {
+  readonly chunk: string;
+  readonly bindings?: readonly string[];
+  readonly tags: readonly string[];
 }
 
 export interface HandlerEntry {
@@ -191,9 +197,8 @@ export function printTemplatesModule(templates: ReadonlyMap<string, string>): st
 /** What a state script pushes: its event types, separated by spaces, and its state. */
 export type StateRecord = readonly [events: string, state: () => PageState];
 
-/** An event the listener read, waiting for the loader. */
-export interface QueuedEvent {
-  readonly message: Message<string, readonly unknown[]>;
+/** What every queued event has, whatever it asks the loader to run. */
+interface QueuedBase {
   /** The element that carries the `on:<event>` attribute. */
   readonly target: Element;
   readonly type: string;
@@ -205,6 +210,43 @@ export interface QueuedEvent {
   /** An event whose signal is aborted is dropped before it runs. A subscription sets it. */
   readonly signal?: AbortSignal;
 }
+
+/** An event that carries its message: a message prop, a reset, a continuation of a task. */
+export interface QueuedMessage extends QueuedBase {
+  readonly message: Message<string, readonly unknown[]>;
+  readonly site?: undefined;
+}
+
+/**
+ * An event whose message an event function computes once its chunk has loaded. `event` is
+ * the DOM event, or the value a subscription delivers, and `current` is the element that holds the
+ * attribute (`window` or `document` for a global event), which the listener records because the
+ * browser clears `currentTarget` after the dispatch.
+ */
+export interface QueuedCall extends QueuedBase {
+  readonly message?: undefined;
+  /** The export name of the event function, such as `$e3`. */
+  readonly site: string;
+  readonly event: unknown;
+  readonly current: unknown;
+}
+
+/** An event the listener read, waiting for the loader. */
+export type QueuedEvent = QueuedMessage | QueuedCall;
+
+/** What an event function reads: the model, the model the DOM shows, and the page's props. */
+export interface SiteScope {
+  readonly model: Model;
+  readonly rendered: Model;
+  readonly page: { readonly props: Props };
+}
+
+/** An event function: returns the messages the event sends, as `[tag, payload]` pairs. */
+export type Site = (
+  event: unknown,
+  current: unknown,
+  scope: SiteScope,
+) => readonly (readonly [tag: string, payload: readonly unknown[]])[];
 
 /** `self.$idlip`: the state records, and the queue the listener fills. */
 export interface Boot extends Array<StateRecord> {

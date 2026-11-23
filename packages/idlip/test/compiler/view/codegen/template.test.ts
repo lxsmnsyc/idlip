@@ -86,10 +86,11 @@ describe('cloned templates', () => {
       'list=',
     );
     expect(code).toMatch(
-      /const templateL\d+\$ = \{ h: '<!--i--><li i-x="1"[^>]*><a i-x="2" i-a="3 2"><!--x3--><\/a>/,
+      /const templateL\d+\$ = \{ h: '<!--i--><li i-x="1"[^>]*><a on:click="\$e0" i-a="2"><!--x2--><\/a>/,
     );
     expect(code).toContain('putAttr$($n[1], ');
-    expect(code).toContain("setOn$($n[2], 'click', ['select', [row.id]]);");
+    // The event is a fixed attribute of the template, so no write sets it.
+    expect(code).not.toContain('setOn$');
   });
 
   it('clones a row with a condition and a nested list, and a static branch', () => {

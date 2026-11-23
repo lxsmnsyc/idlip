@@ -66,9 +66,7 @@ describe('text that fills an element', () => {
     page.click('b');
     // `settled` compares the page with a server render of the new model.
     await page.settled();
-    expect(page.get('b').outerHTML).toBe(
-      '<b class="on" on:click="[&quot;bump&quot;,[]]" i-a="0 1">1</b>',
-    );
+    expect(page.get('b').outerHTML).toBe('<b class="on" on:click="$e0" i-a="0 1">1</b>');
     expect(page.get('ul').innerHTML).toBe(
       '<!--l4--><!--i--><li i-a="5">A</li><!--/i--><!--i--><li i-a="5"></li><!--/i--><!--/l-->',
     );

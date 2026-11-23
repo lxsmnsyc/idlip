@@ -127,7 +127,7 @@ function runChunk(code: string, helpers: Record<string, unknown>): Record<string
 /** Calls the `render` export of a list chunk. */
 /** The todo row as the server writes it, from the reference render helpers. */
 function renderServerRow(item: { id: string; text: string; done: boolean }): string {
-  return `<li${attr('class', { done: item.done })} i-a="4"><input type="checkbox"${attr('checked', item.done)}${on('click', ['toggle', [item.id]])} i-a="5 7"><!--t6-->${text(item.text)}<!--/t--></li>`;
+  return `<li${attr('class', { done: item.done })} i-a="4"><input type="checkbox"${attr('checked', item.done)} on:click="$e3" i-a="5"><!--t6-->${text(item.text)}<!--/t--></li>`;
 }
 
 function renderRow(exports: Record<string, unknown>, scope: unknown): string {
@@ -266,8 +266,8 @@ describe('fixture todo list template', () => {
 describe('events', () => {
   it('writes modifiers from the IR into the DOM message', () => {
     const { result } = generateFixture('todo');
-    expect(result.server).toContain(`on:submit='["add",[],"prevent"]'`);
-    expect(result.server).toContain(`on:keydown='["clear",[],"key:Escape"]'`);
+    expect(result.server).toContain('on:submit="$e0 prevent"');
+    expect(result.server).toContain('on:keydown="$e2 key:Escape"');
   });
 
   it('writes every modifier kind and latest, in order', () => {
@@ -292,9 +292,7 @@ describe('events', () => {
       { kind: 'key', filter: 'Ctrl+s' },
     ];
     const result = generate(ir, source, '/src/test.tsx');
-    expect(result.server).toContain(
-      `on:click='["bump",[],"prevent stop once capture key:Ctrl+s latest"]'`,
-    );
+    expect(result.server).toContain('on:click="$e0 prevent stop once capture key:Ctrl+s latest"');
   });
 
   it('writes the props fields of a handler and of the handlers it calls', () => {
@@ -312,7 +310,7 @@ describe('events', () => {
     `;
     const result = generateSource(source);
     expect(result.diagnostics).toEqual([]);
-    expect(result.server).toContain(`on$('click', ['outer', [props.step]])`);
+    expect(result.sites[0].code).toContain(`return [['outer', [props.step]]];`);
   });
 
   it('writes the props of nested calls in the order of the handler chunk', () => {
@@ -339,7 +337,7 @@ describe('events', () => {
     const chunk = handlers.client.find((module) => module.chunk === 'handler=top');
     const names = /\[([^\]]*)\]\) \{/.exec(chunk?.code ?? '')?.[1] ?? '';
     const params = names.split(', ');
-    const payload = /\['top', \[([^\]]*)\]\]/.exec(result.server)?.[1] ?? '';
+    const payload = /\['top', \[([^\]]*)\]\]/.exec(result.sites[0].code)?.[1] ?? '';
     const values = payload.split(', ');
     expect(values.at(-1)).toBe('7');
     expect(params.length).toBe(values.length);
@@ -362,10 +360,10 @@ describe('events', () => {
     `;
     const result = generateSource(source);
     expect(result.diagnostics).toEqual([]);
-    expect(result.server).toContain(`on$('click', ['add', [props.step, 2]])`);
+    expect(result.sites[0].code).toContain(`return [['add', [props.step, 2]]];`);
   });
 
-  it('marks a literal array argument that starts with $', () => {
+  it('sends a literal array argument that starts with $ as it is', () => {
     const source = `
       export default function App() {
         let n = 0;
@@ -376,7 +374,7 @@ describe('events', () => {
       }
     `;
     const result = generateSource(source);
-    expect(result.server).toContain(`on:click='["pick",[["$","$a","b"]]]'`);
+    expect(result.sites[0].code).toContain(`return [['pick', [['$a', 'b']]]];`);
   });
 
   it('puts a global listener in a template', () => {
@@ -396,9 +394,7 @@ describe('events', () => {
     `;
     const result = generateSource(source);
     expect(result.diagnostics).toEqual([]);
-    expect(result.server).toContain(
-      `<template i-global="window" on:keydown='["bump",[]]'></template>`,
-    );
+    expect(result.server).toContain('<template i-global="window" on:keydown="$e0"></template>');
     expect(result.manifest.events).toEqual(['keydown:window']);
   });
 });
@@ -830,7 +826,6 @@ describe('manifest', () => {
     const { result } = generateFixture('todo');
     expect(Object.keys(result.manifest.groups)).toEqual([
       'todos.*.done',
-      'todos.*.id',
       'todos.*.text',
       'draft',
       'todos',

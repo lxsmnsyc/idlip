@@ -43,7 +43,7 @@ it('emits a marker block, a source chunk per source and a restart binding', () =
 
   // Each marker is its own block, so the block hooks reach it.
   expect(result.server).toMatch(
-    /<!--c\d+:s--><template i-sub="every"\$\{attr\$\('i-input', JSON\.stringify\(1000\)\)\} on:value='\["tick",\[\["\$event"\]\]\]'><\/template><!--\/c-->/,
+    /<!--c\d+:s--><template i-sub="every"\$\{attr\$\('i-input', JSON\.stringify\(1000\)\)\} on:value="\$e0"><\/template><!--\/c-->/,
   );
   expect(result.server).toContain("attr$('i-key', JSON.stringify(room))");
   // `on:value` is read by the loader, so no listener is needed for it.

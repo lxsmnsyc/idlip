@@ -74,7 +74,6 @@ describe('chunk ids', () => {
       'handler=add',
       'handler=toggle',
       'binding=todos.*.done',
-      'binding=todos.*.id',
       'binding=todos.*.text',
       'binding=draft',
       'binding=todos',

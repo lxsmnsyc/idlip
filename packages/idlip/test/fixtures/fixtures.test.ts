@@ -242,6 +242,10 @@ describe.each(FIXTURES)('fixture %s', (name) => {
   const manifest = readManifest(name);
   const page = readText(name, 'expected', 'page.html').trimEnd();
 
+  it('writes no $event path into the page', () => {
+    expect(page).not.toContain('$event');
+  });
+
   it('parses the source and every expected module', () => {
     const source = readText(name, input.source);
     expect(parseSync(input.source, source).errors).toEqual([]);
@@ -543,7 +547,7 @@ describe('nested components', () => {
 
   it('gives a child its own handlers without a path and a message prop its owner', () => {
     // `increment` is the child's: the loader reads its path from the boundary around the target.
-    expect(page).toContain(`on:click='["increment",[]]'`);
+    expect(page).toContain('on:click="$e0"');
     // `remove` and `clearAll` belong to the board, the root, so the owner is the empty path.
     expect(page).toContain(`on:click='["remove",["a1"],"",""]'`);
     expect(page).toContain(`on:click='["clearAll",[],"",""]'`);

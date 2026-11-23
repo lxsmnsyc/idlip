@@ -22,7 +22,7 @@ component Keyed (stateful, exported)
       <p>
         {#3}
       for #4 key=id item=t
-        <li [on:click -> select(t.id)  render reads todos.*.id]>
+        <li [on:click -> select(t.id)]>
           {#5}
   holes:
     #0 todos.find((t) => t.id === selected).text

@@ -361,11 +361,18 @@ export function putText$(node: Node, value: unknown): void {
   }
 }
 
-/** Reads the rows around a region from the DOM: `reset` has no binding scope. `paths` maps a list id to its `each` path. */
+/**
+ * Reads the rows around a node from the DOM: a `reset` and an event have no binding scope.
+ * `paths` maps a list id to its `each` path, or to a function of the scope for any other `each`.
+ */
 export function getRows$(
   start: Node,
   model: unknown,
-  paths: Record<string, string>,
+  paths: Record<
+    string,
+    string | ((scope: { model: unknown; props: unknown; rows: unknown[] }) => unknown)
+  >,
+  props?: unknown,
 ): { item: unknown; index: number }[] {
   const levels: { id: string; index: number }[] = [];
   let node: Node | null = start;
@@ -395,10 +402,15 @@ export function getRows$(
   }
   const rows: { item: unknown; index: number }[] = [];
   for (const { id, index } of levels.toReversed()) {
+    const path = paths[id];
     let value: unknown = model;
     let star = 0;
-    for (const key of paths[id].split('.')) {
-      value = Reflect.get(Object(value), key === '*' ? rows[star++].index : key);
+    if (typeof path === 'function') {
+      value = path({ model, props, rows });
+    } else {
+      for (const key of path.split('.')) {
+        value = Reflect.get(Object(value), key === '*' ? rows[star++].index : key);
+      }
     }
     rows.push({ item: Reflect.get(Object(value), index), index });
   }

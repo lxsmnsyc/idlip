@@ -2,7 +2,7 @@
 /**
  * The early events listener. A page puts `renderListener()` in `<head>`, before the markup of
  * `render()`. It adds one document listener per event type a state record names, applies the
- * key filter and the modifiers, resolves placeholders, and queues a `QueuedEvent` in
+ * key filter and the modifiers, and queues a `QueuedEvent` in
  * `self.$idlip.q` for the loader. `contracts/compiled-format.md` (Events, Modifiers,
  * Delegated listening) describes each step.
  */
@@ -16,17 +16,18 @@ var m=/^((?:(?:Ctrl|Alt|Shift|Meta|Mod)\+)*)(.+)$/.exec(f),k=m[2];
 return(k.length>1?e.key==k:(e.key+'').toLowerCase()==k.toLowerCase())&&m[1].replace('Mod',M?'Meta':'Ctrl').split('+').every(n=>!n||e[n.toLowerCase()+'Key'])
 },
 go=(e,t,l,c)=>{
-var a='on:'+t,u=[],x,m,o,r=[];
+var a='on:'+t,u=[],x,m,o,r=[],v,j;
 for(x of l){
-try{m=JSON.parse(x.getAttribute(a))}catch(_){continue}
+v=x.getAttribute(a);j=v[0]=='[';
+try{m=j?JSON.parse(v):(o=v.split(/ (.*)/),[o[0],,o[1]])}catch(_){continue}
 o=(m[2]||'').split(' ');
 if(o.some(f=>f.slice(0,4)=='key:'&&!ok(f.slice(4),e)))continue;
-if(o.includes('capture'))r.unshift([x,m,o]);else u.push([x,m,o])
+if(o.includes('capture'))r.unshift([x,m,o,j]);else u.push([x,m,o,j])
 }
-r.concat(u).some(([x,m,o])=>{
-if(o.includes('prevent')&&!o.includes('passive'))e.preventDefault();
+r.concat(u).some(([x,m,o,j])=>{
+if((o.includes('prevent')||o.some(f=>f.slice(0,8)=='prevent:'&&ok(f.slice(8),e)))&&!o.includes('passive'))e.preventDefault();
 if(o.includes('once'))x.removeAttribute(a);
-q.push({message:{t:m[0],p:m[1].map(v=>Array.isArray(v)&&typeof v[0]=='string'&&v[0][0]=='$'?v[0]=='$'?v.slice(1):v[0]=='$event'?v.slice(1).reduce((n,k)=>n==null?n:n==e&&k=='currentTarget'?c||x:n[k],e):v:v)},target:x,type:t,latest:o.includes('latest'),owner:m[3]});
+q.push({...(j?{message:{t:m[0],p:m[1]}}:{site:m[0],event:e,current:c||x}),target:x,type:t,latest:o.includes('latest'),owner:m[3]});
 if(o.includes('stop')){e.stopImmediatePropagation();return 1}
 })
 },

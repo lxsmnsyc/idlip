@@ -183,14 +183,14 @@ describe('todo', () => {
     expect(harness.patch.mock.calls[0][2]).toMatchObject({ draft: 'milk' });
   });
 
-  it('resolves placeholders when the event fires, not when the chunk loads', async () => {
+  it('queues the event itself, and the event function reads the element when it runs', async () => {
     harness = setup('todo', { gated: ['handler=setDraft'] });
     harness.start();
-    const messages: unknown[] = [];
+    const sites: unknown[] = [];
     const push = harness.boot.q!.push;
     harness.boot.q!.push = (...events) => {
       for (const event of events) {
-        messages.push(event.message);
+        sites.push(event.site);
       }
       return push(...events);
     };
@@ -198,11 +198,7 @@ describe('todo', () => {
     input(field(), 'ab');
     input(field(), 'abc');
     await reached('handler=setDraft');
-    expect(messages).toEqual([
-      { t: 'setDraft', p: ['a'] },
-      { t: 'setDraft', p: ['ab'] },
-      { t: 'setDraft', p: ['abc'] },
-    ]);
+    expect(sites).toEqual(['$e1', '$e1', '$e1']);
     release('handler=setDraft');
     await harness.settled();
     expect(harness.patch).toHaveBeenCalledTimes(1);
