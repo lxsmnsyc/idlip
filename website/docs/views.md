@@ -138,7 +138,7 @@ The counter and the todo app use all three forms:
 | `on:click={() => toggle(t.id)}`                     | `toggle` with `t.id`, read from the row when the event runs. |
 | `on:input={(e) => setDraft(e.currentTarget.value)}` | `setDraft` with the value of the field when the event runs.  |
 
-- **An arrow is a function in the handler chunk.** It runs after the event has dispatched, once the chunk has loaded. It reads the event, the state, the props and the row, and it sends a message to each handler it calls. The HTML holds only the name of the function.
+- **An arrow is a function in the handler chunk.** It runs after the event has dispatched, once the chunk has loaded. It reads the event, the state, the props and the row, and it sends a message to each handler it calls. The HTML holds only the name of the function. It reads the element then, so events queued while the chunk loads all send the latest value of a field.
 - **A body may hold** handler calls, `if` and `else` on any expression of the view, and `const` declarations. It may call several handlers, or none in some branches. At least one call must be in the arrow (`event-no-call`).
 - **Arguments** are expressions. `e.currentTarget.value` and `e.key` read the event, and `t.id` reads the row the user clicked.
 - **`e.preventDefault()` and `e.stopPropagation()`** go first, since the browser must see them while the event dispatches. The compiler lifts them to the page.

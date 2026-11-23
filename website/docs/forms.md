@@ -61,7 +61,7 @@ export default function Guests(): JSX.Element {
 }
 ```
 
-- **The arrow reads the paths when it runs**, after the chunk loads. The message holds the values, not the form.
+- **The arrow reads the paths when it runs**, after the chunk loads. The message holds the values, not the form. A field is read then, so events queued while the chunk loads all send the latest value.
 - **`value`, `checked` and `valueAsNumber`** are typed on each field.
 - **A `submit` is always prevented**, so the page does not navigate. You do not need `e.preventDefault()`.
 - **A field name may be computed.** `e.currentTarget.elements[field].value` is read when the arrow runs.
