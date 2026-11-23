@@ -155,6 +155,16 @@ describe('document component', () => {
     ).toContain('head-title-twice');
   });
 
+  it('rejects an event on an element of the document head', () => {
+    expect(
+      rules(`export default function App() {
+  let n = 0;
+  function f() { n = n + 1; }
+  return <html><head><meta charset="utf-8" on:click={f} /></head><body>{n}</body></html>;
+}`),
+    ).toContain('codegen-unsupported');
+  });
+
   it('still rejects a title outside the document head', () => {
     expect(
       rules(`export default function App() {

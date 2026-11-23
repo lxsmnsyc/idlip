@@ -83,8 +83,9 @@ function writeFirst(parts: RenderResult, options: StreamOptions): string {
       'idlip: the page has no loader script. Build it with the idlip() plugin, or pass `loader`.',
     );
   }
-  const page = `${html.slice(0, open)}${parts.head}${html.slice(open, close)}${added}${html.slice(close)}`;
-  return `<!doctype html>${page.slice(0, -TAIL.length)}`;
+  // The closing tags go after the pending chunks, so the first chunk stops before them.
+  const end = html.length - TAIL.length;
+  return `<!doctype html>${html.slice(0, open)}${parts.head}${html.slice(open, close)}${added}${html.slice(close, end)}`;
 }
 
 /** Stops the iterator of the pending chunks without waiting. A failure has no reader to tell. */
