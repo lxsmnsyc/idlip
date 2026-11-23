@@ -129,7 +129,7 @@ export default function Gauge(props: { start: number }) {
 function Head(props: { children: JSX.Element | readonly JSX.Element[] }): JSX.Element;
 ```
 
-Puts `children` in the document head. It holds elements only, with one `<title>` at most, and they take no events, `ref` or `html`. A `<title>` outside `<Head>` is the error `title-outside-head`. On the server, `renderPage` returns the head markup apart from the body.
+Puts `children` in the document head. It holds elements only, with one `<title>` at most, and they take no events, `ref` or `html`. A `<title>` outside `<Head>` is the error `title-outside-head`. The `<head>` of a document component is the first `<Head>` block. On the server, the stream writes the head markup into the `<head>` of the document.
 
 ```tsx live
 import { Head } from 'idlip';
