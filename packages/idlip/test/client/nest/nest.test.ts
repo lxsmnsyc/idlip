@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { isComment } from '../../../src/client/patch/guards.ts';
+import { until } from '../loader/helpers.ts';
 import { getLoaded, setup } from './harness.ts';
 import type { Harness } from './harness.ts';
 
@@ -25,6 +26,8 @@ describe('nested board', () => {
     getButtons('+')[1].click();
     await harness.settled();
     expect(getCounts()).toEqual(['0', '1', '0']);
+    // A binding chunk starts beside the handler chunk, and `settled` does not wait for it.
+    await until(() => getLoaded().length >= 2);
     expect(getLoaded().toSorted()).toEqual(['counter:binding=count', 'counter:handler=increment']);
     expect(harness.errors).toEqual([]);
   });

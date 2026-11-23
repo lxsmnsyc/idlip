@@ -2,7 +2,7 @@
 // oxlint-disable typescript/no-unsafe-type-assertion
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resume } from '../../../src/client/loader/resume.ts';
-import { getLoaded, reached, release, setup } from './helpers.ts';
+import { getLoaded, reached, release, setup, until } from './helpers.ts';
 import type { Harness } from './helpers.ts';
 
 let harness: Harness | undefined;
@@ -179,6 +179,8 @@ describe('todo', () => {
     input(field(), 'milk');
     await harness.settled();
     // The binding chunk of the write set starts with the handler chunk.
+    // A binding chunk starts beside the handler chunk, and `settled` does not wait for it.
+    await until(() => getLoaded().length >= 2);
     expect(getLoaded().toSorted()).toEqual(['binding=draft', 'handler=setDraft']);
     expect(harness.patch.mock.calls[0][2]).toMatchObject({ draft: 'milk' });
   });
@@ -233,6 +235,8 @@ describe('todo', () => {
     harness.start();
     document.querySelector<HTMLInputElement>('input[type=checkbox]')!.click();
     await harness.settled();
+    // A binding chunk starts beside the handler chunk, and `settled` does not wait for it.
+    await until(() => getLoaded().length >= 2);
     expect(getLoaded().toSorted()).toEqual(['binding=todos.*.done', 'handler=toggle']);
     const [, prev, next] = harness.patch.mock.calls[0];
     expect((prev.todos as { done: boolean }[])[0].done).toBe(true);

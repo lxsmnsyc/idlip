@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { mount } from '../../../src/testing/index.ts';
 import type { MountedPage } from '../../../src/testing/index.ts';
-import { getLoaded, setup } from '../loader/helpers.ts';
+import { getLoaded, setup, until } from '../loader/helpers.ts';
 import type { Harness } from '../loader/helpers.ts';
 
 let page: MountedPage | undefined;
@@ -254,6 +254,8 @@ describe('a chunk that fails to load', () => {
     document.querySelectorAll('button')[0].click();
     await harness.settled();
     // The binding chunk of the write set loads with the handler chunk.
+    // A binding chunk starts beside the handler chunk, and `settled` does not wait for it.
+    await until(() => getLoaded().length >= 2);
     expect(getLoaded().toSorted()).toEqual(['binding=count', 'handler=increment']);
     expect(harness.patch).toHaveBeenCalledTimes(1);
     expect(events).toHaveLength(0);

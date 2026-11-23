@@ -38,6 +38,8 @@ describe('parallel loading', () => {
     expect(harness.patch).not.toHaveBeenCalled();
     release('handler=toggle');
     await harness.settled();
+    // A binding chunk starts beside the handler chunk, and `settled` does not wait for it.
+    await until(() => getLoaded().length >= 2);
     expect(getLoaded()).toEqual(['binding=todos.*.done', 'handler=toggle']);
     expect(harness.patch).toHaveBeenCalledTimes(1);
   });
@@ -47,6 +49,8 @@ describe('parallel loading', () => {
     harness.start();
     toggle().click();
     await harness.settled();
+    // A binding chunk starts beside the handler chunk, and `settled` does not wait for it.
+    await until(() => getLoaded().length >= 2);
     expect(getLoaded().toSorted()).toEqual(['binding=todos.*.done', 'handler=toggle']);
   });
 
