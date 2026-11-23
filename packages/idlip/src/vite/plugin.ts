@@ -90,6 +90,8 @@ const STYLES_ID = '\0idlip-styles:';
 const NAMES_ID = '\0idlip-names:';
 /** A stylesheet import that asks for the text or the URL, not for a link on the page. */
 const STYLE_QUERY = /[?&](?:inline|url|raw)(?:&|=|$)/;
+/** A default import in chunk code: `import styles from "./todo.module.css";`. */
+const DEFAULT_IMPORT = /^import\s+(\w+)\s+from\s+(["'])([^"'\n]+)\2;?[ \t]*$/gm;
 /** The default `modules` globs. */
 const DEFAULT_MODULES = ['src/**/*.tsx'];
 /** The id of a child's view chunk, with the component's name for a named component. */
@@ -613,11 +615,69 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
         urls[`${STYLES_PREFIX}${getModuleId(file)}`] = list.join(' ');
       }
     }
-    // Nothing loads the entries: the stylesheets are what they were for.
-    for (const file of entries) {
+    // Nothing loads the entries: the stylesheets are what they were for. A chunk that only the
+    // entries import (the class object of a CSS Module that two entries share) goes with them.
+    const dropped = [...entries];
+    for (const file of dropped) {
+      const item = items[file];
       Reflect.deleteProperty(bundle, file);
+      if (item?.type !== 'chunk') {
+        continue;
+      }
+      for (const imported of item.imports) {
+        const other = items[imported];
+        if (other?.type !== 'chunk' || other.isEntry || entries.has(imported)) {
+          continue;
+        }
+        let used = false;
+        for (const rest of Object.values(bundle)) {
+          used ||= rest.type === 'chunk' && rest.imports.includes(imported);
+        }
+        if (!used) {
+          entries.add(imported);
+          dropped.push(imported);
+        }
+      }
     }
     return entries;
+  }
+
+  /**
+   * Replaces each default import of a CSS Module in the code of a chunk with the module's class
+   * object, written in the chunk. Why: an import of a separate module makes the bundler move the
+   * chunk's code into a common chunk, and a click would load a stub and then that chunk.
+   */
+  async function inlineNames(
+    context: Rolldown.PluginContext,
+    code: string,
+    file: string,
+  ): Promise<string> {
+    let result = code;
+    for (const match of code.matchAll(DEFAULT_IMPORT)) {
+      const [text, local, , specifier] = match;
+      if (!isStyleModule(specifier)) {
+        continue;
+      }
+      // oxlint-disable-next-line no-await-in-loop
+      const target = await context.resolve(specifier, file);
+      if (target === null || Boolean(target.external)) {
+        continue;
+      }
+      // oxlint-disable-next-line no-await-in-loop
+      const info = await context.load({ id: target.id });
+      if (info.code === null) {
+        return context.error(`idlip: ${target.id} has no class names`);
+      }
+      // The module's own `export const` lines and its default export become one local object.
+      const body = info.code
+        .replace(/^export default /m, 'return ')
+        .replaceAll(/^export (const|let|var) /gm, '$1 ');
+      if (/^export /m.test(body)) {
+        return context.error(`idlip: ${target.id} has an export that a chunk cannot inline`);
+      }
+      result = result.replace(text, `const ${local} = (() => {\n${body}\n})();`);
+    }
+    return result;
   }
 
   /** Whether each `.tsx` file holds a component, with the source that was read. */
@@ -1027,7 +1087,11 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
         }
         for (const module of client) {
           if (module.chunk === parsed.chunk) {
-            return { code: module.code, moduleType: 'js' };
+            const code =
+              isServe || this.environment.name !== 'client'
+                ? module.code
+                : await inlineNames(this, module.code, parsed.file);
+            return { code, moduleType: 'js' };
           }
         }
       }

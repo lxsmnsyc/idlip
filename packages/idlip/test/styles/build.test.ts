@@ -48,6 +48,7 @@ export default function App(): JSX.Element {
   'src/panel.tsx': `// oxlint-disable
 import type { JSX } from 'idlip/jsx-runtime';
 import './panel.css';
+import panelStyles from './panel.module.css';
 
 export default function Panel(): JSX.Element {
   let count = 0;
@@ -56,9 +57,10 @@ export default function Panel(): JSX.Element {
     count = count + 1;
   }
 
-  return <button class="panel" on:click={add}>{count}</button>;
+  return <button class={count > 1 ? panelStyles.big : "panel"} on:click={add}>{count}</button>;
 }
 `,
+  'src/panel.module.css': '.big { color: rgb(2, 4, 6); }\n',
   'src/app.css': 'body { color: rgb(1, 2, 3); }\n',
   'src/panel.css': '.panel { color: rgb(4, 5, 6); }\n',
   'src/app.module.css': '.on { color: rgb(7, 8, 9); }\n.off { color: rgb(9, 8, 7); }\n',
@@ -180,6 +182,17 @@ describe('component styles in a build', () => {
     const chunks = readAll(path.join(root, 'dist/client/assets'), '.js');
     expect(chunks).toContain(off);
     expect(chunks).toContain(on);
+  });
+
+  it('writes the view of a child that reads a CSS Module as one file, with no stub', () => {
+    const files = readdirSync(path.join(root, 'dist/client/assets'));
+    const views = files.filter((name) => /^panel\.view[.-]/.test(name));
+    expect(views).toHaveLength(1);
+    const code = readFileSync(path.join(root, 'dist/client/assets', views[0]), 'utf8');
+    // The view holds its template and the class names, and re-exports nothing from another file.
+    expect(code).toContain('<button');
+    expect(code).toContain('big');
+    expect(code).not.toMatch(/export\s*\{[^}]*\}\s*from/);
   });
 
   it('leaves no entry for the stylesheets and no shared chunk for the class names', () => {

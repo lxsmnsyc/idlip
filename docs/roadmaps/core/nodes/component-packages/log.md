@@ -12,3 +12,5 @@
 - Found, not mine: a child view that reads a CSS Module is emitted as two files (the entry re-exports a chunk of the same module), in an app too (checked on `examples/counters` with a temporary module). The build passes and a click is fine. Noted in the docs.
 - Ports for e2e: the `packages` project reads `E2E_PACKAGES_PORT` (default 4177); its dev copies use `E2E_HOT_PORT` + 5 and + 6.
 - `pnpm check` is in the brief but the root has no such script. I ran the separate commands.
+- Review fixes: `dir` is checked by real path and `..foo` is a valid folder. A slug with `+` for the scope separator was tried and failed: Rolldown rewrites `+` to `_` in file names, and `_` is valid in package names. So the slug stays `a-b-c` and `readPackages` throws when two packages give one slug.
+- Cause of the view stub: the per-importer `\0idlip-names:` module (not the `this.load`, not the styles entry; measured by returning a constant from `load`). A module that only the view imports still made Rolldown place the view in a common chunk. Inlining the class object in the chunk's code removes the module, and one file remains.

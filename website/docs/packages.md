@@ -75,5 +75,4 @@ The page links the stylesheets of every component it can render, packages includ
 ## Limits
 
 - A package cannot ship the entry or the pages of an app.
-- A child component that reads a CSS Module loads its view from two small files instead of one, in a package and in an app alike.
 - A change to the `package.json` of a package does not restart `vite dev`. Restart it after you change the `idlip` field.

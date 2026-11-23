@@ -46,7 +46,11 @@ The import keeps the `.tsx` extension: the compiler requires it for a child (`co
 @acme/ui sets idlip.dir outside the package: ../x.
 ```
 
-The first is the one the brief names. The second is a field with no `version`. The third is an addition: a `dir` that leaves the package (user to confirm, or drop it).
+```
+@a/b-c and @a-b/c both name their chunks "a-b-c". Use only one.
+```
+
+The first is the one the brief names. The second is a field with no `version`. The third (a `dir`, checked by its real path, that leaves the package) and the fourth (two packages whose names give one chunk name) are additions: user to confirm, or drop them.
 
 ## Built
 
@@ -63,7 +67,7 @@ The first is the one the brief names. The second is a field with no `version`. T
 - Unknown format version fails with the message: pass (`test/packages/packages.test.ts`).
 - Two packages with a `button.tsx` build with distinct chunk names and keys: pass.
 - Loader unchanged (no client source changed): the e2e budget test passes (4,096 B gzip budget).
-- Checks (the root has no `pnpm check`): `pnpm build` (0 errors), `pnpm typecheck` (all projects), `oxlint --type-aware` (0 errors, existing warnings only), `pnpm format:check` (pass), `pnpm test` (87 files, 944 passed, 35 skipped), `pnpm --filter website build` (31 pages), `pnpm --filter e2e test` (52 passed).
+- Checks after the review fixes (the root has no `pnpm check`): `pnpm build` (0 errors), `pnpm typecheck` (all projects), `oxlint --type-aware` (0 errors, existing warnings only), `pnpm format:check` (pass), `pnpm test` (88 files, 954 passed, 35 skipped), `pnpm --filter website build` (31 pages), `pnpm --filter e2e test` (52 passed in the last run; an earlier review run counted 44 passed and 8 skipped). Loader file unchanged (`loader.DejSiby1.js`).
 
 ## Deviations and gotchas
 
@@ -71,6 +75,6 @@ The first is the one the brief names. The second is a field with no `version`. T
 - A component is imported with its `.tsx` extension (see Public API 2). Why: a compiler rule I did not change.
 - Only direct dependencies are scanned, as the brief says. A package that renders a component of another package needs that package in the app's dependencies too. Otherwise the plugin warns that the file is outside `modules`.
 - A change of a package's `package.json` does not restart `vite dev`. Edits of a linked package's source do update the page.
-- A child view that reads a CSS Module is built as two small files, in a package and in an app (existing behavior of `component-styles`, seen in `examples/counters` with a temporary module). It works; it costs one more request when that child first appears.
+- Review fix (separate commit): a child view that reads a CSS Module was a one-line stub plus a common chunk (from `component-styles`). A default import of a CSS Module in chunk code is now the class object written in the chunk (`inlineNames`), and a chunk that only the stylesheet entries import is dropped. `test/styles/build.test.ts` asserts one view file with no re-export.
 - A transitive dependency check, `files` and the `exports` of a package are not validated by the plugin.
 - Not done: CommonJS dependencies of a package (brumate's `optimizeDeps.include` note) were not tested, so the docs do not claim anything about them.
