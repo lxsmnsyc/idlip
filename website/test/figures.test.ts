@@ -25,9 +25,10 @@ const demo: DemoData = {
   helpers: makeFile('_idlip-helpers.js', 928),
   chunks: [],
   handlerName: 'toggle',
+  site: '$e3',
   token: '["toggle",["a2"]]',
   writes: ['todos.*.done'],
-  row: '<li i-a="4"><input type="checkbox" on:click=\'["toggle",["a2"]]\' i-a="5 7"><!--t6-->Two &lt;b&gt;<!--/t--></li>',
+  row: '<li i-a="4"><input type="checkbox" on:click="$e3" i-a="5"><!--t6-->Two &lt;b&gt;<!--/t--></li>',
   state: '<script i-state>(self.$idlip||=[]).push([])</script>',
   todos: [
     { id: 'a1', text: 'One', done: true },
@@ -135,9 +136,9 @@ describe('the static figures', () => {
   it('the trace shows the markup, each chunk and the targets', () => {
     const root = mount(renderFigure('message-trace', demo));
     expect(root.querySelector('.fig-code')?.textContent).toBe(
-      '<input\n  type="checkbox"\n  on:click=\n    \'["toggle",["a2"]]\'\n  i-a="5 7">',
+      '<input\n  type="checkbox"\n  on:click=\n    "$e3"\n  i-a="5">',
     );
-    expect(root.querySelector('.fig-msg')?.textContent).toBe('\'["toggle",["a2"]]\'');
+    expect(root.querySelector('.fig-msg')?.textContent).toBe('"$e3"');
     expect(readTexts(root, '.fig-file')).toEqual([
       'todo.handler.toggle.js',
       '_idlip-helpers.js',
@@ -150,16 +151,16 @@ describe('the static figures', () => {
     expect(readTexts(root, '.fig-target')).toEqual(['row a2', 'count']);
   });
 
-  it('fails when the row has no checkbox with the message', () => {
+  it('fails when the row has no checkbox that runs the event function', () => {
     expect(() => renderFigure('message-trace', { ...demo, row: '<li></li>' })).toThrow(
-      'no checkbox with the message',
+      'no checkbox that runs',
     );
   });
 
   it('leaves only the caption in the search text', () => {
     const html = `<p>Before.</p>${renderFigure('message-trace', demo)}<p>After.</p>`;
     const stripped = stripFigures(html);
-    expect(stripped).toContain('<p>Before.</p><p>The message on the checkbox');
+    expect(stripped).toContain('<p>Before.</p><p>The checkbox names an event function');
     expect(stripped).not.toContain('fig-well');
     expect(stripped).toContain('<p>After.</p>');
   });

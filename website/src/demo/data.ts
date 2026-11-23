@@ -41,7 +41,9 @@ export interface DemoData {
   chunks: DemoFile[];
   /** The handler the second checkbox names, such as `toggle`. */
   handlerName: string;
-  /** The message the second checkbox holds, the value of its `on:click`. */
+  /** The event function the second checkbox runs, the value of its `on:click`, such as `$e3`. */
+  site: string;
+  /** The message that function sends for the second checkbox, such as `["toggle",["a2"]]`. */
   token: string;
   /** The model paths the handler writes, such as `todos.*.done`. */
   writes: string[];

@@ -23,7 +23,7 @@ const STEPS = [
   { id: 'start', ms: 500 },
   { id: 'aim', ms: 700 },
   { id: 'press', ms: 200 },
-  // The listener reads the message, and the handler chunk runs it.
+  // The handler chunk loads, its event function builds the message, and the handler runs it.
   { id: 'send', ms: 1000 },
   // The model changes one path.
   { id: 'model', ms: 1000 },
@@ -34,20 +34,19 @@ const STEPS = [
 
 /**
  * The checkbox of the clicked todo as the server wrote it, one attribute per line, with the
- * message marked. Throws when the markup has no checkbox with the message.
+ * event function marked. Throws when the markup has no checkbox that runs it.
  */
 function renderMarkup(demo: DemoData): string {
   const tag = /<input\b([^>]*)>/.exec(demo.row);
-  if (!tag?.[1].includes(demo.token)) {
-    throw new Error(`The demo row has no checkbox with the message ${demo.token}: ${demo.row}`);
+  if (!tag?.[1].includes(demo.site)) {
+    throw new Error(`The demo row has no checkbox that runs ${demo.site}: ${demo.row}`);
   }
   let lines = '<span class="fig-tag">&lt;input</span>';
   for (const match of tag[1].matchAll(/([\w:-]+)(?:=('[^']*'|"[^"]*"))?/g)) {
     const name = match[1];
     const value = match.at(2);
     let html = `<span class="fig-attr">${escape(name)}</span>`;
-    if (value?.includes(demo.token)) {
-      // The message goes on a line of its own, so the markup fits half the figure.
+    if (value?.includes(demo.site)) {
       html += `=\n    <span class="fig-msg">${highlightStrings(value)}</span>`;
     } else if (value !== undefined) {
       html += `=<span class="fig-str">${escape(value)}</span>`;
@@ -93,6 +92,6 @@ export function renderMessageTrace(demo: DemoData): string {
     kind: 'fig-trace',
     head: '',
     body,
-    caption: `The message on the checkbox runs the handler, which writes <code>${escape(click.writes)}</code>, and the binding of that path changes the row and the count.`,
+    caption: `The checkbox names an event function whose message runs the handler, which writes <code>${escape(click.writes)}</code>, and the binding of that path changes the row and the count.`,
   });
 }

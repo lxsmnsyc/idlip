@@ -216,7 +216,7 @@ function renderCode(data: DemoData): string {
     .replace(/(<!--t\d+-->)/, '\n  $1')
     .replace(/<\/li>$/, '\n</li>');
   const rowMarks: Mark[] = [];
-  for (const match of data.row.matchAll(/i-a="[^"]*"|on:click='[^']*'/g)) {
+  for (const match of data.row.matchAll(/i-a="[^"]*"|on:click=(?:'[^']*'|"[^"]*")/g)) {
     rowMarks.push({ text: match[0], lit: match[0].startsWith('on:') ? '3' : '4' });
   }
 

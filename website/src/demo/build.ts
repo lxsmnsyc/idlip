@@ -99,27 +99,35 @@ function findChunkFile(output: ReadonlyMap<string, string>, chunk: string): stri
   return found[0];
 }
 
-/** The first argument of a checkbox message: `a2` in `["toggle",["a2"]]`. */
-function readMessageId(token: string): string {
-  const message: unknown = JSON.parse(token);
-  const args: unknown = Array.isArray(message) ? message[1] : undefined;
-  return Array.isArray(args) && typeof args[0] === 'string' ? args[0] : '';
+/** The ids of the todos in the model of the state script, in order: `a1` in `todos:[{id:"a1",...}]`. */
+function readTodoIds(body: string): string[] {
+  const list = /todos:\[([^\]]*)\]/.exec(body)?.[1] ?? '';
+  const ids: string[] = [];
+  for (const match of list.matchAll(/\bid:"([^"]*)"/g)) {
+    ids.push(match[1]);
+  }
+  return ids;
+}
+
+/** The event function a row's checkbox runs: `$e3` in `on:click="$e3"`. */
+function readSite(row: string): string {
+  return /on:click=["']([^"'\s]+)/.exec(row)?.[1] ?? '';
 }
 
 /**
- * Reads the todos of the first render from the markup: the id the checkbox message names, the
- * text of each row and its checkbox.
+ * Reads the todos of the first render: the id from the model of the state script, and the text
+ * and checkbox of each row from the markup.
  */
 function readTodos(body: string): { id: string; text: string; done: boolean }[] {
   const todos: { id: string; text: string; done: boolean }[] = [];
+  const ids = readTodoIds(body);
   for (const match of body.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/g)) {
     const text = /<!--t\d+-->([\s\S]*?)<!--\/t-->/.exec(match[1])?.[1];
-    const token = /on:click='([^']*)'/.exec(match[1])?.[1];
-    if (text === undefined || token === undefined) {
-      throw new Error(`The demo row has no text binding or no message: ${match[0]}`);
+    if (text === undefined || readSite(match[1]) === '' || todos.length >= ids.length) {
+      throw new Error(`The demo row has no text binding, no event or no id: ${match[0]}`);
     }
     todos.push({
-      id: readMessageId(token),
+      id: ids[todos.length],
       text: text.replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&amp;', '&'),
       done: /\bchecked\b/.test(match[1]),
     });
@@ -201,11 +209,12 @@ export async function buildDemo(outDir: string, base: string): Promise<DemoData>
   const body = html.slice(html.indexOf('<body>'));
   const rows = [...body.matchAll(/<li\b[\s\S]*?<\/li>/g)];
   const row = rows[1]?.[0] ?? '';
-  const token = /on:click='([^']*)'/.exec(row)?.[1] ?? '';
-  const message: unknown = JSON.parse(token);
-  const handlerName = Array.isArray(message) && typeof message[0] === 'string' ? message[0] : '';
+  const site = readSite(row);
   const source = readFileSync(path.join(EXAMPLE, 'src/todo.tsx'), 'utf8');
   const { manifest } = compile(source, '/src/todo.tsx');
+  // The checkbox runs an event function, which the manifest lists with the handlers it sends.
+  const siteEntry = Object.hasOwn(manifest.handlers, site) ? manifest.handlers[site] : undefined;
+  const handlerName = siteEntry?.tags?.length === 1 ? siteEntry.tags[0] : '';
   if (!Object.hasOwn(manifest.handlers, handlerName)) {
     throw new Error(`The manifest has no handler ${handlerName}`);
   }
@@ -222,6 +231,8 @@ export async function buildDemo(outDir: string, base: string): Promise<DemoData>
   // The diagram shows the clicked row turning done and the count going down, then the binding
   // patching that row and the count. Fail the build when the example stops matching that.
   const todos = readTodos(body);
+  // The message the update receives for a click on the second row.
+  const token = JSON.stringify([handlerName, [todos[1]?.id ?? '']]);
   const rowId = /^<li i-a="(\d+)"/.exec(row)?.[1];
   if (todos.length < 2 || todos[1].done) {
     throw new Error('The diagram needs the second todo of the demo to start not done');
@@ -253,6 +264,7 @@ export async function buildDemo(outDir: string, base: string): Promise<DemoData>
     helpers,
     chunks,
     handlerName,
+    site,
     token,
     writes,
     row,

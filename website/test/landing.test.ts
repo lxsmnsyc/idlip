@@ -29,9 +29,10 @@ const demo: DemoData = {
     makeFile('todo.list.3.js', 450),
   ],
   handlerName: 'toggle',
+  site: '$e3',
   token: '["toggle",["a2"]]',
   writes: ['todos.*.done'],
-  row: '<li i-a="4"><input type="checkbox" on:click=\'["toggle",["a2"]]\' i-a="5 7"><!--t6-->Two<!--/t--></li>',
+  row: '<li i-a="4"><input type="checkbox" on:click="$e3" i-a="5"><!--t6-->Two<!--/t--></li>',
   state:
     '<script i-state>(self.$idlip||=[]).push(["click",()=>({manifest:{},model:{todos:[]},props:{}})])</script>',
   todos: [

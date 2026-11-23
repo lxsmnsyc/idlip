@@ -13,12 +13,12 @@ The browser does not run view code to start the page. The server sends the HTML,
 
 ```html
 <li i-a="4">
-  <input type="checkbox" on:click='["toggle",["a2"]]' i-a="5 7" />
+  <input type="checkbox" on:click="$e3" i-a="5" />
   <!--t6-->Write a component<!--/t-->
 </li>
 ```
 
-- **`on:click`** holds the message as data: the handler name and its arguments.
+- **`on:click`** names an event function, `$e3`. The manifest lists it with its chunk and the handlers it sends. When the chunk loads, the function reads the row from the model and returns the message `["toggle",["a2"]]`.
 - **`i-a`** and the `<!--t6-->` comments mark the places that bindings patch. A bound text that is the only child of its element has no comments: the element's `i-a` holds its id, as in `<span i-a="3">Ada</span>`.
 - **The state script**, `<script i-state>` at the end of the body, holds the model, the props and the manifest. The manifest lists each handler, its chunk and the model paths it writes.
 

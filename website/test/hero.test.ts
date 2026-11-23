@@ -26,6 +26,7 @@ const demo: DemoData = {
   helpers: makeFile('_idlip-helpers.js', 928),
   chunks: [],
   handlerName: 'toggle',
+  site: '$e3',
   token: '["toggle",["a2"]]',
   writes: ['todos.*.done'],
   row: '',
