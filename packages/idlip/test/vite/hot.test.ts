@@ -21,21 +21,21 @@ import { createConfig } from './app.ts';
 
 const PACKAGE = path.resolve(import.meta.dirname, '../..');
 const CLIENT = path.join(PACKAGE, 'src/client/index.ts');
-const COUNTER = readFileSync(path.join(PACKAGE, 'test/fixtures/counter/counter.idlip.tsx'), 'utf8');
+const COUNTER = readFileSync(path.join(PACKAGE, 'test/fixtures/counter/counter.tsx'), 'utf8');
 const ENTRY = `import { render as renderComponent, renderListener } from 'idlip/server';
-import Counter from './counter.idlip.tsx';
+import Counter from './counter.tsx';
 
 export async function render() {
   const body = await renderComponent(Counter, { start: 4 });
   return '<!doctype html><html><head>' + renderListener() + '</head><body>' + body + '</body></html>';
 }
 `;
-const HANDLER = '/src/counter.idlip.tsx?idlip-handler=increment&lang.js';
+const HANDLER = '/src/counter.tsx?idlip-handler=increment&lang.js';
 
 function createCounterApp(): string {
   const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'idlip-hot-')));
   mkdirSync(path.join(root, 'src'));
-  writeFileSync(path.join(root, 'src/counter.idlip.tsx'), COUNTER);
+  writeFileSync(path.join(root, 'src/counter.tsx'), COUNTER);
   writeFileSync(path.join(root, 'src/entry-server.js'), ENTRY);
   return root;
 }
@@ -51,20 +51,17 @@ function createAppConfig(root: string): InlineConfig {
 }
 
 describe('classifyEdit', () => {
-  const before = compile(COUNTER, '/src/counter.idlip.tsx');
+  const before = compile(COUNTER, '/src/counter.tsx');
 
   it('swaps the chunks whose code changed', () => {
-    const edited = compile(COUNTER.replace('count + 1', 'count + 2'), '/src/counter.idlip.tsx');
+    const edited = compile(COUNTER.replace('count + 1', 'count + 2'), '/src/counter.tsx');
     const message = classifyEdit(before, edited, '/', 7);
     expect(message?.kind).toBe('swap');
     expect(message?.chunks).toEqual([HANDLER]);
   });
 
   it('remounts when the markup changes', () => {
-    const edited = compile(
-      COUNTER.replace('+1</button>', '+one</button>'),
-      '/src/counter.idlip.tsx',
-    );
+    const edited = compile(COUNTER.replace('+1</button>', '+one</button>'), '/src/counter.tsx');
     const message = classifyEdit(before, edited, '/', 7);
     expect(message?.kind).toBe('remount');
     expect(message?.chunks.length).toBeGreaterThan(1);
@@ -75,7 +72,7 @@ describe('classifyEdit', () => {
       /  function reset\(\) \{[^}]*\}\n/,
       '',
     );
-    const edited = compile(source, '/src/counter.idlip.tsx');
+    const edited = compile(source, '/src/counter.tsx');
     expect(Object.keys(edited.manifest.handlers)).not.toContain('reset');
     const message = classifyEdit(before, edited, '/', 7);
     expect(message?.kind).toBe('remount');
@@ -83,7 +80,7 @@ describe('classifyEdit', () => {
   });
 
   it('sends nothing when no chunk changed', () => {
-    const edited = compile(`// note\n${COUNTER}`, '/src/counter.idlip.tsx');
+    const edited = compile(`// note\n${COUNTER}`, '/src/counter.tsx');
     expect(classifyEdit(before, edited, '/', 7)).toBeUndefined();
   });
 
@@ -125,7 +122,7 @@ describe('vite dev hot updates', () => {
       throw new Error('The dev server did not start');
     }
     const client = vite.environments.client;
-    const file = path.join(root, 'src/counter.idlip.tsx');
+    const file = path.join(root, 'src/counter.tsx');
     writeFileSync(file, source);
     vite.environments.ssr.moduleGraph.onFileChange(file);
     const modules = [...(client.moduleGraph.getModulesByFile(file) ?? [])];
@@ -154,7 +151,7 @@ describe('vite dev hot updates', () => {
     expect(await get(HANDLER)).toContain('+ 1');
     const sent = await edit(COUNTER.replace('count + 1', 'count + 5'));
     const data: HotMessage = {
-      module: '/src/counter.idlip.tsx',
+      module: '/src/counter.tsx',
       kind: 'swap',
       chunks: [HANDLER],
       timestamp: 1700000000000,

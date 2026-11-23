@@ -8,3 +8,7 @@ export function add(model) {
   draft = '';
   return { ...model, draft, todos, next };
 }
+
+export function $e0($e, $c) {
+return [['add', []]];
+}

@@ -80,7 +80,7 @@ export function setup(): Harness {
   for (const [tag, code] of Object.entries(EXTRA)) {
     const file = join(dir, `extra.${tag}.mjs`);
     writeFileSync(file, code);
-    const id = `/src/board.idlip.tsx?idlip-handler=${tag}&lang.js`;
+    const id = `/src/board.tsx?idlip-handler=${tag}&lang.js`;
     extra += `${JSON.stringify(id)}:${JSON.stringify(`/@fs${file}`)},`;
     handlers += `${tag}:{chunk:"handler=${tag}"},`;
   }
@@ -88,7 +88,7 @@ export function setup(): Harness {
     .replace('</script>', '')
 
     .replaceAll(
-      /("[^"]*\.idlip\.tsx\?idlip-[^&"]+&lang\.js"):"[^"]*"/g,
+      /("[^"]*\.tsx\?idlip-[^&"]+&lang\.js"):"[^"]*"/g,
       (_all, key: string) => `${key}:${JSON.stringify(urlOf(JSON.parse(key) as string))}`,
     );
   const full = script

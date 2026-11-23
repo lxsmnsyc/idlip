@@ -6,7 +6,7 @@ This proposal replaces the Messages, Update and Nesting sections of [0001](0001-
 
 ## Decisions
 
-- **A module is a function component.** A `*.idlip.tsx` file exports components as function declarations. The compiler reads the body and emits the view IR, the server render function and one chunk per handler. The body never runs.
+- **A module is a function component.** A `*.tsx` file exports components as function declarations. The compiler reads the body and emits the view IR, the server render function and one chunk per handler. The body never runs.
 - **No compile-time APIs.** Nothing is imported from `idlip` only so that the compiler can find it. The syntax carries the meaning: `let` is state, `const` is a derived value, a function declaration is a handler, and `return` is the view. A marker for state would need a marker for derived values too, and would leave unmarked `let` and `const` with unclear meaning. The exceptions are the block components below, until the markup DSL (`markup-frontend`) replaces them with blocks.
 - **A handler is a message.** Each function declared in the body is a message tag and a chunk. There is no `Msg` interface: `tsc` checks each call to a handler against its parameters.
 - **Effects are `await` in a handler.** The compiler splits an async handler at each `await` into a task and a continuation. This replaces `task()`, `Result<T>` and commands that take constructors. Errors go to `try` and `catch`.
@@ -14,12 +14,12 @@ This proposal replaces the Messages, Update and Nesting sections of [0001](0001-
 - **Impure values come through `await`,** as in Elm's `Random.generate` and `Time.now`: `const id = await Random.id()`. The result is in the continuation's payload, so the message log replays exactly.
 - **Components nest as JSX.** `<Counter start={0} />` gives the child a slot in the parent's model. A component with no state and no handlers is inlined, as partials were.
 - **MVU stays after compilation.** All state is one serializable model value, every change is a named message, and the compiled update functions are pure functions of the model and the message.
-- **File suffix `.idlip.tsx`.** Unchanged.
+- **File suffix `.tsx`.** Unchanged.
 
 ## Example
 
 ```tsx
-// todo.idlip.tsx
+// todo.tsx
 import { For, Random } from 'idlip';
 import { saveTodos } from './api';
 

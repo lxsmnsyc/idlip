@@ -1,7 +1,7 @@
 ---
 id: markup-vscode
 title: VS Code extension and language server
-status: done
+status: dropped
 priority: should
 type: feature
 story: markup-frontend
@@ -56,3 +56,5 @@ Create `packages/vscode` (private extension) and `packages/language-server` that
 Two packages, mostly glue to Volar.
 
 Landed as a666a6b on `feat/markup-frontend` after one clean fresh review. Follow-up: `markup-ts-plugin`.
+
+Dropped 2026-11-21 by debate `debates/dsl`: built on `feat/markup-frontend` only, never merged; the branch stays as history.

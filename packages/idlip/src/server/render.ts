@@ -1,5 +1,14 @@
 import { Feature, serialize } from 'seroval';
-import type { ChunkUrls, Manifest, Model, PageState, Props } from '../core/format.ts';
+import { getChunkId } from '../core/format.ts';
+import type {
+  ChildManifest,
+  ChunkUrls,
+  HandlerEntry,
+  Manifest,
+  Model,
+  PageState,
+  Props,
+} from '../core/format.ts';
 import { DEV } from '../core/dev.ts';
 import { attr } from './helpers.ts';
 
@@ -62,17 +71,53 @@ export interface RenderResult {
   /** The elements of every `<Head>`. The title of the last block is first. */
   head: string;
   body: string;
+  /**
+   * The chunk URLs of the page, the root's and its children's: the first argument of
+   * `renderPreload`. Frozen and shared by every render of the module.
+   */
+  chunks: ChunkUrls;
+  /**
+   * The manifests of the root and of the child modules: the second argument of
+   * `renderPreload`. The array is frozen and shared; treat the manifests as read-only too.
+   */
+  manifests: readonly Manifest[];
 }
 
-/** What the state script holds: the root's state, the child manifests and the slots. */
-interface RecordedState extends PageState {
-  readonly modules?: Readonly<Record<string, Manifest>>;
-  readonly slots?: Readonly<Record<string, Slot>>;
-  /** The event types of the root and of every module in `modules`. */
-  readonly events: readonly string[];
+/** The slots a render recorded, by path. */
+type Slots = Record<string, Slot>;
+
+/**
+ * What a root module adds to its state script whatever the render: the manifest and chunk URLs
+ * (`head`), the child manifests (`tail`) and the event types. `head` and `tail` are the inside
+ * of seroval's `({…})` output, ready to join with the model. They are rebuilt only when the
+ * module, its chunk map or its `uses` change.
+ */
+interface StaticPart {
+  readonly chunks: ChunkUrls;
+  readonly uses: readonly ModuleInfo[] | undefined;
+  /** Every child module the part holds, by module id, to check the children of a render. */
+  readonly known: ReadonlyMap<string, ModuleInfo>;
+  /** The first element of the pushed array: the event types, as a string literal. */
+  readonly events: string;
   /** The build id the plugin put in the chunk map. The state script carries it as `i-build`. */
-  readonly build?: string;
+  readonly build: string | undefined;
+  /** The chunk URLs of the state, without `build`. */
+  readonly urls: Record<string, string>;
+  /** The manifests of the child modules. */
+  readonly modules: ReadonlyMap<string, Manifest>;
+  /** A frozen copy of `urls`, which `renderPage` returns to every caller. */
+  readonly pageChunks: ChunkUrls;
+  /** The root's manifest, then the child manifests, frozen, which `renderPage` returns. */
+  readonly manifests: readonly Manifest[];
+  /** `manifest` and `chunks` as seroval wrote them, without the braces. Undefined if not plain. */
+  readonly head: string | undefined;
+  /** `modules` as seroval wrote it, without the braces. Empty when there are none. */
+  readonly tail: string | undefined;
 }
+
+const PARTS = new WeakMap<Manifest, StaticPart>();
+
+const CLIENT_MANIFESTS = new WeakMap<Manifest, ChildManifest>();
 
 function joinPath(prefix: string, segment: string): string {
   return prefix === '' ? segment : `${prefix}.${segment}`;
@@ -100,29 +145,19 @@ function findBadPath(value: unknown, path: string, seen: Set<object>): string | 
   return path;
 }
 
-function serializeState(state: RecordedState): string {
-  const record: Record<string, unknown> = {
-    manifest: state.manifest,
-    chunks: state.chunks,
-    model: state.model,
-    props: state.props,
-  };
-  if (state.modules !== undefined) {
-    record.modules = state.modules;
-  }
-  if (state.slots !== undefined) {
-    record.slots = state.slots;
-  }
-  if (state.dynamic !== undefined) {
-    record.dynamic = state.dynamic;
-  }
+/** Serializes the values of one render, and names the path of the one that does not serialize. */
+function serializeValues(
+  record: Record<string, unknown>,
+  state: ComponentState,
+  slots?: Slots,
+): string {
   try {
     return serialize(record, SEROVAL_OPTIONS);
   } catch (error) {
     // Walk the values to name the path, which seroval's error does not carry.
     const seen = new Set<object>();
     let bad = findBadPath(state.model, 'model', seen) ?? findBadPath(state.props, 'props', seen);
-    for (const [path, slot] of Object.entries(state.slots ?? {})) {
+    for (const [path, slot] of Object.entries(slots ?? {})) {
       bad ??=
         findBadPath(slot.model, `slots.${path}.model`, seen) ??
         findBadPath(slot.props, `slots.${path}.props`, seen);
@@ -136,43 +171,75 @@ function serializeState(state: RecordedState): string {
   }
 }
 
-function writeState(state: RecordedState, nonce: string | undefined): string {
-  const events = escapeScript(JSON.stringify(state.events.join(' ')));
-  // seroval's output is a parenthesized expression, so it serves as the arrow body as it is.
-  // It writes `<` as `\x3C` and escapes U+2028 and U+2029, so a value cannot end the script.
-  const body = serializeState(state);
-  const script = `(self.$idlip||=[]).push([${events},()=>${body}])`;
-  return `<script i-state${attr('i-build', state.build)}${attr('nonce', nonce)}>${script}</script>`;
+/** Returns the inside of a plain object literal `({…})` as seroval writes it, else undefined. */
+function openPlain(code: string): string | undefined {
+  return code.startsWith('({') && code.endsWith('})') ? code.slice(2, -2) : undefined;
 }
 
-/** Adds the manifest and chunk URLs of the modules a component can render, and their children. */
+/**
+ * Drops from a child manifest what the loader never reads: `events` (the record holds the
+ * union), `listens` (`renderPreload` reads it on the server), the `writes` of each handler and
+ * `view` (a template chunk imports the view chunk by id). The root manifest is written whole.
+ */
+function toChildManifest(manifest: Manifest): ChildManifest {
+  let client = CLIENT_MANIFESTS.get(manifest);
+  if (client === undefined) {
+    const { events: _events, listens: _listens, view: _view, handlers, ...rest } = manifest;
+    const slim: Record<string, HandlerEntry> = {};
+    for (const [tag, entry] of Object.entries(handlers)) {
+      const { writes: _writes, ...kept } = entry;
+      slim[tag] = kept;
+    }
+    client = { ...rest, handlers: slim };
+    CLIENT_MANIFESTS.set(manifest, client);
+  }
+  return client;
+}
+
+/** The child manifests as the state script holds them, by module. */
+function toClientModules(modules: ReadonlyMap<string, Manifest>): Record<string, ChildManifest> {
+  const out: Record<string, ChildManifest> = {};
+  for (const [module, manifest] of modules) {
+    out[module] = toChildManifest(manifest);
+  }
+  return out;
+}
+
+/**
+ * Adds the manifest and chunk URLs of the modules a component can render, and their children.
+ * The view chunk of a child is left out of `chunks`: nothing loads it by URL.
+ */
 function collectModules(
   uses: readonly ModuleInfo[],
   modules: Map<string, Manifest>,
   chunks: Record<string, string>,
+  known: Map<string, ModuleInfo>,
 ): void {
   for (const info of uses) {
-    if (!modules.has(info.manifest.module)) {
-      modules.set(info.manifest.module, info.manifest);
-      Object.assign(chunks, info.chunks);
-      collectModules(info.uses ?? [], modules, chunks);
+    const { module, view } = info.manifest;
+    if (!modules.has(module)) {
+      modules.set(module, info.manifest);
+      known.set(module, info);
+      const viewId = view === undefined ? undefined : getChunkId(module, view.chunk);
+      for (const [id, url] of Object.entries(info.chunks)) {
+        if (id !== viewId) {
+          chunks[id] = url;
+        }
+      }
+      collectModules(info.uses ?? [], modules, chunks, known);
     }
   }
 }
 
-/**
- * Puts the calls of one render together. The call without a path is the root's. A call with a
- * path is a child's: it becomes a slot, and its module joins `modules`. The chunk URLs and the
- * event types of every module on the page join the root's.
- */
-function mergeState(root: ComponentState, children: Map<string, ComponentState>): RecordedState {
+/** Builds what the state script of a root module holds whatever the render. */
+function buildPart(root: ComponentState, children: Iterable<ComponentState> = []): StaticPart {
   const modules = new Map<string, Manifest>();
-  const chunks: Record<string, string> = {};
-  const slots = new Map<string, Slot>();
-  collectModules(root.uses ?? [], modules, chunks);
-  for (const [path, state] of children) {
-    slots.set(path, { module: state.manifest.module, model: state.model, props: state.props });
-    collectModules([state], modules, chunks);
+  const known = new Map<string, ModuleInfo>();
+  const urls: Record<string, string> = Object.assign({}, root.chunks);
+  collectModules(root.uses ?? [], modules, urls, known);
+  // Children outside `uses` join this render's part only.
+  for (const state of children) {
+    collectModules([state], modules, urls, known);
   }
   const events = new Set(root.manifest.events);
   for (const manifest of modules.values()) {
@@ -180,19 +247,104 @@ function mergeState(root: ComponentState, children: Map<string, ComponentState>)
       events.add(event);
     }
   }
-  const merged = { ...root.chunks, ...chunks };
-  const { build, ...urls } = merged;
+  // The build id is not in the state's `chunks`: it is the `i-build` attribute.
+  const build = Object.hasOwn(urls, 'build') ? urls.build : undefined;
+  delete urls.build;
+  const tail =
+    modules.size === 0
+      ? ''
+      : openPlain(serialize({ modules: toClientModules(modules) }, SEROVAL_OPTIONS));
   return {
-    manifest: root.manifest,
-    chunks: urls,
-    ...(Object.hasOwn(merged, 'build') ? { build } : {}),
-    model: root.model,
-    props: root.props,
-    ...(root.dynamic === undefined ? {} : { dynamic: root.dynamic }),
-    ...(modules.size === 0 ? {} : { modules: Object.fromEntries(modules) }),
-    ...(slots.size === 0 ? {} : { slots: Object.fromEntries(slots) }),
-    events: [...events].toSorted(),
+    chunks: root.chunks,
+    uses: root.uses,
+    known,
+    events: escapeScript(JSON.stringify([...events].toSorted().join(' '))),
+    build,
+    urls,
+    modules,
+    // Every render returns these objects, so a caller cannot change them for the next one. A copy,
+    // since seroval writes a frozen object with `Object.freeze`.
+    pageChunks: Object.freeze({ ...urls }),
+    manifests: Object.freeze([root.manifest, ...modules.values()]),
+    head: openPlain(serialize({ manifest: root.manifest, chunks: urls }, SEROVAL_OPTIONS)),
+    tail,
   };
+}
+
+/** Whether every child of a render is a module the part holds, with the same module data. */
+function holds(part: StaticPart, children: Map<string, ComponentState>): boolean {
+  for (const state of children.values()) {
+    const info = part.known.get(state.manifest.module);
+    if (
+      info === undefined ||
+      info.manifest !== state.manifest ||
+      info.chunks !== state.chunks ||
+      info.uses !== state.uses
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/** Returns the static part of a render, kept from the last one when the module data is the same. */
+function getPart(root: ComponentState, children: Map<string, ComponentState>): StaticPart {
+  let kept = PARTS.get(root.manifest);
+  if (kept === undefined || kept.chunks !== root.chunks || kept.uses !== root.uses) {
+    // The kept part comes from `uses` alone, so no render's children leak into the next one.
+    kept = buildPart(root);
+    PARTS.set(root.manifest, kept);
+  }
+  // A child outside `uses` builds a part for this render only.
+  return holds(kept, children) ? kept : buildPart(root, children.values());
+}
+
+/**
+ * Writes the state script. The call without a path is the root's. A call with a path is a
+ * child's: it becomes a slot, and its module joins `modules`. The manifests, chunk URLs and
+ * event types are the same on each render of a module, so they are serialized once and kept.
+ * Only the model, props, slots and dynamic holes go through seroval on each render.
+ */
+function writeState(
+  part: StaticPart,
+  root: ComponentState,
+  children: Map<string, ComponentState>,
+  nonce: string | undefined,
+): string {
+  const values: Record<string, unknown> = { model: root.model, props: root.props };
+  let slots: Slots | undefined;
+  if (children.size !== 0) {
+    slots = {};
+    for (const [path, state] of children) {
+      slots[path] = { module: state.manifest.module, model: state.model, props: state.props };
+    }
+    values.slots = slots;
+  }
+  if (root.dynamic !== undefined) {
+    values.dynamic = root.dynamic;
+  }
+  // seroval writes `<` as `\x3C` and escapes U+2028 and U+2029, so a value cannot end the script.
+  const inner = openPlain(serializeValues(values, root, slots));
+  let body: string;
+  if (part.head !== undefined && part.tail !== undefined && inner !== undefined) {
+    // seroval's output is a parenthesized expression, so it serves as the arrow body as it is.
+    // The parts share no value, so they join as one object literal.
+    const tail = part.tail === '' ? '' : `,${part.tail}`;
+    body = `({${part.head},${inner}${tail}})`;
+  } else {
+    // A value that seroval shares or cycles makes it write a function: serialize it all at once.
+    const record: Record<string, unknown> = {
+      manifest: root.manifest,
+      chunks: part.urls,
+      ...values,
+    };
+    if (part.modules.size !== 0) {
+      record.modules = toClientModules(part.modules);
+    }
+    body = serializeValues(record, root, slots);
+  }
+  const script = `(self.$idlip||=[]).push([${part.events},()=>${body}])`;
+  return `<script i-state${attr('i-build', part.build)}${attr('nonce', nonce)}>${script}</script>`;
 }
 
 function renderSync(
@@ -257,7 +409,13 @@ function renderSync(
   }
   // The last title is the one that wins, so it goes first. The others follow, for the client.
   head.unshift(...titles.slice(-1), ...titles.slice(0, -1));
-  return { head: head.join(''), body: markup + writeState(mergeState(root, children), nonce) };
+  const part = getPart(root, children);
+  return {
+    head: head.join(''),
+    body: markup + writeState(part, root, children, nonce),
+    chunks: part.pageChunks,
+    manifests: part.manifests,
+  };
 }
 
 /**
@@ -283,7 +441,8 @@ export function render<P>(
 
 /**
  * Renders a compiled component and returns the markup for `<head>` next to the body markup.
- * The host writes `head` inside `<head>` and `body` in `<body>`.
+ * The host writes `head` inside `<head>` and `body` in `<body>`. `chunks` and `manifests` are
+ * what `renderPreload` reads: `renderPreload(page.chunks, page.manifests)`.
  */
 // oxlint-disable-next-line typescript/promise-function-async
 export function renderPage<P>(

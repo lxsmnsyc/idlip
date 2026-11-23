@@ -1,15 +1,17 @@
-// The render helpers (`text`, `attr`, `on`) and the DOM helpers (`setText`, `setAttr`, `setOn`,
-// `setBranch`) of compiled modules. Each has one source, here. The server imports the render
-// helpers. A client chunk does not import any of them: the compiler copies the ones it uses
-// into the chunk with `printHelpers`, from the text of these functions, so the loader stays
-// small. Rules for the sources:
+// The render helpers of the server module (`text`, `attr`, `on`) and the DOM helpers of client
+// chunks (`setText`, `setAttr`, `setOn`, `setBranch`, `clone` and the rest). Each has one
+// source, here. The server imports the render helpers. A client chunk imports the ones it uses
+// from `idlip/helpers`, one shared module that `printHelpersModule` writes from the text of
+// these functions. The Vite plugin serves it, the bundler keeps the helpers the chunks use, and
+// the loader starts loading it with the first chunk. The loader stays small, and a build ships
+// each helper once. Rules for the sources:
 // - Every function is named with a `$` suffix, so a copy cannot clash with a name in the module.
 // - No comment inside a body, since the copy is the text of the function.
-// - A function mentions only what `HELPERS` lists for it.
+// - A function calls only the functions of `HELPERS` and the forwarders, by their names.
 // - A loader export is called as `name$`, through the forwarding function below. In a chunk the
 //   name is the import alias, `parseHtml as parseHtml$`. A bundler or a test runner renames
 //   imported bindings in the text of a function, but not a function declared in the module.
-// oxlint-disable typescript/no-base-to-string, no-control-regex
+// oxlint-disable typescript/no-base-to-string, no-control-regex, no-console
 import { addBlock, findInnerBlocks, removeBlock } from '../client/patch/blocks.ts';
 import { parseHtml } from '../client/patch/dom.ts';
 import { track$ } from './dynamic.ts';
@@ -34,7 +36,7 @@ function removeBlock$(start: Comment): void {
   removeBlock(start);
 }
 
-function getText$(value: unknown): string {
+export function getText$(value: unknown): string {
   if (value === null || value === undefined || typeof value === 'boolean') {
     return '';
   }
@@ -129,7 +131,6 @@ export function safeUrl$(value: unknown, name: string, embed?: boolean): unknown
   }
   if (unsafe) {
     if (process.env.NODE_ENV !== 'production') {
-      // oxlint-disable-next-line no-console
       console.warn(`idlip: dropped an unsafe URL from ${name}.`);
     }
     return undefined;
@@ -215,15 +216,15 @@ export function setOn$(el: Element, event: string, message: DomMessage): void {
 
 /**
  * When `branch` differs from the marker's, replaces the block's content with
- * `render(branch)` and updates the marker. The hooks run children first: before the swap
- * for the blocks inside the old content and then the block, after it for the blocks inside
- * the new content and then the block. The loader forgets the nodes it found as the hooks run.
+ * `render(branch, doc)`, a cloned fragment, and updates the marker. The hooks run children
+ * first: before the swap for the blocks inside the old content and then the block, after it for
+ * the blocks inside the new content and then the block. The loader forgets the nodes it found as
+ * the hooks run.
  */
 export function setBranch$(
   start: Comment,
   branch: number,
-  render: (branch: number) => string,
-  ns?: Namespace,
+  render: (branch: number, doc: Document) => Node,
 ): void {
   const colon = start.data.indexOf(':');
   const end = findEnd$(start);
@@ -238,9 +239,7 @@ export function setBranch$(
   while (start.nextSibling !== end) {
     start.nextSibling?.remove();
   }
-  for (const node of parseHtml$(start.ownerDocument, render(branch), ns)) {
-    parent.insertBefore(node, end);
-  }
+  parent.insertBefore(render(branch, start.ownerDocument), end);
   start.data = `${start.data.slice(0, colon + 1)}${branch}`;
   for (const block of findInnerBlocks$(start, end)) {
     addBlock$(block);
@@ -248,11 +247,133 @@ export function setBranch$(
   addBlock$(start);
 }
 
-/** Reads the rows around a region from the DOM: `reset` has no binding scope. `paths` maps a list id to its `each` path. */
-function getRows$(
+/** A cloned template of a chunk: its HTML, and once parsed, its content and the paths to its marks. */
+function isElement$(node: Node): node is Element {
+  return node.nodeType === 1;
+}
+
+export interface Template {
+  /** The HTML. */
+  readonly h: string;
+  /** The number of marks. */
+  readonly n: number;
+  /** The namespace the HTML is parsed in, for a body inside `<svg>` or `<math>`. */
+  readonly s?: Namespace;
+  /** The parse for the first document that cloned it, the page's. It holds that document. */
+  k?: { d: Document; c: ParentNode; p: number[][] };
+  /** The parse for any other document, such as an iframe's. */
+  m?: WeakMap<Document, { d: Document; c: ParentNode; p: number[][] }>;
+}
+
+/**
+ * Clones a template of static markup in `doc`. Returns the fragment, then the node of each
+ * mark: an element with `i-x="<n>"`, a text node in place of `<!--x<n>-->`, or a comment
+ * `<!--<data>x<n>-->` that keeps `<data>`, the start or end of a block. The first call in a
+ * document parses the template and finds the marks where the parser put them.
+ */
+export function clone$(template: Template, doc: Document): Node[] {
+  let parsed = template.k;
+  if (parsed?.d !== doc) {
+    parsed = template.m?.get(doc);
+  }
+  if (parsed === undefined) {
+    const root = doc.createDocumentFragment();
+    root.append(...parseHtml$(doc, template.h, template.s));
+    const paths: number[][] = [];
+    let found = 0;
+    const walker = doc.createTreeWalker(root, 129);
+    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+      const match = isElement$(node) ? null : /^(.*?)x(\d+)$/.exec(node.nodeValue!);
+      const mark = isElement$(node) ? node.getAttribute('i-x') : match?.[2];
+      if (mark === null || mark === undefined) {
+        continue;
+      }
+      if (isElement$(node)) {
+        node.removeAttribute('i-x');
+      } else if (match![1] === '') {
+        const text = doc.createTextNode(' ');
+        node.parentNode!.replaceChild(text, node);
+        walker.currentNode = text;
+        node = text;
+      } else {
+        node.nodeValue = match![1];
+      }
+      const path: number[] = [];
+      for (let at = node; at !== root; at = at.parentNode!) {
+        let index = 0;
+        for (let before = at.previousSibling; before !== null; before = before.previousSibling) {
+          index++;
+        }
+        path.unshift(index);
+      }
+      paths[Number(mark) - 1] = path;
+      found++;
+    }
+    if (found !== template.n) {
+      throw new Error(`idlip: a template has ${template.n} marks and the parse found ${found}`);
+    }
+    parsed = { d: doc, c: root, p: paths };
+    if (template.k === undefined) {
+      template.k = parsed;
+    } else {
+      (template.m ??= new WeakMap()).set(doc, parsed);
+    }
+  }
+  const fragment = doc.importNode(parsed.c, true);
+  const nodes: Node[] = [fragment];
+  for (const path of parsed.p) {
+    let node: Node = fragment;
+    for (const index of path) {
+      node = node.firstChild!;
+      for (let step = 0; step < index; step++) {
+        node = node.nextSibling!;
+      }
+    }
+    nodes.push(node);
+  }
+  return nodes;
+}
+
+/** Writes an attribute on a cloned element, as `attr$` would have written it in the HTML. */
+export function putAttr$(el: Element, name: string, value: unknown): void {
+  if (value === false || value === null || value === undefined) {
+    return;
+  }
+  if (value === true) {
+    el.setAttribute(name, '');
+  } else if (name === 'class' && typeof value === 'object') {
+    const names = joinClass$(value);
+    if (names !== '') {
+      el.setAttribute(name, names);
+    }
+  } else {
+    el.setAttribute(name, getText$(value));
+  }
+}
+
+/** Writes the text of a cloned text node, or removes the node for an empty text, as the HTML has none. */
+export function putText$(node: Node, value: unknown): void {
+  const text = getText$(value);
+  if (text === '') {
+    node.parentNode!.removeChild(node);
+  } else {
+    node.nodeValue = text;
+  }
+}
+
+/**
+ * Reads the rows around a node from the DOM: a `reset` and an event have no binding scope. The
+ * walk ends at the boundary of the component that holds the node.
+ * `paths` maps a list id to its `each` path, or to a function of the scope for any other `each`.
+ */
+export function getRows$(
   start: Node,
   model: unknown,
-  paths: Record<string, string>,
+  paths: Record<
+    string,
+    string | ((scope: { model: unknown; props: unknown; rows: unknown[] }) => unknown)
+  >,
+  props?: unknown,
 ): { item: unknown; index: number }[] {
   const levels: { id: string; index: number }[] = [];
   let node: Node | null = start;
@@ -261,31 +382,43 @@ function getRows$(
     let row = false;
     let index = 0;
     let list: Node | undefined;
+    let nest = 0;
+    let stop = false;
     for (
       let item = node.previousSibling;
-      item !== null && list === undefined;
+      item !== null && list === undefined && !stop;
       item = item.previousSibling
     ) {
       const data = item.nodeType === 8 ? (item.nodeValue ?? '') : '';
-      if (data === '/i') {
+      if (data === '/n') {
+        nest++;
+      } else if (data.startsWith('n:')) {
+        stop = nest === 0;
+        nest -= nest === 0 ? 0 : 1;
+      } else if (nest === 0 && data === '/i') {
         index += row && depth === 0 ? 1 : 0;
         depth++;
-      } else if (data === 'i') {
+      } else if (nest === 0 && data === 'i') {
         row ||= depth === 0;
         depth -= depth === 0 ? 0 : 1;
-      } else if (row && depth === 0 && /^l\d/.test(data)) {
+      } else if (nest === 0 && row && depth === 0 && /^l\d/.test(data)) {
         levels.push({ id: data.slice(1), index });
         list = item;
       }
     }
-    node = list ?? node.parentNode;
+    node = stop ? null : (list ?? node.parentNode);
   }
   const rows: { item: unknown; index: number }[] = [];
   for (const { id, index } of levels.toReversed()) {
+    const path = paths[id];
     let value: unknown = model;
     let star = 0;
-    for (const key of paths[id].split('.')) {
-      value = Reflect.get(Object(value), key === '*' ? rows[star++].index : key);
+    if (typeof path === 'function') {
+      value = path({ model, props, rows });
+    } else {
+      for (const key of path.split('.')) {
+        value = Reflect.get(Object(value), key === '*' ? rows[star++].index : key);
+      }
     }
     rows.push({ item: Reflect.get(Object(value), index), index });
   }
@@ -294,40 +427,35 @@ function getRows$(
 
 type Source = (...args: never[]) => unknown;
 
-interface Helper {
-  source: Source;
-  /** The helpers whose copy this one needs, by function name. */
-  uses: string[];
-  /** The names of the loader's exports this one calls, such as `parseHtml`. */
-  client: string[];
-}
-
-/** Every function that can be copied, in the order the copies print. */
-const HELPERS: Record<string, Helper | undefined> = {
-  getText$: { source: getText$, uses: [], client: [] },
-  escapeText$: { source: escapeText$, uses: [], client: [] },
-  escapeAttr$: { source: escapeAttr$, uses: [], client: [] },
-  joinClass$: { source: joinClass$, uses: [], client: [] },
-  encode$: { source: encode$, uses: [], client: [] },
-  findEnd$: { source: findEnd$, uses: [], client: [] },
-  getRows$: { source: getRows$, uses: [], client: [] },
-  text$: { source: text$, uses: ['getText$', 'escapeText$'], client: [] },
-  safeUrl$: { source: safeUrl$, uses: [], client: [] },
-  attr$: { source: attr$, uses: ['getText$', 'escapeAttr$', 'joinClass$'], client: [] },
-  on$: { source: on$, uses: [], client: [] },
-  slot$: { source: slot$, uses: ['encode$'], client: [] },
-  setText$: { source: setText$, uses: ['getText$'], client: [] },
-  setAttr$: { source: setAttr$, uses: ['getText$', 'joinClass$'], client: [] },
-  setOn$: { source: setOn$, uses: [], client: [] },
-  track$: { source: track$, uses: [], client: [] },
-  setBranch$: {
-    source: setBranch$,
-    uses: ['findEnd$'],
-    client: ['addBlock', 'findInnerBlocks', 'parseHtml', 'removeBlock'],
-  },
+/**
+ * Every function the module holds, by name. A copy calls only functions of this table and the
+ * forwarders, by these names. The order does not matter, since function declarations hoist.
+ */
+const HELPERS: Record<string, Source | undefined> = {
+  getText$,
+  escapeText$,
+  escapeAttr$,
+  joinClass$,
+  encode$,
+  findEnd$,
+  getRows$,
+  text$,
+  safeUrl$,
+  attr$,
+  on$,
+  slot$,
+  setText$,
+  setAttr$,
+  setOn$,
+  track$,
+  isElement$,
+  clone$,
+  putAttr$,
+  putText$,
+  setBranch$,
 };
 
-/** The forwarding functions. A chunk replaces each by an import of the loader's export. */
+/** The forwarding functions. The module replaces each by an import of the loader's export. */
 const FORWARDERS: Record<string, Source | undefined> = {
   addBlock$,
   findInnerBlocks$,
@@ -341,55 +469,28 @@ export const HELPER_NAMES: readonly string[] = [
   ...Object.keys(FORWARDERS),
 ];
 
-export interface PrintedHelpers {
-  /** The source of each function the chunk needs, dependencies first. */
-  code: string[];
-  /** The names to import from `idlip/client`, which the loader holds. */
-  client: Set<string>;
-}
+/** The specifier chunks import the helpers from. */
+export const HELPERS_MODULE = 'idlip/helpers';
 
 /**
- * Returns the code to copy into a chunk that uses the given helpers (`text`, `setAttr` and
- * so on), and the loader exports that code needs.
+ * Returns the source of the `idlip/helpers` module: a copy of every helper, the loader exports
+ * they call as imports from `idlip/client`, and an export of each helper. It throws when a
+ * bundler renamed a function, since the copies call each other by name.
  */
-export function printHelpers(names: Iterable<string>): PrintedHelpers {
-  const wanted = new Set<string>();
-  const client = new Set<string>();
-  const queue: string[] = [];
-  for (const name of names) {
-    queue.push(`${name}$`);
-  }
-  while (queue.length > 0) {
-    const name = queue.pop()!;
-    const helper = HELPERS[name];
-    if (helper === undefined) {
-      throw new Error(`Unknown helper ${name}`);
-    }
-    if (wanted.has(name)) {
-      continue;
-    }
-    wanted.add(name);
-    queue.push(...helper.uses);
-    for (const imported of helper.client) {
-      client.add(imported);
-    }
-  }
+export function printHelpersModule(): string {
   const code: string[] = [];
-  for (const [name, helper] of Object.entries(HELPERS)) {
-    if (helper === undefined || !wanted.has(name)) {
-      continue;
+  for (const [name, source] of Object.entries(HELPERS)) {
+    if (source?.name !== name) {
+      throw new Error(`The helper ${name} was renamed to ${source?.name}`);
     }
-    // A bundler may rename a function, which would break the names the copies call.
-    if (helper.source.name !== name) {
-      throw new Error(`The helper ${name} was renamed to ${helper.source.name}`);
-    }
-    code.push(helper.source.toString());
+    code.push(source.toString());
   }
-  for (const imported of client) {
-    const forwarder = FORWARDERS[`${imported}$`];
-    if (forwarder?.name !== `${imported}$`) {
-      throw new Error(`The forwarder ${imported}$ was renamed to ${forwarder?.name}`);
+  const specifiers: string[] = [];
+  for (const [name, forwarder] of Object.entries(FORWARDERS)) {
+    if (forwarder?.name !== name) {
+      throw new Error(`The forwarder ${name} was renamed to ${forwarder?.name}`);
     }
+    specifiers.push(`${name.slice(0, -1)} as ${name}`);
   }
-  return { code, client };
+  return `import { ${specifiers.join(', ')} } from 'idlip/client';\n\n${code.join('\n\n')}\n\nexport { ${Object.keys(HELPERS).join(', ')} };\n`;
 }

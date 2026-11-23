@@ -1,6 +1,6 @@
 # 0005: Markup syntax
 
-Status: draft
+Status: rejected (2026-11-21, `docs/roadmaps/core/debates/dsl/debate.md`). TSX stays the one source syntax.
 
 This proposal defines the `.idlip` file: a plain TypeScript module whose components return markup with control-flow blocks. It follows brumate's grammar (`../brumate/docs/grammar.md`) without `<script>`, `<style>`, `#template`, `#loading`, `#portal`, `#client` and the other blocks idlip has no use for yet. Components stay plain functions as in [0002](0002-modules.md), and the effects, subscription, error and head rules of [0004](0004-effects-refs-errors.md) stay as they are.
 
@@ -16,7 +16,7 @@ This proposal defines the `.idlip` file: a plain TypeScript module whose compone
 - **`#for` needs `by`.** Keys are fields of the item, as in `<For key="id">`. There is no index key and no `#else` on `#for` in this version.
 - **`#switch` takes no discriminant.** Each `#case` holds a condition and the first true one renders, as in brumate. The lowering is a chain of conditions, so TypeScript narrows in each case.
 - **The compiler lowers to TSX and runs `analyze()` unchanged.** Errors from the analyzer map back to `.idlip` positions with a segment table.
-- **File suffix `.idlip`.** Files named `*.idlip.tsx` keep working: they are TSX with no markup grammar. A module imports another by `./chart.idlip`.
+- **File suffix `.idlip`.** Files named `*.tsx` keep working: they are TSX with no markup grammar. A module imports another by `./chart.idlip`.
 
 ## Example
 

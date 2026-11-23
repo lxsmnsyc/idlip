@@ -18,6 +18,8 @@ declare const __IDLIP_HAS_ERRORS__: boolean | undefined;
 declare const __IDLIP_HAS_RETRY__: boolean | undefined;
 declare const __IDLIP_HAS_SKEW__: boolean | undefined;
 declare const __IDLIP_HAS_DYNAMIC__: boolean | undefined;
+declare const __IDLIP_HAS_KEY_FN__: boolean | undefined;
+declare const __IDLIP_HAS_INNER_LISTS__: boolean | undefined;
 
 /** Handlers that `await`, which the task runner serves. */
 export const HAS_TASKS: boolean = typeof __IDLIP_HAS_TASKS__ === 'undefined' || __IDLIP_HAS_TASKS__;
@@ -44,3 +46,9 @@ export const HAS_SKEW: boolean = typeof __IDLIP_HAS_SKEW__ === 'undefined' || __
 /** Dynamic holes, whose paths the page state records and the patch reads. */
 export const HAS_DYNAMIC: boolean =
   typeof __IDLIP_HAS_DYNAMIC__ === 'undefined' || __IDLIP_HAS_DYNAMIC__;
+/** A `<For>` key that is not one field of the item, which the list chunk evaluates. */
+export const HAS_KEY_FN: boolean =
+  typeof __IDLIP_HAS_KEY_FN__ === 'undefined' || __IDLIP_HAS_KEY_FN__;
+/** A list inside a condition, a region or a row, which a patch can render fresh before its own binding runs. */
+export const HAS_INNER_LISTS: boolean =
+  typeof __IDLIP_HAS_INNER_LISTS__ === 'undefined' || __IDLIP_HAS_INNER_LISTS__;

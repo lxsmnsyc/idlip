@@ -1,61 +1,9 @@
-import { addBlock as addBlock$, findInnerBlocks as findInnerBlocks$, parseHtml as parseHtml$, removeBlock as removeBlock$ } from 'idlip/client';
+import { clone$, putText$, setBranch$ } from 'idlip/helpers';
 
-function getText$(value) {
-	if (value === null || value === undefined || typeof value === "boolean") {
-		return "";
-	};
-	return String(value);
-}
-
-function escapeText$(value) {
-	return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-}
-
-function findEnd$(start) {
-	let depth = 0;
-	for (let node = start.nextSibling; node !== null; node = node.nextSibling) {
-		if (node.nodeType !== 8) {
-			continue;
-		};
-		if (node.nodeValue === "/c") {
-			if (depth === 0) {
-				return node;
-			};
-			depth--;
-		} else if (/^c\d/.test(node.nodeValue ?? "")) {
-			depth++;
-		}
-	};
-	return null;
-}
-
-function text$(value) {
-	return escapeText$(getText$(value));
-}
-
-function setBranch$(start, branch, render, ns) {
-	const colon = start.data.indexOf(":");
-	const end = findEnd$(start);
-	const parent = start.parentNode;
-	if (start.data.slice(colon + 1) === String(branch) || end === null || parent === null) {
-		return;
-	};
-	for (const block of findInnerBlocks$(start, end)) {
-		removeBlock$(block);
-	};
-	removeBlock$(start);
-	while (start.nextSibling !== end) {
-		start.nextSibling?.remove();
-	};
-	for (const node of parseHtml$(start.ownerDocument, render(branch), ns)) {
-		parent.insertBefore(node, end);
-	};
-	start.data = `${start.data.slice(0, colon + 1)}${branch}`;
-	for (const block of findInnerBlocks$(start, end)) {
-		addBlock$(block);
-	};
-	addBlock$(start);
-}
+const templateE1_0$ = { h: '<b><!--x1--></b>', n: 1 };
+const templateE1_1$ = { h: '<em><!--x1--></em>', n: 1 };
+const templateC2_0$ = { h: '<!--e1:x1--><!--/e-->', n: 1 };
+const templateC2_1$ = { h: '<i>hidden</i>', n: 0 };
 
 function check(value) {
   if (value < 0) {
@@ -68,16 +16,24 @@ export function c2(start, { model }) {
 setBranch$(start, model.shown ? 0 : 1, renderC2);
 }
 
-function renderC2(branch) {
+function renderC2(branch, $doc) {
 if (branch === 0) {
-let $try1;
+const $n = clone$(templateC2_0$, $doc);
+let $nc1;
 try {
-$try1 = `<!--e1:0--><b>${text$(check(3))}</b><!--/e-->`;
+const $n2 = clone$(templateE1_0$, $doc);
+putText$($n2[1], check(3));
+$nc1 = $n2[0];
+$n[1].data += 0;
 } catch ($e) {
 const error = $e instanceof Error ? $e.name + ': ' + $e.message : String($e);
-$try1 = `<!--e1:1--><em>${text$(error)}</em><!--/e-->`;
+const $n3 = clone$(templateE1_1$, $doc);
+putText$($n3[1], error);
+$nc1 = $n3[0];
+$n[1].data += 1;
 }
-return $try1;
+$n[1].after($nc1);
+return $n[0];
 }
-return '<i>hidden</i>';
+return clone$(templateC2_1$, $doc)[0];
 }

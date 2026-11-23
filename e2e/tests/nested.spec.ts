@@ -41,7 +41,8 @@ test('the first child click loads only that child handler and binding chunks', a
     await getRow(page, 0).getByRole('button', { name: '+' }).click();
     await expect(getRow(page, 0).locator('output')).toHaveText('1');
   });
-  expect(chunks.toSorted()).toEqual(['binding=count', 'handler=increment']);
+  // The shared helpers module loads with the first chunks, in the same round trip.
+  expect(chunks.toSorted()).toEqual(['binding=count', 'handler=increment', 'helpers']);
   expect(await readMain(page)).toBe(
     await renderFresh(page, [{ ...initial[0], start: 1 }, initial[1], initial[2]]),
   );

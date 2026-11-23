@@ -53,7 +53,7 @@ export default function Refs(props: { start: string }): JSX.Element {
       <button on:click={() => add()}>add</button>
       <p>{size}</p>
       <ul>
-        <For each={items} key="id">
+        <For each={items} key={(r) => r.id}>
           {(r) => <li ref={['row', r.id]}>{r.text}</li>}
         </For>
       </ul>
@@ -87,7 +87,7 @@ function clickButton(mounted: MountedPage, label: string): void {
 
 describe('refs in the server render', () => {
   it('writes i-ref on elements and on rows', () => {
-    const { server } = compile(SOURCE, '/src/app.idlip.tsx');
+    const { server } = compile(SOURCE, '/src/app.tsx');
     expect(server).toContain('i-ref="form"');
     expect(server).toContain('i-ref="search"');
     expect(server).toContain("attr$('i-ref', 'row ' + r.id)");
@@ -101,7 +101,7 @@ describe('refs in the server render', () => {
 
   it('rejects a ref key that is not the key of the For', () => {
     const bad = SOURCE.replace("['row', r.id]", "['row', r.text]");
-    const { diagnostics } = compile(bad, '/src/app.idlip.tsx');
+    const { diagnostics } = compile(bad, '/src/app.tsx');
     expect(diagnostics.map((item) => item.rule)).toContain('ref-key');
   });
 });

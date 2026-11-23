@@ -1,7 +1,7 @@
 ---
 id: markup-compile
 title: Compile .idlip files
-status: done
+status: dropped
 priority: should
 type: feature
 story: markup-frontend
@@ -57,3 +57,5 @@ Feed `.idlip` files into `compile()`, map diagnostics back to `.idlip` spans, re
 Wiring plus span mapping over existing stages.
 
 Landed as a97403a on `feat/markup-frontend` after one fresh review round (Vite `readImport`, span fallback) and a lint fix.
+
+Dropped 2026-11-21 by debate `debates/dsl`: built on `feat/markup-frontend` only, never merged; the branch stays as history.

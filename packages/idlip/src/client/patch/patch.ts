@@ -13,7 +13,8 @@ import type {
 } from '../../core/format.ts';
 import { failRegion } from '../errors.ts';
 import { DYNAMIC_GROUP, getDynamic, isIdle } from '../dynamic.ts';
-import { HAS_CHILDREN, HAS_DYNAMIC, HAS_ERRORS } from '../features.ts';
+import { HAS_CHILDREN, HAS_DYNAMIC, HAS_ERRORS, HAS_INNER_LISTS } from '../features.ts';
+import { added } from './blocks.ts';
 import { diffPaths, getListKeys } from './diff.ts';
 import { isBinding, isComment, isRecord } from './guards.ts';
 import { findNode } from './nodes.ts';
@@ -21,7 +22,7 @@ import { findNode } from './nodes.ts';
 interface Plan {
   /** The paths of every group. */
   readonly paths: readonly string[];
-  readonly keys: Readonly<Record<string, string>>;
+  readonly keys: Readonly<Record<string, string | undefined>>;
   /** The export names of bindings inside rows. */
   readonly rowNames: ReadonlySet<string>;
 }
@@ -134,7 +135,7 @@ function readList(binding: Binding, scope: Scope): readonly unknown[] {
  * `patch-lists` provides `patchList`.
  */
 export function createPatch(patchList: PatchList): Patch {
-  return async (page, prev, next) => {
+  const runPatch: Patch = async (page, prev, next) => {
     const { manifest } = page;
     const plan = getPlan(manifest);
     const selected = selectGroups(manifest, plan, prev, next);
@@ -208,4 +209,15 @@ export function createPatch(patchList: PatchList): Patch {
       }
     }
   };
+  // The blocks a patch adds are its own: the set starts and ends empty. Patches run one at a time.
+  return HAS_INNER_LISTS
+    ? async (page, prev, next) => {
+        added.clear();
+        try {
+          await runPatch(page, prev, next);
+        } finally {
+          added.clear();
+        }
+      }
+    : runPatch;
 }

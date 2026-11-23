@@ -20,7 +20,7 @@ for (const item of ['src', 'vite.config.ts', 'package.json', 'tsconfig.json']) {
 symlinkSync(path.join(source, 'node_modules'), path.join(target, 'node_modules'), 'dir');
 
 if (name === 'counters-subs') {
-  const file = path.join(target, 'src/counter.idlip.tsx');
+  const file = path.join(target, 'src/counter.tsx');
   const code = readFileSync(file, 'utf8');
   const head = 'async function* idle(_input: number, signal: AbortSignal) {\n';
   if (!code.includes(head)) {

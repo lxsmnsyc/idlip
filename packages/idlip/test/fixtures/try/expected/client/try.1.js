@@ -1,18 +1,9 @@
-function getText$(value) {
-	if (value === null || value === undefined || typeof value === "boolean") {
-		return "";
-	};
-	return String(value);
-}
+import { clone$, putText$ } from 'idlip/helpers';
 
-function escapeText$(value) {
-	return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-}
+const templateE1_1$ = { h: '<em><!--x1--></em>', n: 1 };
 
-function text$(value) {
-	return escapeText$(getText$(value));
-}
-
-export function render(error) {
-return `<em>${text$(error)}</em>`;
+export function render(error, $scope, $doc) {
+const $n = clone$(templateE1_1$, $doc);
+putText$($n[1], error);
+return $n[0];
 }

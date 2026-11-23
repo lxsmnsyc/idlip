@@ -1,4 +1,4 @@
-file todo.idlip.tsx
+file todo.tsx
 
 component TodoApp (stateful, exported)
   props: props
@@ -33,7 +33,7 @@ component TodoApp (stateful, exported)
       <ul>
         for #3 key=id item=t
           <li class={#4}>
-            <input type="checkbox" checked={#5} [on:click -> toggle(t.id)  render reads todos.*.id]>
+            <input type="checkbox" checked={#5} [on:click -> toggle(t.id)]>
             {#6}
   holes:
     #0 draft

@@ -1,4 +1,4 @@
-import { getChunkId } from '../core/format.ts';
+import { HELPERS_KEY, TEMPLATES_KEY, getChunkId } from '../core/format.ts';
 import type { ChunkUrls, Manifest } from '../core/format.ts';
 
 export interface PreloadOptions {
@@ -32,7 +32,9 @@ function escapeTarget(value: string): string {
  * Returns the chunk URLs to preload. It walks the event types in the given order, then the
  * manifests in the given order, then the handler names of that event in sorted order. For each
  * handler it takes the handler chunk and then the binding chunks of its `bindings`. It stops
- * at `max`, so the earliest events and handlers win.
+ * at `max`, so the earliest events and handlers win. When it names any chunk, the shared
+ * helpers and templates modules (`chunks.helpers`, `chunks.templates`) come first, outside
+ * `max`, since the chunks import them.
  */
 function findUrls(
   chunks: ChunkUrls,
@@ -66,13 +68,23 @@ function findUrls(
       }
     }
   }
-  return [...urls];
+  // The chunks import the helpers and templates modules, so a preload of a chunk without them
+  // saves no trip.
+  const shared: string[] = [];
+  if (urls.size > 0) {
+    for (const key of [HELPERS_KEY, TEMPLATES_KEY]) {
+      if (Object.hasOwn(chunks, key)) {
+        shared.push(chunks[key]);
+      }
+    }
+  }
+  return [...shared, ...urls];
 }
 
 /**
  * Names the chunks of the first click so the browser fetches them with the page. It reads
  * `manifest.listens` of the root manifest, and of the child manifests when the page has
- * children (the values of `PageState.modules`): the handlers the view dispatches on each event
+ * children (the manifests of the server modules): the handlers the view dispatches on each event
  * and the binding chunks of their write sets. Nothing else is named. It needs no markup, so
  * the result can go out in a `Link` header as soon as the request is known. Put the `<link>`
  * tags in `<head>`, or send the `header` format with a 103 response. The loader imports the

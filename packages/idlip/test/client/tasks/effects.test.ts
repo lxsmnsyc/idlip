@@ -46,7 +46,7 @@ it('runs the compiled effects chunks: props reach a continuation and awaits chai
   const script = state
     .replace('</script>', '')
     .replaceAll(
-      /("[^"]*\.idlip\.tsx\?idlip-([^&"]+)&lang\.js"):"[^"]*"/g,
+      /("[^"]*\.tsx\?idlip-([^&"]+)&lang\.js"):"[^"]*"/g,
       (_all, key: string, chunk: string) => {
         const name = getChunkFile(chunk);
         writeFileSync(

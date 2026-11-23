@@ -1,7 +1,7 @@
 ---
 id: docs-benchmarks
 title: Benchmarks page
-status: todo
+status: done
 priority: should
 type: docs
 story:
@@ -20,13 +20,20 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 60000
 owns:
   - website/docs/benchmarks.md
+  - website/src/benchmarks.json
 shared: []
 reserves: []
 provides: []
 depends_on:
+  - on: bench-scale
+    kind: hard
+    why: the page covers the scale scenario and the landing headline numbers
+  - on: website-polish
+    kind: hard
+    why: website-polish creates website/src/benchmarks.json and the landing section that reads it
   - on: website-scaffold
     kind: hard
     why: adds a Markdown page that the scaffold's build and sidebar process
@@ -36,6 +43,12 @@ depends_on:
   - on: spike-chunk-merge
     kind: hard
     why: the first-click numbers change if chunk merging lands, so the page waits for the final ones
+  - on: bench-rows
+    kind: hard
+    why: the page shows the rows and dashboard tables
+  - on: perf-from-bench
+    kind: hard
+    why: the page shows the numbers after the performance work
 ---
 
 # Benchmarks page
@@ -67,3 +80,12 @@ S: one page. The only cost is a benchmark run.
 ## Updates after wave 9
 
 - `prefetch` measured the cold first click with the links on: 60 ms against 221 ms off, at 150 ms RTT (`nodes/prefetch/outcome.md`, `benchmarks/prefetch/run.mjs`). Add it as a labelled row or note only if the page says prefetch is opt-in and loads two chunks before any click. The main table stays the default build.
+
+## Updates after the bench nodes (2026-11-21)
+
+- Columns: idlip, brumate latest (`benchmarks/brumate`), brumate 0.3.0, Marko 6, Qwik 1, Qwik 2 for todos; idlip, brumate, Marko for rows and dashboard (`bench-rows`).
+- Use the run recorded after `perf-from-bench`, and copy its "Where idlip loses" list.
+
+## Landing numbers (2026-11-22)
+
+Also update `website/src/benchmarks.json`, the data file the landing page reads (`website-polish`), with the same numbers and run date as the page.

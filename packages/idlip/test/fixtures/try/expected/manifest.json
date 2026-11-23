@@ -1,5 +1,5 @@
 {
-  "module": "/src/board.idlip.tsx",
+  "module": "/src/board.tsx",
   "events": [
     "click"
   ],
@@ -27,6 +27,24 @@
       "bindings": [
         "shown"
       ]
+    },
+    "$e0": {
+      "chunk": "handler=add",
+      "bindings": [
+        "items.*.n"
+      ],
+      "tags": [
+        "add"
+      ]
+    },
+    "$e1": {
+      "chunk": "handler=toggle",
+      "bindings": [
+        "shown"
+      ],
+      "tags": [
+        "toggle"
+      ]
     }
   },
   "fallback": {
@@ -41,7 +59,7 @@
       ],
       "chunk": "binding=items.*.n",
       "bindings": [
-        "t6"
+        "a6"
       ],
       "covers": [
         "items"
@@ -74,7 +92,7 @@
       "path": "items",
       "chunk": "list=5",
       "bindings": [
-        "t6"
+        "a6"
       ]
     }
   }

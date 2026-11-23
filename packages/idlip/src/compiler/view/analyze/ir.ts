@@ -110,28 +110,50 @@ export interface Hole {
   span: Span;
 }
 
+/**
+ * The key of a `<For>` row, from `key={(item) => ...}`. A `field` is a field of the item
+ * (`item.id`) and the manifest names it. A `computed` key is any other expression of the item
+ * in the closed grammar; the list chunk evaluates it.
+ */
+export type ForKey = { kind: 'field'; field: string } | { kind: 'computed'; expr: Expr };
+
 /** What an event prop dispatches. */
 export type Target =
   | { kind: 'handler'; name: string }
   | { kind: 'prop'; name: string }
   | { kind: 'reset' };
 
+/**
+ * One step of an event arrow, run when the event dispatches: a handler call, or a branch on a
+ * test. The expressions read the event (`root.kind === 'event'`), the model, the props and
+ * the row scope.
+ */
+export type EventStep =
+  | { kind: 'send'; target: Target; args: Expr[]; span: Span }
+  | { kind: 'if'; test: Expr; then: EventStep[]; else: EventStep[] };
+
+/**
+ * What an event does. `steps` compile to a function in the handler chunk that returns the
+ * messages (`event-callbacks`). `message` is data built at render: a message prop of a stateful
+ * child, a forwarded message prop and a `<Try>` reset.
+ */
+export type EventBody =
+  | { kind: 'steps'; steps: EventStep[] }
+  | { kind: 'message'; target: Target; args: Expr[]; paths: Path[] };
+
 /** `on:click={...}` or `latest:pointermove={...}`, and message props on child components. */
 export interface Event {
   name: string;
   mode: 'on' | 'latest';
-  target: Target;
-  /** Argument expressions. Event paths (`root.kind === 'event'`) are read at dispatch. */
-  args: Expr[];
-  /** Model paths the arguments read at render, so the payload attribute can patch. */
-  paths: Path[];
+  body: EventBody;
   /** `prevent`, `stop` and key filters, from the block body forms of view-ir v9. */
   modifiers: EventModifier[];
   span: Span;
 }
 
+/** `prevent` with `keys` prevents the events that match one of the key filters only. */
 export type EventModifier =
-  | { kind: 'prevent' }
+  | { kind: 'prevent'; keys?: string[] }
   | { kind: 'stop' }
   | { kind: 'once' }
   | { kind: 'capture' }
@@ -173,7 +195,7 @@ export type Node =
   | {
       kind: 'for';
       each: Hole;
-      key: string;
+      key: ForKey;
       item: string;
       index: string | undefined;
       namespace: Namespace;

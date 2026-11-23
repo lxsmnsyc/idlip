@@ -1,0 +1,797 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>idlip hero: the page wakes where you click</title>
+    <style>
+      /*BASE_CSS*/
+
+      /* The timeline sets these every frame, so no transition. */
+      .pointer {
+        transition: none;
+      }
+
+      /* The browser frame and the page inside it. */
+      .frame {
+        top: 24px;
+        left: 24px;
+        width: 512px;
+        height: 280px;
+        overflow: hidden;
+        border-radius: var(--radius-md);
+        background: var(--bg-elevated);
+        color: var(--text);
+      }
+      .bar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        height: 36px;
+        padding: 0 14px;
+      }
+      .dots {
+        display: flex;
+        gap: 5px;
+        margin-right: auto;
+      }
+      .dots i {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--surface-strong);
+      }
+      .net {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        height: 22px;
+        padding: 0 10px;
+        border-radius: var(--radius);
+        background: var(--surface);
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 9px;
+        white-space: nowrap;
+        opacity: 0;
+        transform: translateY(-6px);
+        transition:
+          opacity var(--duration) var(--ease-out),
+          transform var(--duration) var(--ease);
+      }
+      .net b {
+        color: var(--text);
+        font-weight: 700;
+      }
+      .net.lit {
+        background: var(--accent-fill);
+        color: var(--on-accent);
+      }
+      .net.lit b {
+        color: var(--on-accent);
+      }
+      .board.on-load .n-loader,
+      .board.on-click .n-handler,
+      .board.on-patch .n-binding {
+        opacity: 1;
+        transform: none;
+      }
+      .board.on-click .n-handler {
+        transition-delay: 80ms;
+      }
+
+      /* Blocks of the page. Their opacity comes from the timeline. */
+      .blk {
+        position: absolute;
+        border-radius: 8px;
+        background: var(--surface-strong);
+      }
+      .blk.soft {
+        background: var(--surface);
+      }
+      .media {
+        border-radius: 14px;
+        background:
+          repeating-linear-gradient(
+            135deg,
+            transparent 0 10px,
+            color-mix(in srgb, var(--surface-strong) 70%, transparent) 10px 11px
+          ),
+          var(--surface);
+      }
+      .media::after {
+        position: absolute;
+        left: 18px;
+        bottom: 16px;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: var(--surface-strong);
+        content: '';
+      }
+      .btn {
+        border-radius: var(--radius);
+        background: var(--text);
+      }
+
+      /* The one live block: the todo app. */
+      .widget {
+        position: absolute;
+        top: 100px;
+        left: 304px;
+        width: 196px;
+        padding: 10px;
+        gap: 4px;
+        background: var(--surface);
+      }
+      .widget .row {
+        height: 40px;
+        font-size: 12px;
+        background: var(--bg-elevated);
+      }
+      .widget .app-title {
+        font-size: 14px;
+      }
+      .widget .app-head {
+        height: 28px;
+        align-items: center;
+        padding: 0 4px;
+      }
+      .wake {
+        position: absolute;
+        inset: -4px;
+        border-radius: 24px;
+        box-shadow: 0 0 0 3px var(--accent-fill);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity var(--mid) var(--ease-out);
+      }
+      .board.on-click .wake {
+        opacity: 1;
+      }
+      .board.on-press .r2 .box {
+        transform: scale(0.88);
+      }
+      .board.on-patch .r2 .box::before,
+      .board.on-patch .r2 .box svg {
+        opacity: 1;
+        transform: none;
+      }
+      .board.on-patch .r2 .txt {
+        opacity: 0.6;
+      }
+      .count .now {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      .board.on-patch .count .now {
+        opacity: 1;
+        transform: none;
+      }
+      .board.on-patch .count .was {
+        opacity: 0;
+        transform: translateY(-6px);
+      }
+      .count .flash {
+        inset: -3px -6px;
+        border-radius: 8px;
+      }
+      .board.on-patch:not(.on-rest) .flash {
+        opacity: 1;
+      }
+
+      /* The print head of the server render: one pass, top to bottom. */
+      .scan {
+        position: absolute;
+        top: 36px;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: var(--accent-strong);
+        opacity: 0;
+        pointer-events: none;
+      }
+      .scan::before {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 2px;
+        height: 40px;
+        background: linear-gradient(to top, var(--accent-tint), transparent);
+        content: '';
+      }
+
+      /* The timeline: component JS run over time, with a scrubber. */
+      .timeline {
+        top: 316px;
+        left: 24px;
+        width: 512px;
+        height: 100px;
+        border-radius: var(--radius-md);
+        background: var(--tl-bg);
+        --tl-bg: color-mix(in srgb, var(--on-ink) 9%, var(--ink));
+      }
+      .tl-head {
+        position: absolute;
+        top: 12px;
+        left: 20px;
+        right: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 24px;
+      }
+      .tl-value {
+        display: grid;
+        font-family: var(--mono);
+        font-size: 14px;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+      }
+      .tl-value > span {
+        grid-area: 1 / 1;
+        justify-self: end;
+        padding: 1px 6px;
+        border-radius: 6px;
+        transition:
+          opacity var(--duration) var(--ease-out),
+          transform var(--duration) var(--ease-out);
+      }
+      .tl-value .now {
+        background: var(--accent-fill);
+        color: var(--on-accent);
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      .board.on-patch .tl-value .now {
+        opacity: 1;
+        transform: none;
+      }
+      .board.on-patch .tl-value .was {
+        opacity: 0;
+        transform: translateY(-6px);
+      }
+      .chart {
+        position: absolute;
+        top: 0;
+        left: 0;
+        overflow: visible;
+      }
+      .chart .base {
+        fill: none;
+        stroke: var(--line);
+        stroke-width: 2;
+        stroke-linecap: round;
+      }
+      .chart .step {
+        fill: none;
+        stroke: var(--on-ink);
+        stroke-width: 2;
+        stroke-linejoin: round;
+        stroke-linecap: round;
+      }
+      .chart .area {
+        fill: var(--accent-fill);
+      }
+      .chart .tick {
+        fill: var(--on-ink);
+      }
+      .chart text {
+        fill: var(--on-ink-muted);
+        font-family: var(--mono);
+        font-size: 9px;
+      }
+      .chart .on-area {
+        fill: var(--on-accent);
+      }
+      .mask {
+        position: absolute;
+        top: 44px;
+        left: 20px;
+        width: 476px;
+        height: 46px;
+        background: var(--tl-bg);
+        opacity: 0.72;
+        transform-origin: 100% 50%;
+        pointer-events: none;
+      }
+      .head {
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 3;
+        width: 2px;
+        height: 44px;
+        margin-left: -1px;
+        background: var(--on-ink);
+        pointer-events: none;
+      }
+      .knob {
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 4;
+        width: 44px;
+        height: 44px;
+        margin: -22px 0 0 -22px;
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        background: transparent;
+        cursor: grab;
+        touch-action: none;
+      }
+      .knob::before {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 16px;
+        height: 16px;
+        margin: -8px 0 0 -8px;
+        border-radius: 50%;
+        background: var(--on-ink);
+        box-shadow: 0 0 0 4px var(--ink);
+        content: '';
+        transition: transform var(--duration-fast) var(--ease-out);
+      }
+      .knob:hover::before {
+        transform: scale(1.15);
+      }
+      .knob:active {
+        cursor: grabbing;
+      }
+      .knob:active::before {
+        transform: scale(0.96);
+      }
+      .knob:focus-visible {
+        outline: 3px solid var(--focus);
+        outline-offset: -8px;
+      }
+      .scrub {
+        position: absolute;
+        top: 40px;
+        left: 20px;
+        width: 472px;
+        height: 56px;
+        cursor: pointer;
+        touch-action: none;
+      }
+    </style>
+  </head>
+  <body>
+    <!--THEME-->
+    <main>
+      <figure
+        class="board"
+        data-board
+        aria-label="A page rendered once on the server; a click wakes only the todo block it touched"
+        style="margin: 0"
+      >
+        <p class="visually-hidden" role="status" aria-live="polite" data-live></p>
+        <div class="scene">
+          <div class="abs frame" data-frame>
+            <div class="bar">
+              <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="net n-loader">loader.js <b>3.9 kB</b></span>
+              <span class="net lit n-handler">toggle.js <b>119 B</b></span>
+              <span class="net lit n-binding">todos._.done.js <b>505 B</b></span>
+            </div>
+
+            <!-- The page: blocks the server rendered, and the todo app. -->
+            <i class="blk" data-b style="top: 52px; left: 16px; width: 24px; height: 24px"></i>
+            <i
+              class="blk soft"
+              data-b
+              style="top: 60px; left: 56px; width: 44px; height: 8px; border-radius: 4px"
+            ></i>
+            <i
+              class="blk soft"
+              data-b
+              style="top: 60px; left: 112px; width: 52px; height: 8px; border-radius: 4px"
+            ></i>
+            <i
+              class="blk soft"
+              data-b
+              style="top: 60px; left: 176px; width: 40px; height: 8px; border-radius: 4px"
+            ></i>
+            <i class="blk btn" data-b style="top: 52px; left: 424px; width: 72px; height: 24px"></i>
+            <i
+              class="blk"
+              data-b
+              style="top: 100px; left: 16px; width: 248px; height: 20px; border-radius: 6px"
+            ></i>
+            <i
+              class="blk"
+              data-b
+              style="top: 126px; left: 16px; width: 176px; height: 20px; border-radius: 6px"
+            ></i>
+            <i
+              class="blk soft"
+              data-b
+              style="top: 160px; left: 16px; width: 264px; height: 8px; border-radius: 4px"
+            ></i>
+            <i
+              class="blk soft"
+              data-b
+              style="top: 174px; left: 16px; width: 240px; height: 8px; border-radius: 4px"
+            ></i>
+            <i
+              class="blk soft"
+              data-b
+              style="top: 188px; left: 16px; width: 200px; height: 8px; border-radius: 4px"
+            ></i>
+            <i
+              class="blk media"
+              data-b
+              style="top: 208px; left: 16px; width: 272px; height: 60px"
+            ></i>
+
+            <div class="app widget" data-b data-live-block>
+              <div class="app-head">
+                <span class="app-title">Todos</span
+                ><span class="count"
+                  ><span class="was"><b>1</b> left</span><span class="now"><b>0</b> left</span
+                  ><i class="flash"></i
+                ></span>
+              </div>
+              <div class="row r1 done">
+                <span class="box"
+                  ><svg
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.4"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M5 12.5l4.5 4.5L19 7.5" /></svg></span
+                ><span class="txt">Write the format</span>
+              </div>
+              <div class="row r2" data-target>
+                <span class="box"
+                  ><svg
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.4"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M5 12.5l4.5 4.5L19 7.5" /></svg></span
+                ><span class="txt">Build the runtime</span>
+              </div>
+              <i class="wake"></i>
+            </div>
+            <i class="scan" data-scan></i>
+          </div>
+
+          <div class="abs timeline">
+            <div class="tl-head" aria-hidden="true">
+              <p class="label">component JS run</p>
+              <p class="tl-value" style="margin: 0">
+                <span class="was">0 B</span><span class="now">624 B</span>
+              </p>
+            </div>
+            <svg
+              class="chart"
+              width="512"
+              height="100"
+              viewBox="0 0 512 100"
+              aria-hidden="true"
+              data-chart
+            ></svg>
+            <i class="mask" data-mask></i>
+            <div class="scrub" data-scrub></div>
+            <i class="head" data-head></i>
+            <button
+              class="knob"
+              type="button"
+              role="slider"
+              aria-label="Timeline"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              aria-valuenow="0"
+              title="Drag to scrub"
+              data-knob
+            ></button>
+          </div>
+
+          <span class="pointer" aria-hidden="true" data-pointer
+            ><svg
+              viewBox="0 0 24 24"
+              width="22"
+              height="22"
+              fill="currentColor"
+              stroke="var(--bg-elevated)"
+              stroke-width="1.5"
+              stroke-linejoin="round"
+            >
+              <path d="M5 3l14 7.5-6.2 1.6L10 18z" /></svg
+          ></span>
+          <button
+            class="hit"
+            type="button"
+            aria-label="Toggle Build the runtime"
+            title="Toggle Build the runtime"
+            disabled
+          ></button>
+        </div>
+      </figure>
+    </main>
+    <script>
+      /*BASE_JS*/
+
+      const board = document.querySelector('[data-board]');
+      const live = board.querySelector('[data-live]');
+      const hit = board.querySelector('.hit');
+      const scan = board.querySelector('[data-scan]');
+      const pointer = board.querySelector('[data-pointer]');
+      const pointerIcon = pointer.querySelector('svg');
+      const mask = board.querySelector('[data-mask]');
+      const head = board.querySelector('[data-head]');
+      const knob = board.querySelector('[data-knob]');
+      const scrub = board.querySelector('[data-scrub]');
+      const blocks = [...board.querySelectorAll('[data-b]')];
+      const liveBlock = board.querySelector('[data-live-block]');
+
+      // The story on a 0..1 timeline. Every visual is a function of t, so scrubbing goes both ways.
+      const LOOP_MS = 7600;
+      const T = {
+        render: 0.04,
+        rendered: 0.24,
+        load: 0.3,
+        aim: 0.42,
+        click: 0.6,
+        patch: 0.66,
+        rest: 0.82,
+      };
+      const TRACK = { x: 20, w: 472, base: 84, top: 52 };
+      let t = 0;
+      let playing = !REDUCE;
+      let holdUntil = 0;
+      let last = 0;
+      let frame = 0;
+      let hidden = document.hidden;
+      let offscreen = false;
+      let wrapping = false;
+      let blockTops = [];
+      let target = { x: 0, y: 0 };
+
+      function clamp(value, min = 0, max = 1) {
+        return Math.min(max, Math.max(min, value));
+      }
+      function smooth(edge0, edge1, value) {
+        const k = clamp((value - edge0) / (edge1 - edge0));
+        return k * k * (3 - 2 * k);
+      }
+      function xAt(time) {
+        return TRACK.x + time * TRACK.w;
+      }
+
+      // Draw the chart once: the base line, the step at the click, the event ticks.
+      function drawChart() {
+        const chart = board.querySelector('[data-chart]');
+        const xc = xAt(T.click);
+        const xr = xAt(T.render);
+        const xl = xAt(T.load);
+        const end = TRACK.x + TRACK.w;
+        chart.innerHTML = `
+    <rect class="area" x="${xc}" y="${TRACK.top}" width="${end - xc}" height="${TRACK.base - TRACK.top}" rx="6"/>
+    <path class="base" d="M${TRACK.x} ${TRACK.base} H${xc}"/>
+    <circle class="tick" cx="${xr}" cy="${TRACK.base}" r="3"/>
+    <circle class="tick" cx="${xl}" cy="${TRACK.base}" r="3"/>
+    <text x="${xr - 3}" y="${TRACK.base - 12}">server render</text>
+    <text x="${xl - 3}" y="${TRACK.base - 12}">page load</text>
+    <text class="on-area" x="${xc + 10}" y="${TRACK.base - 12}">click</text>`;
+      }
+
+      function place() {
+        const frameRect = board.querySelector('[data-frame]').getBoundingClientRect();
+        const page = frameRect.height - 36;
+        blockTops = [];
+        for (const block of blocks) {
+          const rect = block.getBoundingClientRect();
+          blockTops.push((rect.top - frameRect.top - 36) / page);
+        }
+        const boardRect = board.getBoundingClientRect();
+        const box = board.querySelector('[data-target] .box').getBoundingClientRect();
+        target = {
+          x: box.left + box.width / 2 - boardRect.left,
+          y: box.top + box.height / 2 - boardRect.top,
+        };
+        hit.style.left = `${target.x - 22}px`;
+        hit.style.top = `${target.y - 22}px`;
+      }
+
+      function render() {
+        // The server render: a print head passes once and each block appears as it is reached.
+        const pass = smooth(T.render, T.rendered, t);
+        const scanY = 36 + pass * 248;
+        scan.style.transform = `translateY(${pass * 244}px)`;
+        scan.style.opacity =
+          t > T.render && t < T.rendered + 0.02
+            ? String(1 - smooth(T.rendered - 0.02, T.rendered + 0.02, t))
+            : '0';
+        const dim = smooth(T.click, T.patch + 0.04, t);
+        for (const [k, block] of blocks.entries()) {
+          const shown = clamp((pass - blockTops[k]) * 8);
+          const isLive = block === liveBlock;
+          block.style.opacity = String(shown * (isLive ? 1 : 1 - 0.55 * dim));
+          block.style.transform = `translateY(${(1 - shown) * 6}px)`;
+        }
+
+        // Discrete moments drive CSS transitions, which reverse when t goes back.
+        board.classList.toggle('on-load', t >= T.load);
+        board.classList.toggle('on-press', t >= T.click - 0.012 && t < T.click + 0.012);
+        board.classList.toggle('on-click', t >= T.click);
+        board.classList.toggle('on-patch', t >= T.patch);
+        board.classList.toggle('on-rest', t >= T.rest);
+        hit.disabled = t < T.load;
+
+        // The pointer of the autoplay comes in, presses, and leaves.
+        const come = smooth(T.aim, T.click - 0.02, t);
+        const away = smooth(T.patch + 0.04, T.patch + 0.1, t);
+        const shownPointer = board.classList.contains('user')
+          ? 0
+          : Math.min(smooth(T.aim, T.aim + 0.04, t), 1 - away);
+        pointer.style.opacity = String(shownPointer);
+        pointer.style.transform = `translate(${target.x - 4 + (1 - come) * 70}px, ${target.y - 2 + (1 - come) * 80}px)`;
+        pointerIcon.style.transform = board.classList.contains('on-press') ? 'scale(0.88)' : '';
+
+        // The timeline: the playhead, and a veil over what has not happened yet.
+        const x = xAt(t);
+        head.style.transform = `translate(${x}px, 44px)`;
+        knob.style.transform = `translate(${x}px, ${TRACK.base}px)`;
+        mask.style.transform = `scaleX(${1 - t})`;
+        knob.setAttribute('aria-valuenow', String(Math.round(t * 100)));
+        knob.setAttribute('aria-valuetext', describe());
+      }
+
+      function describe() {
+        if (t < T.rendered) return 'Server render';
+        if (t < T.click) return 'Page loaded, no component code run';
+        if (t < T.patch) return 'Click: toggle.js loads, 119 B';
+        return 'One row and the count patched, 624 B of component code';
+      }
+
+      function tick(now) {
+        frame = 0;
+        const dt = last ? now - last : 0;
+        last = now;
+        if (playing && now >= holdUntil && !wrapping) {
+          t += dt / LOOP_MS;
+          if (t >= 1) {
+            t = 1;
+            wrap();
+          }
+          const before = board.classList.contains('on-patch');
+          render();
+          if (!before && board.classList.contains('on-patch')) {
+            live.textContent =
+              'Loaded toggle.js, 119 B, and todos._.done.js, 505 B. Only the todo block changed.';
+          }
+        }
+        schedule();
+      }
+
+      function schedule() {
+        if (!frame && playing && !hidden && !offscreen) {
+          frame = requestAnimationFrame(tick);
+        }
+      }
+
+      function wrap() {
+        wrapping = true;
+        board.classList.add('fade');
+        setTimeout(() => {
+          board.classList.add('snap');
+          board.classList.remove('user');
+          t = 0;
+          render();
+          void board.offsetWidth;
+          board.classList.remove('snap', 'fade');
+          wrapping = false;
+          last = 0;
+        }, 320);
+      }
+
+      function seek(value, { hold = 0 } = {}) {
+        t = clamp(value);
+        holdUntil = performance.now() + hold;
+        last = 0;
+        render();
+      }
+
+      // Scrubbing: drag the knob or the track. Play resumes a moment after release.
+      function timeFromEvent(event) {
+        const rect = scrub.getBoundingClientRect();
+        return clamp((event.clientX - rect.left) / rect.width);
+      }
+      function startScrub(event) {
+        event.preventDefault();
+        const el = event.currentTarget;
+        el.setPointerCapture(event.pointerId);
+        board.classList.add('user');
+        seek(timeFromEvent(event), { hold: 1e9 });
+        const move = (e) => seek(timeFromEvent(e), { hold: 1e9 });
+        const up = () => {
+          el.removeEventListener('pointermove', move);
+          el.removeEventListener('pointerup', up);
+          el.removeEventListener('pointercancel', up);
+          holdUntil = performance.now() + 1500;
+        };
+        el.addEventListener('pointermove', move);
+        el.addEventListener('pointerup', up);
+        el.addEventListener('pointercancel', up);
+      }
+      knob.addEventListener('pointerdown', startScrub);
+      scrub.addEventListener('pointerdown', startScrub);
+      knob.addEventListener('keydown', (event) => {
+        const steps = {
+          ArrowLeft: -0.02,
+          ArrowDown: -0.02,
+          ArrowRight: 0.02,
+          ArrowUp: 0.02,
+          Home: -1,
+          End: 1,
+        };
+        if (event.key in steps) {
+          event.preventDefault();
+          board.classList.add('user');
+          seek(t + steps[event.key], { hold: 2500 });
+        }
+      });
+
+      hit.addEventListener('click', () => {
+        board.classList.add('user');
+        if (t >= T.click) {
+          // Toggle back: before the click, and wait.
+          seek(T.click - 0.06, { hold: 2600 });
+          live.textContent = 'Build the runtime is not done.';
+        } else {
+          seek(REDUCE ? T.rest : T.click - 0.012);
+        }
+      });
+
+      document.addEventListener('visibilitychange', () => {
+        hidden = document.hidden;
+        last = 0;
+        if (hidden) {
+          cancelAnimationFrame(frame);
+          frame = 0;
+        } else {
+          schedule();
+        }
+      });
+      new IntersectionObserver(([entry]) => {
+        offscreen = !entry.isIntersecting;
+        last = 0;
+        if (offscreen) {
+          cancelAnimationFrame(frame);
+          frame = 0;
+        } else {
+          schedule();
+        }
+      }).observe(board);
+
+      document.fonts.ready.then(() => {
+        drawChart();
+        place();
+        t = REDUCE ? T.rest + 0.05 : 0;
+        board.classList.add('snap');
+        render();
+        void board.offsetWidth;
+        board.classList.remove('snap');
+        schedule();
+      });
+    </script>
+  </body>
+</html>

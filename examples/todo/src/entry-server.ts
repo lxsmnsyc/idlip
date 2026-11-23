@@ -1,5 +1,5 @@
-import { render as renderComponent, renderListener } from 'idlip/server';
-import TodoApp from './todo.idlip.tsx';
+import { renderListener, renderPage, renderPreload } from 'idlip/server';
+import TodoApp from './todo.tsx';
 
 interface Todo {
   id: string;
@@ -58,17 +58,21 @@ function writeNonce(nonce: string | undefined): string {
 }
 
 /**
- * Renders the todo page for a request URL.
+ * Renders the todo page for a request URL. The head preloads the chunks of the first click, so
+ * the click makes no request. `?preload=off` leaves the links out, and the first click loads
+ * its chunks.
  */
 export async function render(url: string, options: PageOptions = {}): Promise<string> {
   const { nonce } = options;
-  const body = await renderComponent(TodoApp, readProps(url), { nonce });
+  const page = await renderPage(TodoApp, readProps(url), { nonce });
   const loader = options.loader ?? '/@id/idlip/client';
+  const preload = new URL(url, 'http://localhost').searchParams.get('preload') !== 'off';
   return (
     `<!doctype html><html lang="en"><head><meta charset="utf-8">` +
     `<meta name="viewport" content="width=device-width, initial-scale=1"><title>todo</title>` +
     renderListener({ nonce }) +
+    (preload ? renderPreload(page.chunks, page.manifests, { nonce }) : '') +
     `<script type="module" src="${loader}"${writeNonce(nonce)}></script>` +
-    `</head><body>${body}</body></html>`
+    `</head><body>${page.body}</body></html>`
   );
 }

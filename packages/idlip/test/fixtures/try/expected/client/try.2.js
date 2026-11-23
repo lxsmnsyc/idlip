@@ -1,58 +1,8 @@
-function getText$(value) {
-	if (value === null || value === undefined || typeof value === "boolean") {
-		return "";
-	};
-	return String(value);
-}
+import { clone$, getRows$, putText$ } from 'idlip/helpers';
 
-function escapeText$(value) {
-	return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-}
-
-function getRows$(start, model, paths) {
-	const levels = [];
-	let node = start;
-	while (node !== null) {
-		let depth = 0;
-		let row = false;
-		let index = 0;
-		let list;
-		for (let item = node.previousSibling; item !== null && list === undefined; item = item.previousSibling) {
-			const data = item.nodeType === 8 ? item.nodeValue ?? "" : "";
-			if (data === "/i") {
-				index += row && depth === 0 ? 1 : 0;
-				depth++;
-			} else if (data === "i") {
-				row ||= depth === 0;
-				depth -= depth === 0 ? 0 : 1;
-			} else if (row && depth === 0 && /^l\d/.test(data)) {
-				levels.push({
-					id: data.slice(1),
-					index
-				});
-				list = item;
-			}
-		};
-		node = list ?? node.parentNode;
-	};
-	const rows = [];
-	for (const { id, index } of levels.toReversed()) {
-		let value = model;
-		let star = 0;
-		for (const key of paths[id].split(".")) {
-			value = Reflect.get(Object(value), key === "*" ? rows[star++].index : key);
-		};
-		rows.push({
-			item: Reflect.get(Object(value), index),
-			index
-		});
-	};
-	return rows;
-}
-
-function text$(value) {
-	return escapeText$(getText$(value));
-}
+const templateE2_1$ = { h: '<button on:click=\'["$reset",[2]]\'><!--x1--></button>', n: 1 };
+const templateE2_0$ = { h: '<span i-a="6"><!--x1--></span>', n: 1 };
+const templateR2$ = { h: '<!--e2:x1--><!--/e-->', n: 1 };
 
 function check(value) {
   if (value < 0) {
@@ -61,20 +11,31 @@ function check(value) {
   return value;
 }
 
-export function render(error) {
-return `<button on:click='["$reset",[2]]'>${text$(error)}</button>`;
+export function render(error, $scope, $doc) {
+const $n = clone$(templateE2_1$, $doc);
+putText$($n[1], error);
+return $n[0];
 }
 
 const lists$ = {"5":"items"};
 
 export function region({ model }, start) {
 const rows = getRows$(start, model, lists$);
-let $try2;
+const $doc = start.ownerDocument;
+const $n = clone$(templateR2$, $doc);
+let $nc1;
 try {
-$try2 = `<!--e2:0--><span><!--t6-->${text$(check(rows[0].item.n))}<!--/t--></span><!--/e-->`;
+const $n2 = clone$(templateE2_0$, $doc);
+putText$($n2[1], check(rows[0].item.n));
+$nc1 = $n2[0];
+$n[1].data += 0;
 } catch ($e) {
 const error = $e instanceof Error ? $e.name + ': ' + $e.message : String($e);
-$try2 = `<!--e2:1--><button on:click='["$reset",[2]]'>${text$(error)}</button><!--/e-->`;
+const $n3 = clone$(templateE2_1$, $doc);
+putText$($n3[1], error);
+$nc1 = $n3[0];
+$n[1].data += 1;
 }
-return $try2;
+$n[1].after($nc1);
+return $n[0];
 }

@@ -12,7 +12,7 @@ function isRender(value: unknown): value is Render {
 
 /** Compiles a module and renders its server code with the reference helpers. */
 function renderModule(source: string): string {
-  const result = generate(analyze('test.idlip.tsx', source), source, '/src/test.idlip.tsx');
+  const result = generate(analyze('test.tsx', source), source, '/src/test.tsx');
   const body = result.server
     .replaceAll(/^import .*$/gm, '')
     .replace('export default function', 'function')
@@ -41,12 +41,14 @@ describe('generated locals', () => {
         let rows = [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }];
         return (
           <ul>
-            <For each={rows} key="id">{(row) => <li>{row.label}</li>}</For>
+            <For each={rows} key={(row) => row.id}>{(row) => <li>{row.label}</li>}</For>
           </ul>
         );
       }
     `);
-    expect(html.replaceAll(/<!--.*?-->/g, '')).toBe('<ul><li>A</li><li>B</li></ul>');
+    expect(html.replaceAll(/<!--.*?-->/g, '')).toBe(
+      '<ul><li i-a="1">A</li><li i-a="1">B</li></ul>',
+    );
   });
 
   it('keeps state named like other generated locals apart', () => {

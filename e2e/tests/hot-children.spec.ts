@@ -5,7 +5,7 @@ import type { Page } from '@playwright/test';
 
 // `vite dev` of a copy of examples/counters-subs (`fixture/hot-app.ts`), which the test edits.
 // Each `Counter` is a child with a subscription, and the copy counts the starts of its source.
-const file = path.resolve(import.meta.dirname, '../.hot/counters-subs/src/counter.idlip.tsx');
+const file = path.resolve(import.meta.dirname, '../.hot/counters-subs/src/counter.tsx');
 
 async function readStarts(page: Page): Promise<number> {
   return Number(await page.evaluate(() => Reflect.get(globalThis, 'idlipStarts') as unknown));

@@ -1,22 +1,21 @@
 import { addChild } from 'idlip/client';
-import * as Counter from '/src/counter.idlip.tsx?idlip-view&lang.js';
+import { clone$, slot$ } from 'idlip/helpers';
+import { init as $init_Counter, render as $render_Counter } from '/src/counter.tsx?idlip-view&lang.js';
 
-function encode$(part) {
-	return encodeURIComponent(part).replaceAll("-", "%2D");
-}
+const Counter = { init: $init_Counter, render: $render_Counter };
 
-function slot$(path, site, ...keys) {
-	let id = String(site);
-	for (const key of keys) {
-		id += `:${encode$(String(key))}`;
-	};
-	return path === "" ? id : `${path}/${id}`;
-}
+const templateL2$ = { h: '<!--i--><!--n:x1--><!--/n--><!--/i-->', n: 1 };
 
 // `addChild` makes the child's model from `init`, records the slot and returns the child's
-// markup between its boundary comments.
-export function render(scope) {
+// nodes, which go between the boundary comments of the template.
+export function render(scope, $doc) {
 const c = scope.rows[0].item;
 const path = scope.path ?? '';
-return addChild(slot$(path, 1, c.id), '/src/counter.idlip.tsx', Counter, { label: c.label, onRemove: ['remove', [c.id], '', path] });
+const $n = clone$(templateL2$, $doc);
+const $np1 = slot$(path, 1, c.id);
+$n[1].data += $np1;
+$n[1].after(addChild($np1, '/src/counter.tsx', Counter, { label: c.label, onRemove: ['remove', [c.id], '', path] }, $doc));
+return $n[0];
 }
+
+export const blocks = true;

@@ -1,10 +1,25 @@
 import { gzipSync } from 'node:zlib';
+import { COUNT_ARG } from './count.mjs';
+import { CLICKS, expected, widgets } from './dashboard.mjs';
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 function isScript(entry) {
   return entry.type === 'script' || /\.m?js(\?|$)/.test(entry.url);
+}
+
+// These two run in the page. They rebuild the count reader from its source, because a function
+// sent to the page cannot use imports. The tests run them against a DOM.
+export function prepareLeft({ source }) {
+  window.__left = new Function(`return (${source})`)()(document);
+}
+
+export function toggleDone({ source }) {
+  const left = new Function(`return (${source})`)()(document);
+  return (
+    left === window.__left - 1 && document.querySelectorAll('ul li')[1].className.includes('done')
+  );
 }
 
 // The interactions. Each one has an action and a check that runs in the page.
@@ -17,9 +32,8 @@ const INTERACTIONS = {
   },
   toggle: {
     run: (page) => page.locator('ul li button').nth(1).click(),
-    done: () =>
-      /(\d+) left/.exec(document.body.textContent)?.[1] === String(window.__left - 1) &&
-      document.querySelectorAll('ul li')[1].className.includes('done'),
+    arg: COUNT_ARG,
+    done: toggleDone,
   },
   add: {
     run: async (page) => {
@@ -50,7 +64,7 @@ function total(entries) {
 // Loads the page, waits while idle, then runs the steps in order. Records every request with
 // the phase in which it started. Each step has a `name`, a `run(page)` and a `done(arg)` that
 // runs in the page.
-async function run(browser, base, pageUrl, steps, { idleMs, prepare }) {
+async function run(browser, base, pageUrl, steps, { idleMs, prepare, prepareArg }) {
   const context = await browser.newContext();
   const page = await context.newPage();
   const log = [];
@@ -85,7 +99,7 @@ async function run(browser, base, pageUrl, steps, { idleMs, prepare }) {
   await page.waitForLoadState('networkidle');
   await sleep(idleMs);
   if (prepare) {
-    await page.evaluate(prepare);
+    await page.evaluate(prepare, prepareArg);
   }
 
   const checks = {};
@@ -128,9 +142,8 @@ function session(browser, base, order, { idleMs, n }) {
   }
   return run(browser, base, `${base}/?n=${n}`, steps, {
     idleMs,
-    prepare: () => {
-      window.__left = Number(/(\d+) left/.exec(document.body.textContent)[1]);
-    },
+    prepareArg: COUNT_ARG,
+    prepare: prepareLeft,
   });
 }
 
@@ -181,10 +194,33 @@ function roundTrips(requests) {
   return max;
 }
 
+// Runs in the page before the click. By the page's own clock, from the click event: the first
+// DOM change after it (`window.__write`), and the frame that shows it (`window.__frame`, a task
+// queued from the next animation frame, so the frame has rendered).
+function installWriteTimer() {
+  let clicked = 0;
+  document.addEventListener('click', (event) => (clicked = event.timeStamp), { capture: true });
+  new MutationObserver(() => {
+    if (clicked !== 0 && window.__write === undefined) {
+      window.__write = performance.now() - clicked;
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          window.__frame = performance.now() - clicked;
+        });
+      });
+    }
+  }).observe(document.body, {
+    subtree: true,
+    childList: true,
+    characterData: true,
+    attributes: true,
+  });
+}
+
 // Clicks on a throttled network and records the requests until the update.
 // "idle": the page loads, idles, then the network slows down before the click.
 // "cold": the network is slow from the start and the click comes right after load.
-async function waterfallRun(browser, base, { latency, idleMs, cold, url, step }) {
+async function waterfallRun(browser, base, { latency, idleMs, cold, url, step, timeWrite }) {
   const context = await browser.newContext();
   const page = await context.newPage();
   const cdp = await context.newCDPSession(page);
@@ -221,6 +257,9 @@ async function waterfallRun(browser, base, { latency, idleMs, cold, url, step })
   }
   page.on('requestfinished', finish);
   page.on('requestfailed', finish);
+  if (timeWrite) {
+    await page.evaluate(installWriteTimer);
+  }
   start = performance.now();
   await step.run(page);
   let ms;
@@ -230,6 +269,11 @@ async function waterfallRun(browser, base, { latency, idleMs, cold, url, step })
   } catch {
     ms = 'FAILED';
   }
+  let write;
+  if (timeWrite && ms !== 'FAILED') {
+    await page.waitForFunction(() => window.__frame !== undefined);
+    write = await page.evaluate(() => ({ write: window.__write, frame: window.__frame }));
+  }
   const list = [];
   for (const entry of requests.values()) {
     if (ms === 'FAILED' || entry.start <= ms) {
@@ -237,7 +281,7 @@ async function waterfallRun(browser, base, { latency, idleMs, cold, url, step })
     }
   }
   await context.close();
-  return { ms, requests: list.length, roundTrips: roundTrips(list), log: list };
+  return { ms, write, requests: list.length, roundTrips: roundTrips(list), log: list };
 }
 
 async function waterfall(browser, base, options) {
@@ -249,6 +293,129 @@ async function waterfall(browser, base, options) {
 
 export function measureWaterfall(browser, base, options) {
   return waterfall(browser, base, {
+    ...options,
+    url: `${base}/?n=3`,
+    step: { arg: null, ...INTERACTIONS.counter },
+  });
+}
+
+// --- Dashboard -------------------------------------------------------------------
+
+// A click on the "run" or "mode" button of a widget, done when the widget shows what the
+// same handler computes in Node.
+function click(key, button) {
+  const widget = widgets()[CLICKS[key]];
+  const want = expected(widget, button);
+  return {
+    name: key,
+    run: (page) => page.locator(`#${widget.id} .${button === 'run' ? 'run' : 'mode'}`).click(),
+    arg: { id: widget.id, ...want },
+    // The output, the mode, the summary and every list item must match the Node result.
+    done: ({ id, output, mode, summary, items }) => {
+      const root = document.getElementById(id);
+      const shown = [];
+      for (const li of root.querySelectorAll('ul li')) {
+        shown.push(li.textContent.trim());
+      }
+      return (
+        root.querySelector('.out').textContent === output &&
+        root.querySelector('.mode').textContent.trim() === mode &&
+        root.querySelector('.summary').textContent.trim() === summary &&
+        shown.join(',') === items.join(',')
+      );
+    },
+  };
+}
+
+// Scrolls a widget into view. The session then waits 1 s, as it does after every step, so code
+// that loads when an element comes near the viewport has time to arrive before the click.
+function scroll(key) {
+  const { id } = widgets()[CLICKS[key]];
+  return {
+    name: `scroll-${key}`,
+    run: (page) => page.locator(`#${id}`).scrollIntoViewIfNeeded(),
+    arg: null,
+    done: () => true,
+  };
+}
+
+function MAIN() {
+  return [
+    click('above', 'run'),
+    scroll('below'),
+    click('below', 'run'),
+    scroll('third'),
+    click('third', 'cycle'),
+  ];
+}
+
+function summary(s) {
+  return (
+    s && {
+      boot: s.phases.boot,
+      idle: s.phases.idle,
+      above: s.phases.above,
+      scrollBelow: s.phases['scroll-below'],
+      below: s.phases.below,
+      scrollThird: s.phases['scroll-third'],
+      third: s.phases.third,
+      total: s.all,
+      checks: s.checks,
+    }
+  );
+}
+
+function sessionErrors(sessions) {
+  const errors = [];
+  for (const s of sessions) {
+    errors.push(...s.errors);
+  }
+  return errors;
+}
+
+export async function measureDashboard(browser, base, { idleMs, preloadOption }) {
+  const options = { idleMs };
+  const main = await run(browser, base, `${base}/`, MAIN(), options);
+  const below = await run(browser, base, `${base}/`, [scroll('below'), click('below', 'run')], {
+    idleMs,
+  });
+  const off = preloadOption
+    ? await run(browser, base, `${base}/?preload=off`, MAIN(), options)
+    : undefined;
+  const sessions = [main, below];
+  if (off) {
+    sessions.push(off);
+  }
+  return {
+    ...summary(main),
+    belowFirst: {
+      scroll: below.phases['scroll-below'],
+      click: below.phases.below,
+      checks: below.checks,
+    },
+    preloadOff: summary(off),
+    failed: failures(sessions),
+    errors: [...new Set(sessionErrors(sessions))],
+    sessions: { main, belowFirst: below, preloadOff: off },
+  };
+}
+
+export function measureDashboardWaterfall(browser, base, options) {
+  return waterfall(browser, base, { ...options, url: `${base}/`, step: click('above', 'run') });
+}
+
+// One first click after idle on a throttled network, the "idle" run of the waterfall: the
+// counter of the todos page, or widget 1 of the dashboard. `first-click-ab.mjs` interleaves it.
+export function measureFirstClick(browser, base, { scenario, latency, idleMs }) {
+  const options = { latency, idleMs, cold: false, timeWrite: true };
+  if (scenario === 'dashboard') {
+    return waterfallRun(browser, base, {
+      ...options,
+      url: `${base}/`,
+      step: click('above', 'run'),
+    });
+  }
+  return waterfallRun(browser, base, {
     ...options,
     url: `${base}/?n=3`,
     step: { arg: null, ...INTERACTIONS.counter },

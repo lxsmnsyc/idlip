@@ -55,3 +55,5 @@ Write `docs/proposals/0005-markup.md` and the grammar for `.idlip` files, with p
 ## Sizing
 
 Design work with fixtures; gate because all later markup nodes follow it.
+
+Retired 2026-11-21 by debate `debates/dsl`: proposal 0005 is rejected and the markup fixtures are removed; TSX stays the one source syntax.

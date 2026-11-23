@@ -66,6 +66,7 @@ describe('entries without a write set', () => {
     editState(harness, (state) => {
       const handlers = state.manifest.handlers as Record<string, unknown>;
       handlers.toggle = { chunk: 'handler=toggle' };
+      handlers.$e3 = { chunk: 'handler=toggle', tags: ['toggle'] };
     });
     harness.start();
     toggle().click();

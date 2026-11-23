@@ -1,7 +1,7 @@
 ---
 id: docs-start
 title: Guide: getting started, components and state, views
-status: todo
+status: done
 priority: should
 type: docs
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 152000
 owns:
   - website/docs/getting-started.md
   - website/docs/components.md
@@ -36,9 +36,6 @@ depends_on:
   - on: example-todo
     kind: hard
     why: the pages explain the working todo app and its resume behavior
-  - on: markup-frontend
-    kind: hard
-    why: views are written in the DSL, and the samples compile with its lowering
 ---
 
 # Guide: getting started, components and state, views
@@ -78,3 +75,7 @@ M: four pages, about 800 lines of prose and samples. Verifiability is a check sc
 - Name these analyzer ids in the common-errors list: `event-computed-key`, `event-placeholder`, `html-trusted`, `attr-event`, `srcdoc-trusted`, `hole-dynamic` (only where a dynamic path set cannot be bound).
 - Views with a helper that takes the whole model or `props` are now accepted (`dynamic-paths`), so do not list them as errors.
 - The `resuming` page may show the optional preload (`renderPreload`) as the way to make the first click request nothing. It is off by default: the page and the e2e count stay at the loader only.
+
+## After debate `debates/dsl` (2026-11-21)
+
+TSX stays the one source syntax. Pages and examples use `*.idlip.tsx`; no markup DSL, no `@idlip/language-core` or `@idlip/tsc`.

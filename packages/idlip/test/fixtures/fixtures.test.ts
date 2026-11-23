@@ -6,7 +6,8 @@ import { parseSync } from 'oxc-parser';
 import { describe, expect, it, vi } from 'vitest';
 import { getChunkFile, getChunkId } from '../../src/core/format.ts';
 import type { Manifest, Model } from '../../src/core/format.ts';
-import { createContext, diffPaths, selectChunks, slot } from './reference.ts';
+import { createContext, diffPaths, selectChunks, slot, toClientManifest } from './reference.ts';
+import { printRow } from './rows.ts';
 import type { NestedContext } from './reference.ts';
 
 // Server modules import the render helpers from the package. The reference versions stand in
@@ -28,14 +29,14 @@ vi.mock('idlip/client', async () => {
 // A parent imports its child's server module by the source's specifier. The compiler's output
 // resolves it to the child's server module, which here is the expected file. The parent's
 // template chunk imports the child's view chunk by id.
-vi.mock('./nested/counter/counter.idlip.tsx', async () => {
+vi.mock('./nested/counter/counter.tsx', async () => {
   const server = await vi.importActual<Record<string, unknown>>(
     './nested/counter/expected/server.js',
   );
   // A module with no children has no `uses` export, and a mock throws on a missing export.
   return { uses: [], ...server };
 });
-vi.mock('/src/counter.idlip.tsx?idlip-view&lang.js', async () =>
+vi.mock('/src/counter.tsx?idlip-view&lang.js', async () =>
   vi.importActual<Record<string, unknown>>('./nested/counter/expected/client/view.js'),
 );
 
@@ -241,6 +242,10 @@ describe.each(FIXTURES)('fixture %s', (name) => {
   const manifest = readManifest(name);
   const page = readText(name, 'expected', 'page.html').trimEnd();
 
+  it('writes no $event path into the page', () => {
+    expect(page).not.toContain('$event');
+  });
+
   it('parses the source and every expected module', () => {
     const source = readText(name, input.source);
     expect(parseSync(input.source, source).errors).toEqual([]);
@@ -327,6 +332,12 @@ describe.each(FIXTURES)('fixture %s', (name) => {
 
   it('renders each list row as the server does', async () => {
     const { model } = await renderServer(name);
+    // A row is HTML or a cloned fragment, so both sides print as nodes in a DOM.
+    const window = new Window();
+    const globals = ['document', 'Node', 'DocumentFragment', 'Element'] as const;
+    for (const key of globals) {
+      Reflect.set(globalThis, key, Reflect.get(window, key));
+    }
     for (const [id, list] of Object.entries(manifest.lists)) {
       const template = await importChunk(name, list.chunk);
       const group = manifest.groups[findGroupOf(manifest, `l${id}`)];
@@ -342,10 +353,16 @@ describe.each(FIXTURES)('fixture %s', (name) => {
       let rows = '';
       for (const [index, item] of values.entries()) {
         const scope = { model, props: {}, rows: [{ item, index }] };
-        rows += `<!--i-->${String(callExport(template, 'render', scope))}<!--/i-->`;
+        rows += printRow(callExport(template, 'render', scope, document));
       }
-      expect(page).toContain(`<!--l${id}-->${rows}<!--/l-->`);
+      const start = page.indexOf(`<!--l${id}-->`) + `<!--l${id}-->`.length;
+      const end = page.indexOf('<!--/l-->', start);
+      expect(rows).toBe(printRow(page.slice(start, end)));
     }
+    for (const key of globals) {
+      Reflect.deleteProperty(globalThis, key);
+    }
+    await window.happyDOM.close();
   });
 
   it('marks the node of every binding in the page', async () => {
@@ -514,7 +531,7 @@ describe('nested components', () => {
     expect(Object.keys(slots).toSorted()).toEqual(opened.toSorted());
     expect(opened).toEqual(['0', '1:a1', '1:a2']);
     for (const entry of Object.values(slots)) {
-      expect(entry).toMatchObject({ module: '/src/counter.idlip.tsx' });
+      expect(entry).toMatchObject({ module: '/src/counter.tsx' });
     }
     await window.happyDOM.close();
   });
@@ -524,13 +541,13 @@ describe('nested components', () => {
     expect(events).toBe('click');
     expect(boardManifest.events).toEqual([]);
     expect(state.modules).toEqual({
-      '/src/counter.idlip.tsx': readManifest('nested/counter'),
+      '/src/counter.tsx': toClientManifest(readManifest('nested/counter')),
     });
   });
 
   it('gives a child its own handlers without a path and a message prop its owner', () => {
     // `increment` is the child's: the loader reads its path from the boundary around the target.
-    expect(page).toContain(`on:click='["increment",[]]'`);
+    expect(page).toContain('on:click="$e0"');
     // `remove` and `clearAll` belong to the board, the root, so the owner is the empty path.
     expect(page).toContain(`on:click='["remove",["a1"],"",""]'`);
     expect(page).toContain(`on:click='["clearAll",[],"",""]'`);

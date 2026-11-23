@@ -1,0 +1,28 @@
+// impure.tsx: impure globals in holes (view-ir v8).
+function roll() {
+  return Math.floor(Math.random() * 6) + 1;
+}
+
+export default function Impure(props: { seed: number }) {
+  let count = 0;
+
+  function bump() {
+    count = count + 1;
+  }
+
+  return (
+    <main>
+      {/* No paths: rendered once on the server, no diagnostic. */}
+      <p>{Math.random()}</p>
+      <p>{Date.now()}</p>
+      <p>{performance.now()}</p>
+      <p id={crypto.randomUUID()}>{roll()}</p>
+      {/* Props of the root never change: still a warning, since the path set is not empty. */}
+      <p>{props.seed + Math.random()}</p>
+      {/* hole-impure: recomputes only when count changes */}
+      <button on:click={bump}>{`${count} at ${Date.now()}`}</button>
+      {/* Not on the list: still hole-global. */}
+      <p>{crypto.getRandomValues(count)}</p>
+    </main>
+  );
+}

@@ -1,7 +1,7 @@
 ---
 id: docs-reference
 title: API reference and editor setup
-status: todo
+status: done
 priority: should
 type: docs
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 182000
 owns:
   - website/docs/reference/**
   - website/docs/editor.md
@@ -31,12 +31,6 @@ depends_on:
   - on: website-scaffold
     kind: hard
     why: adds Markdown pages that the scaffold's build, sidebar and sample checker process
-  - on: markup-frontend
-    kind: hard
-    why: documents the DSL grammar and the idlip/compiler markup exports
-  - on: markup-ts-plugin
-    kind: hard
-    why: the editor page covers the VS Code extension, idlip-tsc and the TypeScript plugin
   - on: custom-effects
     kind: hard
     why: the reference lists the effect API
@@ -83,3 +77,7 @@ M: about eight pages with an export-coverage check. Verifiability is a script.
 
 - New exports to cover: `idlip`: `trusted`, `TrustedHtml`, `Dom`, `Rect`, `RefName`, `timer`, `socket`, `eventSource`, `media`; `idlip/server`: `renderPage`, `renderPreload`, `PreloadOptions`, `safeUrl`, `slot`, `track`; `idlip/client`: `addChild`, `setProp`, `restartSub`; `idlip/testing`: `expectCaught`. Contracts `core-api` and `compiled-format` are at v11.
 - Diagnostics to list in the syntax page: see the Diagnostics table of `contracts/view-ir.md` v11.
+
+## After debate `debates/dsl` (2026-11-21)
+
+TSX stays the one source syntax. Pages and examples use `*.idlip.tsx`; no markup DSL, no `@idlip/language-core` or `@idlip/tsc`.

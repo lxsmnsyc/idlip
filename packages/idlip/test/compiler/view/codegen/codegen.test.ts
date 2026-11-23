@@ -1,7 +1,9 @@
+// @vitest-environment happy-dom
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { runInThisContext } from 'node:vm';
 import { format } from 'oxfmt';
+import * as runtime from '../../../../src/core/helpers.ts';
 import { describe, expect, it } from 'vitest';
 import { analyze } from '../../../../src/compiler/view/analyze/index.ts';
 import type {
@@ -18,6 +20,7 @@ import type { GenerateResult } from '../../../../src/compiler/view/codegen/index
 import { getChunkFile } from '../../../../src/core/format.ts';
 import type { Model } from '../../../../src/core/format.ts';
 import { attr, createContext, on, text } from '../../../fixtures/reference.ts';
+import { printRow } from '../../../fixtures/rows.ts';
 
 const FIXTURES = join(import.meta.dirname, '..', '..', '..', 'fixtures');
 
@@ -122,12 +125,17 @@ function runChunk(code: string, helpers: Record<string, unknown>): Record<string
 }
 
 /** Calls the `render` export of a list chunk. */
+/** The todo row as the server writes it, from the reference render helpers. */
+function renderServerRow(item: { id: string; text: string; done: boolean }): string {
+  return `<li${attr('class', { done: item.done })} i-a="4"><input type="checkbox"${attr('checked', item.done)} on:click="$e3" i-a="5"><!--t6-->${text(item.text)}<!--/t--></li>`;
+}
+
 function renderRow(exports: Record<string, unknown>, scope: unknown): string {
   const render = exports.render;
   if (!isRender(render)) {
     throw new Error('The chunk has no render export');
   }
-  return render(scope, undefined);
+  return printRow(Reflect.apply(render, undefined, [scope, document]));
 }
 
 function collectEvents(nodes: Node[], events: Event[]): void {
@@ -150,8 +158,8 @@ function generateFixture(name: string): { result: GenerateResult; input: Input }
   return { result: generate(analyze(input.source, source), source, input.id), input };
 }
 
-function generateSource(source: string, id = '/src/test.idlip.tsx'): GenerateResult {
-  return generate(analyze('test.idlip.tsx', source), source, id);
+function generateSource(source: string, id = '/src/test.tsx'): GenerateResult {
+  return generate(analyze('test.tsx', source), source, id);
 }
 
 const NESTED = `
@@ -164,10 +172,10 @@ const NESTED = `
         }
         return (
           <main on:click={pick}>
-            <For each={columns} key="id">
+            <For each={columns} key={(column) => column.id}>
               {(column) => (
                 <section>
-                  <For each={column.cards} key="id">
+                  <For each={column.cards} key={(card) => card.id}>
                     {(card) => <p class={selected === card.id}>c</p>}
                   </For>
                 </section>
@@ -237,22 +245,20 @@ describe.each(['counter', 'todo'])('fixture %s', (name) => {
 });
 
 describe('fixture todo list template', () => {
-  it('renders the same rows as the fixture chunk', () => {
+  it('renders the rows the server writes, as the fixture chunk does', () => {
     const { result } = generateFixture('todo');
     const chunk = result.client.find((module) => module.chunk === 'list=3');
-    const actual = runChunk(chunk?.code ?? '', { attr$: attr, on$: on, text$: text });
-    const expected = runChunk(readFixture('todo', 'expected', 'client', 'list.3.js'), {
-      attr,
-      on,
-      text,
-    });
+    const actual = runChunk(chunk?.code ?? '', runtime);
+    const expected = runChunk(readFixture('todo', 'expected', 'client', 'list.3.js'), runtime);
     const items = [
       { id: 'a1', text: 'one & two', done: true },
       { id: 'a2', text: '<b>', done: false },
     ];
     for (const item of items) {
       const scope = { model: {}, props: {}, rows: [{ item, index: 0 }] };
-      expect(renderRow(actual, scope)).toBe(renderRow(expected, scope));
+      const row = renderRow(actual, scope);
+      expect(row).toBe(renderRow(expected, scope));
+      expect(row).toBe(printRow(renderServerRow(item)));
     }
   });
 });
@@ -260,8 +266,8 @@ describe('fixture todo list template', () => {
 describe('events', () => {
   it('writes modifiers from the IR into the DOM message', () => {
     const { result } = generateFixture('todo');
-    expect(result.server).toContain(`on:submit='["add",[],"prevent"]'`);
-    expect(result.server).toContain(`on:keydown='["clear",[],"key:Escape"]'`);
+    expect(result.server).toContain('on:submit="$e0 prevent"');
+    expect(result.server).toContain('on:keydown="$e2 key:Escape"');
   });
 
   it('writes every modifier kind and latest, in order', () => {
@@ -274,7 +280,7 @@ describe('events', () => {
         return <button on:click={bump}>{n}</button>;
       }
     `;
-    const ir = analyze('test.idlip.tsx', source);
+    const ir = analyze('test.tsx', source);
     const events: Event[] = [];
     collectEvents(ir.components[0].view, events);
     events[0].mode = 'latest';
@@ -285,10 +291,8 @@ describe('events', () => {
       { kind: 'capture' },
       { kind: 'key', filter: 'Ctrl+s' },
     ];
-    const result = generate(ir, source, '/src/test.idlip.tsx');
-    expect(result.server).toContain(
-      `on:click='["bump",[],"prevent stop once capture key:Ctrl+s latest"]'`,
-    );
+    const result = generate(ir, source, '/src/test.tsx');
+    expect(result.server).toContain('on:click="$e0 prevent stop once capture key:Ctrl+s latest"');
   });
 
   it('writes the props fields of a handler and of the handlers it calls', () => {
@@ -306,7 +310,7 @@ describe('events', () => {
     `;
     const result = generateSource(source);
     expect(result.diagnostics).toEqual([]);
-    expect(result.server).toContain(`on$('click', ['outer', [props.step]])`);
+    expect(result.sites[0].code).toContain(`return [['outer', [props.step]]];`);
   });
 
   it('writes the props of nested calls in the order of the handler chunk', () => {
@@ -329,11 +333,11 @@ describe('events', () => {
     `;
     const result = generateSource(source);
     expect(result.diagnostics).toEqual([]);
-    const handlers = compileHandlers('test.idlip.tsx', source);
+    const handlers = compileHandlers('test.tsx', source);
     const chunk = handlers.client.find((module) => module.chunk === 'handler=top');
     const names = /\[([^\]]*)\]\) \{/.exec(chunk?.code ?? '')?.[1] ?? '';
     const params = names.split(', ');
-    const payload = /\['top', \[([^\]]*)\]\]/.exec(result.server)?.[1] ?? '';
+    const payload = /\['top', \[([^\]]*)\]\]/.exec(result.sites[0].code)?.[1] ?? '';
     const values = payload.split(', ');
     expect(values.at(-1)).toBe('7');
     expect(params.length).toBe(values.length);
@@ -356,10 +360,10 @@ describe('events', () => {
     `;
     const result = generateSource(source);
     expect(result.diagnostics).toEqual([]);
-    expect(result.server).toContain(`on$('click', ['add', [props.step, 2]])`);
+    expect(result.sites[0].code).toContain(`return [['add', [props.step, 2]]];`);
   });
 
-  it('marks a literal array argument that starts with $', () => {
+  it('sends a literal array argument that starts with $ as it is', () => {
     const source = `
       export default function App() {
         let n = 0;
@@ -370,7 +374,7 @@ describe('events', () => {
       }
     `;
     const result = generateSource(source);
-    expect(result.server).toContain(`on:click='["pick",[["$","$a","b"]]]'`);
+    expect(result.sites[0].code).toContain(`return [['pick', [['$a', 'b']]]];`);
   });
 
   it('puts a global listener in a template', () => {
@@ -390,10 +394,8 @@ describe('events', () => {
     `;
     const result = generateSource(source);
     expect(result.diagnostics).toEqual([]);
-    expect(result.server).toContain(
-      `<template i-global="window" on:keydown='["bump",[]]'></template>`,
-    );
-    expect(result.manifest.events).toEqual(['keydown']);
+    expect(result.server).toContain('<template i-global="window" on:keydown="$e0"></template>');
+    expect(result.manifest.events).toEqual(['keydown:window']);
   });
 });
 
@@ -471,9 +473,9 @@ describe('server module', () => {
     expect(result.server).toContain('function text(value) {');
     const html = runServer(result.server, {});
     expect(html).toContain('title="xx"');
-    expect(html).toContain('<!--t1-->xx<!--/t-->');
+    expect(html).toContain('i-a="0 1">xx</b>');
     const chunk = result.client.find((module) => module.chunk === 'binding=attr');
-    expect(chunk?.code).toContain('function setText$(start, value) {');
+    expect(chunk?.code).toContain("import { setAttr$, setText$ } from 'idlip/helpers';");
     expect(chunk?.code).not.toContain('idlip/client');
     expect(chunk?.code).toContain('function text(value) {');
   });
@@ -525,7 +527,7 @@ describe('server module', () => {
     expect(result.server).not.toContain('<!--t0-->');
     expect(result.server).not.toContain('<!--c1:');
     expect(result.manifest.groups).toEqual({
-      n: { paths: ['n'], chunk: 'binding=n', bindings: ['t2'], covers: [] },
+      n: { paths: ['n'], chunk: 'binding=n', bindings: ['a2'], covers: [] },
     });
   });
 
@@ -584,7 +586,7 @@ describe('client chunks', () => {
         <main>
           {n > props.min ? <b class={{ big: n > 5 }}>{n}</b> : <i>low</i>}
           <ul>
-            {n > 0 && <For each={items} key="id">{(item, index) => <li>{index}: {item} {n}</li>}</For>}
+            {n > 0 && <For each={items} key={(item) => item.id}>{(item, index) => <li>{index}: {item} {n}</li>}</For>}
           </ul>
           <button on:click={bump}>+</button>
         </main>
@@ -593,11 +595,14 @@ describe('client chunks', () => {
   `;
 
   it('renders a condition branch with its own bindings and the scope it reads', () => {
-    const result = generateSource(SOURCE.replace(' key="id"', ' key="item"'));
+    const result = generateSource(
+      SOURCE.replace(' key={(item) => item.id}', ' key={(item) => item.item}'),
+    );
     expect(result.diagnostics.filter((item) => item.severity === 'error')).toEqual([]);
     const chunk = result.client.find((module) => module.chunk === 'binding=n');
-    expect(chunk?.code).toContain('function renderC0(branch, { model }) {');
-    expect(chunk?.code).toContain('(branch) => renderC0(branch, { model })');
+    // The first branch clones, so the render function takes the document after the branch.
+    expect(chunk?.code).toContain('function renderC0(branch, $doc, { model }) {');
+    expect(chunk?.code).toContain('(branch, $doc) => renderC0(branch, $doc, { model })');
     expect(chunk?.code).toContain('<!--t');
     // The branch reads `props.min` only in the test, so the chunk takes `props` for it.
     expect(chunk?.code).toMatch(/export function c0\(start, \{ model, props \}\)/);
@@ -605,11 +610,18 @@ describe('client chunks', () => {
   });
 
   it('declares the loop variables a template reads and renders rows', () => {
-    const result = generateSource(SOURCE.replace(' key="id"', ' key="item"'));
+    const result = generateSource(
+      SOURCE.replace(' key={(item) => item.id}', ' key={(item) => item.item}'),
+    );
     const list = result.client.find((module) => module.chunk.startsWith('list='));
     expect(list?.code).toContain('const index = rows[0].index;');
     expect(list?.code).toContain('const item = rows[0].item;');
-    const exports = runChunk(list?.code ?? '', { attr$: attr, on$: on, text$: text });
+    const exports = runChunk(list?.code ?? '', {
+      ...runtime,
+      attr$: attr,
+      on$: on,
+      text$: text,
+    });
     const html = renderRow(exports, {
       model: { n: 3 },
       props: {},
@@ -630,7 +642,7 @@ describe('client chunks', () => {
         }
         return (
           <svg>
-            <For each={xs} key="x">{(x) => <circle r={x} />}</For>
+            <For each={xs} key={(x) => x.x}>{(x) => <circle r={x} />}</For>
             <text on:click={add}>+</text>
           </svg>
         );
@@ -638,7 +650,7 @@ describe('client chunks', () => {
     `;
     const result = generateSource(source);
     const list = result.client.find((module) => module.chunk.startsWith('list='));
-    expect(list?.code).toContain("export const namespace = 'svg';");
+    expect(list?.code).toMatch(/const templateL\d+\$ = \{ h: '<!--i--><circle .*, s: 'svg' \};/);
   });
 
   it('nests lists: the inner list is a row binding of the outer list', () => {
@@ -651,10 +663,10 @@ describe('client chunks', () => {
         }
         return (
           <main on:click={add}>
-            <For each={columns} key="id">
+            <For each={columns} key={(column) => column.id}>
               {(column) => (
                 <section>
-                  <For each={column.cards} key="id">{(card) => <p>{card.title}</p>}</For>
+                  <For each={column.cards} key={(card) => card.id}>{(card) => <p>{card.title}</p>}</For>
                 </section>
               )}
             </For>
@@ -670,7 +682,7 @@ describe('client chunks', () => {
       key: 'id',
       path: 'columns.*.cards',
       chunk: 'list=1',
-      bindings: ['t2'],
+      bindings: ['a2'],
       parent: '0',
     });
     const group = result.manifest.groups['columns.*.cards'];
@@ -688,7 +700,7 @@ describe('client chunks', () => {
         }
         return (
           <ul on:click={pick}>
-            <For each={todos} key="id">{(t) => <li class={selected === t.id}>x</li>}</For>
+            <For each={todos} key={(t) => t.id}>{(t) => <li class={selected === t.id}>x</li>}</For>
           </ul>
         );
       }
@@ -736,8 +748,8 @@ describe('client chunks', () => {
         }
         return (
           <div on:click={pick}>
-            <For each={xs} key="id">{(x) => <i class={selected}>x</i>}</For>
-            <For each={ys} key="id">{(y) => <b class={selected}>y</b>}</For>
+            <For each={xs} key={(x) => x.id}>{(x) => <i class={selected}>x</i>}</For>
+            <For each={ys} key={(y) => y.id}>{(y) => <b class={selected}>y</b>}</For>
           </div>
         );
       }
@@ -796,9 +808,9 @@ describe('manifest', () => {
         return <button on:click={save}>{n}</button>;
       }
     `;
-    const ir: ModuleIR = analyze('test.idlip.tsx', source);
+    const ir: ModuleIR = analyze('test.tsx', source);
     const component: Component = ir.components[0];
-    const result = generate(ir, source, '/src/test.idlip.tsx');
+    const result = generate(ir, source, '/src/test.tsx');
     for (const segment of component.handlers[0].segments) {
       // A continuation lives in the chunk of its handler.
       expect(result.manifest.handlers[segment.tag]).toEqual({
@@ -814,7 +826,6 @@ describe('manifest', () => {
     const { result } = generateFixture('todo');
     expect(Object.keys(result.manifest.groups)).toEqual([
       'todos.*.done',
-      'todos.*.id',
       'todos.*.text',
       'draft',
       'todos',

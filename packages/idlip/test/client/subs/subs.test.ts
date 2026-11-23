@@ -215,7 +215,7 @@ export default function Keyed(): JSX.Element {
       <button id="add" on:click={add}>Add</button>
       <p id="count">{count}</p>
       <Subscribe key={room} to={feed} input={room} on:value={tick} />
-      <For each={items} key="id">
+      <For each={items} key={(row) => row.id}>
         {(row) => (
           <li>
             <Subscribe key={row.id} to={feed} input={row.id} on:value={tick} />

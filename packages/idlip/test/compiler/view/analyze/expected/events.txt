@@ -1,4 +1,4 @@
-file events.idlip.tsx
+file events.tsx
 
 component Events (stateful, exported)
   state:

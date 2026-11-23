@@ -21,3 +21,7 @@ export function add$1(model, [$outcome, text]) {
   draft = '';
   return { ...model, draft, todos };
 }
+
+export function $e1($e, $c) {
+return [['add', []]];
+}

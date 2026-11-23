@@ -1,4 +1,4 @@
-file counter.idlip.tsx
+file counter.tsx
 
 component Counter (stateful, exported)
   props: props

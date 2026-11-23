@@ -6,7 +6,7 @@ import { compile } from '../../src/compiler/index.ts';
 import { mount } from '../../src/testing/index.ts';
 import type { MountedPage } from '../../src/testing/index.ts';
 
-const SOURCE = readFileSync(join(import.meta.dirname, '../fixtures/svg/raw.idlip.tsx'), 'utf8');
+const SOURCE = readFileSync(join(import.meta.dirname, '../fixtures/svg/raw.tsx'), 'utf8');
 
 let page: MountedPage | undefined;
 
@@ -17,7 +17,7 @@ afterEach(() => {
 
 function getErrors(source: string): string[] {
   const rules: string[] = [];
-  for (const item of compile(source, '/src/app.idlip.tsx').diagnostics) {
+  for (const item of compile(source, '/src/app.tsx').diagnostics) {
     if (item.severity === 'error') {
       rules.push(item.rule);
     }

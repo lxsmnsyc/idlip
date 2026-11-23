@@ -23,7 +23,9 @@ function readLiveProperties(element: Element, attributes: Map<string, string>): 
   // A head block that a patch adds takes a number after every block on the page.
   attributes.delete('i-head');
   if (element instanceof HTMLInputElement) {
-    attributes.set('value', element.value);
+    // A browser strips line breaks from an input's value, on a set and on a parsed attribute.
+    // happy-dom does it on a set only, so both sides are sanitized here.
+    attributes.set('value', element.value.replaceAll(/[\r\n]/g, ''));
     attributes.set('checked', String(element.checked));
   } else if (element instanceof HTMLTextAreaElement) {
     attributes.set('value', element.value);
@@ -74,6 +76,16 @@ function takeSnapshots(parent: Node, skip: (node: Node) => boolean): Snapshot[] 
     }
   }
   flushText();
+  // A browser drops a newline that starts a `pre` or a `listing` in parsed markup, and happy-dom
+  // keeps it, so a clone written to match a browser differs from happy-dom's parse there. Both
+  // sides drop every leading newline of the first text.
+  if (parent instanceof Element && (parent.localName === 'pre' || parent.localName === 'listing')) {
+    const first = list.at(0);
+    if (first?.name === '#text') {
+      const data = first.data.replace(/^\n+/, '');
+      list.splice(0, 1, ...(data === '' ? [] : [{ ...first, data }]));
+    }
+  }
   return list;
 }
 

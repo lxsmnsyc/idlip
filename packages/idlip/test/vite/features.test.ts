@@ -14,7 +14,6 @@ import { createBuilder } from 'vite';
 import { describe, expect, it } from 'vitest';
 import { compile as compileSource } from '../../src/compiler/index.ts';
 import type { CompileResult } from '../../src/core/format.ts';
-import { idlip } from '../../src/vite/index.ts';
 import { getDefines, getFeatures, replaceFeatures } from '../../src/vite/features.ts';
 import { compileFixture, createCheckedCompile, createConfig } from './app.ts';
 
@@ -71,7 +70,8 @@ async function buildFiles(name: string, compile?: CompileFn): Promise<Record<str
     const checked = createCheckedCompile(root).compile;
     const config = createConfig(root, { compile: compile ?? checked, client: LOADER });
     // The real loader, not the stub the fixture app aliases.
-    config.resolve = {};
+    // A chunk imports `idlip/client`, which is the loader itself here.
+    config.resolve = { alias: { 'idlip/client': LOADER } };
     const builder = await createBuilder(config);
     await builder.buildApp();
     const assets = path.join(root, 'dist/client/assets');
@@ -87,20 +87,68 @@ async function buildFiles(name: string, compile?: CompileFn): Promise<Record<str
 
 describe('feature detection', () => {
   it('turns a flag on when a module reports it', () => {
-    expect([...getFeatures([compileFixture('', '/src/todo.idlip.tsx')])]).toEqual([]);
-    expect([...getFeatures([compileFixture('', '/src/effects.idlip.tsx')])]).toEqual(['TASKS']);
-    expect([...getFeatures([compileKeyed('', '/src/todo.idlip.tsx')])]).toEqual(['KEYED']);
+    expect([...getFeatures([compileFixture('', '/src/todo.tsx')])]).toEqual([]);
+    expect([...getFeatures([compileFixture('', '/src/effects.tsx')])]).toEqual(['TASKS']);
+    expect([...getFeatures([compileKeyed('', '/src/todo.tsx')])]).toEqual(['KEYED']);
   });
 
   it('turns DYNAMIC on when a manifest has the dynamic group', () => {
-    const source = readFileSync(path.join(FIXTURES, 'dynamic/dynamic.idlip.tsx'), 'utf8');
-    expect([...getFeatures([compileSource(source, '/src/dynamic.idlip.tsx')])]).toEqual([
-      'DYNAMIC',
-    ]);
+    const source = readFileSync(path.join(FIXTURES, 'dynamic/dynamic.tsx'), 'utf8');
+    expect([...getFeatures([compileSource(source, '/src/dynamic.tsx')])]).toEqual(['DYNAMIC']);
+  });
+
+  it('turns KEY_FN on for a computed key, also in a child component, and not for a field key', () => {
+    const list = (key: string): string => `
+      import { For } from 'idlip';
+      export default function App() {
+        let items = [{ id: 1, kind: 'a' }];
+        return <ul><For each={items} key={${key}}>{(t) => <li>{t.kind}</li>}</For></ul>;
+      }
+    `;
+    const field = compileSource(list('(t) => t.id'), '/src/app.tsx');
+    const template = compileSource(list('(t) => `${t.kind}:${t.id}`'), '/src/app.tsx');
+    expect([...getFeatures([field])]).not.toContain('KEY_FN');
+    expect([...getFeatures([template])]).toContain('KEY_FN');
+    // The computed list is in a component the default export renders, not in the main one.
+    const child = compileSource(
+      `
+      import { For } from 'idlip';
+      export default function App() {
+        let open = true;
+        function toggle() { open = !open; }
+        return <main><button on:click={toggle}>x</button><Board /></main>;
+      }
+      function Board() {
+        let items = [{ id: 1, kind: 'a' }];
+        function more() { items = [...items, { id: 2, kind: 'b' }]; }
+        return <ul><button on:click={more}>m</button><For each={items} key={(t) => \`\${t.kind}:\${t.id}\`}>{(t) => <li>{t.kind}</li>}</For></ul>;
+      }
+    `,
+      '/src/app.tsx',
+    );
+    expect(child.components).toBeDefined();
+    expect([...getFeatures([child])]).toContain('KEY_FN');
+  });
+
+  it('turns INNER_LISTS on for a list inside a branch, and not for a list at the top', () => {
+    const view = (body: string): string => `
+      import { For } from 'idlip';
+      export default function App() {
+        let open = true;
+        let items = [{ id: 1 }];
+        function toggle() { open = !open; }
+        return <main><button on:click={toggle}>x</button>${body}</main>;
+      }
+    `;
+    const list = '<ul><For each={items} key={(t) => t.id}>{(t) => <li>{t.id}</li>}</For></ul>';
+    const top = compileSource(view(list), '/src/app.tsx');
+    const inner = compileSource(view(`{open ? ${list} : null}`), '/src/app.tsx');
+    expect([...getFeatures([top])]).not.toContain('INNER_LISTS');
+    expect([...getFeatures([inner])]).toContain('INNER_LISTS');
   });
 
   it('turns CHILDREN on for a child module and for a module with children', () => {
-    const todo = compileFixture('', '/src/todo.idlip.tsx');
+    const todo = compileFixture('', '/src/todo.tsx');
     const child = { ...todo, manifest: { ...todo.manifest, view: { chunk: 'view' } } };
     const parent = { ...todo, server: `${todo.server}\nexport const uses = [Counter];` };
     expect([...getFeatures([child])]).toEqual(['CHILDREN']);
@@ -109,8 +157,8 @@ describe('feature detection', () => {
 
   it('unions the modules of an app', () => {
     const on = getFeatures([
-      compileFixture('', '/src/effects.idlip.tsx'),
-      compileKeyed('', '/src/todo.idlip.tsx'),
+      compileFixture('', '/src/effects.tsx'),
+      compileKeyed('', '/src/todo.tsx'),
     ]);
     expect([...on].toSorted()).toEqual(['KEYED', 'TASKS']);
   });
@@ -123,45 +171,6 @@ describe('feature detection', () => {
     });
     expect(replaceFeatures('a(1)', defines)).toBeUndefined();
   });
-});
-
-describe('feature flags of a module outside `modules`', () => {
-  it('fails the build when the module needs a dropped feature', async () => {
-    const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'idlip-features-')));
-    try {
-      mkdirSync(path.join(root, 'src'));
-      mkdirSync(path.join(root, 'lib'));
-      copyFileSync(
-        path.join(FIXTURES, 'todo/todo.idlip.tsx'),
-        path.join(root, 'src/todo.idlip.tsx'),
-      );
-      copyFileSync(
-        path.join(FIXTURES, 'effects/effects.idlip.tsx'),
-        path.join(root, 'lib/effects.idlip.tsx'),
-      );
-      // The server entry imports the module that `modules` does not list.
-      writeFileSync(
-        path.join(root, 'src/entry-server.js'),
-        "import '../lib/effects.idlip.tsx';\nexport function render() { return ''; }\n",
-      );
-      const compile = (source: string, id: string): CompileResult =>
-        compileFixture(source, id.replace('/lib/', '/src/'));
-      const config = createConfig(root, { compile, client: LOADER });
-      config.resolve = {};
-      config.plugins = [
-        idlip({
-          entry: '/src/entry-server.js',
-          modules: 'src/todo.idlip.tsx',
-          compile,
-          client: LOADER,
-        }),
-      ];
-      const builder = await createBuilder(config);
-      await expect(builder.buildApp()).rejects.toThrow(/lib\/effects\.idlip\.tsx uses HAS_TASKS/);
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
-  }, 60_000);
 });
 
 describe('feature flags in the client build', () => {

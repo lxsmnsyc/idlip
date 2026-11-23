@@ -1,5 +1,6 @@
 import { gzipSync } from 'node:zlib';
 import type { Request } from '@playwright/test';
+import getChunkName from '../fixture/chunk.ts';
 import {
   collectRequests,
   expect,
@@ -16,11 +17,17 @@ import {
 const listenerBudget = 1024;
 const loaderBudget = 4096;
 
+// The example page preloads the chunks of the first click. `?preload=off` leaves the links out,
+// so the tests of the loading path see the loader fetch the chunks itself.
+const NO_PRELOAD = '/?preload=off';
+
 test.describe('scripts off', () => {
   test.use({ javaScriptEnabled: false });
 
   test('the server render works before any script runs', async ({ page }) => {
-    await page.goto('/');
+    // With scripts off, Chromium cancels the module preloads, and each would count as a failed
+    // request.
+    await page.goto(NO_PRELOAD);
     await expect(page.getByText('Write the format')).toBeVisible();
     await expect(page.getByText('Build <the> runtime')).toBeVisible();
     await expect(page.locator('p')).toHaveText('1 left');
@@ -66,14 +73,14 @@ test('only the page and the loader load before the first event', async ({ page, 
     requests.push(labelRequest(request));
   }
   page.on('request', onRequest);
-  const response = await page.goto('/', { waitUntil: 'networkidle' });
+  const response = await page.goto(NO_PRELOAD, { waitUntil: 'networkidle' });
   // Pointer movement and focus are not handled events.
   await page.getByRole('checkbox').first().hover();
   await settle(page);
   page.off('request', onRequest);
 
   const html = (await response?.text()) ?? '';
-  const expected = ['document /'];
+  const expected = [`document ${NO_PRELOAD}`];
   for (const url of (await readLoaderFiles(page, html, baseURL ?? '')).keys()) {
     const { pathname, search } = new URL(url);
     expected.push(`script ${pathname}${search}`);
@@ -85,14 +92,118 @@ test('only the page and the loader load before the first event', async ({ page, 
 test('the first click loads the toggle chunk and the changed binding chunk only', async ({
   page,
 }) => {
-  await page.goto('/', { waitUntil: 'networkidle' });
+  await page.goto(NO_PRELOAD, { waitUntil: 'networkidle' });
   const second = page.getByRole('checkbox').nth(1);
   const chunks = await collectRequests(page, async () => {
     await second.click();
     await expect(page.locator('p')).toHaveText('0 left');
   });
-  expect(chunks.toSorted()).toEqual(['binding=todos.*.done', 'handler=toggle']);
+  // A build also loads the helpers module the chunks share. The fixture's chunks import none.
+  const helpers = process.env.E2E_TARGET === 'fixture' ? [] : ['helpers'];
+  expect(chunks.toSorted()).toEqual(['binding=todos.*.done', 'handler=toggle', ...helpers]);
   expect(await page.evaluate(() => window.idlipDecoded)).toBe(1);
+});
+
+test('the first click requests every file before any arrives, so it is one round trip', async ({
+  page,
+}) => {
+  await page.goto(NO_PRELOAD, { waitUntil: 'networkidle' });
+  // The loader asks for the helpers module with the chunks. Found as an import of a chunk, it
+  // would be requested only after that chunk arrived.
+  const finished: Request[] = [];
+  function onFinished(request: Request): void {
+    finished.push(request);
+  }
+  page.on('requestfinished', onFinished);
+  await page.getByRole('checkbox').nth(1).click();
+  await expect(page.locator('p')).toHaveText('0 left');
+  await settle(page);
+  page.off('requestfinished', onFinished);
+
+  const names: string[] = [];
+  let lastStart = 0;
+  let firstEnd = Infinity;
+  for (const request of finished) {
+    names.push(getChunkName(request.url()) ?? request.url());
+    const timing = request.timing();
+    lastStart = Math.max(lastStart, timing.startTime);
+    firstEnd = Math.min(firstEnd, timing.startTime + timing.responseEnd);
+  }
+  const helpers = process.env.E2E_TARGET === 'fixture' ? [] : ['helpers'];
+  expect(names.toSorted()).toEqual(['binding=todos.*.done', 'handler=toggle', ...helpers]);
+  // Every request started before the earliest response ended.
+  expect(lastStart).toBeLessThan(firstEnd);
+});
+
+for (const [label, url] of [
+  ['without preload links', NO_PRELOAD],
+  ['with preload links', '/'],
+] as const) {
+  test(`a helpers module that fails to load once costs at most the first patch, ${label}`, async ({
+    page,
+    problems,
+  }) => {
+    test.skip(process.env.E2E_TARGET === 'fixture', 'the fixture serves no helpers module');
+    let requested = 0;
+    await page.route('**/assets/*.js', async (route) => {
+      if (getChunkName(route.request().url()) === 'helpers' && requested++ === 0) {
+        // Failing a little later makes the binding chunk's static import wait on this fetch, so
+        // the binding chunk fails with it. Failing at once, Chromium fetches the helpers again
+        // for the chunk, and the first click applies.
+        await new Promise((resolve) => {
+          setTimeout(resolve, 50);
+        });
+        await route.abort();
+        return;
+      }
+      await route.continue();
+    });
+    await page.goto(url, { waitUntil: 'networkidle' });
+    await page.getByRole('checkbox').nth(1).click();
+    await settle(page);
+
+    // The next event asks for a failed chunk under a new URL. Chromium keeps no failed module
+    // fetch, so the chunk's import fetches the helpers again, and the patch brings the DOM to
+    // the model of both clicks.
+    await page.getByRole('checkbox').first().click();
+    await expect(page.locator('p')).toHaveText('1 left');
+    await settle(page);
+    expect(requested).toBeGreaterThan(1);
+    const both = [
+      { ...initial[0], done: false },
+      { ...initial[1], done: true },
+    ];
+    expect(await readMain(page)).toBe(await renderFresh(page, both));
+
+    // The aborted fetch, and the binding chunk when it failed with it, are the only problems.
+    for (const problem of problems) {
+      expect(problem).toMatch(/_idlip-helpers|ERR_FAILED|Failed to fetch dynamically imported/);
+    }
+    problems.length = 0;
+  });
+}
+
+test('the preload links fetch the first click chunks with the page, so the click fetches nothing', async ({
+  page,
+}) => {
+  test.skip(process.env.E2E_TARGET === 'fixture', 'the fixture page has no preload links');
+  const loaded = await collectRequests(page, async () => {
+    await page.goto('/', { waitUntil: 'networkidle' });
+  });
+  const names: string[] = [];
+  for (const name of loaded) {
+    if (!name.startsWith('/')) {
+      names.push(name);
+    }
+  }
+  expect(names.toSorted()).toEqual(['binding=todos.*.done', 'handler=toggle', 'helpers']);
+  const chunks = await collectRequests(page, async () => {
+    await page.getByRole('checkbox').nth(1).click();
+    await expect(page.locator('p')).toHaveText('0 left');
+  });
+  expect(chunks).toEqual([]);
+  // The preloads raised no CSP violation under the page's nonce policy.
+  expect(await page.evaluate(() => window.idlipViolations)).toEqual([]);
 });
 
 test('a later click on the same handler loads nothing', async ({ page }) => {
@@ -106,6 +217,34 @@ test('a later click on the same handler loads nothing', async ({ page }) => {
   expect(chunks).toEqual([]);
   // The state decoded once, for the first event.
   expect(await page.evaluate(() => window.idlipDecoded)).toBe(1);
+});
+
+test('a click before the preloads arrive fetches each chunk once and applies', async ({ page }) => {
+  test.skip(process.env.E2E_TARGET === 'fixture', 'the fixture page has no preload links');
+  let release: () => void = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  // Hold the preloaded chunks, not the loader, so the click lands while they are in flight.
+  const fetched: string[] = [];
+  await page.route('**/assets/*.js', async (route) => {
+    const name = getChunkName(route.request().url());
+    if (name !== undefined) {
+      fetched.push(name);
+      await held;
+    }
+    await route.continue();
+  });
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.getByRole('checkbox').nth(1).click();
+  await expect(page.locator('p')).toHaveText('1 left');
+  release();
+  await expect(page.locator('p')).toHaveText('0 left');
+  await settle(page);
+  // The loader's imports reuse the preloads in flight.
+  expect(fetched.toSorted()).toEqual(['binding=todos.*.done', 'handler=toggle', 'helpers']);
+  const toggled = [initial[0], { ...initial[1], done: true }];
+  expect(await readMain(page)).toBe(await renderFresh(page, toggled));
 });
 
 test('a click before the page scripts finish loading still applies', async ({ page }) => {

@@ -1,7 +1,7 @@
 ---
 id: markup-parser
 title: Markup scanner and parser
-status: done
+status: dropped
 priority: should
 type: feature
 story: markup-frontend
@@ -57,3 +57,5 @@ Scan and parse `.idlip` source into an AST with source spans for every token, fo
 One parser over a frozen grammar.
 
 Landed as 6e45503 on `feat/markup-frontend` after one fresh review round.
+
+Dropped 2026-11-21 by debate `debates/dsl`: built on `feat/markup-frontend` only, never merged; the branch stays as history.

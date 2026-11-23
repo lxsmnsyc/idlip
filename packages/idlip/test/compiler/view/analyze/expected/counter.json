@@ -1,5 +1,5 @@
 {
-  "file": "counter.idlip.tsx",
+  "file": "counter.tsx",
   "components": [
     {
       "name": "Counter",
@@ -73,8 +73,8 @@
             }
           ],
           "span": {
-            "start": 144,
-            "end": 193
+            "start": 138,
+            "end": 187
           }
         },
         {
@@ -96,8 +96,8 @@
             }
           ],
           "span": {
-            "start": 196,
-            "end": 254
+            "start": 190,
+            "end": 248
           }
         },
         {
@@ -124,8 +124,8 @@
             }
           ],
           "span": {
-            "start": 257,
-            "end": 304
+            "start": 251,
+            "end": 298
           }
         }
       ],
@@ -146,16 +146,27 @@
                 {
                   "name": "click",
                   "mode": "on",
-                  "target": {
-                    "kind": "handler",
-                    "name": "increment"
+                  "body": {
+                    "kind": "steps",
+                    "steps": [
+                      {
+                        "kind": "send",
+                        "target": {
+                          "kind": "handler",
+                          "name": "increment"
+                        },
+                        "args": [],
+                        "span": {
+                          "start": 344,
+                          "end": 355
+                        }
+                      }
+                    ]
                   },
-                  "args": [],
-                  "paths": [],
                   "modifiers": [],
                   "span": {
-                    "start": 350,
-                    "end": 361
+                    "start": 344,
+                    "end": 355
                   }
                 }
               ],
@@ -166,8 +177,8 @@
                 }
               ],
               "span": {
-                "start": 333,
-                "end": 373
+                "start": 327,
+                "end": 367
               }
             },
             {
@@ -179,21 +190,32 @@
                 {
                   "name": "click",
                   "mode": "on",
-                  "target": {
-                    "kind": "handler",
-                    "name": "add"
+                  "body": {
+                    "kind": "steps",
+                    "steps": [
+                      {
+                        "kind": "send",
+                        "target": {
+                          "kind": "handler",
+                          "name": "add"
+                        },
+                        "args": [
+                          {
+                            "kind": "literal",
+                            "value": 10
+                          }
+                        ],
+                        "span": {
+                          "start": 398,
+                          "end": 405
+                        }
+                      }
+                    ]
                   },
-                  "args": [
-                    {
-                      "kind": "literal",
-                      "value": 10
-                    }
-                  ],
-                  "paths": [],
                   "modifiers": [],
                   "span": {
-                    "start": 397,
-                    "end": 412
+                    "start": 391,
+                    "end": 406
                   }
                 }
               ],
@@ -204,8 +226,8 @@
                 }
               ],
               "span": {
-                "start": 380,
-                "end": 425
+                "start": 374,
+                "end": 419
               }
             },
             {
@@ -217,16 +239,27 @@
                 {
                   "name": "click",
                   "mode": "on",
-                  "target": {
-                    "kind": "handler",
-                    "name": "reset"
+                  "body": {
+                    "kind": "steps",
+                    "steps": [
+                      {
+                        "kind": "send",
+                        "target": {
+                          "kind": "handler",
+                          "name": "reset"
+                        },
+                        "args": [],
+                        "span": {
+                          "start": 443,
+                          "end": 450
+                        }
+                      }
+                    ]
                   },
-                  "args": [],
-                  "paths": [],
                   "modifiers": [],
                   "span": {
-                    "start": 449,
-                    "end": 456
+                    "start": 443,
+                    "end": 450
                   }
                 }
               ],
@@ -237,8 +270,8 @@
                 }
               ],
               "span": {
-                "start": 432,
-                "end": 471
+                "start": 426,
+                "end": 465
               }
             },
             {
@@ -292,8 +325,8 @@
                         }
                       ],
                       "span": {
-                        "start": 493,
-                        "end": 501
+                        "start": 487,
+                        "end": 495
                       }
                     }
                   }
@@ -321,15 +354,15 @@
                       }
                     ],
                     "span": {
-                      "start": 504,
-                      "end": 509
+                      "start": 498,
+                      "end": 503
                     }
                   }
                 }
               ],
               "span": {
-                "start": 478,
-                "end": 519
+                "start": 472,
+                "end": 513
               }
             },
             {
@@ -368,8 +401,8 @@
                   }
                 ],
                 "span": {
-                  "start": 527,
-                  "end": 531
+                  "start": 521,
+                  "end": 525
                 }
               },
               "then": [
@@ -386,8 +419,8 @@
                     }
                   ],
                   "span": {
-                    "start": 535,
-                    "end": 552
+                    "start": 529,
+                    "end": 546
                   }
                 }
               ],
@@ -396,8 +429,8 @@
             }
           ],
           "span": {
-            "start": 321,
-            "end": 564
+            "start": 315,
+            "end": 558
           }
         }
       ],
@@ -444,8 +477,8 @@
             }
           ],
           "span": {
-            "start": 493,
-            "end": 501
+            "start": 487,
+            "end": 495
           }
         },
         {
@@ -466,8 +499,8 @@
             }
           ],
           "span": {
-            "start": 504,
-            "end": 509
+            "start": 498,
+            "end": 503
           }
         },
         {
@@ -504,8 +537,8 @@
             }
           ],
           "span": {
-            "start": 527,
-            "end": 531
+            "start": 521,
+            "end": 525
           }
         }
       ]

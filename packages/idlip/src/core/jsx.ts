@@ -19,7 +19,7 @@ export declare namespace JSX {
   }
 
   interface IntrinsicAttributes {
-    key?: string | number;
+    key?: string | number | ((item: never) => string | number);
   }
 
   interface IntrinsicElements {}

@@ -1,7 +1,10 @@
 import { serialize } from 'seroval';
+import { getChunkId } from '../../src/core/format.ts';
 import type {
+  ChildManifest,
   ChunkUrls,
   DomMessage,
+  HandlerEntry,
   Manifest,
   Model,
   PageState,
@@ -118,7 +121,10 @@ export function slot(path: string, site: number, ...keys: unknown[]): string {
 /** A client view chunk, as the item template chunk of a parent imports it. */
 export interface ViewChunk {
   init: (props: Props) => Model;
-  render: (scope: { model: Model; props: Props; rows: []; path: string }) => string;
+  render: (
+    scope: { model: Model; props: Props; rows: []; path: string },
+    doc: Document,
+  ) => DocumentFragment;
 }
 
 /** The slots `addChild` recorded in the reference client. */
@@ -128,10 +134,16 @@ export const slots: Map<string, Slot> = new Map<string, Slot>();
  * A reference `addChild` of `idlip/client`: makes the child's model, records the slot and returns
  * the child's markup between its boundary comments.
  */
-export function addChild(path: string, module: string, view: ViewChunk, props: Props): string {
+export function addChild(
+  path: string,
+  module: string,
+  view: ViewChunk,
+  props: Props,
+  doc: Document,
+): Node {
   const model = view.init(props);
   slots.set(path, { module, model, props });
-  return `<!--n:${path}-->${view.render({ model, props, rows: [], path })}<!--/n-->`;
+  return view.render({ model, props, rows: [], path }, doc);
 }
 
 function collectModules(
@@ -142,10 +154,30 @@ function collectModules(
   for (const info of uses) {
     if (!modules.has(info.manifest.module)) {
       modules.set(info.manifest.module, info.manifest);
-      Object.assign(chunks, info.chunks);
+      const { module, view } = info.manifest;
+      const viewId = view === undefined ? undefined : getChunkId(module, view.chunk);
+      for (const [id, url] of Object.entries(info.chunks)) {
+        if (id !== viewId) {
+          chunks[id] = url;
+        }
+      }
       collectModules(info.uses ?? [], modules, chunks);
     }
   }
+}
+
+/**
+ * A child manifest as the state script holds it: without `events`, `listens`, `view` and the
+ * `writes` of each handler, which the loader never reads.
+ */
+export function toClientManifest(manifest: Manifest): ChildManifest {
+  const { events: _events, listens: _listens, view: _view, handlers, ...rest } = manifest;
+  const slim: Record<string, HandlerEntry> = {};
+  for (const [tag, entry] of Object.entries(handlers)) {
+    const { writes: _writes, ...kept } = entry;
+    slim[tag] = kept;
+  }
+  return { ...rest, handlers: slim };
 }
 
 /**
@@ -191,11 +223,13 @@ export function createContext(): { context: NestedContext; writeState: () => str
       model: root.model,
       props: root.props,
     };
-    if (modules.size > 0) {
-      state.modules = Object.fromEntries(modules);
-    }
     if (children.size > 0) {
       state.slots = Object.fromEntries(children);
+    }
+    if (modules.size > 0) {
+      state.modules = Object.fromEntries(
+        [...modules].map(([module, manifest]) => [module, toClientManifest(manifest)]),
+      );
     }
     const names = [...events].toSorted().join(' ');
     // seroval's output is a parenthesized expression, so it serves as the arrow body as it is.
@@ -238,7 +272,7 @@ function checkChanged(
   next: unknown,
   segments: readonly string[],
   prefix: string,
-  keys: Readonly<Record<string, string>>,
+  keys: Readonly<Record<string, string | undefined>>,
 ): boolean {
   if (prev === next) {
     return false;
@@ -256,6 +290,10 @@ function checkChanged(
   // bindings after a reorder. By index covers holes outside rows, such as `todos[selected].done`.
   if (Object.hasOwn(keys, prefix)) {
     const key = keys[prefix];
+    if (key === undefined) {
+      // A computed key: no item pairing is safe, so any change of the list counts.
+      return true;
+    }
     const before = listKeyed(prev, key);
     for (const [id, item] of listKeyed(next, key)) {
       if (before.has(id) && checkChanged(before.get(id), item, rest, itemPath, keys)) {
@@ -284,7 +322,7 @@ export function diffPaths(
   prev: Model,
   next: Model,
   paths: readonly string[],
-  keys: Readonly<Record<string, string>>,
+  keys: Readonly<Record<string, string | undefined>>,
 ): Set<string> {
   const changed = new Set<string>();
   for (const path of paths) {
@@ -308,7 +346,7 @@ function hasChanged(paths: readonly string[], changed: ReadonlySet<string>): boo
  * Returns the binding chunks a patch loads: changed groups in manifest order, minus covered ones.
  */
 export function selectChunks(manifest: Manifest, prev: Model, next: Model): string[] {
-  const keys: Record<string, string> = {};
+  const keys: Record<string, string | undefined> = {};
   for (const list of Object.values(manifest.lists)) {
     if (list.path !== undefined) {
       keys[list.path] = list.key;

@@ -1,0 +1,22 @@
+== view analysis error rule ids (TSX grammar policing)
+      83
+'attr-event' 'attr-jsx' 'attr-reserved' 'await-callee' 'await-placement' 'body-destructure' 'body-return' 'body-statement' 'body-var' 'child-children' 'component-import' 'component-recursive' 'component-unknown' 'condition-operator' 'derived-cycle' 'derived-jsx' 'event-closure' 'event-message-args' 'event-mode-twice' 'event-param' 'event-passive-prevent' 'event-placeholder' 'event-target' 'for-each' 'for-key' 'for-param' 'for-render' 'global-attr' 'global-children' 'handler-assign' 'handler-free' 'handler-generator' 'handler-impure' 'handler-mutate' 'helper-closure' 'hole-array' 'hole-call' 'hole-children' 'hole-closure' 'hole-effect' 'hole-function-value' 'hole-global' 'hole-grammar' 'hole-handler' 'hole-impure' 'hole-jsx' 'hole-literal' 'hole-member' 'hole-message' 'hole-method' 'hole-object' 'hole-operator' 'hole-spread' 'hole-statement' 'hole-unknown' 'html-children' 'html-element' 'html-implied' 'html-nesting' 'html-raw-text' 'html-trusted' 'init-scope' 'jsx-namespace-tag' 'jsx-spread' 'let-annotation' 'let-bare-as' 'let-init' 'let-unassigned' 'oxc-parser' 'props-count' 'props-pattern' 'props-subst' 'props-whole' 'ref-form' 'ref-key' 'srcdoc-trusted' 'subscribe-children' 'subscribe-input-key' 'subscribe-source' 'text-hole' 'title-outside-head' 'try-catch' 'view-map' 
+== analyze.ts lines
+    4699 total
+== block components in TSX
+  13 <For
+   6 <Head
+   2 <Subscribe
+   5 <Try
+== old debate O11/P3/P7
+23:7. After the proof of concept, a markup DSL with real control-flow blocks replaces the TSX view syntax: outline node `markup-frontend` (should, `apps`, after `example-todo`). It parses into the same view IR. It keeps no `<script>` or `<style>` blocks; styles are an imported sidecar. Diagnostics carry rule ids. (P3 and P7, user overrule of O11)
+29:- `compile-view-analyze`: report grammar violations as errors with rule ids. (P9, O11)
+40:- time: no new must work. D costs about 4.3k lines of parser and analyzer plus 2 weeks of type and editor tooling, paid only when the O11 trigger fires. (J4, O1)
+78:- P3: the judge rejected a markup frontend after 0.1. The user upholds it: they want real control-flow blocks, because JSX needs fake control-flow components. It comes after the TSX proof of concept. Source: the user, 2026-11-20, objecting to repeated pushback for plain TS: "we never had this kind of pushback with brumate". They accept the brumate-style tooling (Volar language core, tsc wrapper, editor extension). Settled: do not reopen TS versus DSL unless the user asks.
+79:- O11: the judge set a trigger of 10 block-removable diagnostics. The user rejects the trigger: the debate weighed syntax only by node count, not by authoring value.
+== calibration totals
+| safe-urls            | S            | S      | 93,333  | Review fix: objects and arrays are dropped too.                                                                                 |
+| safe-urls-2          | S            | S      | 83,522  | The analyzer decides the URL kind, since the helper does not know the tag.                                                      |
+| dynamic-paths        | M            | M      | 363,165 | Tracked holes only at the top level of a root; rows, branches and children use static fallback.                                 |
+| deploy-skew          | M            | M      | 364,832 | First version checked in the loader (+166 B); moved to `build.js` (+60 B).                                                      |
+| loader-trim          | S            | S      | 149,933 | 126 B cut over eight small edits, 4007 B to 3881 B.                                                                             |

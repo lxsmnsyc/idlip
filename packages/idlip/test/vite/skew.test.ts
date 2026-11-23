@@ -71,7 +71,7 @@ describe('keepBuilds', () => {
 
 describe('the state script', () => {
   const manifest: Manifest = {
-    module: '/src/a.idlip.tsx',
+    module: '/src/a.tsx',
     events: [],
     listens: {},
     handlers: {},

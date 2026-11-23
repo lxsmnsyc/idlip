@@ -1,0 +1,324 @@
+// Each marked line breaks one rule. The comment names the rule id the analysis reports.
+import { For, Head, Subscribe, Try, trusted } from 'idlip';
+import { load, format } from './api';
+import { Widget } from './widget';
+
+type Mode = 'a' | 'b';
+
+function helper(value: number): number {
+  return value * 2;
+}
+function Stateful() {
+  let n = 0;
+  function bump() {
+    n = n + 1;
+  }
+  return <b on:click={bump}>{n}</b>;
+}
+
+// body-return: no return.
+function NoView() {
+  let n = 0;
+  function bump() {
+    n = n + 1;
+  }
+}
+
+// props-count: two parameters.
+function Two(a: { x: number }, b: { y: number }) {
+  return <i>{a.x}</i>;
+}
+
+// component-recursive: a stateless component that renders itself.
+function Loop() {
+  return (
+    <div>
+      <Loop />
+    </div>
+  );
+}
+
+// event-message-args: a forwarded message prop called with arguments.
+// hole-message: a message prop read in a hole.
+// hole-children: children read in a hole.
+function Forward({ onPick, children }: { onPick: () => void; children?: unknown }) {
+  return (
+    <b on:click={() => onPick(1)}>
+      {format(onPick)} {format(children)}
+    </b>
+  );
+}
+
+// No error on its own: forwards its message prop.
+function Pick({ onPick }: { onPick: () => void }) {
+  return <b on:click={onPick}>pick</b>;
+}
+
+// props-whole: the props object read by a computed key, in an inlined component.
+function Whole(props: { x: number }) {
+  return <i>{props[props.x]}</i>;
+}
+
+// props-pattern: a default in the props pattern.
+export default function Broken({ size = 1 }: { size?: number }) {
+  let draft = '';
+  let items: string[] = []; // let-annotation
+  let mode = 'a' as Mode; // let-bare-as
+  let unset; // let-init
+  let rolled = Math.random(); // let-init: an impure initial value
+  let copy = draft; // init-scope
+  let never = 0; // let-unassigned (warning)
+  var legacy = 1; // body-var
+  const { length } = draft; // body-destructure
+  const markup = <i />; // derived-jsx
+  const loopA = loopB; // derived-cycle
+  const loopB = loopA;
+  if (draft === '') draft = 'x'; // body-statement
+  function* steps() {} // handler-generator
+
+  function setDraft(text: string) {
+    draft = text;
+  }
+  function add() {
+    items.push(draft); // handler-mutate
+    mode.length = 2; // handler-mutate
+    const first = items[0];
+    first.done = true; // handler-mutate: a write through an alias of a state value
+    const [second] = items;
+    second.tags.push('x'); // handler-mutate: a mutator call through an alias
+    for (const item of items) {
+      item.done = false; // handler-mutate: a loop variable aliases an element
+    }
+    const copy = { ...items[0] };
+    copy.done = true; // a copy is not an alias
+    [1].forEach((first) => {
+      first.done = true; // a parameter shadows the alias
+    });
+    {
+      const second = { done: false };
+      second.done = true; // a block-scoped local shadows the alias
+    }
+    let late;
+    late = items[1];
+    late.done = true; // handler-mutate: an alias assigned after let
+    loopA = 'x'; // handler-assign
+    draft = String(Math.random()); // handler-impure
+    const when = new Date(); // handler-impure
+    void when;
+    void missing; // handler-free
+  }
+  async function save() {
+    if (draft !== '') {
+      await load(draft); // await-placement
+    }
+    const local = async () => 1;
+    await local(); // await-callee
+    items = [];
+    mode = 'b';
+  }
+
+  return (
+    <main>
+      {/* hole-closure */}
+      <p>{() => draft}</p>
+      {/* hole-method: split is not on the allow-list */}
+      <p>{draft.split(',')}</p>
+      {/* hole-global: JSON is not on the allow-list */}
+      <p>{JSON.stringify(draft)}</p>
+      {/* hole-impure: a warning, since the hole reads draft */}
+      <p>{draft + Math.random()}</p>
+      {/* hole-array */}
+      <p>{format([1, ...items])}</p>
+      {/* hole-call */}
+      <p>{draft()}</p>
+      {/* hole-effect */}
+      <p>{new Date()}</p>
+      {/* hole-grammar */}
+      <p>{this}</p>
+      {/* hole-jsx */}
+      <p>{format(<i />)}</p>
+      {/* hole-literal */}
+      <p>{format(/x/)}</p>
+      {/* hole-member */}
+      <p>{format(draft).name}</p>
+      {/* hole-object */}
+      <p>{format({ ...items })}</p>
+      {/* hole-spread */}
+      <p>{format(...items)}</p>
+      {/* attr-jsx */}
+      <p title=<i /> />
+      {/* jsx-namespace-tag */}
+      <svg:rect />
+      {/* for-each */}
+      <For key={(item) => item.id}>{(item) => <li>{item}</li>}</For>
+      {/* for-param */}
+      <For each={items} key={(item) => item.id}>
+        {([first]) => <li>{first}</li>}
+      </For>
+      {/* global-children */}
+      <window>text</window>
+      {/* subscribe-children */}
+      <Subscribe to={load}>text</Subscribe>
+      {/* component-import */}
+      <Widget />
+      {/* props-whole */}
+      <Whole x={1} />
+      {/* component-recursive */}
+      <Loop />
+      {/* hole-handler */}
+      <p>{setDraft}</p>
+      {/* hole-statement */}
+      <p>{(draft = 'x')}</p>
+      {/* hole-unknown */}
+      <p>{nowhere}</p>
+      {/* helper-closure */}
+      <p>{format(draft, (x: string) => x)}</p>
+      {/* hole-operator */}
+      <p>{'a' in items}</p>
+      {/* hole-function-value */}
+      <p>{helper}</p>
+      {/* view-map */}
+      <ul>{items.map((item) => item)}</ul>
+      {/* condition-operator */}
+      {draft || <p>empty</p>}
+      {/* event-closure */}
+      <button on:click={() => save() && save()}>x</button>
+      {/* event-target */}
+      <button on:click={() => console.log(draft)}>x</button>
+      {/* event-param */}
+      <button on:click={({ target }) => setDraft(target)}>x</button>
+      {/* event-mode-twice */}
+      <button on:click={save} latest:click={save}>
+        x
+      </button>
+      {/* for-key */}
+      <For each={items}>{(item) => <li>{item}</li>}</For>
+      {/* for-render */}
+      <For each={items} key={(item) => item.id}>
+        {items}
+      </For>
+      {/* ref-form */}
+      <input ref={draft} />
+      {/* html-trusted */}
+      <div html={draft} />
+      {/* html-children */}
+      <div html={trusted(draft)}>child</div>
+      {/* html-nesting */}
+      <p>
+        <div>block in paragraph</div>
+      </p>
+      {/* html-implied */}
+      <table>
+        <tr>
+          <td>row</td>
+        </tr>
+      </table>
+      {/* html-nesting: text in a table */}
+      <table>text</table>
+      {/* html-nesting: link in a link */}
+      <a href="/">
+        <a href="/x">nested link</a>
+      </a>
+      {/* title-outside-head */}
+      <title>Outside head</title>
+      {/* subscribe-input-key */}
+      <Subscribe to={load} input={draft} on:value={setDraft} />
+      {/* subscribe-source */}
+      <Subscribe to={(x: number) => x} on:value={setDraft} />
+      {/* jsx-spread */}
+      <div {...{ id: 'x' }} />
+      {/* component-unknown */}
+      <Missing />
+      {/* global-attr */}
+      <window class="x" />
+      {/* try-catch */}
+      <Try catch="oops">body</Try>
+      {/* child-children */}
+      <Stateful>child</Stateful>
+      {/* no error: a title in Head */}
+      <Head>
+        <title>{draft}</title>
+      </Head>
+      {/* hole-global: an impure global in an event argument is fixed at render */}
+      <button on:click={() => setDraft(Math.random())}>roll</button>
+      {/* hole-global: the same in a message prop of an inlined component */}
+      <Pick onPick={() => setDraft(Date.now())} />
+      {/* try-catch: a block-bodied catch arrow */}
+      <Try
+        catch={(error) => {
+          return <p>failed</p>;
+        }}
+      >
+        body
+      </Try>
+      {/* for-render: a block-bodied render arrow */}
+      <For each={items} key={(item) => item.id}>
+        {(item) => {
+          return <li>{item}</li>;
+        }}
+      </For>
+      {/* for-param: the index is not a plain name */}
+      <For each={items} key={(item) => item.id}>
+        {(item, [index]) => <li>{item}</li>}
+      </For>
+      {/* attr-reserved: the i- prefix belongs to the compiled format */}
+      <div i-a="x" />
+      {/* event-placeholder: the event is not plain data */}
+      <input on:input={(e) => setDraft(e)} />
+      {/* event-statement: a loop is not an event step */}
+      <input
+        on:keydown={(e) => {
+          while (draft) {
+            save();
+          }
+        }}
+      />
+      {/* event-target: a repeated preventDefault is not a handler */}
+      <form
+        on:submit={(e) => {
+          e.preventDefault();
+          e.preventDefault();
+          save();
+        }}
+      />
+      {/* event-no-call: an arrow that only cancels the event */}
+      <form
+        on:submit={(e) => {
+          e.preventDefault();
+        }}
+      />
+      {/* event-prevent-twice: a keyed prevent after an unconditional one */}
+      <input
+        on:keydown={(e) => {
+          e.preventDefault();
+          if (e.key === 'a') e.preventDefault();
+          save();
+        }}
+      />
+      {/* html-raw-text: a hole in a script */}
+      <script>{draft}</script>
+      {/* html-raw-text: a hole next to text in a textarea */}
+      <textarea>a {draft}</textarea>
+      {/* html-nesting: a text hole directly in a table row */}
+      <table>
+        <tbody>
+          <tr>{draft}</tr>
+        </tbody>
+      </table>
+      {/* html-nesting: text in a table part through a condition */}
+      <table>
+        <tbody>{draft && 'text'}</tbody>
+      </table>
+      {/* html-nesting: text in a table part through a For */}
+      <table>
+        <tbody>
+          <For each={items} key={(item) => item.id}>
+            {(item) => item}
+          </For>
+        </tbody>
+      </table>
+      {/* hole-unknown: size is dropped with the rejected pattern */}
+      {size}
+    </main>
+  );
+}

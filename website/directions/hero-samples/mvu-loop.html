@@ -1,0 +1,998 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>idlip hero: the MVU loop</title>
+    <style>
+      /*BASE_CSS*/
+
+      /* Header: the phase switch and the code meter. */
+      .phase {
+        top: 24px;
+        left: 24px;
+        display: flex;
+        padding: 4px;
+        border-radius: var(--radius);
+        background: var(--well);
+      }
+      .seg {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        width: 108px;
+        height: 32px;
+        place-items: center;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .seg > span {
+        grid-area: 1 / 1;
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        transition: opacity var(--duration) var(--ease-out);
+      }
+      .seg .on {
+        color: var(--on-accent);
+      }
+      .seg .off {
+        color: var(--on-ink-muted);
+      }
+      .thumb {
+        position: absolute;
+        top: 4px;
+        left: 4px;
+        width: 108px;
+        height: 32px;
+        border-radius: var(--radius);
+        background: var(--accent-fill);
+        transition: transform var(--slow) var(--ease);
+      }
+      .board.at-ship .thumb {
+        transform: translateX(108px);
+      }
+      .seg-server .on,
+      .board.at-ship .seg-browser .on,
+      .seg-browser .off,
+      .board.at-ship .seg-server .off {
+        opacity: 1;
+      }
+      .seg-server .off,
+      .seg-browser .on,
+      .board.at-ship .seg-server .on,
+      .board.at-ship .seg-browser .off {
+        opacity: 0;
+      }
+
+      .meter {
+        top: 24px;
+        right: 24px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        height: 40px;
+        opacity: 0;
+        transform: translateY(-4px);
+        transition:
+          opacity var(--duration) var(--ease-out),
+          transform var(--duration) var(--ease-out);
+      }
+      .board.at-ship .meter {
+        opacity: 1;
+        transform: none;
+        transition-delay: 300ms;
+      }
+      .meter-value {
+        display: grid;
+        font-family: var(--mono);
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: -0.04em;
+        font-variant-numeric: tabular-nums;
+      }
+      .meter-value > span {
+        grid-area: 1 / 1;
+        justify-self: end;
+        padding: 2px 6px;
+        border-radius: 6px;
+        transition:
+          opacity var(--duration) var(--ease-out),
+          transform var(--duration) var(--ease-out);
+      }
+      .meter-value .now {
+        background: var(--accent-fill);
+        color: var(--on-accent);
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      .board.at-patch .meter-value .now {
+        opacity: 1;
+        transform: none;
+        transition-delay: 500ms;
+      }
+      .board.at-patch .meter-value .was {
+        opacity: 0;
+        transform: translateY(-6px);
+        transition-delay: 500ms;
+      }
+
+      /* The viewport: two panels on a track, the server and the browser. */
+      .vp {
+        top: 80px;
+        left: 24px;
+        width: 512px;
+        height: 336px;
+        overflow: hidden;
+        border-radius: var(--radius-md);
+      }
+      .track {
+        position: absolute;
+        inset: 0;
+        transition: transform 900ms cubic-bezier(0.7, 0, 0.2, 1);
+      }
+      .board.at-ship .track {
+        transform: translateX(-524px);
+      }
+      .panel {
+        position: absolute;
+        top: 0;
+        width: 512px;
+        height: 336px;
+        border-radius: var(--radius-md);
+        background: var(--well);
+      }
+      .panel-browser {
+        left: 524px;
+      }
+      .ring {
+        position: absolute;
+        inset: 0;
+        overflow: visible;
+      }
+      .ring ellipse {
+        fill: none;
+        stroke: var(--line);
+        stroke-width: 1.5;
+        stroke-dasharray: 2 6;
+        stroke-linecap: round;
+      }
+
+      /* The nodes of the loop: Model and Update, as cards. */
+      .node {
+        position: absolute;
+        display: grid;
+        gap: 8px;
+        padding: 12px;
+        border-radius: 16px;
+        background: var(--bg-elevated);
+        color: var(--text);
+        transition:
+          opacity var(--mid) var(--ease-out),
+          transform var(--mid) var(--ease);
+      }
+      .node-head {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .node-head svg {
+        color: var(--muted);
+      }
+      .kv {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 20px;
+        font-family: var(--mono);
+        font-size: 10px;
+        font-variant-numeric: tabular-nums;
+      }
+      .kv > i {
+        color: var(--muted);
+        font-style: normal;
+      }
+      .val {
+        display: grid;
+      }
+      .val > span {
+        grid-area: 1 / 1;
+        justify-self: end;
+        padding: 1px 5px;
+        border-radius: 5px;
+        transition:
+          opacity var(--duration) var(--ease-out),
+          transform var(--duration) var(--ease-out);
+      }
+      .model {
+        top: 104px;
+        left: 16px;
+        width: 160px;
+      }
+      .update {
+        top: 214px;
+        left: 160px;
+        width: 144px;
+      }
+      .update .code {
+        display: grid;
+        height: 20px;
+        font-family: var(--mono);
+        font-size: 10px;
+        white-space: nowrap;
+      }
+      .update .code > span {
+        grid-area: 1 / 1;
+        align-self: center;
+        transition: opacity var(--duration) var(--ease-out);
+      }
+      .update .code .arg {
+        opacity: 0;
+      }
+      .fn {
+        color: var(--syn-function);
+      }
+      .str {
+        color: var(--syn-string);
+      }
+
+      /* Server: the model card seals into the state capsule. */
+      .model-body {
+        display: grid;
+        gap: 0;
+        transform-origin: 50% 0;
+        transition:
+          opacity var(--duration) var(--ease-out),
+          transform var(--mid) var(--ease-out);
+      }
+      .board.at-seal .panel-server .model-body {
+        opacity: 0;
+        transform: scale(0.9);
+      }
+      .sealed {
+        position: absolute;
+        inset: 44px 12px 12px;
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+        background: var(--surface);
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 10px;
+        opacity: 0;
+        transform: scale(0.9);
+        transition:
+          opacity var(--duration) var(--ease-out),
+          transform var(--mid) var(--ease);
+      }
+      .board.at-seal .sealed {
+        opacity: 1;
+        transform: none;
+        transition-delay: 160ms;
+      }
+
+      /* Browser: the loop is there but asleep until the click. A cover dims it. */
+      .panel-browser .node::after {
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: var(--ink);
+        content: '';
+        opacity: 0.6;
+        transition: opacity var(--mid) var(--ease-out);
+      }
+      .board.at-handler .panel-browser .update::after,
+      .board.at-update .panel-browser .model::after {
+        opacity: 0;
+      }
+      .board.at-handler .update .code .arg {
+        opacity: 1;
+        transition-delay: 600ms;
+      }
+      .board.at-handler .update .code .sig {
+        opacity: 0;
+        transition-delay: 600ms;
+      }
+      .slot {
+        display: grid;
+        height: 24px;
+      }
+      .slot > * {
+        grid-area: 1 / 1;
+        justify-self: start;
+        transition:
+          opacity var(--duration) var(--ease-out),
+          transform var(--duration) var(--ease);
+      }
+      .slot .chip {
+        height: 24px;
+        padding: 0 10px;
+      }
+      .slot .lit {
+        opacity: 0;
+        transform: scale(0.8);
+      }
+      .slot .wait {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        align-self: center;
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 10px;
+      }
+      .board.at-handler .update .slot .lit {
+        opacity: 1;
+        transform: none;
+        transition-delay: 640ms;
+      }
+      .board.at-handler .update .slot .wait {
+        opacity: 0;
+        transition-delay: 640ms;
+      }
+      .v-false {
+        color: var(--text);
+      }
+      .v-true {
+        background: var(--accent-fill);
+        color: var(--on-accent);
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      .board.at-update .panel-browser .flip .v-true {
+        opacity: 1;
+        transform: none;
+        transition-delay: 520ms;
+      }
+      .board.at-update .panel-browser .flip .v-false {
+        opacity: 0;
+        transform: translateY(-6px);
+        transition-delay: 520ms;
+      }
+
+      /* The page: rendered by the server, then shown by the browser. It does not move. */
+      .page {
+        top: 44px;
+        left: 312px;
+        z-index: 4;
+        width: 192px;
+        padding: 8px 10px 10px;
+        gap: 4px;
+      }
+      .bar {
+        display: grid;
+        height: 20px;
+        padding: 0 2px;
+      }
+      .bar > * {
+        grid-area: 1 / 1;
+        align-self: center;
+        transition: opacity var(--duration) var(--ease-out);
+      }
+      .bar .dots {
+        display: flex;
+        gap: 4px;
+        opacity: 0;
+      }
+      .bar .dots i {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--surface-strong);
+      }
+      .bar .tag {
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 9px;
+      }
+      .board.at-ship .bar .dots {
+        opacity: 1;
+      }
+      .board.at-ship .bar .tag {
+        opacity: 0;
+      }
+      .page .row {
+        height: 36px;
+        font-size: 12px;
+      }
+      .page .row,
+      .page .app-head {
+        opacity: 0;
+        transform: translateY(6px);
+        transition:
+          opacity var(--duration) var(--ease-out),
+          transform var(--mid) var(--ease-out);
+      }
+      .board.at-render .page .row,
+      .board.at-render .page .app-head {
+        opacity: 1;
+        transform: none;
+      }
+      .board.at-render .page .app-head {
+        transition-delay: 560ms;
+      }
+      .board.at-render .page .r1 {
+        transition-delay: 640ms;
+      }
+      .board.at-render .page .r2 {
+        transition-delay: 720ms;
+      }
+      .count .was b,
+      .count .now b {
+        font-variant-numeric: tabular-nums;
+      }
+      .count .now {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      .board.at-patch .count .now {
+        opacity: 1;
+        transform: none;
+        transition-delay: 620ms;
+      }
+      .board.at-patch .count .was {
+        opacity: 0;
+        transform: translateY(-6px);
+        transition-delay: 620ms;
+      }
+      .board.at-patch .r2 {
+        --patched: 1;
+      }
+      .r2 .box::before,
+      .r2 .box svg {
+        transition-delay: 0ms;
+      }
+      .board.at-patch .r2 .box::before,
+      .board.at-patch .r2 .box svg {
+        opacity: 1;
+        transform: none;
+        transition-delay: 600ms;
+      }
+      .board.at-patch .r2 .txt {
+        opacity: 0.6;
+        transition-delay: 600ms;
+      }
+      .board.at-press .r2 .box {
+        transform: scale(0.88);
+      }
+      .board.at-handler .r2 .box {
+        transform: none;
+      }
+      .board.at-patch .flash {
+        opacity: 1;
+        transition-delay: 600ms;
+      }
+      .board.at-rest .flash {
+        opacity: 0;
+        transition-delay: 300ms;
+        transition-duration: 700ms;
+      }
+      .count .flash {
+        inset: -3px -6px;
+        border-radius: 8px;
+      }
+
+      /* The state capsule under the page. */
+      .capsule {
+        top: 200px;
+        left: 312px;
+        z-index: 4;
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        height: 28px;
+        padding: 0 12px 0 10px;
+        border-radius: var(--radius);
+        background: var(--bg-elevated);
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 10px;
+        opacity: 0;
+        transform: translateY(-6px) scale(0.9);
+        transition:
+          opacity var(--duration) var(--ease-out),
+          transform var(--mid) var(--ease);
+      }
+      .capsule .k {
+        color: var(--syn-tag);
+      }
+      .capsule .a {
+        color: var(--syn-attr);
+      }
+      .board.at-seal .capsule {
+        opacity: 1;
+        transform: none;
+        transition-delay: 560ms;
+      }
+      .capsule-rider {
+        height: 24px;
+        padding: 0 10px;
+        background: var(--bg-elevated);
+        color: var(--text);
+      }
+
+      /* The lit arcs of the loop. */
+      .wire path {
+        fill: none;
+        stroke: var(--on-ink);
+        stroke-width: 2.5;
+        stroke-linecap: round;
+        opacity: 0;
+        transition: opacity var(--mid) var(--ease-out);
+      }
+      .board.at-render:not(.at-seal) .arc-top,
+      .board.at-loop:not(.at-seal) .arc-right,
+      .board.at-loop:not(.at-seal) .arc-left,
+      .board.at-handler:not(.at-update) .arc-right,
+      .board.at-update:not(.at-patch) .arc-left,
+      .board.at-patch:not(.at-rest) .arc-top {
+        opacity: 0.9;
+      }
+      .board.at-loop:not(.at-seal) .arc-top {
+        opacity: 0.35;
+      }
+      .vp .rider .chip {
+        height: 24px;
+        padding: 0 10px;
+      }
+
+      .pointer {
+        transform: translate(calc(var(--tx) + 64px), calc(var(--ty) + 72px));
+      }
+      .board.at-aim .pointer {
+        opacity: 1;
+        transform: translate(var(--tx), var(--ty));
+      }
+      .board.at-press .pointer svg {
+        transform: scale(0.88);
+      }
+      .board.at-handler .pointer svg {
+        transform: none;
+      }
+      .board.at-update .pointer {
+        opacity: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <!--THEME-->
+    <main>
+      <figure
+        class="board"
+        data-board
+        aria-label="The MVU loop of idlip: the server renders once, a click runs one handler and one binding"
+        style="margin: 0"
+      >
+        <p class="visually-hidden" role="status" aria-live="polite" data-live></p>
+        <div class="scene">
+          <div class="abs phase" aria-hidden="true">
+            <span class="thumb"></span>
+            <span class="seg seg-server">
+              <span class="on"
+                ><svg
+                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="4" y="4" width="16" height="7" rx="2" />
+                  <rect x="4" y="13" width="16" height="7" rx="2" />
+                  <path d="M8 7.5h.01M8 16.5h.01" /></svg
+                >Server</span
+              >
+              <span class="off"
+                ><svg
+                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="4" y="4" width="16" height="7" rx="2" />
+                  <rect x="4" y="13" width="16" height="7" rx="2" />
+                  <path d="M8 7.5h.01M8 16.5h.01" /></svg
+                >Server</span
+              >
+            </span>
+            <span class="seg seg-browser">
+              <span class="on"
+                ><svg
+                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="3" y="4" width="18" height="16" rx="3" />
+                  <path d="M3 9h18" /></svg
+                >Browser</span
+              >
+              <span class="off"
+                ><svg
+                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="3" y="4" width="18" height="16" rx="3" />
+                  <path d="M3 9h18" /></svg
+                >Browser</span
+              >
+            </span>
+          </div>
+
+          <div class="abs meter" aria-hidden="true">
+            <p class="label">component JS</p>
+            <p class="meter-value" style="margin: 0">
+              <span class="was">0 B</span><span class="now">624 B</span>
+            </p>
+          </div>
+
+          <div class="abs vp">
+            <svg
+              class="wire"
+              viewBox="0 0 512 336"
+              style="width: 512px; height: 336px"
+              aria-hidden="true"
+            >
+              <path class="arc-top" d="M96 152 A160 112 0 0 1 416 152" />
+              <path class="arc-right" d="M416 152 A160 112 0 0 1 232 263.3" />
+              <path class="arc-left" d="M232 263.3 A160 112 0 0 1 96 152" />
+            </svg>
+            <div class="track">
+              <!-- The server: the loop runs once, Model to View. -->
+              <div class="panel panel-server">
+                <svg class="ring" viewBox="0 0 512 336" aria-hidden="true">
+                  <ellipse cx="256" cy="152" rx="160" ry="112" />
+                </svg>
+                <div class="node model">
+                  <div class="node-head">
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <ellipse cx="12" cy="6" rx="7" ry="3" />
+                      <path
+                        d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"
+                      /></svg
+                    >Model
+                  </div>
+                  <div class="model-body">
+                    <div class="kv">
+                      <i>todos[0].done</i><span class="val"><span>true</span></span>
+                    </div>
+                    <div class="kv">
+                      <i>todos[1].done</i
+                      ><span class="val"><span class="v-false">false</span></span>
+                    </div>
+                  </div>
+                  <div class="sealed">
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="14"
+                      height="14"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <rect x="5" y="11" width="14" height="10" rx="2" />
+                      <path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg
+                    >encoded
+                  </div>
+                </div>
+                <div class="node update">
+                  <div class="node-head">
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path
+                        d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"
+                      /></svg
+                    >Update
+                  </div>
+                  <div class="code">
+                    <span class="sig"><span class="fn">update</span>(model, msg)</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- The browser: the same loop, asleep until a click. -->
+              <div class="panel panel-browser">
+                <svg class="ring" viewBox="0 0 512 336" aria-hidden="true">
+                  <ellipse cx="256" cy="152" rx="160" ry="112" />
+                </svg>
+                <div class="node model">
+                  <div class="node-head">
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <ellipse cx="12" cy="6" rx="7" ry="3" />
+                      <path
+                        d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"
+                      /></svg
+                    >Model
+                  </div>
+                  <div class="model-body">
+                    <div class="kv">
+                      <i>todos[0].done</i><span class="val"><span>true</span></span>
+                    </div>
+                    <div class="kv flip">
+                      <i>todos[1].done</i
+                      ><span class="val"
+                        ><span class="v-false">false</span><span class="v-true">true</span></span
+                      >
+                    </div>
+                  </div>
+                </div>
+                <div class="node update">
+                  <div class="node-head">
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path
+                        d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"
+                      /></svg
+                    >Update
+                  </div>
+                  <div class="code">
+                    <span class="sig"><span class="fn">update</span>(model, msg)</span
+                    ><span class="arg"
+                      ><span class="fn">toggle</span>(<span class="str">"a2"</span>)</span
+                    >
+                  </div>
+                  <div class="slot">
+                    <span class="wait"
+                      ><svg
+                        viewBox="0 0 24 24"
+                        width="12"
+                        height="12"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <rect x="5" y="11" width="14" height="10" rx="2" />
+                        <path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg
+                      >not loaded</span
+                    >
+                    <span class="chip lit">toggle.js <b>119 B</b></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- The page and its state: they stay put while the track moves under them. -->
+            <div class="abs app node page">
+              <div class="bar">
+                <span class="tag">HTML</span><span class="dots"><i></i><i></i><i></i></span>
+              </div>
+              <div class="app-head">
+                <span class="app-title">Todos</span
+                ><span class="count"
+                  ><span class="was"><b>1</b> left</span><span class="now"><b>0</b> left</span
+                  ><i class="flash"></i
+                ></span>
+              </div>
+              <div class="row r1 done">
+                <span class="box"
+                  ><svg
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.4"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M5 12.5l4.5 4.5L19 7.5" /></svg></span
+                ><span class="txt">Write the format</span>
+              </div>
+              <div class="row r2" data-target>
+                <span class="box"
+                  ><svg
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.4"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M5 12.5l4.5 4.5L19 7.5" /></svg></span
+                ><span class="txt">Build the runtime</span><i class="flash"></i>
+              </div>
+            </div>
+            <div class="abs capsule">
+              <span
+                ><span class="k">&lt;script</span> <span class="a">i-state</span
+                ><span class="k">&gt;</span></span
+              >
+            </div>
+
+            <span class="rider dot" data-dot></span>
+            <span class="rider" data-r-capsule
+              ><span class="chip capsule-rider"
+                ><span style="color: var(--syn-tag)">&lt;script</span>&nbsp;<span
+                  style="color: var(--syn-attr)"
+                  >i-state</span
+                ><span style="color: var(--syn-tag)">&gt;</span></span
+              ></span
+            >
+            <span class="rider" data-r-handler
+              ><span class="chip lit">toggle.js <b>119 B</b></span></span
+            >
+            <span class="rider" data-r-binding
+              ><span class="chip lit">todos._.done.js <b>505 B</b></span></span
+            >
+          </div>
+
+          <span class="pointer" aria-hidden="true"
+            ><svg
+              viewBox="0 0 24 24"
+              width="22"
+              height="22"
+              fill="currentColor"
+              stroke="var(--bg-elevated)"
+              stroke-width="1.5"
+              stroke-linejoin="round"
+            >
+              <path d="M5 3l14 7.5-6.2 1.6L10 18z" /></svg
+          ></span>
+          <button
+            class="hit"
+            type="button"
+            aria-label="Toggle Build the runtime"
+            title="Toggle Build the runtime"
+            disabled
+          ></button>
+        </div>
+      </figure>
+    </main>
+    <script>
+      /*BASE_JS*/
+
+      const board = document.querySelector('[data-board]');
+      const live = board.querySelector('[data-live]');
+      const hit = board.querySelector('.hit');
+      const arc = {
+        top: board.querySelector('.arc-top'),
+        right: board.querySelector('.arc-right'),
+        left: board.querySelector('.arc-left'),
+      };
+      const dot = board.querySelector('[data-dot]');
+      const riders = {
+        capsule: board.querySelector('[data-r-capsule]'),
+        handler: board.querySelector('[data-r-handler]'),
+        binding: board.querySelector('[data-r-binding]'),
+      };
+
+      // Place the pointer and the hit area on the checkbox of the second row.
+      function place() {
+        const frame = board.getBoundingClientRect();
+        const box = board.querySelector('[data-target] .box').getBoundingClientRect();
+        const x = box.left + box.width / 2 - frame.left;
+        const y = box.top + box.height / 2 - frame.top;
+        board.style.setProperty('--tx', `${x - 4}px`);
+        board.style.setProperty('--ty', `${y - 2}px`);
+        hit.style.left = `${x - 22}px`;
+        hit.style.top = `${y - 22}px`;
+      }
+
+      const steps = [
+        { id: 'start', ms: 400 },
+        { id: 'render', ms: 1100 },
+        { id: 'loop', ms: 800 },
+        { id: 'seal', ms: 900 },
+        { id: 'ship', ms: 1100 },
+        { id: 'aim', ms: 700 },
+        { id: 'press', ms: 200 },
+        { id: 'handler', ms: 850 },
+        { id: 'update', ms: 750 },
+        { id: 'patch', ms: 900 },
+        { id: 'rest', ms: 1700 },
+      ];
+
+      const player = createPlayer(board, steps, {
+        onStep(id, n, previous) {
+          hit.disabled = n < player.indexOf('ship');
+          if (n < previous) {
+            cancelRides(board);
+            return;
+          }
+          if (id === 'render') {
+            ride(dot, arc.top, { to: 0.66, duration: 700, hold: false });
+          } else if (id === 'loop') {
+            ride(dot, arc.right, { duration: 380, hold: false });
+            ride(dot, arc.left, { duration: 380, delay: 380, hold: false });
+          } else if (id === 'seal') {
+            ride(riders.capsule, arc.top, {
+              from: 0.05,
+              to: 0.82,
+              duration: 620,
+              delay: 120,
+              hold: false,
+            });
+          } else if (id === 'handler') {
+            ride(riders.handler, arc.right, { from: 0.22, duration: 640, hold: false });
+          } else if (id === 'update') {
+            ride(dot, arc.left, { duration: 560, hold: false });
+          } else if (id === 'patch') {
+            ride(riders.binding, arc.top, { to: 0.62, duration: 640, hold: false });
+          }
+          if (id === 'patch') {
+            live.textContent =
+              'Loaded toggle.js, 119 B, and todos._.done.js, 505 B. One row and the count changed.';
+          }
+        },
+      });
+
+      hit.addEventListener('click', () => {
+        const n = player.index;
+        board.classList.add('user');
+        if (n >= player.indexOf('press')) {
+          // Toggle back: the row and the count return, and the loop sleeps again.
+          board.classList.remove('user');
+          player.jump('ship', 2600);
+          live.textContent = 'Build the runtime is not done.';
+        } else {
+          player.jump(REDUCE ? 'rest' : 'press');
+        }
+      });
+
+      document.fonts.ready.then(() => {
+        place();
+        player.start();
+      });
+    </script>
+  </body>
+</html>

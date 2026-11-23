@@ -14,21 +14,15 @@ export interface Message<Tag extends string = string, Payload = unknown> {
 }
 
 /**
- * The JSON value of an `on:<event>` attribute: the tag, the payload and the
- * modifiers, separated by spaces (`"prevent"`, `"key:Escape"`).
+ * The JSON value of an `on:<event>` attribute that is data built at render (a message prop, a
+ * reset): the tag, the payload, the modifiers separated by spaces (`"prevent"`, `"key:Escape"`)
+ * and the owner. Any other `on:<event>` attribute is the name of an event function, then
+ * the modifiers: `$e3 prevent`.
  */
 export type DomMessage =
   | readonly [tag: string, payload: readonly unknown[]]
   | readonly [tag: string, payload: readonly unknown[], modifiers: string]
   | readonly [tag: string, payload: readonly unknown[], modifiers: string, owner: string];
-
-/**
- * A payload item that the listener replaces when the event fires.
- * `['$', ...items]` is a literal array whose first item starts with `$`.
- */
-export type Placeholder =
-  | readonly ['$event', ...segments: string[]]
-  | readonly ['$', ...items: unknown[]];
 
 /** The state fields of a component, by name. */
 export type Model = Readonly<Record<string, unknown>>;
@@ -38,7 +32,7 @@ export type Props = Readonly<Record<string, unknown>>;
 
 /** What the compiler knows about one module, and what the page carries for it. */
 export interface Manifest {
-  /** The root-relative Vite id given to `compile`, such as `/src/todo.idlip.tsx`. */
+  /** The root-relative Vite id given to `compile`, such as `/src/todo.tsx`. */
   readonly module: string;
   /** Event types the view listens to, sorted. */
   readonly events: readonly string[];
@@ -47,7 +41,10 @@ export interface Manifest {
    * reads it to preload chunks without the markup. Absent when no element dispatches a handler.
    */
   readonly listens?: Readonly<Record<string, readonly string[]>>;
-  /** Message tag to its update chunk. Continuation tags have entries too. */
+  /**
+   * Message tag to its update chunk. Continuation tags have entries too, and so has each event
+   * function (`$e3`), whose export lives in the chunk of the first handler it sends.
+   */
   readonly handlers: Readonly<Record<string, HandlerEntry>>;
   /**
    * Continuation tag to the chunk that runs its awaited call: `task=<tag>`, or the handler's
@@ -85,6 +82,8 @@ export interface HandlerEntry {
   readonly writes?: readonly string[];
   /** The group keys the loader starts with the chunk: groups that meet `writes`, minus covered ones. */
   readonly bindings?: readonly string[];
+  /** For an event function: every handler it may send, the first one holds its chunk. */
+  readonly tags?: readonly string[];
 }
 
 export interface BindingGroup {
@@ -98,8 +97,11 @@ export interface BindingGroup {
 }
 
 export interface ListEntry {
-  /** The `key` prop of the `<For>`. */
-  readonly key: string;
+  /**
+   * The field of the item that `key={(item) => item.field}` reads. Absent for a computed key,
+   * which the list chunk evaluates with its `key` export.
+   */
+  readonly key?: string;
   /**
    * The path of `each` when it is a path, such as `todos` or `columns.*.cards`.
    * `diffPaths` also pairs the `*` items under it by `key`. Absent when `each` is a helper call.
@@ -121,7 +123,7 @@ export interface PageState {
   readonly model: Model;
   readonly props: Props;
   /** Manifests of the child modules on the page and of what they can render, by module. */
-  readonly modules?: Readonly<Record<string, Manifest>>;
+  readonly modules?: Readonly<Record<string, ChildManifest>>;
   /** Rendered children by model path. */
   readonly slots?: Readonly<Record<string, Slot>>;
   /**
@@ -131,6 +133,14 @@ export interface PageState {
    */
   readonly dynamic?: Record<string, string[]>;
 }
+
+/**
+ * A child manifest as the state script holds it: without `events` (the record has the union),
+ * `listens` (`renderPreload` reads it on the server), `view` and the `writes` of each handler.
+ */
+export type ChildManifest = Omit<Manifest, 'events' | 'listens' | 'view' | 'handlers'> & {
+  readonly handlers: Readonly<Record<string, Omit<HandlerEntry, 'writes'>>>;
+};
 
 /** A rendered child: its module, its model and the props the client reads. */
 export interface Slot {
@@ -142,12 +152,46 @@ export interface Slot {
 /** Chunk id (`getChunkId`) to the URL the loader imports. */
 export type ChunkUrls = Readonly<Record<string, string>>;
 
+/**
+ * The key of the shared helpers module in a built chunk map (`idlip/helpers`). Chunks import
+ * it, and the loader starts loading it with the first chunk, so a click stays one round trip.
+ * Chunk ids start with `/`, so none collides.
+ */
+export const HELPERS_KEY = 'helpers';
+
+/**
+ * The key of the shared templates module in a built chunk map (`idlip/templates`). It holds the
+ * templates that more than one chunk renders, and the loader loads it with the helpers module.
+ */
+export const TEMPLATES_KEY = 'templates';
+
+/** The module a chunk imports the templates of more than one chunk from. */
+export const TEMPLATES_MODULE = 'idlip/templates';
+
+/** The export name of a shared template is this and the hash of its markup. */
+export const TEMPLATE_PREFIX = 't';
+
+/** A cloned template of a chunk, by the hash of its namespace and markup. */
+export interface ModuleTemplate {
+  readonly hash: string;
+  /** The object literal that the chunk declares: `{ h: '<li>', n: 1 }`. */
+  readonly init: string;
+}
+
+/** Prints the shared templates module: one export per hash, in hash order. */
+export function printTemplatesModule(templates: ReadonlyMap<string, string>): string {
+  const lines: string[] = [];
+  for (const hash of [...templates.keys()].toSorted()) {
+    lines.push(`export const ${TEMPLATE_PREFIX}${hash} = ${templates.get(hash)};`);
+  }
+  return `${lines.join('\n')}\n`;
+}
+
 /** What a state script pushes: its event types, separated by spaces, and its state. */
 export type StateRecord = readonly [events: string, state: () => PageState];
 
-/** An event the listener read, waiting for the loader. */
-export interface QueuedEvent {
-  readonly message: Message<string, readonly unknown[]>;
+/** What every queued event has, whatever it asks the loader to run. */
+interface QueuedBase {
   /** The element that carries the `on:<event>` attribute. */
   readonly target: Element;
   readonly type: string;
@@ -159,6 +203,43 @@ export interface QueuedEvent {
   /** An event whose signal is aborted is dropped before it runs. A subscription sets it. */
   readonly signal?: AbortSignal;
 }
+
+/** An event that carries its message: a message prop, a reset, a continuation of a task. */
+export interface QueuedMessage extends QueuedBase {
+  readonly message: Message<string, readonly unknown[]>;
+  readonly site?: undefined;
+}
+
+/**
+ * An event whose message an event function computes once its chunk has loaded. `event` is
+ * the DOM event, or the value a subscription delivers, and `current` is the element that holds the
+ * attribute (`window` or `document` for a global event), which the listener records because the
+ * browser clears `currentTarget` after the dispatch.
+ */
+export interface QueuedCall extends QueuedBase {
+  readonly message?: undefined;
+  /** The export name of the event function, such as `$e3`. */
+  readonly site: string;
+  readonly event: unknown;
+  readonly current: unknown;
+}
+
+/** An event the listener read, waiting for the loader. */
+export type QueuedEvent = QueuedMessage | QueuedCall;
+
+/** What an event function reads: the model, the model the DOM shows, and the page's props. */
+export interface SiteScope {
+  readonly model: Model;
+  readonly rendered: Model;
+  readonly page: { readonly props: Props };
+}
+
+/** An event function: returns the messages the event sends, as `[tag, payload]` pairs. */
+export type Site = (
+  event: unknown,
+  current: unknown,
+  scope: SiteScope,
+) => readonly (readonly [tag: string, payload: readonly unknown[]])[];
 
 /** `self.$idlip`: the state records, and the queue the listener fills. */
 export interface Boot extends Array<StateRecord> {
@@ -224,8 +305,8 @@ export type Binding = NodeBinding | ListBinding | PropBinding;
 export interface ViewChunk {
   /** The initial model from the state initializers and the props. */
   readonly init: (props: Props) => Model;
-  /** The whole view, without the boundary markers. */
-  readonly render: (scope: Scope) => string;
+  /** The whole view without the boundary markers, cloned in `doc`. */
+  readonly render: (scope: Scope, doc: Document) => DocumentFragment;
 }
 
 /** A handler export: the next model, or the next model and a task. */
@@ -268,9 +349,12 @@ export type HandlerChunk = Readonly<Record<string, Update>>;
 export type BindingChunk = Readonly<Record<string, Binding>>;
 
 export interface ListChunk {
-  /** Renders one row, without the row markers. */
-  readonly render: (scope: Scope) => string;
-  readonly namespace?: 'svg' | 'mathml';
+  /** Renders one row: a fragment cloned from a template in `doc`, with the row markers. */
+  readonly render: (scope: Scope, doc: Document) => DocumentFragment;
+  /** The key of an item, for a list whose manifest entry has no `key` field. */
+  readonly key?: (item: unknown) => unknown;
+  /** Set when a row holds a block, so the block hooks run once the row is in the page. */
+  readonly blocks?: true;
 }
 
 /** Loads a chunk of a module: imports the URL the state record gives for its id. */
@@ -296,7 +380,8 @@ export type Patch = (page: Page, prev: Model, next: Model) => Promise<void>;
 
 /**
  * Owned by `patch-bindings`. Returns the paths whose values differ by reference.
- * `keys` maps a list path (`ListEntry.path`) to its key field. A `*` path under such a list
+ * `keys` maps a list path (`ListEntry.path`) to its key field, or to `undefined` for a computed
+ * key, under which any change of the list counts as a change of its `*` paths. A `*` path under such a list
  * changes when it differs by key or by index: by key for row bindings after a reorder, by
  * index for holes outside rows such as `todos[selected].done`.
  */
@@ -304,7 +389,7 @@ export type DiffPaths = (
   prev: Model,
   next: Model,
   paths: readonly string[],
-  keys: Readonly<Record<string, string>>,
+  keys: Readonly<Record<string, string | undefined>>,
 ) => Set<string>;
 
 export interface ListContext {
@@ -336,6 +421,8 @@ export interface Module {
   /** The chunk name, such as `handler=toggle` or `binding=todos.*.done`. */
   readonly chunk: string;
   readonly code: string;
+  /** The cloned templates the chunk renders, shared ones included. */
+  readonly templates?: readonly ModuleTemplate[];
 }
 
 export interface CompileDiagnostic {
@@ -345,12 +432,43 @@ export interface CompileDiagnostic {
   readonly span: { readonly start: number; readonly end: number };
 }
 
+/** The manifest and client chunks of one component of a file. */
+export interface CompiledComponent {
+  readonly manifest: Manifest;
+  readonly client: readonly Module[];
+}
+
 export interface CompileResult {
-  /** The server module's code. Empty when a diagnostic is an error. */
+  /** The server module's code, for every component of the file. Empty on an error. */
   readonly server: string;
+  /** The chunks of the first component: the default export, or the first named one. */
   readonly client: readonly Module[];
   readonly manifest: Manifest;
+  /** The other components of the file, in source order. Absent when there are none. */
+  readonly components?: readonly CompiledComponent[];
   readonly diagnostics: readonly CompileDiagnostic[];
+}
+
+/** Returns every component of a compile result, the first one first. */
+export function listCompiled(result: CompileResult): CompiledComponent[] {
+  return [{ manifest: result.manifest, client: result.client }, ...(result.components ?? [])];
+}
+
+/** The `#<Name>` at the end of the module id of a component other than the default export. */
+const COMPONENT_SUFFIX = /#([A-Z][^#?/.]*)$/;
+
+/**
+ * Splits a module id into its file and the name of the component. The default export of a
+ * file has the file's id, `/src/todo.tsx`. Any other component adds `#` and its name,
+ * `/src/widgets.tsx#Counter`.
+ */
+export function splitModule(module: string): { file: string; name: string | undefined } {
+  // Only a final `#` and a capitalized name with no `/`, `.` or `?` names a component, so a
+  // folder such as `/src/a#b/` stays part of the file.
+  const match = COMPONENT_SUFFIX.exec(module);
+  return match === null
+    ? { file: module, name: undefined }
+    : { file: module.slice(0, match.index), name: match[1] };
 }
 
 /** `idlip/compiler`. */
@@ -371,8 +489,12 @@ export function getChunkFile(chunk: string): string {
 }
 
 /**
- * Returns the Vite module id of a chunk: `/src/todo.idlip.tsx?idlip-handler=toggle&lang.js`.
+ * Returns the Vite module id of a chunk: `/src/todo.tsx?idlip-handler=toggle&lang.js`. A named
+ * component puts its name before the chunk: `/src/widgets.tsx?idlip-Counter.handler=add&lang.js`
+ * for the module `/src/widgets.tsx#Counter`.
  */
 export function getChunkId(module: string, chunk: string): string {
-  return `${module}?idlip-${chunk}&lang.js`;
+  // The name is a capital letter and no `#`, `?`, `/` or `.`, as in `splitModule`, so a `#` in a
+  // folder or file name stays. The replace costs the loader less than a branch.
+  return `${module}?idlip-${chunk}&lang.js`.replace(/#([A-Z][^#?/.]*)\?idlip-/, '?idlip-$1.');
 }

@@ -1,0 +1,51 @@
+// Edge cases for path resolution: computed keys, aliases, helpers over computed values.
+import { For } from 'idlip';
+
+interface Item {
+  id: string;
+  name: string;
+}
+
+function name(item: Item): string {
+  return item.name;
+}
+function visible(items: readonly Item[], query: string): Item[] {
+  const out: Item[] = [];
+  for (const item of items) if (item.name.includes(query)) out.push(item);
+  return out;
+}
+
+export default function Edges(props: { items: Item[] }) {
+  let items = props.items;
+  let byId = {} satisfies Record<string, Item> as Record<string, Item>;
+  let selected = '';
+  let index = 0;
+  let query = '';
+
+  const list = items;
+  const current = items[index];
+  const chosen = byId[selected];
+
+  function select(id: string) {
+    selected = id;
+    index = items.findIndex((item) => item.id === id);
+    byId = { ...byId };
+    items = [...items];
+    query = '';
+  }
+
+  return (
+    <main>
+      <p>{current.name}</p>
+      <p>{chosen?.name}</p>
+      <p>{name(index > 0 ? items[0] : items[1])}</p>
+      <p>{name(list[index])}</p>
+      <For each={visible(items, query)} key={(item) => item.id}>
+        {(item) => <button on:click={() => select(item.id)}>{item.name}</button>}
+      </For>
+      <For each={list} key={(item) => item.id}>
+        {(item) => <span>{item.name}</span>}
+      </For>
+    </main>
+  );
+}

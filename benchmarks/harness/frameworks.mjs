@@ -33,12 +33,33 @@ export async function loadAdapter(name) {
   return import(path.join(appDir(name), 'adapter.js'));
 }
 
-export const SCENARIOS = ['todos'];
+export const SCENARIOS = ['todos', 'dashboard', 'rows'];
 
-// The app of a scenario: `load()` of the adapter.
-export async function loadApp(name) {
+// The app of a scenario: `load()` of the adapter for todos, `loadDashboard()` for the
+// dashboard, `loadRows()` for the rows and `loadScale()` for the scale pages. The scale scenario
+// is not in SCENARIOS: `scale.mjs` runs it on its own.
+export async function loadApp(name, scenario = 'todos') {
   const adapter = await loadAdapter(name);
+  if (scenario === 'dashboard') {
+    return adapter.loadDashboard();
+  }
+  if (scenario === 'rows') {
+    return adapter.loadRows();
+  }
+  if (scenario === 'scale') {
+    return adapter.loadScale();
+  }
   return adapter.load();
+}
+
+// Whether an app builds a scenario. Every app builds todos. The others need a `build:<scenario>`
+// script, so the Qwik and brumate 0.3.0 apps stay todos-only.
+export async function hasScenario(name, scenario) {
+  if (scenario === 'todos') {
+    return true;
+  }
+  const pkg = JSON.parse(await readFile(path.join(appDir(name), 'package.json'), 'utf8'));
+  return Boolean(pkg.scripts?.[`build:${scenario}`]);
 }
 
 // The versions of the dependencies that each app has installed.

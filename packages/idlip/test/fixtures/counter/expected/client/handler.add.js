@@ -3,3 +3,7 @@ export function add(model, [step]) {
   count = count + step;
   return { ...model, count };
 }
+
+export function $e1($e, $c) {
+return [['add', [10]]];
+}

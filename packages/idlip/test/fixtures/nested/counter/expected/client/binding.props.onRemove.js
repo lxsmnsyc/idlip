@@ -1,7 +1,5 @@
-function setOn$(el, event, message) {
-  el.setAttribute(`on:${event}`, JSON.stringify(message));
-}
+import { setOn$ } from 'idlip/helpers';
 
 export function a2(el, { props }) {
-  setOn$(el, 'click', props.onRemove);
+setOn$(el, 'click', props.onRemove);
 }

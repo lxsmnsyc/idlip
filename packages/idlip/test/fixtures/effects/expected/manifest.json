@@ -1,5 +1,5 @@
 {
-  "module": "/src/effects.idlip.tsx",
+  "module": "/src/effects.tsx",
   "events": [
     "click",
     "input"
@@ -96,6 +96,44 @@
       "bindings": [
         "label"
       ]
+    },
+    "$e0": {
+      "chunk": "handler=setDraft",
+      "bindings": [
+        "draft"
+      ],
+      "tags": [
+        "setDraft"
+      ]
+    },
+    "$e1": {
+      "chunk": "handler=add",
+      "bindings": [
+        "draft"
+      ],
+      "tags": [
+        "add"
+      ]
+    },
+    "$e2": {
+      "chunk": "handler=persist",
+      "bindings": [
+        "save.state",
+        "label",
+        "saved"
+      ],
+      "tags": [
+        "persist"
+      ]
+    },
+    "$e3": {
+      "chunk": "handler=rename",
+      "bindings": [
+        "label"
+      ],
+      "tags": [
+        "rename"
+      ]
     }
   },
   "tasks": {
@@ -111,7 +149,7 @@
       ],
       "chunk": "binding=save.state",
       "bindings": [
-        "t3"
+        "a3"
       ],
       "covers": []
     },
@@ -131,7 +169,7 @@
       ],
       "chunk": "binding=label",
       "bindings": [
-        "t1"
+        "a1"
       ],
       "covers": []
     },
@@ -141,7 +179,7 @@
       ],
       "chunk": "binding=saved",
       "bindings": [
-        "t2"
+        "a2"
       ],
       "covers": []
     }

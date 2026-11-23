@@ -1,7 +1,7 @@
 ---
 id: website-scaffold
 title: Website scaffold
-status: todo
+status: done
 priority: should
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 305000
 owns:
   - website/package.json
   - website/tsconfig.json
@@ -36,9 +36,6 @@ shared:
 reserves: []
 provides: []
 depends_on:
-  - on: markup-frontend
-    kind: hard
-    why: the sample checker compiles every idlip block with toTypeScript from idlip/compiler
   - on: example-todo
     kind: hard
     why: the starter page shows the working todo example
@@ -85,3 +82,12 @@ M: new package of 6 to 10 files, a known pattern from brumate that is new to thi
 - No generated output is committed (`dist`).
 - Add `website` to the root scripts only if the root `build` needs it; keep `pnpm --filter idlip test` fast.
 - Follow the ui-style skill for the layout and states (focus, hover, empty search, dark mode).
+
+## After debate `debates/dsl` (2026-11-21)
+
+TSX stays the one source syntax. Pages and examples use `*.idlip.tsx`; no markup DSL, no `@idlip/language-core` or `@idlip/tsc`. This replaces the markup parts of the brief above:
+
+- Code samples are fenced `tsx` blocks. Highlight them with the stock TSX grammar; there is no `idlip` grammar to load.
+- `scripts/check-samples.ts` takes every fenced `tsx` block, runs `compile(source, 'sample.idlip.tsx')` from `idlip/compiler` and fails on a diagnostic or a thrown error. `tsx no-check` skips a block. `tsx fragment` wraps the block in `export default function Sample() { return (...) }` first.
+- The test that proves the checker fails uses a view the analyzer rejects (for example a closure in a model value or an unknown hole), not a tag mismatch.
+- Ignore `docs/proposals/0005-markup.md`, the `markup-grammar` contract and the `markup-frontend` outcome.

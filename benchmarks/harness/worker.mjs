@@ -1,11 +1,14 @@
 // Runs SSR for one framework in its own process. The parent sends commands over IPC so
 // that only one framework renders at a time.
 import { gzipSync } from 'node:zlib';
+import { widgets } from './dashboard.mjs';
 import { loadApp } from './frameworks.mjs';
+import { label } from './rows.mjs';
 
 const [name, scenario = 'todos'] = process.argv.slice(2);
 const app = await loadApp(name, scenario);
-const render = (n) => app.render(n);
+// The dashboard page has no size. Its commands get n = 0.
+const render = scenario === 'dashboard' ? () => app.render() : (n) => app.render(n);
 
 function text(html) {
   return html.replace(/<[^>]*>/g, '');
@@ -33,7 +36,34 @@ function checkTodos(html, n) {
   return problems;
 }
 
-const check = checkTodos;
+// Checks that the page shows every widget with its first item and the label of its first mode.
+function checkDashboard(html) {
+  const body = text(html);
+  const problems = [];
+  for (const widget of widgets()) {
+    for (const part of [widget.title, `Mode: ${widget.modes[0]}`, String(widget.items[0])]) {
+      if (!body.includes(part)) {
+        problems.push(`missing "${part}"`);
+      }
+    }
+  }
+  return problems;
+}
+
+// Checks that the page shows every row with its ID and label.
+function checkRows(html, n) {
+  const body = text(html);
+  const problems = [];
+  for (const id of [1, n]) {
+    if (!body.includes(label(id))) {
+      problems.push(`missing "${label(id)}" of row ${id}`);
+    }
+  }
+  return problems;
+}
+
+const CHECKS = { todos: checkTodos, dashboard: checkDashboard, rows: checkRows };
+const check = CHECKS[scenario];
 
 // Encodes a render result to UTF-8 bytes, as a server must before it sends it. A string is
 // encoded whole, the way `res.end(html)` does it. A stream or other iterable of chunks is

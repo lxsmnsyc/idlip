@@ -30,7 +30,7 @@ export async function loadUser(id: string): Promise<User> {
 ```
 
 ```tsx
-// profile.idlip.tsx
+// profile.tsx
 import { loadUser } from './api';
 
 type UserState =

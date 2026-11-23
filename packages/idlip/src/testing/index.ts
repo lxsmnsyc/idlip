@@ -1,14 +1,18 @@
 /**
- * `idlip/testing`: `mount` renders a `.idlip.tsx` source on the server, resumes it in the
+ * `idlip/testing`: `mount` renders a `.tsx` source on the server, resumes it in the
  * DOM of the test (happy-dom or any global `document`), and serves chunks from memory. A
  * test clicks and types as a user does and waits until chunks and patches settle.
  */
 import { compile } from '../compiler/index.ts';
-import { getChunkId } from '../core/format.ts';
+import { resolveSpecifier } from '../compiler/view/codegen/path.ts';
+import { getChunkId, listCompiled, splitModule } from '../core/format.ts';
 import type {
   Boot,
   CompileResult,
+  Manifest,
   Model,
+  Page,
+  PageState,
   Patch,
   Props,
   RenderContext,
@@ -17,13 +21,16 @@ import type {
 import { patchList } from '../client/list/index.ts';
 import { renderListener } from '../client/loader/listener.ts';
 import { resume } from '../client/loader/resume.ts';
+import { addChild, setProp } from '../client/nesting.ts';
 import { restartSub } from '../client/subs/index.ts';
 import * as clientExports from '../client/patch/index.ts';
 import { renderPage } from '../server/render.ts';
 import * as serverExports from '../server/index.ts';
 import { compareTrees } from './compare.ts';
-import { bindImports, toDataUrl } from './modules.ts';
+import { bindImports, importHelpers, toDataUrl } from './modules.ts';
 import type { Scope } from './modules.ts';
+import { setDriver } from './internal.ts';
+import type { MountedChild } from './internal.ts';
 
 export interface MountOptions {
   /**
@@ -32,7 +39,7 @@ export interface MountOptions {
    * hidden dependency. Default `true`.
    */
   check?: boolean;
-  /** The Vite id of the module, which names its chunks. Default `/src/app.idlip.tsx`. */
+  /** The Vite id of the module, which names its chunks. Default `/src/app.tsx`. */
   id?: string;
   /** Written on the state script. */
   nonce?: string;
@@ -42,6 +49,11 @@ export interface MountOptions {
    * region by mistake. Set it to `true` in a test that expects the catch view. Default `false`.
    */
   expectCaught?: boolean;
+  /**
+   * The source of each stateful child the module renders, by the specifier the module imports it
+   * with. The child compiles as a child, and its chunks are served as well as the module's.
+   */
+  children?: Readonly<Record<string, string>>;
 }
 
 export interface MountedPage {
@@ -71,6 +83,18 @@ const STATE_SCRIPT = /<script i-state[^>]*>[\s\S]*<\/script>$/;
 const STATE_BODY = /^<script i-state[^>]*>([\s\S]*)<\/script>$/;
 
 let mounts = 0;
+
+/** A child module that is compiled and ready to serve. */
+interface ChildModule {
+  readonly specifier: string;
+  readonly compiled: CompileResult;
+}
+
+// Both patterns assume the exact output of the compiler: `import * as Name from 'specifier';` in
+// a server module, and a quoted `...?idlip-<kind>&lang.js` id in a chunk. A change to either
+// output must change them too.
+const MODULE_IMPORT = /import\s*\*\s*as\s+(\w+)\s+from\s*'([^']+)';?/g;
+const CHUNK_IMPORT = /'([^']*\?idlip-[^']+&lang\.js)'/g;
 
 /** The page that is mounted now. Two pages would share `$idlip` and the loader's state. */
 let live = false;
@@ -122,7 +146,7 @@ function runScript(script: string): void {
 }
 
 /**
- * Compiles a `.idlip.tsx` source, renders it on the server with `props`, and resumes it in
+ * Compiles a `.tsx` source, renders it on the server with `props`, and resumes it in
  * the document. The document must exist already: use the `happy-dom` test environment.
  */
 export async function mount(
@@ -130,10 +154,21 @@ export async function mount(
   props: Record<string, unknown>,
   options: MountOptions = {},
 ): Promise<MountedPage> {
-  const { check = true, id = '/src/app.idlip.tsx', nonce, expectCaught = false } = options;
+  const { check = true, id = '/src/app.tsx', nonce, expectCaught = false } = options;
   const key = `$idlipTesting${mounts++}`;
   const compiled = compile(source, id);
   const messages: string[] = [];
+  const children: ChildModule[] = [];
+  for (const [specifier, childSource] of Object.entries(options.children ?? {})) {
+    const childId = resolveSpecifier(specifier, id);
+    const child = compile(childSource, childId, { child: true });
+    children.push({ specifier, compiled: child });
+    for (const item of child.diagnostics) {
+      if (item.severity === 'error') {
+        messages.push(`${childId}: ${item.message}`);
+      }
+    }
+  }
   for (const item of compiled.diagnostics) {
     if (item.severity === 'error') {
       messages.push(item.message);
@@ -147,7 +182,7 @@ export async function mount(
   }
   live = true;
   try {
-    return await start(compiled, key, props, check, nonce, expectCaught);
+    return await start(compiled, children, key, props, check, nonce, expectCaught);
   } catch (error) {
     live = false;
     Reflect.deleteProperty(globalThis, key);
@@ -157,6 +192,7 @@ export async function mount(
 
 async function start(
   compiled: CompileResult,
+  children: readonly ChildModule[],
   key: string,
   props: Record<string, unknown>,
   check: boolean,
@@ -165,18 +201,47 @@ async function start(
 ): Promise<MountedPage> {
   // Chunks and the server module read the runtime through one object, instead of a bare import.
   const names: string[] = [];
+  // The models of the children a patch changed, by path, for the server render of the check.
+  // A child that a patch adds again starts from its props, so its old slot model goes.
+  const slots: Record<string, { model: Model }> = {};
   const scope: Scope = {
     server: { ...serverExports },
-    client: { ...clientExports, patchList, restartSub },
+    client: {
+      ...clientExports,
+      addChild(...args: Parameters<typeof addChild>): ReturnType<typeof addChild> {
+        Reflect.deleteProperty(slots, args[0]);
+        return addChild(...args);
+      },
+      patchList,
+      restartSub,
+      setProp,
+    },
+    helpers: {},
     loaded(chunk) {
       names.push(chunk);
     },
   };
   Reflect.set(globalThis, key, scope);
 
-  // 1. Render on the server.
+  // 1. Render on the server. A module reads the server module of a child from the scope.
+  function bindModules(code: string): string {
+    return bindImports(code, key).replaceAll(
+      MODULE_IMPORT,
+      (all, name: string, specifier: string) =>
+        scope.modules?.[specifier] === undefined
+          ? all
+          : `const ${name} = globalThis[${JSON.stringify(key)}].modules[${JSON.stringify(specifier)}];`,
+    );
+  }
+  // The chunks import their helpers from the module a build would serve.
+  scope.helpers = await importHelpers(key);
+  scope.modules = {};
+  for (const child of children) {
+    // oxlint-disable-next-line no-await-in-loop
+    scope.modules[child.specifier] = await importCode(bindModules(child.compiled.server));
+  }
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-  const server = (await importCode(bindImports(compiled.server, key))) as ServerModule;
+  const server = (await importCode(bindModules(compiled.server))) as ServerModule;
   // `render` passes the context itself.
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion
   const rendered = await renderPage(server.default as (props: Props) => unknown, props, { nonce });
@@ -204,10 +269,44 @@ async function start(
   }
 
   // 3. Serve the chunks from memory: the record's chunk ids map to data URLs.
+  // A chunk of the module imports the view chunk of a child by its id, so those ids map to the
+  // data URL too. A chunk of a named component records its name first, `Counter.handler=add`.
+  const sources = new Map<string, { code: string; chunk: string }>();
+  const units: CompileResult[] = [compiled];
+  for (const child of children) {
+    units.push(child.compiled);
+  }
+  for (const unit of units) {
+    for (const { manifest, client } of listCompiled(unit)) {
+      const component = splitModule(manifest.module).name;
+      for (const item of client) {
+        const chunk = component === undefined ? item.chunk : `${component}.${item.chunk}`;
+        sources.set(getChunkId(manifest.module, item.chunk), { code: item.code, chunk });
+      }
+    }
+  }
   const urls = new Map<string, string>();
-  for (const chunk of compiled.client) {
-    const body = `${bindImports(chunk.code, key)}\n;globalThis[${JSON.stringify(key)}].loaded(${JSON.stringify(chunk.chunk)});\n`;
-    urls.set(getChunkId(compiled.manifest.module, chunk.chunk), toDataUrl(body));
+  // The chunks being built, so an import cycle of any length leaves its id as it is.
+  const building = new Set<string>();
+  function getUrl(chunkId: string): string | undefined {
+    const known = urls.get(chunkId);
+    const found = sources.get(chunkId);
+    if (known !== undefined || found === undefined || building.has(chunkId)) {
+      return known;
+    }
+    building.add(chunkId);
+    const code = bindImports(found.code, key).replaceAll(CHUNK_IMPORT, (all, other: string) => {
+      const url = getUrl(other);
+      return url === undefined ? all : JSON.stringify(url);
+    });
+    building.delete(chunkId);
+    const body = `${code}\n;globalThis[${JSON.stringify(key)}].loaded(${JSON.stringify(found.chunk)});\n`;
+    const url = toDataUrl(body);
+    urls.set(chunkId, url);
+    return url;
+  }
+  for (const chunkId of sources.keys()) {
+    getUrl(chunkId);
   }
   for (const record of boot) {
     const decode = record[1];
@@ -222,6 +321,7 @@ async function start(
   }
 
   // 4. Start the loader with a patcher that records the models it patched.
+  const records = [...boot];
   const patcher = clientExports.createPatch(patchList);
   let patched: Model | undefined;
   let checked = true;
@@ -229,7 +329,13 @@ async function start(
   const failures: unknown[] = [];
   const patch: Patch = async (page, prev, next) => {
     await patcher(page, prev, next);
-    patched = next;
+    // A child page has its own model. The check renders the root from the root's model and each
+    // child from the model of its slot.
+    if (page.path === undefined || page.path === '') {
+      patched = next;
+    } else {
+      slots[page.path] = { model: next };
+    }
     checked = false;
   };
   const loader = resume(boot, patch, (error) => {
@@ -248,6 +354,32 @@ async function start(
   }
   let stopped = false;
 
+  // The children the test drives itself, from a decode of the state script of its own.
+  let driven: PageState | undefined;
+  const shown = new Map<string, Model>();
+  function readDriven(): PageState {
+    if (driven === undefined) {
+      driven = records[0][1]();
+      for (const [path, slot] of Object.entries(driven.slots ?? {})) {
+        shown.set(path, slot.model);
+      }
+    }
+    return driven;
+  }
+  function findBoundary(path: string): Comment | undefined {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_COMMENT);
+    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+      if (node.nodeValue === `n:${path}`) {
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+        return node as Comment;
+      }
+    }
+    return undefined;
+  }
+  function getManifest(state: PageState, module: string): Manifest {
+    return { ...state.modules![module], events: [] };
+  }
+
   function getElement(selector: string): HTMLElement {
     const element = root.querySelector<HTMLElement>(selector);
     if (element === null) {
@@ -257,13 +389,19 @@ async function start(
   }
 
   function checkPage(): void {
-    if (!check || patched === undefined || checked) {
+    if (!check || checked) {
       return;
     }
     checked = true;
-    // The server module renders from the model it is given instead of from props.
+    // The server module renders from the model it is given instead of from props, and each
+    // child from its slot's model. A root that no patch changed renders from its props.
     const fresh = document.createElement('div');
-    const context: RenderContext = { state() {}, headId: () => 0, head() {} };
+    const context: RenderContext & { slots: typeof slots } = {
+      state() {},
+      headId: () => 0,
+      head() {},
+      slots,
+    };
     fresh.innerHTML = server.default(props, context, patched);
     const difference = compareTrees(root, fresh, (node) => node instanceof HTMLScriptElement);
     if (difference !== undefined) {
@@ -271,7 +409,7 @@ async function start(
     }
   }
 
-  return {
+  const mounted: MountedPage = {
     root,
     get: getElement,
     text: (selector) => getElement(selector).textContent,
@@ -312,4 +450,42 @@ async function start(
       }
     },
   };
+  setDriver(mounted, {
+    children: () => {
+      const state = readDriven();
+      const list: MountedChild[] = [];
+      for (const [path, slot] of Object.entries(state.slots ?? {})) {
+        list.push({
+          path,
+          manifest: getManifest(state, slot.module),
+          model: shown.get(path) ?? slot.model,
+        });
+      }
+      return list;
+    },
+    patchChild: async (path, model) => {
+      const state = readDriven();
+      const slot = state.slots?.[path];
+      const boundary = findBoundary(path);
+      const from = shown.get(path);
+      if (slot === undefined || boundary === undefined || from === undefined) {
+        throw new Error(`No child at ${path}`);
+      }
+      const manifest = getManifest(state, slot.module);
+      const page: Page = {
+        root,
+        manifest,
+        props: slot.props,
+        // oxlint-disable-next-line typescript/promise-function-async
+        load: (module, chunk) => import(/* @vite-ignore */ state.chunks[getChunkId(module, chunk)]),
+        path,
+        start: boundary,
+      };
+      await patcher(page, from, model);
+      shown.set(path, model);
+      slots[path] = { model };
+      checked = false;
+    },
+  });
+  return mounted;
 }

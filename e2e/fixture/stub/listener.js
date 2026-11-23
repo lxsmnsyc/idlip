@@ -22,6 +22,15 @@
       if (raw === null) {
         continue;
       }
+      if (raw[0] !== '[') {
+        // An event function: the name, then the modifiers.
+        const [site, ...mods] = raw.split(' ');
+        if (mods.includes('prevent')) {
+          event.preventDefault();
+        }
+        boot.q.push({ site, event, current: node, target: node, type: event.type, latest: false });
+        return;
+      }
       const [tag, payload, modifier] = JSON.parse(raw);
       if (modifier?.startsWith('key:') && event.key !== modifier.slice(4)) {
         return;

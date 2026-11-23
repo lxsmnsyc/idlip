@@ -44,13 +44,19 @@ it('builds a source chunk that imports idlip without a shared chunk, and sizes t
   const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'idlip-subs-')));
   try {
     mkdirSync(path.join(root, 'src'));
-    writeFileSync(path.join(root, 'src/clock.idlip.tsx'), APP);
+    writeFileSync(path.join(root, 'src/clock.tsx'), APP);
     writeFileSync(
       path.join(root, 'src/entry-server.js'),
       'export function render() { return ""; }\n',
     );
     const config = createConfig(root, { compile, client: LOADER });
-    config.resolve = { alias: { idlip: path.join(PACKAGE, 'src/index.ts') } };
+    // The helpers module imports the loader as `idlip/client`, which must be the loader input.
+    config.resolve = {
+      alias: [
+        { find: /^idlip$/, replacement: path.join(PACKAGE, 'src/index.ts') },
+        { find: /^idlip\/client$/, replacement: LOADER },
+      ],
+    };
     config.build = { minify: true };
     const builder = await createBuilder(config);
     await builder.buildApp();

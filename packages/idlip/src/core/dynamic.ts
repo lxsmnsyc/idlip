@@ -2,9 +2,8 @@
  * Runs `read` on a proxy of the model and stores the paths it read in `store[name]`. Every own
  * field read on a plain object or an array is a path, and an array index reads as `*`, so the
  * paths match the manifest's form. A path that starts a longer one was only read on the way to
- * it, so it is dropped. The server and a client chunk run this function: the compiler copies it
- * into the chunk, so it uses no outside names, holds no comment in its body and has the `$`
- * suffix of the other helpers (see `core/helpers.ts`). `in`, `Object.keys` and a spread record
+ * it, so it is dropped. The server and a client chunk run this function: a chunk imports it
+ * from `idlip/helpers` (see `core/helpers.ts`). `in`, `Object.keys` and a spread record
  * `<path>.*`, so a key added later counts as a change. A record read by many keys records one
  * path per key, so its entry in the page state grows with them.
  */

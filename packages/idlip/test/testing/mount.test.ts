@@ -6,7 +6,7 @@ import { mount } from '../../src/testing/index.ts';
 import type { MountedPage } from '../../src/testing/index.ts';
 
 const FIXTURES = join(import.meta.dirname, '../fixtures');
-const TODO = readFileSync(join(FIXTURES, 'todo/todo.idlip.tsx'), 'utf8');
+const TODO = readFileSync(join(FIXTURES, 'todo/todo.tsx'), 'utf8');
 const INITIAL = [
   { id: 'a1', text: 'Write the format', done: true },
   { id: 'a2', text: 'Build <the> runtime', done: false },

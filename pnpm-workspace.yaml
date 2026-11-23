@@ -2,6 +2,7 @@ packages:
   - packages/*
   - examples/*
   - e2e
+  - website
   # Benchmark apps. The root build, test and typecheck scripts leave them out.
   - benchmarks/*
 linkWorkspacePackages: true

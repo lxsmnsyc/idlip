@@ -1,5 +1,5 @@
 {
-  "module": "/src/todo.idlip.tsx",
+  "module": "/src/todo.tsx",
   "events": [
     "click",
     "input",
@@ -48,7 +48,6 @@
       ],
       "bindings": [
         "todos.*.done",
-        "todos.*.id",
         "todos.*.text",
         "draft"
       ]
@@ -61,6 +60,44 @@
       "bindings": [
         "todos.*.done"
       ]
+    },
+    "$e0": {
+      "chunk": "handler=add",
+      "bindings": [
+        "todos.*.done",
+        "todos.*.text",
+        "draft"
+      ],
+      "tags": [
+        "add"
+      ]
+    },
+    "$e1": {
+      "chunk": "handler=setDraft",
+      "bindings": [
+        "draft"
+      ],
+      "tags": [
+        "setDraft"
+      ]
+    },
+    "$e2": {
+      "chunk": "handler=clear",
+      "bindings": [
+        "draft"
+      ],
+      "tags": [
+        "clear"
+      ]
+    },
+    "$e3": {
+      "chunk": "handler=toggle",
+      "bindings": [
+        "todos.*.done"
+      ],
+      "tags": [
+        "toggle"
+      ]
     }
   },
   "groups": {
@@ -72,18 +109,6 @@
       "bindings": [
         "a4",
         "a5"
-      ],
-      "covers": [
-        "todos"
-      ]
-    },
-    "todos.*.id": {
-      "paths": [
-        "todos.*.id"
-      ],
-      "chunk": "binding=todos.*.id",
-      "bindings": [
-        "a7"
       ],
       "covers": [
         "todos"
@@ -132,8 +157,7 @@
       "bindings": [
         "a4",
         "a5",
-        "t6",
-        "a7"
+        "t6"
       ]
     }
   }

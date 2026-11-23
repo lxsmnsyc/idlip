@@ -1,5 +1,5 @@
 import { DEV } from '../core/dev.ts';
-import type { Model, Patch, Props, QueuedEvent, ViewChunk } from '../core/format.ts';
+import type { Manifest, Model, Patch, Props, QueuedEvent, ViewChunk } from '../core/format.ts';
 import type { Child, Nesting, Root, Unit } from './loader/resume.ts';
 import { isComment } from './patch/guards.ts';
 import { onBlock } from './patch/index.ts';
@@ -22,7 +22,8 @@ function createChild(
   model: Model,
   props: Props,
 ): Child {
-  const manifest = top.state.modules![module];
+  // The state script leaves out `events`, which the loader never reads.
+  const manifest: Manifest = { ...top.state.modules![module], events: [] };
   return {
     kind: 'live',
     path,
@@ -94,13 +95,22 @@ function findBoundaries(top: Root): void {
   }
 }
 
-/** Makes a child, records its slot as live and returns its markup between the boundary comments. */
-export function addChild(path: string, module: string, view: ViewChunk, props: Props): string {
+/**
+ * Makes a child, records its slot as live and returns its nodes, cloned in `doc`. The template of
+ * the body holds the boundary comments around them.
+ */
+export function addChild(
+  path: string,
+  module: string,
+  view: ViewChunk,
+  props: Props,
+  doc: Document,
+): Node {
   const top = active!;
   const table = getTable(top);
   const model = view.init(props);
   table.set(path, createChild(top, path, (table.get(path)?.gen ?? -1) + 1, module, model, props));
-  return `<!--n:${path}-->${view.render({ model, props, rows: [], path })}<!--/n-->`;
+  return view.render({ model, props, rows: [], path }, doc);
 }
 
 /** Sets a prop of a live slot when its value differs, and marks the slot to patch. */

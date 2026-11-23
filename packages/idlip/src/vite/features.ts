@@ -1,3 +1,4 @@
+import { listCompiled } from '../core/format.ts';
 import type { CompileResult } from '../core/format.ts';
 
 type Detector = (result: CompileResult) => boolean;
@@ -13,9 +14,29 @@ function hasKeyedPath({ manifest }: CompileResult): boolean {
   return false;
 }
 
+function hasKeyFunction({ manifest }: CompileResult): boolean {
+  for (const list of Object.values(manifest.lists)) {
+    if (list.key === undefined) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function hasInnerLists({ client }: CompileResult): boolean {
+  // A list's start marker in a chunk's markup: a branch, a region or a row renders the list.
+  for (const module of client) {
+    if (/<!--l\d/.test(module.code)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function hasChildren({ manifest, server }: CompileResult): boolean {
   // The child has a `view` chunk. A parent has `uses`, even when the child is not compiled as one.
-  return manifest.view !== undefined || /^export const uses =/m.test(server);
+  // A component other than the main one sets the `uses` of its record, `$Name.uses = [...]`.
+  return manifest.view !== undefined || /^(?:export const uses =|\$[^\s.]+\.uses = )/m.test(server);
 }
 
 /**
@@ -33,15 +54,21 @@ const DETECTORS: Readonly<Record<string, Detector>> = {
   // `deploy-skew` turns this on for apps without `<Try>` too.
   RETRY: ({ manifest }) => manifest.fallback !== undefined,
   DYNAMIC: ({ manifest }) => Object.hasOwn(manifest.groups, '$dynamic'),
+  KEY_FN: hasKeyFunction,
+  INNER_LISTS: hasInnerLists,
 };
 
 /** Returns the flags that the compiled modules turn on. */
 export function getFeatures(results: Iterable<CompileResult>): Set<string> {
   const on = new Set<string>();
+  // Each component of a file is checked with its own manifest.
   for (const result of results) {
-    for (const [name, detect] of Object.entries(DETECTORS)) {
-      if (!on.has(name) && detect(result)) {
-        on.add(name);
+    for (const component of listCompiled(result)) {
+      const one: CompileResult = { ...result, ...component };
+      for (const [name, detect] of Object.entries(DETECTORS)) {
+        if (!on.has(name) && detect(one)) {
+          on.add(name);
+        }
       }
     }
   }
@@ -57,20 +84,6 @@ export function getDefines(on: ReadonlySet<string>, skew = true): Map<string, st
   // SKEW is an option of the plugin, not something a module reports.
   defines.set('__IDLIP_HAS_SKEW__', String(skew));
   return defines;
-}
-
-/** Returns the flags a module needs that the defines turn off. */
-export function findDroppedFeatures(
-  result: CompileResult,
-  defines: ReadonlyMap<string, string>,
-): string[] {
-  const dropped: string[] = [];
-  for (const name of getFeatures([result])) {
-    if (defines.get(`__IDLIP_HAS_${name}__`) === 'false') {
-      dropped.push(`HAS_${name}`);
-    }
-  }
-  return dropped;
 }
 
 /** Replaces the feature globals in a module, or returns undefined when it names none. */

@@ -1,3 +1,4 @@
+import { OPERATIONS, RESUMED } from './client.mjs';
 // Formats a result as a markdown report with one column per framework.
 function num(value) {
   return Math.round(value).toLocaleString('en-US');
@@ -120,6 +121,172 @@ function todosRows(result, metrics) {
   return rows;
 }
 
+function checks(c) {
+  return c && `${ms(c.above)} / ${ms(c.below)} / ${ms(c.third)}`;
+}
+
+function dashboardRows(result, metrics) {
+  function d(name) {
+    return result.frameworks[name].dashboard ?? {};
+  }
+  function b(name) {
+    return d(name).browser;
+  }
+  function off(name) {
+    return b(name)?.preloadOff;
+  }
+  function na(name) {
+    return b(name) && !off(name) ? 'n/a' : undefined;
+  }
+  const { above, below, third } = result.options.dashboardClicks ?? {};
+  const rows = [];
+  if (metrics.has('browser')) {
+    rows.push(
+      [`**Browser** (${result.options.dashboardWidgets} widgets; JS files · raw / gzip)`, () => ''],
+      ['JS before `load`', (n) => js(b(n)?.boot)],
+      [`JS fetched while idle ${result.options.idleMs / 1000} s`, (n) => js(b(n)?.idle)],
+      [`First click, widget ${above} (above the fold): requests`, (n) => b(n)?.above.requests],
+      [`First click, widget ${above}: JS`, (n) => js(b(n)?.above)],
+      [
+        `First click, widget ${below} (below the fold): JS on scroll`,
+        (n) => js(b(n)?.belowFirst.scroll),
+      ],
+      [`First click, widget ${below}: requests on click`, (n) => b(n)?.belowFirst.click.requests],
+      [`First click, widget ${below}: JS on click`, (n) => js(b(n)?.belowFirst.click)],
+      [
+        `Widget ${below} after widget ${above} (scroll + click): JS`,
+        (n) => js(add(b(n)?.scrollBelow, b(n)?.below)),
+      ],
+      [
+        `Widget ${third} after both (scroll + click): JS`,
+        (n) => js(add(b(n)?.scrollThird, b(n)?.third)),
+      ],
+      ['Total JS after 3 widgets', (n) => js(b(n)?.total)],
+      [`Click to update (widget ${above} / ${below} / ${third})`, (n) => checks(b(n)?.checks)],
+      ['**Idle preload off** (Qwik: `preloader: false`)', () => ''],
+      [`JS fetched while idle ${result.options.idleMs / 1000} s`, (n) => na(n) ?? js(off(n)?.idle)],
+      [`First click, widget ${above}: requests`, (n) => na(n) ?? off(n)?.above.requests],
+      [`First click, widget ${above}: JS`, (n) => na(n) ?? js(off(n)?.above)],
+      [
+        `Widget ${below} after widget ${above} (scroll + click): JS`,
+        (n) => na(n) ?? js(add(off(n)?.scrollBelow, off(n)?.below)),
+      ],
+      ['Total JS after 3 widgets', (n) => na(n) ?? js(off(n)?.total)],
+      [
+        `Click to update (widget ${above} / ${below} / ${third})`,
+        (n) => na(n) ?? checks(off(n)?.checks),
+      ],
+    );
+  }
+  if (metrics.has('dist')) {
+    rows.push(['**Build**', () => ''], ['Client JS emitted in dist', (n) => js(d(n).dist)]);
+  }
+  if (metrics.has('ssr-size')) {
+    function s(name) {
+      return d(name).ssrSize;
+    }
+    rows.push(
+      ['**SSR HTML** (raw / gzip -9)', () => ''],
+      ['Dashboard page', (n) => s(n) && size(s(n).raw, s(n).gzip)],
+    );
+  }
+  if (metrics.has('ssr-speed')) {
+    function s(name) {
+      return d(name).ssrSpeed;
+    }
+    rows.push(
+      [`**SSR renders/s** (median of ${result.options.rounds}, min–max)`, () => ''],
+      ['Dashboard page', (n) => s(n) && `${num(s(n).median)} (${num(s(n).min)}–${num(s(n).max)})`],
+    );
+  }
+  if (metrics.has('waterfall')) {
+    function w(name, kind) {
+      return d(name).waterfall?.[kind];
+    }
+    function cell(name, kind) {
+      return (
+        w(name, kind) &&
+        `${w(name, kind).roundTrips} RT · ${w(name, kind).requests} req · ${ms(w(name, kind).ms)}`
+      );
+    }
+    rows.push(
+      [`**First click on widget ${above}, ${result.options.latency} ms RTT**`, () => ''],
+      ['After idle', (n) => cell(n, 'idle')],
+      ['Right after load (cold)', (n) => cell(n, 'cold')],
+    );
+  }
+  return rows;
+}
+
+function mb(bytes) {
+  return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+}
+function spread(entry) {
+  return entry && `${entry.median} (${entry.min}–${entry.max})`;
+}
+
+function rowsRows(result, metrics) {
+  function r(name) {
+    return result.frameworks[name].rows ?? {};
+  }
+  const rows = [];
+  if (metrics.has('browser')) {
+    const { runs, cpu } = result.options;
+    const slowdown = cpu > 1 ? `, ${cpu}× CPU slowdown` : '';
+    rows.push([
+      `**Main thread from click to paint, ms** (median of ${runs}, min–max${slowdown})`,
+      () => '',
+    ]);
+    for (const [key, operation] of Object.entries(OPERATIONS)) {
+      rows.push([operation.label, (n) => spread(r(n).browser?.operations[key]?.cpu)]);
+    }
+    rows.push([
+      'JS heap after creating 1,000 rows',
+      (n) => r(n).browser?.heapCreated && mb(r(n).browser.heapCreated),
+    ]);
+    rows.push(
+      [
+        `**1,000 rows from the server** (load and ${result.options.idleMs / 1000} s idle)`,
+        () => '',
+      ],
+      ['Main thread busy, ms', (n) => spread(r(n).browser?.load?.busy)],
+      ['Longest task, ms', (n) => spread(r(n).browser?.load?.longest)],
+      ['JS heap', (n) => r(n).browser?.load && mb(r(n).browser.load.heap)],
+    );
+    for (const [key, operation] of Object.entries(RESUMED)) {
+      rows.push([
+        `First click: ${operation.label}, main thread / to paint, ms`,
+        (n) => {
+          const entry = r(n).browser?.resumed[key];
+          return entry && `${entry.cpu.median} / ${entry.paint.median}`;
+        },
+      ]);
+    }
+  }
+  if (metrics.has('dist')) {
+    rows.push(['**Build**', () => ''], ['Client JS emitted in dist', (n) => js(r(n).dist)]);
+  }
+  if (metrics.has('ssr-size')) {
+    function s(name) {
+      return r(name).ssrSize;
+    }
+    rows.push(
+      ['**SSR HTML** (raw / gzip -9)', () => ''],
+      ['1,000 rows', (n) => s(n) && size(s(n).raw, s(n).gzip)],
+    );
+  }
+  if (metrics.has('ssr-speed')) {
+    function s(name) {
+      return r(name).ssrSpeed;
+    }
+    rows.push(
+      [`**SSR renders/s** (median of ${result.options.rounds}, min–max)`, () => ''],
+      ['1,000 rows', (n) => s(n) && `${num(s(n).median)} (${num(s(n).min)}–${num(s(n).max)})`],
+    );
+  }
+  return rows;
+}
+
 export function markdown(result, metrics) {
   const names = result.options.frameworks;
   const fw = result.frameworks;
@@ -166,8 +333,21 @@ export function markdown(result, metrics) {
       notes.push(`- ${note}`);
     }
   }
+  // A scenario's table has a column for each framework that builds it.
+  function getNames(scenario) {
+    return result.options.scenarioFrameworks?.[scenario] ?? names;
+  }
   const sections = [];
   if (scenarios.includes('todos'))
-    sections.push('', '## Todos', '', table(names, labels, todosRows(result, metrics)));
+    sections.push('', '## Todos', '', table(getNames('todos'), labels, todosRows(result, metrics)));
+  if (scenarios.includes('dashboard'))
+    sections.push(
+      '',
+      '## Dashboard',
+      '',
+      table(getNames('dashboard'), labels, dashboardRows(result, metrics)),
+    );
+  if (scenarios.includes('rows'))
+    sections.push('', '## Rows', '', table(getNames('rows'), labels, rowsRows(result, metrics)));
   return `${[...header, ...sections, ...notes].join('\n')}\n`;
 }

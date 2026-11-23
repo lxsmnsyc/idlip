@@ -19,7 +19,7 @@ function readManifest(): Manifest {
 }
 
 const manifest = readManifest();
-const base = '/src/todo.idlip.tsx?idlip-';
+const base = '/src/todo.tsx?idlip-';
 const chunks: ChunkUrls = Object.fromEntries([
   [`${base}handler=toggle&lang.js`, '/assets/toggle.a.js'],
   [`${base}handler=add&lang.js`, '/assets/add.b.js'],
@@ -34,6 +34,29 @@ describe('renderPreload', () => {
     expect(renderPreload(chunks, manifest)).toBe(
       '<link rel="modulepreload" href="/assets/toggle.a.js">' +
         '<link rel="modulepreload" href="/assets/done.d.js">',
+    );
+  });
+
+  it('names the shared helpers module first whenever it names a chunk', () => {
+    const shared: ChunkUrls = { ...chunks, helpers: '/assets/_idlip-helpers.g.js' };
+    expect(renderPreload(shared, manifest, { max: 1 })).toBe(
+      '<link rel="modulepreload" href="/assets/_idlip-helpers.g.js">' +
+        '<link rel="modulepreload" href="/assets/toggle.a.js">',
+    );
+    // An event with no handler names nothing, not even the helpers.
+    expect(renderPreload(shared, manifest, { events: ['wheel'] })).toBe('');
+  });
+
+  it('names the shared templates module after the helpers module', () => {
+    const shared: ChunkUrls = {
+      ...chunks,
+      helpers: '/assets/_idlip-helpers.g.js',
+      templates: '/assets/_idlip-templates.t.js',
+    };
+    expect(renderPreload(shared, manifest, { max: 1 })).toBe(
+      '<link rel="modulepreload" href="/assets/_idlip-helpers.g.js">' +
+        '<link rel="modulepreload" href="/assets/_idlip-templates.t.js">' +
+        '<link rel="modulepreload" href="/assets/toggle.a.js">',
     );
   });
 
@@ -74,7 +97,7 @@ describe('renderPreload', () => {
 
   it('reads the manifests of child modules and keeps the event order under the cap', () => {
     const child: Manifest = {
-      module: '/src/child.idlip.tsx',
+      module: '/src/child.tsx',
       events: ['input'],
       listens: { input: ['edit'] },
       handlers: { edit: { chunk: 'handler=edit' } },
@@ -83,7 +106,7 @@ describe('renderPreload', () => {
     };
     const all: ChunkUrls = {
       ...chunks,
-      '/src/child.idlip.tsx?idlip-handler=edit&lang.js': '/assets/edit.g.js',
+      '/src/child.tsx?idlip-handler=edit&lang.js': '/assets/edit.g.js',
     };
     expect(renderPreload(all, [manifest, child], { events: ['input', 'click'], max: 2 })).toBe(
       '<link rel="modulepreload" href="/assets/set-draft.c.js">' +

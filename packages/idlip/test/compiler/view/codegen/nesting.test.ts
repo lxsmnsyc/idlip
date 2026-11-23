@@ -1,21 +1,25 @@
-import { readFileSync, readdirSync } from 'node:fs';
+// @vitest-environment happy-dom
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runInThisContext } from 'node:vm';
 import { format } from 'oxfmt';
 import { describe, expect, it } from 'vitest';
+import { joinSites } from '../../../../src/compiler/sites.ts';
 import { compileHandlers } from '../../../../src/compiler/update/index.ts';
 import { analyze } from '../../../../src/compiler/view/analyze/index.ts';
 import { generate } from '../../../../src/compiler/view/codegen/index.ts';
 import type { GenerateResult } from '../../../../src/compiler/view/codegen/index.ts';
 import { getChunkFile } from '../../../../src/core/format.ts';
 import { render } from '../../../../src/server/render.ts';
+import { clone$, putText$, setOn$ } from '../../../../src/core/helpers.ts';
 import { createContext, on, slot, text } from '../../../fixtures/reference.ts';
+import { printRow } from '../../../fixtures/rows.ts';
 
 const NESTED = join(import.meta.dirname, '..', '..', '..', 'fixtures', 'nested');
 
 /** The fixture sources import the child as a sibling, and the ids say it is in `/src`. */
 const RESOLVED: Record<string, string> = {
-  '../counter/counter.idlip.tsx': '/src/counter.idlip.tsx',
+  '../counter/counter.tsx': '/src/counter.tsx',
 };
 
 function readFixture(name: string, ...parts: string[]): string {
@@ -51,14 +55,16 @@ interface Compiled extends GenerateResult {
 /** Compiles as `compile()` does, with the options that `vite-plugin` passes for a child. */
 function compileFixture(name: string, child: boolean): Compiled {
   const id = readId(name);
-  const source = readFixture(name, `${name}.idlip.tsx`);
+  const source = readFixture(name, `${name}.tsx`);
   const ir = analyze(id, source);
   const handlers = compileHandlers(id, source, ir);
   const view = generate(ir, source, id, {
     child,
     resolve: (specifier) => RESOLVED[specifier] ?? specifier,
   });
-  return { ...view, chunks: [...handlers.client, ...view.client] };
+  // The event functions join the handler chunks, as `compile()` joins them.
+  const joined = joinSites(handlers.client, view.sites, view.manifest);
+  return { ...view, chunks: [...joined, ...view.client] };
 }
 
 async function normalize(code: string): Promise<string> {
@@ -175,6 +181,23 @@ describe.each([
     expect(actual.toSorted()).toEqual(expected.toSorted());
   });
 
+  // `UPDATE_NESTED=1 pnpm vitest run test/compiler/view/codegen/nesting` writes the chunks again.
+  if (process.env.UPDATE_NESTED === '1') {
+    it('writes the golden chunks', () => {
+      for (const module of result.chunks) {
+        writeFileSync(
+          join(NESTED, name, 'expected', 'client', getChunkFile(module.chunk)),
+          module.code,
+        );
+      }
+      writeFileSync(
+        join(NESTED, name, 'expected', 'manifest.json'),
+        `${JSON.stringify(result.manifest, null, 2)}\n`,
+      );
+      writeFileSync(join(NESTED, name, 'expected', 'server.js'), result.server);
+    });
+  }
+
   it('emits the golden chunks, the item template and the view chunk included', async () => {
     for (const module of result.chunks) {
       const expected = readFixture(name, 'expected', 'client', getChunkFile(module.chunk));
@@ -203,6 +226,9 @@ describe('nested behavior', () => {
     const counter = compileFixture('counter', true);
     const { context, writeState } = createContext();
     const html = renderServer(counter.server, {}, readProps('counter'), context) + writeState();
+    if (process.env.UPDATE_NESTED === '1') {
+      writeFileSync(join(NESTED, 'counter', 'expected', 'page.html'), `${html}\n`);
+    }
     expect(html).toBe(readFixture('counter', 'expected', 'page.html').trimEnd());
   });
 
@@ -212,6 +238,9 @@ describe('nested behavior', () => {
     const html =
       renderServer(board.server, { Counter: loadCounter() }, readProps('board'), context) +
       writeState();
+    if (process.env.UPDATE_NESTED === '1') {
+      writeFileSync(join(NESTED, 'board', 'expected', 'page.html'), `${html}\n`);
+    }
     expect(html).toBe(readFixture('board', 'expected', 'page.html').trimEnd());
   });
 
@@ -234,10 +263,13 @@ describe('nested behavior', () => {
     const calls: unknown[][] = [];
     const globals = {
       addChild: (...args: unknown[]) => {
-        calls.push(args);
-        return '';
+        calls.push(args.slice(0, 4));
+        return document.createComment('child');
       },
-      Counter: {},
+      $init_Counter: undefined,
+      $render_Counter: undefined,
+      clone$,
+      slot$: slot,
     };
     const actual = loadChunk(findChunk(board, 'list=2'), ['render'], globals);
     const golden = loadChunk(
@@ -247,15 +279,25 @@ describe('nested behavior', () => {
     );
     const item = { id: 'a/1', label: 'One' };
     const results: unknown[][][] = [];
+    const rows: string[][] = [];
     for (const target of [actual, golden]) {
       calls.length = 0;
+      const printed: string[] = [];
       for (const path of [undefined, '3']) {
-        call(target, 'render', { model: {}, props: {}, rows: [{ item, index: 0 }], path });
+        const scope = { model: {}, props: {}, rows: [{ item, index: 0 }], path };
+        printed.push(printRow(call(target, 'render', scope, document)));
       }
       results.push(calls.map((args) => [...args]));
+      rows.push(printed);
     }
     expect(results[0]).toEqual(results[1]);
-    expect(results[0][0].slice(0, 2)).toEqual(['1:a%2F1', '/src/counter.idlip.tsx']);
+    expect(rows[0]).toEqual(rows[1]);
+    // The template holds the boundary comments, and the child's nodes go between them.
+    expect(rows[0]).toEqual([
+      '<!--n:1:a%2F1--><!--child--><!--/n-->',
+      '<!--n:3/1:a%2F1--><!--child--><!--/n-->',
+    ]);
+    expect(results[0][0].slice(0, 2)).toEqual(['1:a%2F1', '/src/counter.tsx']);
     expect(results[0][1][0]).toBe('3/1:a%2F1');
     expect(results[0][1][3]).toEqual({ label: 'One', onRemove: ['remove', ['a/1'], '', '3'] });
   });
@@ -263,12 +305,21 @@ describe('nested behavior', () => {
   it('renders the view chunk of the counter as the golden one does', () => {
     const counter = compileFixture('counter', true);
     const names = ['init', 'render'];
-    const actual = loadChunk(findChunk(counter, 'view'), names, {});
-    const golden = loadChunk(readFixture('counter', 'expected', 'client', 'view.js'), names, {});
-    const props = { label: 'A & B', onRemove: ['clearAll', [], '', ''] };
+    const globals = { clone$, putText$, setOn$ };
+    const actual = loadChunk(findChunk(counter, 'view'), names, globals);
+    const golden = loadChunk(
+      readFixture('counter', 'expected', 'client', 'view.js'),
+      names,
+      globals,
+    );
+    const props = { label: 'A & B', onRemove: ['clearAll', [], '', ''] as const };
     expect(call(actual, 'init', props)).toEqual({ count: 0 });
     const model = call(golden, 'init', props);
     const scope = { model, props, rows: [], path: '2' };
-    expect(call(actual, 'render', scope)).toBe(call(golden, 'render', scope));
+    const printed = printRow(call(actual, 'render', scope, document));
+    expect(printed).toBe(printRow(call(golden, 'render', scope, document)));
+    // The clone holds the nodes the server's HTML parses to.
+    const server = `<div><span i-a="0">${text(props.label)}</span><button on:click="$e0">+</button><output i-a="1">0</output><button${on('click', props.onRemove)} i-a="2">Remove</button></div>`;
+    expect(printed).toBe(printRow(server));
   });
 });

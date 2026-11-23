@@ -77,6 +77,9 @@ for (const rule of [
   'event-mode-twice',
   'event-message-args',
   'event-placeholder',
+  'event-statement',
+  'event-no-call',
+  'event-prevent-twice',
   'event-passive-prevent',
   'attr-reserved',
   'html-raw-text',
@@ -135,14 +138,14 @@ describe('contract fixtures', () => {
   for (const name of listFixtures()) {
     it(`prints the recorded IR for ${name}`, async () => {
       const { ir, source } = analyzeFixture(name);
-      const base = name.replace(/\.idlip\.tsx\.txt$/, '');
+      const base = name.replace(/\.tsx\.txt$/, '');
       await expect(`${printModule(ir, source)}\n`).toMatchFileSnapshot(`./expected/${base}.txt`);
     });
   }
 
   for (const base of ['counter', 'todo']) {
     it(`produces the recorded JSON IR for ${base}`, () => {
-      const { ir } = analyzeFixture(`${base}.idlip.tsx.txt`);
+      const { ir } = analyzeFixture(`${base}.tsx.txt`);
       const recorded = recordedJson[`./expected/${base}.json`];
       expect(recorded).toBeDefined();
       // The recorded JSON drops `undefined` fields, so compare the JSON forms.
@@ -151,13 +154,13 @@ describe('contract fixtures', () => {
   }
 
   it('gives the todo and the counter no diagnostics', () => {
-    expect(analyzeFixture('todo.idlip.tsx.txt').ir.diagnostics).toEqual([]);
-    expect(analyzeFixture('counter.idlip.tsx.txt').ir.diagnostics).toEqual([]);
+    expect(analyzeFixture('todo.tsx.txt').ir.diagnostics).toEqual([]);
+    expect(analyzeFixture('counter.tsx.txt').ir.diagnostics).toEqual([]);
   });
 
-  it('produces a dynamic hole only in dynamic.idlip.tsx.txt', () => {
+  it('produces a dynamic hole only in dynamic.tsx.txt', () => {
     for (const name of listFixtures()) {
-      if (name === 'dynamic.idlip.tsx.txt') {
+      if (name === 'dynamic.tsx.txt') {
         continue;
       }
       for (const component of analyzeFixture(name).ir.components) {
@@ -202,7 +205,7 @@ describe('rule ids', () => {
   // A marker comment names a rule id; the rule must fire within the next lines. A stateless
   // component is inlined at its use, so its own errors are reported in its body.
   const reportedInBody = new Set(['props-whole', 'component-recursive']);
-  for (const name of ['violations.idlip.tsx.txt', 'parse.idlip.tsx.txt', 'impure.idlip.tsx.txt']) {
+  for (const name of ['violations.tsx.txt', 'parse.tsx.txt', 'impure.tsx.txt']) {
     it(`fires each rule marked in ${name} next to its marker`, () => {
       const { ir, source } = analyzeFixture(name);
       const lines = source.split('\n');
@@ -234,7 +237,7 @@ describe('rule ids', () => {
 
 describe('event modifiers', () => {
   it('reads the block body forms of view-ir v9', () => {
-    const { ir } = analyzeFixture('events.idlip.tsx.txt');
+    const { ir } = analyzeFixture('events.tsx.txt');
     const [form] = ir.components[0].view;
     if (form.kind !== 'element') {
       throw new Error('expected a form');
@@ -267,13 +270,13 @@ describe('event modifiers', () => {
 
 describe('the todo fixture of compiled-format', () => {
   const sources: Record<string, string | undefined> = import.meta.glob(
-    '../../../fixtures/todo/todo.idlip.tsx',
+    '../../../fixtures/todo/todo.tsx',
     { query: '?raw', import: 'default', eager: true },
   );
   const source = Object.values(sources)[0] ?? '';
 
   it('analyzes with no diagnostics', async () => {
-    const ir = analyze('todo.idlip.tsx', source);
+    const ir = analyze('todo.tsx', source);
     expect(ir.diagnostics).toEqual([]);
     await expect(`${printModule(ir, source)}\n`).toMatchFileSnapshot(
       './expected/compiled-format-todo.txt',
@@ -283,7 +286,7 @@ describe('the todo fixture of compiled-format', () => {
 
 describe('the todo manifest', () => {
   const sources: Record<string, string | undefined> = import.meta.glob(
-    '../../../fixtures/todo/todo.idlip.tsx',
+    '../../../fixtures/todo/todo.tsx',
     { query: '?raw', import: 'default', eager: true },
   );
   const manifests: Record<
@@ -297,8 +300,8 @@ describe('the todo manifest', () => {
   const manifest = Object.values(manifests)[0];
 
   it('matches the hole ids and path sets of the analysis', () => {
-    const component = analyze('todo.idlip.tsx', source).components[0];
-    // Binding ids are the hole id after one letter; the event payload takes the next id.
+    const component = analyze('todo.tsx', source).components[0];
+    // Binding ids are the hole id after one letter. An event function binds nothing.
     const paths = new Map<number, string[]>();
     for (const hole of component.holes) {
       expect(hole.paths).not.toBe('dynamic');
@@ -308,7 +311,6 @@ describe('the todo manifest', () => {
       }
       paths.set(hole.id, printed);
     }
-    paths.set(component.holes.length, ['todos.*.id']);
     let checked = 0;
     for (const group of Object.values(manifest.groups)) {
       for (const binding of group.bindings) {
@@ -322,7 +324,7 @@ describe('the todo manifest', () => {
 
 describe('impure globals in holes', () => {
   it('marks the call impure and warns only when the hole reads paths', () => {
-    const { ir, source } = analyzeFixture('impure.idlip.tsx.txt');
+    const { ir, source } = analyzeFixture('impure.tsx.txt');
     const component = ir.components.at(0);
     expect(component?.name).toBe('Impure');
     const warned: string[] = [];
@@ -345,10 +347,10 @@ describe('impure globals in holes', () => {
 
 describe('imported components', () => {
   const files: Record<string, string | undefined> = {
-    'badge.idlip.tsx': `export default function Badge(props: { label: string }) {
+    'badge.tsx': `export default function Badge(props: { label: string }) {
   return <b>{props.label}</b>;
 }`,
-    'widgets.idlip.tsx': `import { format } from './format';
+    'widgets.tsx': `import { format } from './format';
 export function Ticker() {
   let n = 0;
   function tick() {
@@ -368,8 +370,8 @@ export { Shout };`,
     return source === undefined ? undefined : { file, source };
   }
 
-  const app = `import Badge from './badge.idlip.tsx';
-import { Ticker, Shout, Missing } from './widgets.idlip.tsx';
+  const app = `import Badge from './badge.tsx';
+import { Ticker, Shout, Missing } from './widgets.tsx';
 export default function App() {
   let title = 'x';
   function rename(next: string) {
@@ -387,7 +389,7 @@ export default function App() {
 }`;
 
   it('inlines a stateless import, keeps a stateful one as a child and reports bad reads', () => {
-    const ir = analyze('app.idlip.tsx', app, { readImport });
+    const ir = analyze('app.tsx', app, { readImport });
     const main = ir.components.at(0)?.view[0];
     expect(main?.kind).toBe('element');
     const kinds: string[] = [];
@@ -402,16 +404,16 @@ export default function App() {
     const rules: string[] = [];
     for (const diagnostic of ir.diagnostics) {
       rules.push(diagnostic.rule);
-      // Spans point into app.idlip.tsx, at the use of the component.
+      // Spans point into app.tsx, at the use of the component.
       expect(diagnostic.span.end).toBeLessThanOrEqual(app.length);
     }
     expect(rules).toEqual(['component-import', 'component-import']);
-    expect(ir.diagnostics[0]?.message).toContain('widgets.idlip.tsx:10:');
+    expect(ir.diagnostics[0]?.message).toContain('widgets.tsx:10:');
     expect(ir.diagnostics[1]?.message).toContain('no component export named Missing');
   });
 
   it('keeps every imported component a child without a reader', () => {
-    const ir = analyze('app.idlip.tsx', app);
+    const ir = analyze('app.tsx', app);
     expect(ir.diagnostics).toEqual([]);
     const main = ir.components.at(0)?.view[0];
     const kinds: string[] = [];
@@ -428,7 +430,7 @@ describe('props paths before a called method', () => {
   const head = `import type { JSX } from 'idlip/jsx-runtime';\n`;
 
   function readProps(source: string): string[] {
-    const ir = analyze('a.idlip.tsx', head + source);
+    const ir = analyze('a.tsx', head + source);
     expect(ir.diagnostics).toEqual([]);
     const out: string[] = [];
     for (const entry of ir.components[0].handlers[0].free) {
@@ -469,7 +471,7 @@ describe('JSX attribute entities', () => {
     const source = `export default function A(): JSX.Element {
   return <p title="a &amp; b &#65;" id={'a &amp; b'}>x</p>;
 }`;
-    const ir = analyze('a.idlip.tsx', source);
+    const ir = analyze('a.tsx', source);
     expect(ir.components[0].view).toMatchObject([
       {
         kind: 'element',
@@ -487,7 +489,7 @@ describe('JSX text entities', () => {
     const source = `export default function A(): JSX.Element {
   return <p>a &lt; b &amp; c&nbsp;d &#65;&#x42; &unknown;</p>;
 }`;
-    const ir = analyze('a.idlip.tsx', source);
+    const ir = analyze('a.tsx', source);
     expect(ir.components[0].view).toMatchObject([
       { kind: 'element', children: [{ kind: 'text', value: 'a < b & c d AB &unknown;' }] },
     ]);

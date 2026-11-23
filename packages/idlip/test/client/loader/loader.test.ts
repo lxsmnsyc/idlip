@@ -22,17 +22,19 @@ function input(el: HTMLInputElement, value: string): void {
 }
 
 describe('counter', () => {
-  it('loads only the handler chunk and patches with the old and new model', async () => {
+  it('loads the handler chunk with its binding chunk and patches with the old and new model', async () => {
     harness = setup('counter');
     harness.start();
     buttons()[0].click();
     await harness.settled();
-    expect(getLoaded()).toEqual(['handler=increment']);
+    // The binding chunk starts with the handler chunk. It ran no earlier only while its import
+    // of the loader failed outside Vite.
+    expect(getLoaded().toSorted()).toEqual(['binding=count', 'handler=increment']);
     expect(harness.patch).toHaveBeenCalledTimes(1);
     const [page, prev, next] = harness.patch.mock.calls[0];
     expect(prev).toEqual({ count: 4 });
     expect(next).toEqual({ count: 5 });
-    expect(page.manifest.module).toBe('/src/counter.idlip.tsx');
+    expect(page.manifest.module).toBe('/src/counter.tsx');
     expect(page.root).toBe(document.body);
   });
 
@@ -81,7 +83,8 @@ describe('counter', () => {
     expect(harness.patch).toHaveBeenCalledTimes(2);
     expect(harness.patch.mock.calls[1][1]).toEqual({ count: 5 });
     expect(harness.patch.mock.calls[1][2]).toEqual({ count: 6 });
-    expect(getLoaded()).toEqual(['handler=increment']);
+    // Each chunk loads once.
+    expect(getLoaded().toSorted()).toEqual(['binding=count', 'handler=increment']);
   });
 
   it('takes over events the listener queued before the loader started', async () => {
@@ -180,14 +183,14 @@ describe('todo', () => {
     expect(harness.patch.mock.calls[0][2]).toMatchObject({ draft: 'milk' });
   });
 
-  it('resolves placeholders when the event fires, not when the chunk loads', async () => {
+  it('queues the event itself, and the event function reads the element when it runs', async () => {
     harness = setup('todo', { gated: ['handler=setDraft'] });
     harness.start();
-    const messages: unknown[] = [];
+    const sites: unknown[] = [];
     const push = harness.boot.q!.push;
     harness.boot.q!.push = (...events) => {
       for (const event of events) {
-        messages.push(event.message);
+        sites.push(event.site);
       }
       return push(...events);
     };
@@ -195,11 +198,7 @@ describe('todo', () => {
     input(field(), 'ab');
     input(field(), 'abc');
     await reached('handler=setDraft');
-    expect(messages).toEqual([
-      { t: 'setDraft', p: ['a'] },
-      { t: 'setDraft', p: ['ab'] },
-      { t: 'setDraft', p: ['abc'] },
-    ]);
+    expect(sites).toEqual(['$e1', '$e1', '$e1']);
     release('handler=setDraft');
     await harness.settled();
     expect(harness.patch).toHaveBeenCalledTimes(1);

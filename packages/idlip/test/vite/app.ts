@@ -3,6 +3,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   realpathSync,
   writeFileSync,
 } from 'node:fs';
@@ -10,6 +11,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { InlineConfig } from 'vite';
 import { getChunkFile } from '../../src/core/format.ts';
+import { HELPER_NAMES } from '../../src/core/helpers.ts';
 import type { ChunkUrls, Compile, CompileResult, Manifest, Module } from '../../src/core/format.ts';
 import { isChunkUrls, listChunks } from '../../src/vite/chunks.ts';
 import { idlip } from '../../src/vite/index.ts';
@@ -37,6 +39,32 @@ function isManifest(value: unknown): value is Manifest {
 }
 
 /**
+ * Returns the runtime helpers (`HELPER_NAMES`) that more than one `.js` file of an unminified
+ * build folder declares, with the files. A build that ships each helper once returns none.
+ */
+export function findCopiedHelpers(dir: string): string[] {
+  const files = new Map<string, string[]>();
+  for (const name of readdirSync(dir)) {
+    if (!name.endsWith('.js')) {
+      continue;
+    }
+    const code = readFileSync(path.join(dir, name), 'utf8');
+    for (const helper of HELPER_NAMES) {
+      if (code.includes(`function ${helper}(`)) {
+        files.set(helper, [...(files.get(helper) ?? []), name]);
+      }
+    }
+  }
+  const copied: string[] = [];
+  for (const [helper, found] of files) {
+    if (found.length > 1) {
+      copied.push(`${helper}: ${found.join(', ')}`);
+    }
+  }
+  return copied;
+}
+
+/**
  * Reads a chunk URL map from a JSON file.
  */
 export function readChunkUrls(file: string): ChunkUrls {
@@ -49,10 +77,10 @@ export function readChunkUrls(file: string): ChunkUrls {
 
 /**
  * Stands in for `compile()` until `compile-integration` lands: returns the golden
- * fixture output for a module named after a fixture, such as `/src/todo.idlip.tsx`.
+ * fixture output for a module named after a fixture, such as `/src/todo.tsx`.
  */
 export function compileFixture(_source: string, id: string): CompileResult {
-  const name = path.basename(id, '.idlip.tsx');
+  const name = path.basename(id, '.tsx');
   const expected = path.join(FIXTURES, name, 'expected');
   const manifest = readJson(path.join(expected, 'manifest.json'));
   if (!isManifest(manifest) || manifest.module !== id) {
@@ -94,10 +122,7 @@ export function createApp(): string {
   mkdirSync(path.join(root, 'src'));
   const props: Record<string, unknown> = {};
   for (const name of ['counter', 'todo']) {
-    copyFileSync(
-      path.join(FIXTURES, name, `${name}.idlip.tsx`),
-      path.join(root, 'src', `${name}.idlip.tsx`),
-    );
+    copyFileSync(path.join(FIXTURES, name, `${name}.tsx`), path.join(root, 'src', `${name}.tsx`));
     props[name] = readField(readJson(path.join(FIXTURES, name, 'input.json')), 'props');
   }
   // A loader that imports nothing from `idlip/client`, which the plugin rejects.
@@ -106,8 +131,8 @@ export function createApp(): string {
   writeFileSync(
     path.join(root, 'src/entry-server.js'),
     `import { createContext } from ${JSON.stringify(REFERENCE)};
-import Counter from './counter.idlip.tsx';
-import TodoApp from './todo.idlip.tsx';
+import Counter from './counter.tsx';
+import TodoApp from './todo.tsx';
 
 const props = ${JSON.stringify(props)};
 

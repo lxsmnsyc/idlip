@@ -6,8 +6,6 @@
 import type { Model, Page, Scope } from '../core/format.ts';
 import { HAS_CHILDREN } from './features.ts';
 import { addBlock, findInnerBlocks, removeBlock } from './patch/blocks.ts';
-import { parseHtml } from './patch/dom.ts';
-import type { Namespace } from './patch/dom.ts';
 import { isComment } from './patch/guards.ts';
 
 /** The state of a region, read from its start marker. */
@@ -19,11 +17,10 @@ interface Region {
 
 /** The exports of a `try=<id>` chunk. */
 interface TryChunk {
-  readonly render: (error: string, scope: Scope) => string;
-  /** Only a catch view with `reset` has it. A region in a row also takes its start marker. */
-  readonly region: (scope: Scope, start: Comment) => string;
-  /** Set when the region is inside `<svg>` or `<math>`. */
-  readonly namespace?: Namespace;
+  /** The catch view, cloned in `doc`. */
+  readonly render: (error: string, scope: Scope, doc: Document) => Node;
+  /** Only a catch view with `reset` has it: the region with its markers, cloned in the document of `start`. */
+  readonly region: (scope: Scope, start: Comment) => DocumentFragment;
 }
 
 /** The tag of the message that `reset` renders. It has no handler chunk. */
@@ -90,8 +87,8 @@ function findEnd(start: Comment): Comment | undefined {
   return undefined;
 }
 
-/** Replaces a region, markers included, with markup that holds its new markers. */
-function swapRegion(start: Comment, html: string, ns?: Namespace): void {
+/** Replaces a region, markers included, with a fragment that holds its new markers. */
+function swapRegion(start: Comment, fragment: DocumentFragment): void {
   const end = findEnd(start);
   const parent = start.parentNode;
   if (end === undefined || parent === null) {
@@ -108,7 +105,7 @@ function swapRegion(start: Comment, html: string, ns?: Namespace): void {
     parent.removeChild(node);
     node = after!;
   }
-  const nodes = parseHtml(start.ownerDocument, html, ns);
+  const nodes = [...fragment.childNodes];
   for (const node of nodes) {
     parent.insertBefore(node, next);
   }
@@ -146,9 +143,16 @@ export async function failRegion(
   if (region?.state !== 'body' || page.manifest.fallback === undefined) {
     return false;
   }
-  const { render, namespace } = await loadTry(page, region.id);
+  const { render } = await loadTry(page, region.id);
   const text = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-  swapRegion(region.start, `<!--e${region.id}:1-->${render(text, scope)}<!--/e-->`, namespace);
+  const doc = region.start.ownerDocument;
+  const fragment = doc.createDocumentFragment();
+  fragment.append(
+    doc.createComment(`e${region.id}:1`),
+    render(text, scope, doc),
+    doc.createComment('/e'),
+  );
+  swapRegion(region.start, fragment);
   fireError(error, page.path);
   return true;
 }
@@ -167,7 +171,7 @@ export async function resetRegion(
   if (region?.state !== 'catch' || region.id !== String(id)) {
     throw new Error('idlip: no failed region');
   }
-  const { region: render, namespace } = await loadTry(page, region.id);
+  const { region: render } = await loadTry(page, region.id);
   const scope = { model, props: page.props, rows: [], path: page.path };
-  swapRegion(region.start, render(scope, region.start), namespace);
+  swapRegion(region.start, render(scope, region.start));
 }

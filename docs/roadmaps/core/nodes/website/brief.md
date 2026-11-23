@@ -27,6 +27,30 @@ shared: []
 reserves: []
 provides: []
 depends_on:
+  - on: website-search
+    kind: hard
+    why: the public site needs its search
+  - on: website-repl
+    kind: hard
+    why: the public site needs its repl
+  - on: website-polish
+    kind: hard
+    why: the site goes public with its own identity and the full landing page
+  - on: docs-live
+    kind: hard
+    why: samples run in place before the site goes public
+  - on: hero-animation
+    kind: hard
+    why: the public site ships the chosen hero
+  - on: docs-animations
+    kind: hard
+    why: the docs figures go public with the site
+  - on: landing-trim
+    kind: hard
+    why: the trimmed landing page goes public
+  - on: website-landing
+    kind: hard
+    why: the landing page sells the benefit before the site goes public
   - on: website-scaffold
     kind: hard
     why: the site builds and checks its samples
@@ -86,3 +110,7 @@ S: one config file. The deployment is a human step.
 ## Updates after wave 9
 
 - `build.js` of the client build must be served with `Cache-Control: no-store` or a short max age (`deploy-skew`). The `immutable` header for `/assets/` in `vercel.json` must not match it: check where the build writes `build.js` (next to the loader entry) and give it its own header rule.
+
+## After debate `debates/dsl` (2026-11-21)
+
+TSX stays the one source syntax. Pages and examples use `*.idlip.tsx`; no markup DSL, no `@idlip/language-core` or `@idlip/tsc`.

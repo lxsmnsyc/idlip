@@ -46,7 +46,8 @@ describe('resume().settled', () => {
     expect(done).toBe(false);
     release('handler=add');
     await waiting;
-    expect(getLoaded()).toEqual(['handler=add']);
+    // The binding chunk of the write set loads with the handler chunk.
+    expect(getLoaded().toSorted()).toEqual(['binding=count', 'handler=add']);
     expect(harness.patch).toHaveBeenCalledTimes(1);
   });
 

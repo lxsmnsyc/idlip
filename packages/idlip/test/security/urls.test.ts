@@ -7,7 +7,7 @@ import { safeUrl$ } from '../../src/core/helpers.ts';
 import { mount } from '../../src/testing/index.ts';
 import type { MountedPage } from '../../src/testing/index.ts';
 
-const SOURCE = readFileSync(join(import.meta.dirname, 'urls.idlip.tsx'), 'utf8');
+const SOURCE = readFileSync(join(import.meta.dirname, 'urls.tsx'), 'utf8');
 const EVIL = 'javascript:alert(1)';
 const TARGETS: [string, string][] = [
   ['#html', 'href'],

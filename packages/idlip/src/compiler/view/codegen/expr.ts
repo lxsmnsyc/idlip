@@ -13,7 +13,7 @@ export interface Frame {
   row: number | undefined;
 }
 
-export type ScopeName = 'model' | 'props' | 'rows' | 'dynamic';
+export type ScopeName = 'model' | 'props' | 'rows' | 'rendered' | 'dynamic';
 
 /** What the printed code reads, so a chunk imports and destructures only that. */
 export interface Usage {
@@ -34,6 +34,16 @@ export interface Usage {
   views: Map<string, string>;
   /** Whether the code reads the model path of the component it renders. */
   path: boolean;
+  /** Module-level cloned templates by name, such as `templateL3$`. */
+  templates: Map<string, TemplateUse>;
+}
+
+/** A cloned template a chunk renders. */
+export interface TemplateUse {
+  /** The hash of its namespace and markup, which names it in the shared templates module. */
+  hash: string;
+  /** The object literal: `{ h: '...', n: 2 }`. */
+  init: string;
 }
 
 export function createUsage(): Usage {
@@ -47,6 +57,7 @@ export function createUsage(): Usage {
     loader: new Set(),
     views: new Map(),
     path: false,
+    templates: new Map(),
   };
 }
 
@@ -74,6 +85,9 @@ export function mergeUsage(into: Usage, from: Usage): void {
   }
   for (const [name, id] of from.views) {
     into.views.set(name, id);
+  }
+  for (const [name, code] of from.templates) {
+    into.templates.set(name, code);
   }
   into.path = into.path || from.path;
 }
@@ -127,6 +141,9 @@ export class Emitter {
 
   /** Prints state as `model.name` on the server too: a dynamic hole reads a proxy of the model. */
   tracked = false;
+
+  /** True while printing an event function, where `$e` is the event and `$c` its element. */
+  inEvent = false;
 
   constructor(
     readonly mode: 'server' | 'client',
@@ -269,7 +286,10 @@ export class Emitter {
         return getLocalName(root.name);
       default:
         // The event root is the only one left.
-        return this.fail('codegen-event', 'The event is read only as a whole event argument');
+        if (this.inEvent) {
+          return '$e';
+        }
+        return this.fail('codegen-event', 'The event is read only inside an event arrow');
     }
   }
 
@@ -298,9 +318,15 @@ export class Emitter {
       }
     }
     let out = this.printRoot(expr.root);
+    let segments = expr.segments;
+    // The loader hands over `currentTarget`, since the browser clears it after the dispatch.
+    if (expr.root.kind === 'event' && this.inEvent && segments.at(0) === 'currentTarget') {
+      out = '$c';
+      segments = segments.slice(1);
+    }
     // After a `find` the item may be missing, so the rest of the path is optional.
     let optional = expr.optional;
-    for (const segment of expr.segments) {
+    for (const segment of segments) {
       if (typeof segment === 'string') {
         out += getAccessor(segment, optional);
       } else if (segment.kind === 'index') {

@@ -1,4 +1,4 @@
-file features.idlip.tsx
+file features.tsx
 
 component Badge (stateless)
   props: props
@@ -134,7 +134,7 @@ component Board (stateful, exported)
             <ul>
               for #19 key=id item=card
                 if #20
-                  <li class={#21} [on:click -> pick(card.id)  render reads columns.*.cards.*.id]>
+                  <li class={#21} [on:click -> pick(card.id)]>
                     <span class={#23}>
                       {#24}
                       <em>

@@ -1,5 +1,5 @@
 {
-  "module": "/src/counter.idlip.tsx",
+  "module": "/src/counter.tsx",
   "events": [
     "click"
   ],
@@ -17,6 +17,15 @@
       "bindings": [
         "count"
       ]
+    },
+    "$e0": {
+      "chunk": "handler=increment",
+      "bindings": [
+        "count"
+      ],
+      "tags": [
+        "increment"
+      ]
     }
   },
   "groups": {
@@ -26,7 +35,7 @@
       ],
       "chunk": "binding=props.label",
       "bindings": [
-        "t0"
+        "a0"
       ],
       "covers": []
     },
@@ -46,7 +55,7 @@
       ],
       "chunk": "binding=count",
       "bindings": [
-        "t1"
+        "a1"
       ],
       "covers": []
     }

@@ -23,6 +23,6 @@ function setText$(start, value) {
 	}
 }
 
-export function t1(start, { model }) {
+export function a1(start, { model }) {
 setText$(start, model.label);
 }

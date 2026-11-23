@@ -3,3 +3,7 @@ export function clear(model) {
   draft = '';
   return { ...model, draft };
 }
+
+export function $e2($e, $c) {
+return [['clear', []]];
+}

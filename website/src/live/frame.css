@@ -1,0 +1,15 @@
+/* The frame of a live sample. The build puts these after the REPL frame styles. The sample's
+   output panel draws the background, and the page reads the body's height to size the frame. */
+
+body {
+  padding: 0.75rem 0;
+  background: transparent;
+}
+
+body > :not(main, script) {
+  margin-inline: 1.25rem;
+}
+
+main {
+  padding: 0 1.25rem;
+}

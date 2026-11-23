@@ -11,7 +11,7 @@ export function getDynamic(
   page: Page,
   prev: Model,
   next: Model,
-  keys: Readonly<Record<string, string>>,
+  keys: Readonly<Record<string, string | undefined>>,
 ): string[] {
   const names: string[] = [];
   for (const [name, paths] of Object.entries(page.dynamic ?? {})) {

@@ -14,9 +14,17 @@ import type {
   Scope,
 } from '../../../src/core/format.ts';
 import { patchList } from '../../../src/client/list/index.ts';
-import { onBlock } from '../../../src/client/patch/index.ts';
+import { addBlock, onBlock, parseHtml } from '../../../src/client/patch/index.ts';
+import type { Namespace } from '../../../src/client/patch/dom.ts';
 import { createContext, text } from '../../fixtures/reference.ts';
 import todoManifest from '../../fixtures/todo/expected/manifest.json' with { type: 'json' };
+
+/** A row as a list chunk returns it: a fragment with its row markers, made here from HTML. */
+function toRow(html: string, doc: Document, ns?: Namespace): DocumentFragment {
+  const fragment = doc.createDocumentFragment();
+  fragment.append(...parseHtml(doc, `<!--i-->${html}<!--/i-->`, ns));
+  return fragment;
+}
 
 // The fixture's server module and item template chunk render with the reference helpers.
 vi.mock('idlip/server', async () => import('../../fixtures/reference.ts'));
@@ -388,11 +396,19 @@ describe('nested lists', () => {
   }
 
   const chunks: Record<string, ListChunk> = {
-    'list=1': { render: ({ rows }) => `<div>${renderKids(rows[0].item as Branch)}</div>` },
-    'list=2': {
-      render: ({ rows }) => `<section>${renderLeaves(rows[1].item as Branch)}</section>`,
+    'list=1': {
+      render: ({ rows }, doc) => toRow(`<div>${renderKids(rows[0].item as Branch)}</div>`, doc),
+      blocks: true,
     },
-    'list=3': { render: ({ rows }) => `<!--t4-->${text((rows[2].item as Leaf).text)}<!--/t-->` },
+    'list=2': {
+      render: ({ rows }, doc) =>
+        toRow(`<section>${renderLeaves(rows[1].item as Branch)}</section>`, doc),
+      blocks: true,
+    },
+    'list=3': {
+      render: ({ rows }, doc) =>
+        toRow(`<!--t4-->${text((rows[2].item as Leaf).text)}<!--/t-->`, doc),
+    },
   };
 
   const bindings = new Map<string, Binding>([
@@ -473,6 +489,8 @@ describe('nested lists', () => {
       }
       marker.data = 'c5:1';
       marker.after(document.createTextNode('empty'));
+      // A swap adds its block, as `setBranch$` does.
+      addBlock(marker);
     };
     const l2 = vi.fn(({ rows }: Scope) => (rows[0].item as Branch).kids);
     const tree = [{ id: 'b', kids: [leaf('k', [x])], leaves: [] }];
@@ -505,8 +523,7 @@ describe('rows in an svg', () => {
     lists: { '1': { key: 'id', chunk: 'list=1', bindings: [] } },
   } satisfies Manifest;
   const chunk: ListChunk = {
-    namespace: 'svg',
-    render: ({ rows }) => `<circle r="${(rows[0].item as Todo).text}"/>`,
+    render: ({ rows }, doc) => toRow(`<circle r="${(rows[0].item as Todo).text}"/>`, doc, 'svg'),
   };
 
   it('keeps the svg namespace of inserted rows', async () => {

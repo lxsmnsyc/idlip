@@ -37,11 +37,11 @@ A todo app written in the idlip DSL renders on the server and resumes in the bro
 
 - MVU concept, not Elm's API. Names follow TypeScript conventions.
 - A module is a function component: `let` is state, `const` is derived, function declarations are handlers, `return` is the view. No compile-time APIs, apart from the block components `<For>`, `<Try>`, `<Head>` and `<Subscribe>` until the DSL. See `docs/proposals/0002-modules.md`.
-- Views are TSX for the proof of concept, with a closed hole grammar and the block components above. A markup DSL with blocks follows as `markup-frontend`. See `debate/debate.md`.
+- Views are TSX, the one source syntax, with a closed hole grammar and the block components above. No markup DSL: see `debates/dsl/debate.md` (2026-11-21), which supersedes decision 7 of `debate/debate.md`.
 - Nothing the client resumes is a closure. Models, messages, commands and subscriptions are plain data.
 - Serialization uses seroval.
 - Build integration is a Vite plugin (`idlip/vite`). The compiler uses `oxc-parser`.
-- One published runtime and compiler package, `idlip`, with subpaths (editor tooling for the markup DSL ships separately as `@idlip/language-core` and `@idlip/tsc`, decided at the `markup-syntax` gate): `idlip`, `idlip/server`, `idlip/client`, `idlip/compiler`, `idlip/vite`, `idlip/jsx-runtime`.
+- One published runtime and compiler package, `idlip`, with subpaths: `idlip`, `idlip/server`, `idlip/client`, `idlip/compiler`, `idlip/vite`, `idlip/jsx-runtime`.
 - Code follows the ts-style skill. Prose follows the plain-writing skill.
 
 ## Non-goals
@@ -54,7 +54,7 @@ A todo app written in the idlip DSL renders on the server and resumes in the bro
 ## Verification
 
 - Fast check (safe to run in parallel worktrees): `pnpm --filter idlip test`
-- Full check (at checkpoints): `pnpm build && pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm --filter e2e test` (under 2 minutes, no shared resources)
+- Full check (at checkpoints): `pnpm build && pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm --filter e2e test` (under 2 minutes). The e2e servers use fixed ports; in parallel worktrees set `E2E_PORT`, `E2E_COUNTERS_PORT` and `E2E_SUBS_PORT` to free ports.
 
 ## Numbered resources
 

@@ -3,3 +3,7 @@ export function setDraft(model, [text]) {
   draft = text;
   return { ...model, draft };
 }
+
+export function $e1($e, $c) {
+return [['setDraft', [$c.value]]];
+}

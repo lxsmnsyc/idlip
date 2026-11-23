@@ -11,8 +11,8 @@ import type { MountedPage } from '../../src/testing/index.ts';
 import { bindImports, toDataUrl } from '../../src/testing/modules.ts';
 
 const FIXTURES = join(import.meta.dirname, '../fixtures/dynamic');
-const BOARD = readFileSync(join(FIXTURES, 'dynamic.idlip.tsx'), 'utf8');
-const PICK = readFileSync(join(FIXTURES, 'pick.idlip.tsx'), 'utf8');
+const BOARD = readFileSync(join(FIXTURES, 'dynamic.tsx'), 'utf8');
+const PICK = readFileSync(join(FIXTURES, 'pick.tsx'), 'utf8');
 const INITIAL = [
   { id: 'a1', text: 'Write the format', done: true },
   { id: 'a2', text: 'Build the runtime', done: false },
@@ -27,7 +27,7 @@ afterEach(() => {
 
 /** Renders the module on the server and returns the HTML. */
 async function renderBoard(source: string, props: Record<string, unknown>): Promise<string> {
-  const compiled = compile(source, '/src/app.idlip.tsx');
+  const compiled = compile(source, '/src/app.tsx');
   const key = '$idlipDynamicTest';
   Reflect.set(globalThis, key, { server: { ...serverExports }, client: {} });
   try {
@@ -44,34 +44,34 @@ async function renderBoard(source: string, props: Record<string, unknown>): Prom
 
 describe('compile', () => {
   it('puts the dynamic holes in one group with no paths', () => {
-    const { manifest, client } = compile(BOARD, '/src/app.idlip.tsx');
+    const { manifest, client } = compile(BOARD, '/src/app.tsx');
     expect(manifest.groups.$dynamic).toEqual({
       paths: [],
       chunk: 'binding=$dynamic',
-      bindings: ['t0', 'a1', 't2'],
+      bindings: ['a0', 'a1', 'a2'],
       covers: [],
     });
     expect(client.map((chunk) => chunk.chunk)).toContain('binding=$dynamic');
   });
 
   it('leaves a module with no dynamic hole without the group', () => {
-    const todo = readFileSync(join(FIXTURES, '../todo/todo.idlip.tsx'), 'utf8');
-    const { manifest, server } = compile(todo, '/src/todo.idlip.tsx');
+    const todo = readFileSync(join(FIXTURES, '../todo/todo.tsx'), 'utf8');
+    const { manifest, server } = compile(todo, '/src/todo.tsx');
     expect(manifest.groups.$dynamic).toBeUndefined();
     expect(server).not.toContain('track');
   });
 
   it('binds a model-alias hole inside a row with its static paths', () => {
     const source = BOARD.replace('<b on:click', '<u>{summarize(stats)}</u><b on:click');
-    const { diagnostics, manifest } = compile(source, '/src/app.idlip.tsx');
+    const { diagnostics, manifest } = compile(source, '/src/app.tsx');
     expect(diagnostics.filter((item) => item.severity === 'error')).toEqual([]);
     // The row's hole is in a static group, and the dynamic group keeps the top-level holes.
-    expect(manifest.groups.$dynamic.bindings).toEqual(['t0', 'a1', 't2']);
+    expect(manifest.groups.$dynamic.bindings).toEqual(['a0', 'a1', 'a2']);
   });
 
   it('keeps a dynamic hole on a URL attribute behind safeUrl', () => {
     const source = BOARD.replace('<p>{summarize(stats)}</p>', '<a href={summarize(stats)}>go</a>');
-    const { diagnostics, server, client } = compile(source, '/src/app.idlip.tsx');
+    const { diagnostics, server, client } = compile(source, '/src/app.tsx');
     expect(diagnostics.filter((item) => item.severity === 'error')).toEqual([]);
     expect(server).toMatch(/attr\$\('href', safeUrl\$\(track\$\(/);
     const chunk = client.find((item) => item.chunk === 'binding=$dynamic');
@@ -79,7 +79,7 @@ describe('compile', () => {
   });
 
   it('preloads the dynamic chunk with each handler that has write paths', () => {
-    const { manifest } = compile(BOARD, '/src/app.idlip.tsx');
+    const { manifest } = compile(BOARD, '/src/app.tsx');
     for (const entry of Object.values(manifest.handlers)) {
       expect(entry.bindings).toContain('$dynamic');
     }
@@ -105,10 +105,10 @@ describe('track$', () => {
 describe('server', () => {
   it('writes the paths each dynamic hole read into the state script', async () => {
     const html = await renderBoard(BOARD, { initial: INITIAL });
-    expect(html).toContain('<!--t0-->1 left, filter all<!--/t-->');
+    expect(html).toContain('<p i-a="0">1 left, filter all</p>');
     expect(html).toContain('title="1 left, filter all"');
     const state = /<script i-state[^>]*>([\s\S]*)<\/script>/.exec(html)?.[1] ?? '';
-    for (const name of ['t0', 'a1', 't2']) {
+    for (const name of ['a0', 'a1', 'a2']) {
       expect(state).toContain(`${name}:["filter","todos.*.done","todos.length"]`);
     }
   });

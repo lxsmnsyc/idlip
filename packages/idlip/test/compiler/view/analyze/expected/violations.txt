@@ -1,4 +1,4 @@
-file violations.idlip.tsx
+file violations.tsx
 
 component Stateful (stateful)
   state:
@@ -199,12 +199,10 @@ component Broken (stateful, exported)
           {#30}
       <div>
       <input [on:input -> setDraft()]>
-      <input [on:input -> setDraft()]>
-      <input>
-      <input>
       <input>
       <form>
       <form>
+      <input>
       <script>
         {#31}
       <textarea>
@@ -338,7 +336,7 @@ component Broken (stateful, exported)
         expr  undefined
         paths (static)
 
-diagnostics: 104
+diagnostics: 102
   20:1 error body-return: The component NoView must end with return <jsx>
   28:32 error props-count: A component takes one parameter, props
   36:7 error component-recursive: <Loop> renders itself
@@ -392,7 +390,7 @@ diagnostics: 104
   156:28 error hole-unknown: first is not a state field, derived value, prop, loop variable, import or module-level binding
   159:7 error global-children: <window> takes no children
   161:7 error subscribe-children: <Subscribe> takes no children
-  163:8 error component-import: Widget comes from ./widget, which is not an .idlip.tsx component
+  163:8 error component-import: Widget comes from ./widget, which is not a .tsx file. Import it with its .tsx extension, such as ./widget.tsx
   59:14 error props-whole: A stateless component must read props by name, not pass the props object along
   36:7 error component-recursive: <Loop> renders itself
   169:11 error hole-handler: The handler setDraft is allowed only in an event prop
@@ -403,11 +401,11 @@ diagnostics: 104
   179:11 error hole-function-value: The function helper is used as a value; call it or move it to a handler
   181:12 error view-map: Lists are written with <For each key>, not .map()
   183:8 error condition-operator: A JSX branch after || is not a condition block; write a ternary
-  185:31 error event-closure: The body of an event arrow must be one handler call, optionally behind e.preventDefault(), e.stopPropagation() or an if on e.key
+  185:31 error event-closure: A statement of an event arrow is a handler call. preventDefault and stopPropagation go first in the arrow
   187:31 error event-target: console.log is not a handler, a message prop or reset
   189:25 error event-param: An event arrow takes at most one parameter, the event, as a plain name
   191:31 error event-mode-twice: click has both on: and latest:, or appears twice
-  195:7 error for-key: <For> needs key="field", a string literal naming a field of the item
+  195:7 error for-key: <For> takes its key as an arrow written in place: key={(item) => item.id}. A name or a string does not work.
   197:7 error for-render: <For> takes one child: (item, index?) => <jsx>
   201:14 error ref-form: ref takes a string literal, or [literal, loop variable path] inside <For>
   203:12 error html-trusted: html takes trusted(value) from idlip
@@ -430,16 +428,14 @@ diagnostics: 104
   255:7 error for-render: <For> takes one child: (item, index?) => <jsx>
   262:17 error for-param: The <For> index is a plain name
   265:12 error attr-reserved: i-a starts with i-, which the compiled format reserves
-  267:40 error event-placeholder: An argument reads e only as a whole path such as e.currentTarget.value
-  269:40 error event-placeholder: An argument reads e only as a whole path such as e.currentTarget.value
-  274:11 error event-closure: The body of an event arrow must be one handler call, optionally behind e.preventDefault(), e.stopPropagation() or an if on e.key
-  282:11 error event-closure: The body of an event arrow must be one handler call, optionally behind e.preventDefault(), e.stopPropagation() or an if on e.key
-  292:15 error event-closure: The body of an event arrow must be one handler call, optionally behind e.preventDefault(), e.stopPropagation() or an if on e.key
-  299:27 error event-closure: The body of an event arrow must be one handler call, optionally behind e.preventDefault(), e.stopPropagation() or an if on e.key
-  307:27 error event-closure: The body of an event arrow must be one handler call, optionally behind e.preventDefault(), e.stopPropagation() or an if on e.key
-  314:7 error html-raw-text: A hole cannot be inside <script>
-  316:7 error html-raw-text: A hole inside <textarea> must be its only content
-  320:16 error html-nesting: Text cannot be inside <tr>: the HTML parser moves it before the table
-  325:17 error html-nesting: Text cannot be inside <tbody>: the HTML parser moves it before the table
-  331:24 error html-nesting: Text cannot be inside <tbody>: the HTML parser moves it before the table
-  336:8 error hole-unknown: size is not a state field, derived value, prop, loop variable, import or module-level binding
+  267:40 error event-placeholder: e is not plain data. Pass a field of it, such as e.currentTarget.value
+  271:11 error event-statement: An event arrow holds handler calls, if and else, and const. preventDefault and stopPropagation go first, and a conditional one is `if (e.key === "ArrowDown") e.preventDefault();` before the calls, since the event has dispatched by the time the handler runs
+  280:11 error event-target: e.preventDefault is not a handler, a message prop or reset
+  286:20 error event-no-call: An event arrow calls a handler. To only cancel the event, call a handler that does nothing
+  294:11 error event-prevent-twice: preventDefault is called for every event already, or for keys already
+  299:7 error html-raw-text: A hole cannot be inside <script>
+  301:7 error html-raw-text: A hole inside <textarea> must be its only content
+  305:16 error html-nesting: Text cannot be inside <tr>: the HTML parser moves it before the table
+  310:17 error html-nesting: Text cannot be inside <tbody>: the HTML parser moves it before the table
+  316:24 error html-nesting: Text cannot be inside <tbody>: the HTML parser moves it before the table
+  321:8 error hole-unknown: size is not a state field, derived value, prop, loop variable, import or module-level binding

@@ -4,7 +4,7 @@
 // the markers of blocks that patches add and remove. `contracts/compiled-format-subscribe.change-request.md`
 // describes the marker.
 import { DEV } from '../../core/dev.ts';
-import type { QueuedEvent } from '../../core/format.ts';
+import type { QueuedCall, QueuedEvent, QueuedMessage } from '../../core/format.ts';
 import { HAS_SUBS } from '../features.ts';
 import { onBlock } from '../patch/blocks.ts';
 
@@ -63,35 +63,21 @@ function warn(message: string): void {
   console.warn(message);
 }
 
-/** Replaces a `$event` placeholder with the value, and unwraps a `['$', ...]` literal. */
-function fill(item: unknown, value: unknown): unknown {
-  if (Array.isArray(item) && typeof item[0] === 'string' && item[0].startsWith('$')) {
-    if (item[0] === '$') {
-      return item.slice(1);
-    }
-    if (item[0] === '$event') {
-      let found: unknown = value;
-      for (const key of item.slice(1)) {
-        found = found === null || found === undefined ? found : Reflect.get(Object(found), key);
-      }
-      return found;
-    }
-  }
-  return item;
-}
-
-function readMessage(marker: Element, value: unknown): QueuedEvent['message'] {
+/** Reads the `on:value` of a marker: an event function, or a message built at render. */
+function readCall(
+  marker: Element,
+  value: unknown,
+): Pick<QueuedMessage, 'message'> | Pick<QueuedCall, 'site' | 'event' | 'current'> {
   const raw = marker.getAttribute('on:value');
   if (raw === null) {
     throw new Error('idlip: a <Subscribe> marker has no on:value');
   }
+  if (!raw.startsWith('[')) {
+    return { site: raw.split(' ')[0], event: value, current: marker };
+  }
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion
   const [tag, payload] = JSON.parse(raw) as [string, unknown[]];
-  const items: unknown[] = [];
-  for (const item of payload) {
-    items.push(fill(item, value));
-  }
-  return { t: tag, p: items };
+  return { message: { t: tag, p: payload } };
 }
 
 function readInput(marker: Element): unknown {
@@ -115,13 +101,13 @@ async function deliver(
   value: unknown,
 ): Promise<void> {
   const { signal } = run.controller;
-  const message = readMessage(marker, value);
+  const call = readCall(marker, value);
   // The next value is asked for after the batch of this one has patched, or at the abort.
   await new Promise<void>((resolve) => {
     signal.addEventListener('abort', () => {
       resolve();
     });
-    push({ message, target: marker, type: 'value', latest: false, done: resolve, signal });
+    push({ ...call, target: marker, type: 'value', latest: false, done: resolve, signal });
   });
 }
 

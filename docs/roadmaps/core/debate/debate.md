@@ -75,9 +75,19 @@ Options weighed: (A) TS subset with restricted JSX in `*.idlip.tsx`, (B) an own 
 
 ## Overruled
 
-- P3: the judge rejected a markup frontend after 0.1. The user upholds it: they want real control-flow blocks, because JSX needs fake control-flow components. It comes after the TSX proof of concept.
+- P3: the judge rejected a markup frontend after 0.1. The user upholds it: they want real control-flow blocks, because JSX needs fake control-flow components. It comes after the TSX proof of concept. Source: the user, 2026-11-20, objecting to repeated pushback for plain TS: "we never had this kind of pushback with brumate". They accept the brumate-style tooling (Volar language core, tsc wrapper, editor extension). Settled: do not reopen TS versus DSL unless the user asks.
 - O11: the judge set a trigger of 10 block-removable diagnostics. The user rejects the trigger: the debate weighed syntax only by node count, not by authoring value.
 
 ## Cost of this debate
 
 - 3 of 3 rounds, about 184k tokens
+
+## Follow-up, 2026-11-21
+
+The user: "we can't have two compilers in the same framework". The markup DSL replaces TSX as the only source syntax; `.idlip.tsx` input is removed by story children `markup-port` and `markup-only`.
+
+The user rejected markup v1 (a TS function that returns JSX with `#` blocks) as "sticking with TSX". v2: the file is the component, top-level TS statements then top-level markup, `props` typed by a top-level `Props` type, no `<script>` or `<style>` blocks. Node `markup-syntax-v2`.
+
+## Superseded, 2026-11-21
+
+Decision 7 and the P3 overrule are superseded by `debates/dsl/debate.md`: TSX stays the one source syntax.

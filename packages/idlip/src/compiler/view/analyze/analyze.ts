@@ -1,4 +1,4 @@
-// Reads the function components of a `*.idlip.tsx` file with oxc-parser into the view IR:
+// Reads the function components of a `*.tsx` file with oxc-parser into the view IR:
 // state fields, derived values, handlers, the view tree, the path set per hole and diagnostics.
 import { parseSync } from 'oxc-parser';
 import type {
@@ -29,7 +29,9 @@ import type {
   Diagnostic,
   Event,
   EventModifier,
+  EventStep,
   Expr,
+  ForKey,
   FreeKind,
   Handler,
   HandlerPart,
@@ -242,7 +244,7 @@ export interface ImportedModule {
 export interface AnalyzeOptions {
   /**
    * Reads the module an import specifier names, relative to the importing file. The analysis
-   * calls it for components imported from `.idlip.tsx` files, to tell a stateless component,
+   * calls it for components imported from `.tsx` files, to tell a stateless component,
    * which it inlines, from a stateful one, which becomes a child block. Without it, or when it
    * returns `undefined`, an imported component is a child block.
    */
@@ -1135,18 +1137,23 @@ class Analyzer {
   // -------------------------------------------------------------------------------------------
   // Events
 
-  /** Lowers an event prop. Its arguments are computed at render into the payload. */
+  /**
+   * Lowers an event prop. A DOM event, a global event and a subscription value lower to steps
+   * that run when the event dispatches. With `shape` `message` (a message prop of a stateful
+   * child), the event is one call whose arguments are computed at render into the payload.
+   */
   lowerEvent(
     name: string,
     mode: 'on' | 'latest',
     value: JSXAttributeValue | JSXAttribute,
     scope: Scope,
     passValue = false,
+    shape: 'steps' | 'message' = 'steps',
   ): Event | undefined {
     const saved = this.position;
     this.position = 'event';
     try {
-      return this.lowerEventValue(name, mode, value, scope, passValue);
+      return this.lowerEventValue(name, mode, value, scope, passValue, shape);
     } finally {
       this.position = saved;
     }
@@ -1158,12 +1165,19 @@ class Analyzer {
     value: JSXAttributeValue | JSXAttribute,
     scope: Scope,
     passValue: boolean,
+    shape: 'steps' | 'message',
   ): Event | undefined {
     const span: Span = this.readSpan(value);
     let expression = value.type === 'JSXExpressionContainer' ? value.expression : value;
     while (expression.type === 'ParenthesizedExpression') {
       expression = expression.expression;
     }
+    const eventRoot: Expr = {
+      kind: 'path',
+      root: { kind: 'event' },
+      segments: [],
+      optional: false,
+    };
     // `on:click={add}` or `on:click={props.onRemove}`.
     if (expression.type === 'Identifier' || expression.type === 'MemberExpression') {
       const target = this.resolveTarget(expression, scope);
@@ -1174,15 +1188,18 @@ class Analyzer {
         return { ...target.event, name, mode, span };
       }
       // A subscription value is the payload of a bare handler reference.
-      const args: Expr[] = passValue
-        ? [{ kind: 'path', root: { kind: 'event' }, segments: [], optional: false }]
-        : [];
-      return { name, mode, target, args, paths: [], modifiers: [], span };
+      const send: EventStep = {
+        kind: 'send',
+        target,
+        args: passValue ? [eventRoot] : [],
+        span,
+      };
+      return this.buildEvent(name, mode, [send], [], span, shape);
     }
     if (expression.type !== 'ArrowFunctionExpression' || expression.async) {
       this.reportError(
         'event-closure',
-        'An event prop takes a handler, or an arrow whose body is one handler call',
+        'An event prop takes a handler, or a synchronous arrow that calls handlers. The arrow runs after the event has dispatched, so it cannot await',
         expression,
       );
       return undefined;
@@ -1196,34 +1213,298 @@ class Analyzer {
       );
       return undefined;
     }
-    const parsed = this.readEventBody(expression, param?.name);
-    if (parsed === undefined) {
+    const paramName = param?.type === 'Identifier' ? param.name : undefined;
+    const inner = createScope(scope);
+    if (paramName !== undefined) {
+      inner.names.set(paramName, { kind: 'expr', expr: eventRoot });
+    }
+    const { body } = expression;
+    // An expression body is one statement.
+    const statements: AstNode[] =
+      body.type === 'BlockStatement'
+        ? body.body
+        : [{ type: 'ExpressionStatement', expression: body, start: body.start, end: body.end }];
+    const modifiers: EventModifier[] = [];
+    let rest = this.readEventModifiers(statements, paramName, modifiers);
+    if (rest === undefined) {
       return undefined;
     }
-    const { body, modifiers } = parsed;
-    const target = this.resolveTarget(body.callee, scope);
+    // `if (<key test>) { ... }` as the only statement filters the event before its chunk loads.
+    const [first] = rest;
+    if (
+      rest.length === 1 &&
+      first.type === 'IfStatement' &&
+      first.alternate === null &&
+      modifiers.length === 0 &&
+      paramName !== undefined
+    ) {
+      const filter = readKeyFilter(first.test, paramName);
+      if (filter !== undefined) {
+        modifiers.push({ kind: 'key', filter });
+        const inside =
+          first.consequent.type === 'BlockStatement' ? first.consequent.body : [first.consequent];
+        rest = this.readEventModifiers(inside, paramName, modifiers, true);
+        if (rest === undefined) {
+          return undefined;
+        }
+      }
+    }
+    const steps = this.lowerEventSteps(rest, inner, paramName, false);
+    if (steps === undefined) {
+      return undefined;
+    }
+    this.checkPassivePrevent(modifiers, expression);
+    if (!hasSend(steps)) {
+      this.reportError(
+        'event-no-call',
+        'An event arrow calls a handler. To only cancel the event, call a handler that does nothing',
+        expression,
+      );
+      return undefined;
+    }
+    // A forwarded message prop keeps its own modifiers.
+    const [only] = steps;
+    if (steps.length === 1 && only.kind === 'forward') {
+      return { ...only.event, name, mode, span };
+    }
+    const sends = keepSends(steps);
+    if (sends.length !== steps.length || (sends.length > 1 && hasMessageTarget(sends))) {
+      this.reportError(
+        'event-target-nested',
+        'A message prop or reset is the only call of its arrow',
+        expression,
+      );
+      return undefined;
+    }
+    return this.buildEvent(name, mode, sends, modifiers, span, shape);
+  }
+
+  /**
+   * Builds an event from its steps. One call to a message prop or a reset, and any event of a
+   * `message` shape, is data built at render: its arguments cannot read the event.
+   */
+  buildEvent(
+    name: string,
+    mode: 'on' | 'latest',
+    steps: EventStep[],
+    modifiers: EventModifier[],
+    span: Span,
+    shape: 'steps' | 'message',
+  ): Event | undefined {
+    const [only] = steps;
+    const single = steps.length === 1 && only.kind === 'send' ? only : undefined;
+    if (single === undefined || (single.target.kind === 'handler' && shape === 'steps')) {
+      if (shape === 'message') {
+        this.reportError(
+          'event-message-body',
+          'A message prop of a component is one handler call',
+          { type: 'EmptyStatement', start: span.start, end: span.end },
+        );
+        return undefined;
+      }
+      return { name, mode, body: { kind: 'steps', steps }, modifiers, span };
+    }
+    const { target, args } = single;
+    const at: AstNode = { type: 'EmptyStatement', start: span.start, end: span.end };
+    const paths: Path[] = [];
+    for (const argument of args) {
+      if (mentionsEvent(argument)) {
+        this.reportError(
+          'event-message-event',
+          'A message prop is built at render, so its arguments cannot read the event',
+          at,
+        );
+        return undefined;
+      }
+      this.collectPaths(argument, paths);
+    }
+    return {
+      name,
+      mode,
+      body: { kind: 'message', target, args, paths: minimizePaths(paths) },
+      modifiers,
+      span,
+    };
+  }
+
+  /**
+   * Reads the leading statements that work while the event dispatches: `e.preventDefault();`,
+   * `e.stopPropagation();` and `if (<key test>) e.preventDefault();`, which prevents only the
+   * keys of the test. Returns the other statements.
+   */
+  readEventModifiers(
+    statements: readonly AstNode[],
+    param: string | undefined,
+    modifiers: EventModifier[],
+    inKey = false,
+  ): AstNode[] | undefined {
+    let index = 0;
+    while (index < statements.length) {
+      const statement = statements[index];
+      const modifier = readEventModifier(statement, param);
+      if (modifier !== undefined) {
+        if (!addModifier(modifiers, modifier)) {
+          break;
+        }
+        index++;
+        continue;
+      }
+      const keys = param === undefined || inKey ? undefined : readPreventKeys(statement, param);
+      if (keys === undefined) {
+        break;
+      }
+      for (const existing of modifiers) {
+        if (existing.kind === 'prevent') {
+          this.reportError(
+            'event-prevent-twice',
+            'preventDefault is called for every event already, or for keys already',
+            statement,
+          );
+          return undefined;
+        }
+      }
+      modifiers.push({ kind: 'prevent', keys });
+      index++;
+    }
+    return statements.slice(index);
+  }
+
+  /**
+   * Lowers the statements of an event arrow. `nested` is true inside an `if`, where only handler
+   * calls are allowed.
+   */
+  lowerEventSteps(
+    statements: readonly AstNode[],
+    scope: Scope,
+    param: string | undefined,
+    nested: boolean,
+  ): LoweredStep[] | undefined {
+    const steps: LoweredStep[] = [];
+    const block = createScope(scope);
+    let ok = true;
+    for (const statement of statements) {
+      switch (statement.type) {
+        case 'EmptyStatement':
+          break;
+        case 'BlockStatement': {
+          const inside = this.lowerEventSteps(statement.body, block, param, nested);
+          if (inside === undefined) {
+            ok = false;
+          } else {
+            steps.push(...inside);
+          }
+          break;
+        }
+        case 'VariableDeclaration': {
+          const [declarator] = statement.declarations;
+          if (
+            statement.kind !== 'const' ||
+            statement.declarations.length !== 1 ||
+            declarator.id.type !== 'Identifier' ||
+            declarator.init === null
+          ) {
+            this.reportError(
+              'event-statement',
+              'An event arrow declares one const per statement, with a value',
+              statement,
+            );
+            ok = false;
+            break;
+          }
+          block.names.set(declarator.id.name, {
+            kind: 'expr',
+            expr: this.lower(declarator.init, block),
+          });
+          break;
+        }
+        case 'IfStatement': {
+          const test = this.lower(statement.test, block);
+          const consequent =
+            statement.consequent.type === 'BlockStatement'
+              ? statement.consequent.body
+              : [statement.consequent];
+          const thenSteps = this.lowerEventSteps(consequent, block, param, true);
+          let elseSteps: LoweredStep[] | undefined = [];
+          if (statement.alternate !== null) {
+            const alternate =
+              statement.alternate.type === 'BlockStatement'
+                ? statement.alternate.body
+                : [statement.alternate];
+            elseSteps = this.lowerEventSteps(alternate, block, param, true);
+          }
+          if (thenSteps === undefined || elseSteps === undefined) {
+            ok = false;
+          } else {
+            steps.push({
+              kind: 'if',
+              test,
+              then: keepSends(thenSteps),
+              else: keepSends(elseSteps),
+            });
+          }
+          break;
+        }
+        case 'ExpressionStatement': {
+          const step = this.lowerEventCall(statement.expression, block, param, nested);
+          if (step === undefined) {
+            ok = false;
+          } else {
+            steps.push(step);
+          }
+          break;
+        }
+        default:
+          this.reportError(
+            'event-statement',
+            'An event arrow holds handler calls, if and else, and const. preventDefault and stopPropagation go first, and a conditional one is `if (e.key === "ArrowDown") e.preventDefault();` before the calls, since the event has dispatched by the time the handler runs',
+            statement,
+          );
+          ok = false;
+      }
+    }
+    return ok ? steps : undefined;
+  }
+
+  /** Lowers one handler call of an event arrow. */
+  lowerEventCall(
+    expression: AstNode,
+    scope: Scope,
+    param: string | undefined,
+    nested: boolean,
+  ): LoweredStep | undefined {
+    if (expression.type !== 'CallExpression') {
+      this.reportError(
+        'event-closure',
+        'A statement of an event arrow is a handler call. preventDefault and stopPropagation go first in the arrow',
+        expression,
+      );
+      return undefined;
+    }
+    const target = this.resolveTarget(expression.callee, scope);
     if (target === undefined) {
       return undefined;
     }
-    const inner = createScope(scope);
-    if (param?.type === 'Identifier') {
-      inner.names.set(param.name, {
-        kind: 'expr',
-        expr: { kind: 'path', root: { kind: 'event' }, segments: [], optional: false },
-      });
-    }
+    const span = this.readSpan(expression);
     if ('event' in target) {
-      if (body.arguments.length > 0) {
+      if (expression.arguments.length > 0) {
         this.reportError(
           'event-message-args',
           'A forwarded message prop already carries its arguments',
-          body,
+          expression,
         );
       }
-      return { ...target.event, name, mode, span };
+      if (nested) {
+        this.reportError(
+          'event-target-nested',
+          'A message prop is the only call of its arrow, outside any if',
+          expression,
+        );
+        return undefined;
+      }
+      return { kind: 'forward', event: target.event };
     }
     const args: Expr[] = [];
-    for (const argument of body.arguments) {
+    for (const argument of expression.arguments) {
       if (argument.type === 'ArrowFunctionExpression' || argument.type === 'FunctionExpression') {
         this.reportError(
           'event-closure',
@@ -1232,111 +1513,31 @@ class Analyzer {
         );
         continue;
       }
-      if (param !== undefined && readsEventOutsidePath(argument, param.name)) {
+      const lowered = this.lower(argument, scope);
+      if (
+        param !== undefined &&
+        lowered.kind === 'path' &&
+        lowered.root.kind === 'event' &&
+        lowered.segments.length === 0
+      ) {
         this.reportError(
           'event-placeholder',
-          `An argument reads ${param.name} only as a whole path such as ${param.name}.currentTarget.value`,
+          `${param} is not plain data. Pass a field of it, such as ${param}.currentTarget.value`,
           argument,
         );
         continue;
       }
-      args.push(this.lower(argument, inner));
+      args.push(lowered);
     }
-    const paths: Path[] = [];
-    for (const argument of args) {
-      this.collectPaths(argument, paths);
-    }
-    this.checkPassivePrevent(modifiers, expression);
-    return { name, mode, target, args, paths: minimizePaths(paths), modifiers, span };
-  }
-
-  /**
-   * Reads the body of an event arrow: one handler call, optionally behind leading
-   * `e.preventDefault();` and `e.stopPropagation();` statements, or behind one `if` with a key test.
-   */
-  readEventBody(
-    arrow: ArrowFunctionExpression,
-    param: string | undefined,
-  ): { body: CallExpression; modifiers: EventModifier[] } | undefined {
-    const fail = (node: AstNode): void => {
+    if (nested && target.kind !== 'handler') {
       this.reportError(
-        'event-closure',
-        'The body of an event arrow must be one handler call, optionally behind e.preventDefault(), e.stopPropagation() or an if on e.key',
-        node,
+        'event-target-nested',
+        'A message prop or reset is the only call of its arrow, outside any if',
+        expression,
       );
-    };
-    if (arrow.body.type !== 'BlockStatement') {
-      if (arrow.body.type === 'CallExpression') {
-        return { body: arrow.body, modifiers: [] };
-      }
-      fail(arrow.body);
       return undefined;
     }
-    const statements = arrow.body.body;
-    const modifiers: EventModifier[] = [];
-    let index = 0;
-    while (index < statements.length) {
-      const modifier = readEventModifier(statements[index], param);
-      if (modifier === undefined) {
-        break;
-      }
-      // A repeated modifier stays in the remaining statements and fails below.
-      if (!addModifier(modifiers, modifier)) {
-        break;
-      }
-      index++;
-    }
-    if (statements.length - index !== 1) {
-      fail(arrow.body);
-      return undefined;
-    }
-    const last = statements[index];
-    if (last.type === 'ExpressionStatement') {
-      if (last.expression.type === 'CallExpression') {
-        return { body: last.expression, modifiers };
-      }
-      fail(last.expression);
-      return undefined;
-    }
-    // `if (<test>) <call>` carries the key filter. Modifier statements before it do not mix.
-    if (
-      last.type !== 'IfStatement' ||
-      index > 0 ||
-      last.alternate !== null ||
-      param === undefined
-    ) {
-      fail(last);
-      return undefined;
-    }
-    const filter = readKeyFilter(last.test, param);
-    if (filter === undefined) {
-      fail(last.test);
-      return undefined;
-    }
-    modifiers.push({ kind: 'key', filter });
-    let inner = last.consequent;
-    const consequent = inner.type === 'BlockStatement' ? inner.body : [inner];
-    let position = 0;
-    while (position < consequent.length) {
-      const modifier = readEventModifier(consequent[position], param);
-      if (modifier === undefined) {
-        break;
-      }
-      if (!addModifier(modifiers, modifier)) {
-        break;
-      }
-      position++;
-    }
-    inner = consequent[position];
-    if (
-      consequent.length - position !== 1 ||
-      inner.type !== 'ExpressionStatement' ||
-      inner.expression.type !== 'CallExpression'
-    ) {
-      fail(last.consequent);
-      return undefined;
-    }
-    return { body: inner.expression, modifiers };
+    return { kind: 'send', target, args, span };
   }
 
   /** `passive` promises the handler never calls `preventDefault`. No source form gives `passive` yet. */
@@ -1528,7 +1729,7 @@ class Analyzer {
     const parent = context.open.at(-1);
     if (
       parent !== undefined &&
-      ['table', 'tbody', 'thead', 'tfoot', 'tr'].includes(parent) &&
+      ['table', 'tbody', 'thead', 'tfoot', 'tr', 'colgroup'].includes(parent) &&
       context.namespace === 'html'
     ) {
       this.report(
@@ -1587,7 +1788,7 @@ class Analyzer {
   }
 
   /**
-   * Reads the declaration of a component imported from an `.idlip.tsx` file through
+   * Reads the declaration of a component imported from a `.tsx` file through
    * `options.readImport`. Returns `undefined` when there is no reader or it cannot read the file.
    */
   findImportedComponent(
@@ -1599,7 +1800,7 @@ class Analyzer {
     if (imported === undefined || read === undefined) {
       return undefined;
     }
-    if (imported.imported === '*' || !/\.idlip(\.tsx)?$/.test(imported.source)) {
+    if (imported.imported === '*' || !imported.source.endsWith('.tsx')) {
       return undefined;
     }
     const importer = this.foreign?.file ?? this.file;
@@ -1625,16 +1826,18 @@ class Analyzer {
     return { fn, module: foreign };
   }
 
-  /** An imported component must come from an `.idlip.tsx` file. */
+  /** An imported component must come from a `.tsx` file. */
   checkImportedComponent(root: Root, node: AstNode): void {
     if (root.kind !== 'import') {
       return;
     }
-    if (!/\.idlip(\.tsx)?$/.test(root.source)) {
+    if (!root.source.endsWith('.tsx')) {
+      // `./counter` and `./counter.js` are the usual wrong forms, so the hint spells the fix.
+      const hint = `${root.source.replace(/\.[jt]sx?$/, '')}.tsx`;
       this.report(
         'component-import',
         'error',
-        `${root.name} comes from ${root.source}, which is not an .idlip.tsx component`,
+        `${root.name} comes from ${root.source}, which is not a .tsx file. Import it with its .tsx extension, such as ${hint}`,
         node,
       );
     }
@@ -1850,15 +2053,16 @@ class Analyzer {
             row !== undefined &&
             !key.root.index &&
             key.root.name === row.item &&
+            row.key.kind === 'field' &&
             key.segments.length === 1 &&
-            key.segments[0] === row.key
+            key.segments[0] === row.key.field
           ) {
             return { kind: 'tuple', name: first.value, key };
           }
           this.report(
             'ref-key',
             'error',
-            `The key of a ref must be the key of the enclosing <For>, the field ${row?.key ?? ''} of its item`,
+            `The key of a ref must be the key of the enclosing <For>, a field of its item${row?.key.kind === 'field' ? `: ${row.key.field}` : ' (this <For> has a computed key, so refs in its rows cannot use it)'}`,
             attribute,
           );
           return undefined;
@@ -2084,13 +2288,6 @@ class Analyzer {
       this.reportError('for-each', '<For> needs each', node.openingElement);
       return [];
     }
-    if (keyNode?.type !== 'Literal' || typeof keyNode.value !== 'string') {
-      this.reportError(
-        'for-key',
-        '<For> needs key="field", a string literal naming a field of the item',
-        node.openingElement,
-      );
-    }
     const each = this.createHole(eachNode, scope);
     const children = collectNonBlank(node.children);
     const render =
@@ -2121,9 +2318,6 @@ class Analyzer {
         base = own[0];
       }
     }
-    if (base !== undefined && keyNode?.type === 'Literal' && typeof keyNode.value === 'string') {
-      this.listKeys.set(printPath({ root: base.root, segments: base.segments }), keyNode.value);
-    }
     const inner = createScope(scope);
     const itemParam = render.params[0];
     const indexParam = render.params.at(1);
@@ -2137,6 +2331,11 @@ class Analyzer {
       fallback: eachPaths,
     });
     const itemExpr: Expr = { kind: 'path', root: itemRoot, segments: [], optional: false };
+    const key = this.lowerForKey(keyNode, itemRoot, scope, node);
+    // Only a field key lets a write set keep a keyed segment. A computed key gives `*`.
+    if (base !== undefined && key.kind === 'field') {
+      this.listKeys.set(printPath({ root: base.root, segments: base.segments }), key.field);
+    }
     if (itemParam.type === 'Identifier') {
       inner.names.set(itemName, { kind: 'expr', expr: itemExpr });
     } else if (itemParam.type === 'ObjectPattern') {
@@ -2178,22 +2377,98 @@ class Analyzer {
     const body = this.lowerBranch(render.body, inner, {
       ...context,
       loopDepth: context.loopDepth + 1,
-      rowKey: {
-        item: itemName,
-        key: keyNode?.type === 'Literal' && typeof keyNode.value === 'string' ? keyNode.value : '',
-      },
+      rowKey: { item: itemName, key },
     });
     return [
       {
         kind: 'for',
         each,
-        key: keyNode?.type === 'Literal' && typeof keyNode.value === 'string' ? keyNode.value : '',
+        key,
         item: itemName,
         index: indexName,
         namespace: context.namespace,
         body,
       },
     ];
+  }
+
+  /**
+   * Lowers `key={(item) => expression}` of a `<For>`. The body reads the item and globals only,
+   * so the server and the list chunk can both evaluate it. A path of one field of the item is a
+   * `field` key.
+   */
+  lowerForKey(
+    keyNode: AttrExpression | undefined,
+    itemRoot: Root,
+    scope: Scope,
+    node: JSXElement,
+  ): ForKey {
+    const failed: ForKey = { kind: 'field', field: '' };
+    if (keyNode?.type !== 'ArrowFunctionExpression') {
+      const old =
+        keyNode?.type === 'Literal' && typeof keyNode.value === 'string'
+          ? ` key="${keyNode.value}" is gone. Write key={(item) => item.${keyNode.value}}.`
+          : '';
+      this.reportError(
+        'for-key',
+        `<For> takes its key as an arrow written in place: key={(item) => item.id}. A name or a string does not work.${old}`,
+        keyNode ?? node.openingElement,
+      );
+      return failed;
+    }
+    if (keyNode.async || keyNode.params.length !== 1 || keyNode.params[0].type !== 'Identifier') {
+      this.reportError(
+        'for-key',
+        'The key callback is not async and has one plain parameter, as in (item) => item.id. Destructuring and extra parameters are not allowed.',
+        keyNode,
+      );
+      return failed;
+    }
+    if (keyNode.body.type === 'BlockStatement') {
+      this.reportError(
+        'for-key',
+        'The key callback has an expression body, as in (item) => item.id.',
+        keyNode,
+      );
+      return failed;
+    }
+    const inner = createScope(scope);
+    inner.names.set(keyNode.params[0].name, {
+      kind: 'expr',
+      expr: { kind: 'path', root: itemRoot, segments: [], optional: false },
+    });
+    const errors = this.diagnostics.length;
+    const expr = this.lower(keyNode.body, inner);
+    if (this.diagnostics.length > errors) {
+      return failed;
+    }
+    const reads = { item: false, other: false };
+    readKeyReads(expr, itemRoot, reads);
+    if (reads.other) {
+      this.reportError(
+        'for-key',
+        'The <For> key reads the item and nothing else: no state, props, index or helper call.',
+        keyNode.body,
+      );
+      return failed;
+    }
+    if (!reads.item) {
+      this.reportError(
+        'for-key',
+        'The <For> key must read the item. A constant gives every row the same key.',
+        keyNode.body,
+      );
+      return failed;
+    }
+    if (
+      expr.kind === 'path' &&
+      expr.root === itemRoot &&
+      expr.segments.length === 1 &&
+      typeof expr.segments[0] === 'string'
+    ) {
+      return { kind: 'field', field: expr.segments[0] };
+    }
+    return { kind: 'computed', expr };
   }
 
   /** A stateful child component: a child block with its own model slot. */
@@ -2214,7 +2489,7 @@ class Analyzer {
       const expression =
         value?.type === 'JSXExpressionContainer' ? value.expression : (value ?? undefined);
       if (/^on[A-Z]/.test(name)) {
-        const event = this.lowerEvent(name, 'on', value ?? attribute, scope);
+        const event = this.lowerEvent(name, 'on', value ?? attribute, scope, false, 'message');
         if (event !== undefined) {
           messages.push(event);
         }
@@ -2405,9 +2680,7 @@ class Analyzer {
           const event: Event = {
             name: '',
             mode: 'on',
-            target: { kind: 'prop', name: key },
-            args: [],
-            paths: [],
+            body: { kind: 'message', target: { kind: 'prop', name: key }, args: [], paths: [] },
             modifiers: [],
             span: { start: property.start, end: property.end },
           };
@@ -3184,7 +3457,7 @@ interface ViewContext {
   inHead: boolean;
   loopDepth: number;
   /** The innermost `<For>`: its item name and `key` field. */
-  rowKey?: { item: string; key: string };
+  rowKey?: { item: string; key: ForKey };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -3334,50 +3607,127 @@ function addPrevent(event: Event): void {
   event.modifiers = [...event.modifiers, { kind: 'prevent' }];
 }
 
-/** True when the argument reads the event other than as a whole member path. */
-function readsEventOutsidePath(argument: AstNode, param: string): boolean {
-  let node: AstNode = argument;
-  while (node.type === 'ParenthesizedExpression') {
-    node = node.expression;
-  }
-  if (node.type === 'Identifier') {
-    return false;
-  }
-  if (node.type === 'MemberExpression') {
-    let root: AstNode = node;
-    while (root.type === 'MemberExpression') {
-      if (root.computed && mentionsName(root.property, param)) {
-        return true;
-      }
-      root = root.object;
-    }
-    return root.type === 'Identifier' ? false : mentionsName(root, param);
-  }
-  return mentionsName(node, param);
-}
+/** A step as the lowering reads it. A forwarded message prop is the only call of its arrow. */
+type LoweredStep = EventStep | { kind: 'forward'; event: Event };
 
-function mentionsName(node: unknown, name: string): boolean {
-  if (typeof node !== 'object' || node === null) {
-    return false;
-  }
-  if (Array.isArray(node)) {
-    for (const item of node) {
-      if (mentionsName(item, name)) {
-        return true;
-      }
-    }
-    return false;
-  }
-  const record = node as { type?: unknown; name?: unknown };
-  if (record.type === 'Identifier' && record.name === name) {
-    return true;
-  }
-  for (const value of Object.values(record)) {
-    if (mentionsName(value, name)) {
+/** True when a step, or a step inside a branch, calls a handler or forwards a message. */
+function hasSend(steps: readonly LoweredStep[]): boolean {
+  for (const step of steps) {
+    if (step.kind === 'if' ? hasSend(step.then) || hasSend(step.else) : true) {
       return true;
     }
   }
   return false;
+}
+
+function hasMessageTarget(steps: readonly EventStep[]): boolean {
+  for (const step of steps) {
+    if (step.kind === 'send' && step.target.kind !== 'handler') {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** The steps of a branch, which holds handler calls only. */
+function keepSends(steps: readonly LoweredStep[]): EventStep[] {
+  const kept: EventStep[] = [];
+  for (const step of steps) {
+    if (step.kind !== 'forward') {
+      kept.push(step);
+    }
+  }
+  return kept;
+}
+
+function anyEvent(exprs: readonly Expr[]): boolean {
+  for (const expr of exprs) {
+    if (mentionsEvent(expr)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** True when the expression reads the event. */
+function mentionsEvent(expr: Expr): boolean {
+  switch (expr.kind) {
+    case 'literal':
+      return false;
+    case 'path': {
+      if (expr.root.kind === 'event') {
+        return true;
+      }
+      for (const segment of expr.segments) {
+        if (typeof segment !== 'string' && 'value' in segment && mentionsEvent(segment.value)) {
+          return true;
+        }
+      }
+      return false;
+    }
+    case 'unary':
+      return mentionsEvent(expr.arg);
+    case 'binary':
+    case 'logical':
+      return mentionsEvent(expr.left) || mentionsEvent(expr.right);
+    case 'conditional':
+      return mentionsEvent(expr.test) || mentionsEvent(expr.then) || mentionsEvent(expr.else);
+    case 'template':
+      return anyEvent(expr.exprs);
+    case 'object':
+      for (const entry of expr.entries) {
+        if (mentionsEvent(entry.value)) {
+          return true;
+        }
+      }
+      return false;
+    case 'array':
+      return anyEvent(expr.items);
+    case 'call':
+      return expr.helper === 'inlined' ? mentionsEvent(expr.body) : anyEvent(expr.args);
+    case 'method':
+      return mentionsEvent(expr.receiver) || anyEvent(expr.args);
+    default:
+      return mentionsEvent(expr.receiver);
+  }
+}
+
+/**
+ * `if (<key test>) e.preventDefault();` or the same in a block: the key filters of the test, one
+ * per `||` alternative. A statement that is not this form gives `undefined`.
+ */
+function readPreventKeys(statement: AstNode, param: string): string[] | undefined {
+  if (statement.type !== 'IfStatement' || statement.alternate !== null) {
+    return undefined;
+  }
+  const inside =
+    statement.consequent.type === 'BlockStatement'
+      ? statement.consequent.body
+      : [statement.consequent];
+  if (inside.length !== 1 || readEventModifier(inside[0], param)?.kind !== 'prevent') {
+    return undefined;
+  }
+  const filters: string[] = [];
+  const queue: Expression[] = [statement.test];
+  while (queue.length > 0) {
+    let part = queue.shift();
+    while (part?.type === 'ParenthesizedExpression') {
+      part = part.expression;
+    }
+    if (part === undefined) {
+      break;
+    }
+    if (part.type === 'LogicalExpression' && part.operator === '||') {
+      queue.unshift(part.left, part.right);
+      continue;
+    }
+    const filter = readKeyFilter(part, param);
+    if (filter === undefined) {
+      return undefined;
+    }
+    filters.push(filter);
+  }
+  return filters.length === 0 ? undefined : filters;
 }
 
 function readModule(program: Program): ModuleScope {
@@ -3546,6 +3896,59 @@ function collectNonBlank(children: AstNode[]): AstNode[] {
     }
   }
   return out;
+}
+
+/**
+ * Records what a key expression reads: `item` when it reads the loop item, `other` when it reads
+ * anything the key may not (state, props, the index, a call, a computed path segment).
+ */
+function readKeyReads(expr: Expr, item: Root, reads: { item: boolean; other: boolean }): void {
+  switch (expr.kind) {
+    case 'literal':
+      return;
+    case 'path':
+      for (const segment of expr.segments) {
+        if (typeof segment !== 'string') {
+          reads.other = true;
+        }
+      }
+      if (expr.root === item) {
+        reads.item = true;
+      } else if (expr.root.kind !== 'global') {
+        reads.other = true;
+      }
+      return;
+    case 'unary':
+      readKeyReads(expr.arg, item, reads);
+      return;
+    case 'binary':
+    case 'logical':
+      readKeyReads(expr.left, item, reads);
+      readKeyReads(expr.right, item, reads);
+      return;
+    case 'conditional':
+      readKeyReads(expr.test, item, reads);
+      readKeyReads(expr.then, item, reads);
+      readKeyReads(expr.else, item, reads);
+      return;
+    case 'template':
+      for (const one of expr.exprs) {
+        readKeyReads(one, item, reads);
+      }
+      return;
+    case 'method':
+      readKeyReads(expr.receiver, item, reads);
+      for (const one of expr.args) {
+        readKeyReads(one, item, reads);
+      }
+      return;
+    case 'property':
+      readKeyReads(expr.receiver, item, reads);
+      return;
+    default:
+      // Objects, arrays and calls.
+      reads.other = true;
+  }
 }
 
 function hasComputedSegment(segments: Segment[]): boolean {
@@ -3873,7 +4276,7 @@ function readComponents(analyzer: Analyzer, program: Program): Component[] {
   return components;
 }
 
-/** Reads one `*.idlip.tsx` file into the view IR. */
+/** Reads one `*.tsx` file into the view IR. */
 export function analyze(file: string, source: string, options: AnalyzeOptions = {}): ModuleIR {
   const parsed = parseSync(file, source, { lang: 'tsx' });
   let analyzer = new Analyzer(file, source, parsed.program, options);

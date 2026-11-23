@@ -3,7 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vite build"
+    "build": "vite build",
+    "build:rows": "vite build rows",
+    "build:dashboard": "node ../harness/dashboard.mjs idlip && vite build dashboard",
+    "build:scale": "node ../harness/scale.mjs write idlip && vite build scale"
   },
   "dependencies": {
     "idlip": "workspace:*"

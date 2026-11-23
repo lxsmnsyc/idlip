@@ -1,8 +1,8 @@
 // Node `prefetch`: the cold first click of the idlip bench app with and without
 // `renderPreload` links in the head, rounds interleaved on one browser.
 //
-//   off  The page of `benchmarks/idlip` as it is.
-//   on   The same page with `renderPreload(chunks, manifests)` links after the charset.
+//   off  The page of `benchmarks/idlip` without preload links (`page(n, loader, false)`).
+//   on   The same page with its `renderPreload(chunks, manifests)` links, as the app renders it.
 //
 // Each round throttles the network (150 ms latency, about 1.6 Mbit/s, the harness settings),
 // loads the page, clicks the counter right at `load` and waits for `Clicked 1 times`. It
@@ -17,7 +17,7 @@ import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { findChrome } from '../harness/chrome.mjs';
@@ -42,26 +42,6 @@ if (!flags['no-build']) {
 
 const adapter = await import(path.join(appDir, 'adapter.js'));
 const app = await adapter.load();
-const { renderPreload } = await import(
-  pathToFileURL(path.join(here, '../../packages/idlip/dist/server/index.js')).href
-);
-
-// Reads the manifest and the chunk URLs from the state script of a rendered page.
-function readState(html) {
-  const match = /<script i-state[^>]*>([\s\S]*?)<\/script>/.exec(html);
-  const self = {};
-  new Function('self', match[1])(self);
-  return self.$idlip[0][1]();
-}
-
-function withPreload(html) {
-  const state = readState(html);
-  const links = renderPreload(state.chunks, [
-    state.manifest,
-    ...Object.values(state.modules ?? {}),
-  ]);
-  return html.replace('<meta charset="utf-8">', `<meta charset="utf-8">${links}`);
-}
 
 const TYPES = { '.js': 'text/javascript', '.json': 'application/json' };
 
@@ -72,9 +52,9 @@ function serve(variant) {
     response.setHeader('cache-control', 'no-store');
     try {
       if (url.pathname === '/') {
-        const html = await app.render(3);
+        const html = await app.render(3, { preload: variant === 'on' });
         response.setHeader('content-type', 'text/html; charset=utf-8');
-        response.end(variant === 'on' ? withPreload(html) : html);
+        response.end(html);
         return;
       }
       const file = path.join(root, path.normalize(decodeURIComponent(url.pathname)));

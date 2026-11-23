@@ -85,7 +85,7 @@ export default function App() {
   }
   return (
     <ul>
-      <For each={items} key="id">
+      <For each={items} key={(item) => item.id}>
         {(item) => (
           <li>
             <Try catch={(error, reset) => <button on:click={reset}>{error}</button>}>
@@ -152,7 +152,7 @@ describe('a throwing binding', () => {
     await view.settled();
     view.click('p button');
     await view.settled();
-    expect(view.root.innerHTML).toContain('<!--e0:0--><span>');
+    expect(view.root.innerHTML).toContain('<!--e0:0--><span i-a="0">');
     expect(view.text('span')).toBe('1');
     // The bindings of the new body work.
     view.click('main > button:nth-of-type(2)');
@@ -253,7 +253,8 @@ describe('a chunk that fails to load', () => {
     harness.start();
     document.querySelectorAll('button')[0].click();
     await harness.settled();
-    expect(getLoaded()).toEqual(['handler=increment']);
+    // The binding chunk of the write set loads with the handler chunk.
+    expect(getLoaded().toSorted()).toEqual(['binding=count', 'handler=increment']);
     expect(harness.patch).toHaveBeenCalledTimes(1);
     expect(events).toHaveLength(0);
   });

@@ -1,5 +1,5 @@
 import { render as renderComponent, renderListener } from 'idlip/server';
-import Board from './board.idlip.tsx';
+import Board from './board.tsx';
 
 interface Item {
   id: string;

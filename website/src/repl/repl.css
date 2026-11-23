@@ -1,0 +1,500 @@
+/* The REPL page. The build inlines this file into /repl/ only, so no other page carries it. It
+   uses the tokens of styles.css and the network panel styles of the landing demo. */
+
+.repl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--gap);
+  max-width: var(--page-width);
+  margin-inline: auto;
+  padding: 0.5rem 1.25rem 3rem;
+}
+
+.repl-top {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  padding: 1rem 1rem 1rem var(--pad);
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+}
+
+.repl-title {
+  margin: 0 auto 0 0;
+  font-size: var(--text-xl);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+
+.repl-pick {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.repl-pick select,
+.repl-add input {
+  min-height: 2.5rem;
+  padding: 0 1rem;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 2px transparent;
+  color: var(--text);
+  font: 500 var(--text-sm) var(--font);
+  transition: box-shadow var(--duration-fast);
+}
+
+.repl-pick select {
+  padding-inline-end: 2rem;
+  cursor: pointer;
+}
+
+.repl-pick select:hover,
+.repl-add input:hover {
+  box-shadow: inset 0 0 0 2px var(--border-strong);
+}
+
+.repl-share {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  padding: 0 1.1rem;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--ink);
+  color: var(--on-ink);
+  font: 600 var(--text-sm) var(--font);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast),
+    color var(--duration-fast),
+    transform var(--duration-fast) var(--ease);
+}
+
+.repl-share:hover {
+  transform: translateY(-2px);
+}
+
+.repl-share:active {
+  transform: scale(0.96);
+}
+
+.repl-share.is-done {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+}
+
+.repl-editor,
+.repl-output {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0.75rem;
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+}
+
+/* Tabs: pills, the selected one ink. */
+
+.repl-files {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.repl-file-tabs,
+.repl-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.repl-tabs {
+  align-self: flex-start;
+}
+
+.repl-file {
+  display: flex;
+  align-items: center;
+}
+
+.repl-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.25rem;
+  padding: 0 0.95rem;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font: 500 var(--text-sm) var(--font);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast),
+    color var(--duration-fast),
+    transform var(--duration-fast) var(--ease);
+}
+
+.repl-file .repl-tab {
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+}
+
+.repl-tab:hover {
+  background: var(--surface-strong);
+}
+
+.repl-tab:active {
+  transform: scale(0.96);
+}
+
+.repl-tab[aria-selected='true'] {
+  background: var(--ink);
+  color: var(--on-ink);
+}
+
+/* A file with an error: a dot in the danger color, and the count in its description. */
+.repl-tab.has-error::after {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--danger);
+  content: '';
+}
+
+.repl-remove {
+  width: 2rem;
+  height: 2rem;
+  color: var(--muted);
+}
+
+.repl-count {
+  min-width: 1.5rem;
+  padding: 0 0.4rem;
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+  color: var(--text);
+  font: 600 var(--text-xs) / 1.5rem var(--mono);
+  text-align: center;
+}
+
+.repl-count.has-error {
+  background: var(--danger);
+  color: var(--bg-elevated);
+}
+
+.repl-add {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.repl-add input {
+  width: 11rem;
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+}
+
+/* The editor: the textarea over the highlighted code and the marks. */
+
+.repl-code {
+  position: relative;
+  overflow: hidden;
+  height: min(36rem, 70vh);
+  border-radius: var(--radius-md);
+  background: var(--code-bg);
+  box-shadow: inset 0 0 0 2px var(--surface);
+  transition: box-shadow var(--duration-fast);
+}
+
+.repl-code:focus-within {
+  box-shadow: inset 0 0 0 2px var(--border-strong);
+}
+
+.repl-layer {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+  padding: 1.25rem 1.5rem;
+  border: 0;
+  font: 0.8rem / 1.75 var(--mono);
+  letter-spacing: 0;
+  tab-size: 2;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+.repl-highlight,
+.repl-marks {
+  overflow: visible;
+  pointer-events: none;
+}
+
+.repl-marks {
+  color: transparent;
+}
+
+.repl-mark {
+  background: none;
+  color: transparent;
+  text-decoration: underline wavy var(--danger) 1.5px;
+  text-underline-offset: 2px;
+}
+
+.repl-mark.is-warning {
+  text-decoration-color: var(--syn-attr);
+}
+
+.repl-input {
+  height: 100%;
+  overflow: auto;
+  resize: none;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--text);
+  outline: none;
+}
+
+.repl-input::selection {
+  background: var(--accent-tint);
+  color: transparent;
+}
+
+.repl-code:has(.repl-input:focus-visible) {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Problems: under the editor for the file shown, and in their tab for every file. */
+
+.repl-file-problems,
+.repl-problems {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.repl-file-problems:empty {
+  display: none;
+}
+
+.repl-problem button {
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.55rem 0.85rem;
+  border: 0;
+  border-radius: var(--radius-row);
+  background: var(--surface);
+  color: var(--text);
+  font: var(--text-sm) / 1.45 var(--font);
+  text-align: start;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast),
+    transform var(--duration-fast) var(--ease);
+}
+
+.repl-problem button:hover {
+  background: var(--surface-strong);
+}
+
+.repl-problem button:active {
+  transform: scale(0.99);
+}
+
+.repl-problem-place {
+  flex: none;
+  color: var(--muted);
+  font: var(--text-xs) / 1.8 var(--mono);
+}
+
+.repl-problem.is-error .repl-problem-place {
+  color: var(--danger);
+}
+
+/* Output. */
+
+.repl-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+  border-radius: var(--radius-md);
+}
+
+.repl-panel[hidden] {
+  display: none;
+}
+
+.repl-status {
+  margin: 0;
+  padding: 0 0.5rem;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.repl[data-status='blocked'] .repl-status,
+.repl[data-status='failed'] .repl-status {
+  color: var(--danger);
+}
+
+.repl-error {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-row);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 2px var(--danger);
+  color: var(--text);
+  font: var(--text-xs) / 1.6 var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.repl-error p {
+  margin: 0;
+}
+
+.repl-run {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--gap);
+}
+
+.repl-app {
+  background: var(--surface);
+}
+
+.repl-frame {
+  height: 20rem;
+}
+
+.repl-net {
+  padding: 1.25rem 1.5rem 1.5rem;
+  background: var(--surface);
+}
+
+.repl-net .net-empty {
+  background: var(--bg-elevated);
+}
+
+.repl-module {
+  min-width: 0;
+}
+
+.repl-module-title {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0.25rem 0.5rem 0.5rem;
+  font: 600 var(--text-sm) var(--mono);
+}
+
+.repl-module-title span {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.repl-out {
+  max-height: 32rem;
+  margin: 0;
+  padding: 1.1rem 1.25rem;
+  overflow: auto;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font: 0.75rem / 1.7 var(--mono);
+  white-space: pre;
+}
+
+@media (max-width: 70rem) {
+  .repl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 48rem) {
+  .repl {
+    padding-inline: 0.5rem;
+  }
+
+  .repl-top {
+    padding-left: 1.25rem;
+  }
+
+  .repl-code {
+    height: 26rem;
+  }
+
+  .repl-layer {
+    padding: 1rem;
+  }
+}
+
+.repl-undo {
+  min-height: 2.25rem;
+  margin-inline-end: auto;
+  padding: 0 0.95rem;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--ink);
+  color: var(--on-ink);
+  font: 600 var(--text-xs) var(--font);
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease);
+}
+
+.repl-undo:active {
+  transform: scale(0.96);
+}
+
+.repl-state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.repl-run-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.5rem;
+  padding: 0 1.2rem;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  font: 600 var(--text-sm) var(--font);
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease);
+}
+
+.repl-run-button[hidden] {
+  display: none;
+}
+
+.repl-run-button:hover {
+  transform: translateY(-2px);
+}
+
+.repl-run-button:active {
+  transform: scale(0.96);
+}

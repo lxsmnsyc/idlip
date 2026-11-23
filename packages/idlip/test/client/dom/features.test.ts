@@ -39,7 +39,8 @@ async function buildLoader(name: string): Promise<string[]> {
       'export function render() { return ""; }\n',
     );
     const config = createConfig(root, { compile, client: LOADER });
-    config.resolve = {};
+    // A chunk imports `idlip/client`, which is the loader itself here.
+    config.resolve = { alias: { 'idlip/client': LOADER } };
     // Minified, as an app ships it, so the sizes are the loader's.
     config.build = { ...config.build, minify: true };
     const builder = await createBuilder(config);
@@ -67,10 +68,10 @@ function getGzipSize(files: readonly string[]): number {
 
 describe('HAS_REFS', () => {
   it('is on when a handler calls Dom after the patch', () => {
-    const source = readFileSync(path.join(FIXTURES, 'refs/refs.idlip.tsx'), 'utf8');
-    expect([...getFeatures([compile(source, '/src/refs.idlip.tsx')])]).toContain('REFS');
-    const todo = readFileSync(path.join(FIXTURES, 'todo/todo.idlip.tsx'), 'utf8');
-    expect([...getFeatures([compile(todo, '/src/todo.idlip.tsx')])]).not.toContain('REFS');
+    const source = readFileSync(path.join(FIXTURES, 'refs/refs.tsx'), 'utf8');
+    expect([...getFeatures([compile(source, '/src/refs.tsx')])]).toContain('REFS');
+    const todo = readFileSync(path.join(FIXTURES, 'todo/todo.tsx'), 'utf8');
+    expect([...getFeatures([compile(todo, '/src/todo.tsx')])]).not.toContain('REFS');
   });
 
   it('keeps the Dom runner out of a loader that does not use it', async () => {

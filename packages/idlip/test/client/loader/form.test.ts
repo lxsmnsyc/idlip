@@ -6,10 +6,7 @@ import { compile } from '../../../src/compiler/index.ts';
 import { mount } from '../../../src/testing/index.ts';
 import type { MountedPage } from '../../../src/testing/index.ts';
 
-const SOURCE = readFileSync(
-  join(import.meta.dirname, '../../fixtures/form/form.idlip.tsx'),
-  'utf8',
-);
+const SOURCE = readFileSync(join(import.meta.dirname, '../../fixtures/form/form.tsx'), 'utf8');
 
 let page: MountedPage | undefined;
 
@@ -19,14 +16,19 @@ afterEach(() => {
 });
 
 describe('form fields in an event arrow', () => {
-  it('writes the field paths into the message and the prevent modifier', () => {
-    const { server } = compile(SOURCE, '/src/app.idlip.tsx');
-    expect(server).toContain('["$event","currentTarget","elements","draft","value"]');
-    expect(server).toContain('["$event","currentTarget","elements","amount","valueAsNumber"]');
-    expect(server).toContain('"prevent"');
+  it('reads the field paths in the event function and marks the submit as prevented', () => {
+    const { server, client } = compile(SOURCE, '/src/app.tsx');
+    expect(server).toMatch(/on:submit="\$e\d+ prevent"/);
+    expect(server).not.toContain('$event');
+    let code = '';
+    for (const module of client) {
+      code += module.code;
+    }
+    expect(code).toContain('$c.elements.draft.value');
+    expect(code).toContain('$c.elements.amount.valueAsNumber');
   });
 
-  it('reads the fields at dispatch and prevents the submit', async () => {
+  it('reads the fields when the function runs and prevents the submit', async () => {
     page = await mount(SOURCE, {}, { check: false });
     const form = page.get('form');
     const draft = page.get('input[name=draft]');
@@ -72,16 +74,21 @@ export default function Form(props: { onSend: () => void }): JSX.Element {
   return <form on:submit={props.onSend}><button>Go</button></form>;
 }
 `;
-    const { diagnostics } = compile(forwarded, '/src/app.idlip.tsx');
+    const { diagnostics } = compile(forwarded, '/src/app.tsx');
     expect(diagnostics.filter((item) => item.severity === 'error')).toEqual([]);
   });
 
-  it('rejects a computed key', () => {
-    const bad = SOURCE.replace('elements.draft.value', 'elements[name].value').replace(
+  it('reads a computed key in the event function', () => {
+    const source = SOURCE.replace('elements.draft.value', 'elements[name].value').replace(
       'let notes',
       "const name = 'draft';\n  let notes",
     );
-    const { diagnostics } = compile(bad, '/src/app.idlip.tsx');
-    expect(diagnostics.map((item) => item.rule)).toContain('event-computed-key');
+    const { diagnostics, client } = compile(source, '/src/app.tsx');
+    expect(diagnostics.filter((item) => item.severity === 'error')).toEqual([]);
+    let code = '';
+    for (const module of client) {
+      code += module.code;
+    }
+    expect(code).toContain("$c.elements['draft'].value");
   });
 });

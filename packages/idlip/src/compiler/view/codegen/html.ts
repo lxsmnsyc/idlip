@@ -1,4 +1,5 @@
-// Turns view nodes into JS that builds their markup: the server render and client templates.
+// Turns view nodes into JS that builds their markup: the server render. Client chunks clone
+// templates instead (`template.ts`).
 import type { Component, Node } from '../analyze/index.ts';
 import { addChildNode } from './child.ts';
 import { printTracked } from './dynamic.ts';
@@ -72,13 +73,6 @@ export class HtmlBuilder {
   /** Variable names in use for list rows. */
   accumulators: Set<string> = new Set();
 
-  /**
-   * Where the markup runs. A child is called as a module on the server, and added with
-   * `addChild` in a client template. The view chunk prints with the server's names and
-   * adds children as a template does.
-   */
-  target: 'server' | 'client';
-
   /** The ids of the `<Try>` regions whose catch view is being built, innermost last. */
   catching: number[] = [];
 
@@ -86,9 +80,7 @@ export class HtmlBuilder {
     readonly component: Component,
     readonly plan: Plan,
     readonly emitter: Emitter,
-  ) {
-    this.target = emitter.mode;
-  }
+  ) {}
 
   build(nodes: Node[], content: Content = 'html'): Built {
     const built = createBuilt();
@@ -117,12 +109,17 @@ export class HtmlBuilder {
       case 'text-hole': {
         emitter.at = node.hole.span;
         emitter.usage.helpers.add('text');
-        const inner = this.plan.dynamic.has(node.hole.id)
-          ? printTracked(emitter, this.component, node.hole, `t${node.hole.id}`)
+        const { id } = node.hole;
+        const filled = this.plan.filled.has(id);
+        const inner = this.plan.dynamic.has(id)
+          ? printTracked(emitter, this.component, node.hole, `${filled ? 'a' : 't'}${id}`)
           : emitter.expr(node.hole.expr, 1);
         const value = `text$(${inner})`;
-        // A raw text element cannot hold the comment markers.
-        if (this.plan.bound.has(node.hole.id) && content === 'html') {
+        // A raw text element cannot hold the comment markers, and the only child of an element
+        // is found through the element's `i-a`.
+        if (filled) {
+          addCode(built, value);
+        } else if (this.plan.bound.has(id) && content === 'html') {
           addText(built, `<!--t${node.hole.id}-->`);
           addCode(built, value);
           addText(built, '<!--/t-->');
@@ -218,8 +215,7 @@ export class HtmlBuilder {
         { kind: 'text', value: '<!--/e-->' },
       ]);
     // A body that throws after a `<Head>` or a child wrote its head output drops that output.
-    const marked =
-      this.target === 'server' && (this.plan.heads.size > 0 || this.plan.uses.length > 0);
+    const marked = this.plan.heads.size > 0 || this.plan.uses.length > 0;
     built.pre.push(
       `let ${variable};`,
       ...(marked ? [`const $mark${id} = context.headMark?.() ?? 0;`] : []),
@@ -245,9 +241,9 @@ export class HtmlBuilder {
   }
 
   /**
-   * Writes the marker block of a `<Head>`. A client template holds the elements in the marker,
-   * and the loader moves them to `<head>`. The server writes the elements through `context`
-   * instead, each with `i-head="<id>.<index>"`, and the marker stays empty.
+   * Writes the marker block of a `<Head>`. The server writes the elements through `context`,
+   * each with `i-head="<id>.<index>"`, and the marker stays empty. A client template holds the
+   * elements in the marker, and the loader moves them to `<head>` (`template.ts`).
    */
   addHead(node: HeadNode, built: Built): void {
     const id = this.plan.heads.get(node);
@@ -256,16 +252,6 @@ export class HtmlBuilder {
       if (child.kind === 'element') {
         elements.push(child);
       }
-    }
-    if (this.target === 'client') {
-      addText(built, `<!--c${id}:h--><template i-head=""`);
-      this.addAnchor(node, built);
-      addText(built, '>');
-      for (const element of elements) {
-        this.addElement(element, built);
-      }
-      addText(built, '</template><!--/c-->');
-      return;
     }
     const variable = `$head${id}`;
     built.pre.push(`const ${variable} = context.headId?.() ?? 0;`);
@@ -290,14 +276,26 @@ export class HtmlBuilder {
     const { emitter } = this;
     for (const event of events) {
       const region = this.catching.at(-1);
-      if (event.target.kind === 'reset' && region !== undefined) {
+      const { body } = event;
+      if (body.kind === 'steps') {
+        const site = this.plan.siteOf.get(event);
+        if (site !== undefined) {
+          const modifiers = printModifiers(event);
+          addText(
+            built,
+            ` on:${event.name}="${site.name}${modifiers === '' ? '' : ` ${escapeAttribute(modifiers)}`}"`,
+          );
+        }
+        continue;
+      }
+      if (body.target.kind === 'reset' && region !== undefined) {
         // The loader handles the reserved tag `$reset` itself: it renders the region again.
         const modifiers = printModifiers(event);
         const message = modifiers === '' ? ['$reset', [region]] : ['$reset', [region], modifiers];
         addText(built, ` on:${event.name}='${JSON.stringify(message)}'`);
         continue;
       }
-      if (event.target.kind !== 'handler' && event.target.kind !== 'prop') {
+      if (body.target.kind !== 'handler' && body.target.kind !== 'prop') {
         continue;
       }
       emitter.at = event.span;

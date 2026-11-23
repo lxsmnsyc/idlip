@@ -6,6 +6,7 @@ import { Window } from 'happy-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { onBlock } from '../../../src/client/patch/blocks.ts';
 import { setBranch$ as setBranch } from '../../../src/core/helpers.ts';
+import { parseHtml } from '../../../src/client/patch/dom.ts';
 import { findNode } from '../../../src/client/patch/nodes.ts';
 import { createPatch } from '../../../src/client/patch/patch.ts';
 import type { Manifest, Model, Page, Patch, PatchList } from '../../../src/core/format.ts';
@@ -14,7 +15,7 @@ import manifestJson from '../../fixtures/todo/expected/manifest.json' with { typ
 vi.mock('idlip/client', async () => import('../../../src/client/patch/dom.ts'));
 
 const FIXTURE = join(import.meta.dirname, '../../fixtures/todo/expected');
-const MODULE = '/src/todo.idlip.tsx';
+const MODULE = '/src/todo.tsx';
 
 const todos = [
   { id: 'a1', text: 'Write the format', done: true },
@@ -177,8 +178,10 @@ describe('condition blocks', () => {
     '<!--c2:0--><b>other</b><!--/c-->';
   const branches = ['<p>then</p><!--c1:0--><i>inner</i><!--/c-->', '<em>else</em>'];
 
-  function render(branch: number): string {
-    return branches[branch];
+  function render(branch: number, doc: Document): Node {
+    const fragment = doc.createDocumentFragment();
+    fragment.append(...parseHtml(doc, branches[branch]));
+    return fragment;
   }
 
   it('swaps the branch and updates the marker', () => {

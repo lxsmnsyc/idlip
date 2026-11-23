@@ -1,4 +1,4 @@
-import { getChunkId } from '../core/format.ts';
+import { getChunkId, listCompiled } from '../core/format.ts';
 import type { CompileResult } from '../core/format.ts';
 import type { HotMessage } from '../client/hot.ts';
 import { listChunks } from './chunks.ts';
@@ -6,15 +6,15 @@ import { listChunks } from './chunks.ts';
 /** The custom event the plugin sends to the page. Its payload is a `HotMessage`. */
 export const HOT_EVENT = 'idlip:hot';
 
-function getUrl(base: string, result: CompileResult, chunk: string): string {
-  return `${base}${getChunkId(result.manifest.module, chunk).slice(1)}`;
+function getUrl(base: string, module: string, chunk: string): string {
+  return `${base}${getChunkId(module, chunk).slice(1)}`;
 }
 
 /**
  * Compares the compile output of a module before and after an edit. The server module holds
- * the markup, the manifest and the chunk ids, so when it is the same the page keeps its
- * markup, groups and handler names, and only the chunks whose code changed load again.
- * Returns `undefined` when nothing the page runs changed.
+ * the markup, the manifests and the chunk ids of every component of the file, so when it is
+ * the same the page keeps its markup, groups and handler names, and only the chunks whose code
+ * changed load again. Returns `undefined` when nothing the page runs changed.
  */
 export function classifyEdit(
   before: CompileResult | undefined,
@@ -25,19 +25,27 @@ export function classifyEdit(
   const module = after.manifest.module;
   if (before === undefined || before.server !== after.server) {
     const chunks: string[] = [];
-    for (const chunk of listChunks(after.manifest)) {
-      chunks.push(getUrl(base, after, chunk));
+    for (const { manifest } of listCompiled(after)) {
+      for (const chunk of listChunks(manifest)) {
+        chunks.push(getUrl(base, manifest.module, chunk));
+      }
     }
     return { module, kind: 'remount', chunks, timestamp };
   }
+
+  // The same server module means the same components, so chunks compare by module and name.
   const old = new Map<string, string>();
-  for (const item of before.client) {
-    old.set(item.chunk, item.code);
+  for (const { manifest, client } of listCompiled(before)) {
+    for (const item of client) {
+      old.set(getChunkId(manifest.module, item.chunk), item.code);
+    }
   }
   const chunks: string[] = [];
-  for (const item of after.client) {
-    if (old.get(item.chunk) !== item.code) {
-      chunks.push(getUrl(base, after, item.chunk));
+  for (const { manifest, client } of listCompiled(after)) {
+    for (const item of client) {
+      if (old.get(getChunkId(manifest.module, item.chunk)) !== item.code) {
+        chunks.push(getUrl(base, manifest.module, item.chunk));
+      }
     }
   }
   return chunks.length === 0 ? undefined : { module, kind: 'swap', chunks, timestamp };

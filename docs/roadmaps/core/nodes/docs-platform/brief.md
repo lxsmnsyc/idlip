@@ -1,7 +1,7 @@
 ---
 id: docs-platform
 title: Guide: head, SVG, forms, errors, testing, deploy
-status: todo
+status: done
 priority: should
 type: docs
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-21
-spent:
+spent: 203000
 owns:
   - website/docs/head.md
   - website/docs/svg-and-html.md

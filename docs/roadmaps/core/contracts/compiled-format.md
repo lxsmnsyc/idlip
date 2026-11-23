@@ -1,6 +1,6 @@
 ---
 name: compiled-format
-version: 11
+version: 13
 status: frozen
 defined_by: compiled-format
 ---
@@ -132,7 +132,7 @@ Authoring: an event arrow may have a block body that reads as plain TypeScript a
 
 ### Delegated listening
 
-- `<window>` and `<document>` render `<template i-global="window" on:keydown='…'></template>` at their position in the view. The listener adds those listeners on `window` or `document`, and finds the messages in the templates.
+- `<window>` and `<document>` render `<template i-global="window" on:keydown='…'></template>` at their position in the view. The listener adds those listeners on `window` or `document`, and finds the messages in the templates. The type is listed as `<type>:window` or `<type>:document` in `manifest.events` and in the record, even when the element sits in a condition, and the listener adds the window or document listener at record time, so a global element that a patch inserts later is heard. A global event is never passive: its token has no `:passive` suffix.
 - Other events use one listener per event type on `document`, in the bubble phase. It walks from the target outwards and takes the first element with `on:<type>`, unless `stop` ends the walk earlier.
 - The listener adds a capture-phase and a bubble-phase document listener per event type and handles each event in one of them by `event.bubbles`. An event that does not bubble (`focus`, `mouseenter`, media events, a `CustomEvent` without `bubbles`) is matched only on `event.target`, with no outward walk. A walk would fire an ancestor's `on:focus` when a child takes focus. Choosing by `event.bubbles` instead of a fixed list covers every type, custom events included (from the `resume-loader` review).
 - A type whose handlers are all `passive` is listed as `<type>:passive` in the state record, and its document listener is passive.
@@ -150,10 +150,11 @@ The server writes one state script per rendered root, after its markup, on one l
 - The pushed value is a `StateRecord`: the event types, separated by spaces, and a function that returns the `PageState`. The function body is seroval's `serialize()` output for `{ manifest, chunks, model, props }`. The record relies on that output being a parenthesized expression, `({…})` or `(h=>…)()`, so it serves as the arrow body as it is. A seroval upgrade that changes this breaks the format.
 - The client never imports seroval. Running the function decodes the state, as brumate's code records do (`../brumate/docs/compiler.md`: that change took its core from 14,971 B to about 4.8 kB gzip). The loader calls the function on the first event only, so a page that never gets an event never decodes its state.
 - seroval writes `<` in a string as `\x3C` and escapes U+2028 and U+2029, so a value cannot end the script.
-- `chunks` is the chunk URL map (see Chunk URLs) for the modules rendered on the page, and only those.
+- `chunks` is the chunk URL map (see Chunk URLs) for the modules rendered on the page, and only those. The `view` chunk of a module in `modules` is left out, since a template chunk imports it by id.
 - `model` is the component's state fields. `props` holds only the props fields that some binding reads. Handlers get the props they read through the payload. Both fixtures have `props: {}`.
 - With a `nonce` render option, the script is `<script i-state nonce="…">`.
-- `PageState` also holds `slots` and `modules` (Nested components) and `dynamic` (Dynamic holes). Each is absent when the page has none, so a page without children or dynamic holes does not change.
+- `PageState` also holds `slots`, `dynamic` (Dynamic holes) and `modules` (Nested components). Each is absent when the page has none, so a page without children or dynamic holes does not change. The key order is `manifest, chunks, model, props, slots, dynamic, modules`.
+- The server serializes the parts that do not change between requests (the root manifest, `chunks` and `modules` of the root's `uses` closure) once per root module and reuses them; each render serializes only `model`, `props`, `slots` and `dynamic`. When seroval would write function form, it falls back to one call for the whole state. A child rendered outside the root's `uses` closure is serialized for that render only.
 - `i-build="<id>"` on the state script is the build id (Build id). It is not part of the state value.
 
 ### Listener and early events
@@ -371,7 +372,7 @@ These checks apply across block boundaries: a `<For>` inside `<tbody>` whose row
 
 A stateful child has a boundary, a slot in the state script and a `view` chunk. The golden fixtures `test/fixtures/nested/board/` and `nested/counter/` show every part.
 
-- **Types.** `Slot { module, model, props }`; `PageState.slots` (rendered children by path) and `PageState.modules` (manifests of the child modules and of what they can render, the `uses` closure, including a child whose list is empty at render); `Manifest.view?: { chunk: 'view' }`, present when a project module renders the module as a child (`compile` option `{ child: true }`); `Scope.path` (absent is the root); `PropBinding`; `ViewChunk { init(props): Model; render(scope): string }`; `QueuedEvent.owner`; `Page.path` and `Page.start`.
+- **Types.** `Slot { module, model, props }`; `PageState.slots` (rendered children by path) and `PageState.modules: Record<string, ChildManifest>` (manifests of the child modules and of what they can render, the `uses` closure, including a child whose list is empty at render; a `ChildManifest` is a `Manifest` without `events`, `listens`, `view` and the `writes` of each handler, and the loader fills `events: []` where it needs a `Manifest`); `Manifest.view?: { chunk: 'view' }`, present when a project module renders the module as a child (`compile` option `{ child: true }`); `Scope.path` (absent is the root); `PropBinding`; `ViewChunk { init(props): Model; render(scope): string }`; `QueuedEvent.owner`; `Page.path` and `Page.start`.
 - **Boundary.** `<!--n:<path>-->…<!--/n-->`. The root has no boundary and the path `''`. `path = slot ('/' slot)*`, one slot per component level, outermost first. `slot = <site>[':' <key>]*`. `site` is the index of the child among the `child` nodes of the component's view, in source order, from 0, unaffected by conditions and loops. A `key` part is `String(value)` through `encodeURIComponent` with `-` written `%2D`, so a path never holds `/`, `:`, `-` or `>`. The keys are an explicit `key` prop, then the loop key of every enclosing `<For>`, outermost first (always present inside a `<For>`). Examples: `0`, `1:a1`, `1:a1/0`. `slot(path, site, ...keys)` from `idlip/server` builds it. A row holds the boundary: `<!--i--><!--n:1:a1-->…<!--/n--><!--/i-->`. The boundary is a block for `onBlock`, children removed before parents.
 - **Lookups stay in one component.** Binding ids restart in each module. A component's bindings are found between its own boundary comments, and the search never enters a nested boundary.
 - **Ids.** A prop value is a hole and takes a hole id in view order. A message prop whose arguments read model paths takes the next event id. A prop hole or message prop with an empty path set exports nothing.
@@ -459,6 +460,8 @@ The golden fixtures are the stub for both sides: `counter`, `todo`, `effects`, `
 ## Changes
 
 - v11 (2026-11-21, curator pass after wave 8; contracts `compiled-format-*.change-request.md` of `write-sets`, `nesting-format`, `dom-refs`, `commands-subs`, `errors`, `errors-client`, `document-head`, `svg-and-html`, `deploy-skew`, `dynamic-paths`, `form-fields`, `hmr`, `prefetch`, merged from the code on `batch/core`): write sets and `bindings` on handler entries; nested components (boundaries, slots, `p` bindings, `view` chunk, `uses`, owners); `i-ref` and `Step.after`; `<Subscribe>` markers and `sources`; `<Try>` regions, `try=<id>` chunks, `reset`, `idlip:error` and the retry; `<Head>` markers and `renderPage`; raw HTML as an `a` binding; build id, `build.js` and retention; dynamic holes and the `$dynamic` group; form fields as event paths (`$form` removed); `idlip:hot`; `manifest.listens`; the feature flags. Where the requests and the code differ the code wins: `$step` is optional and tested with `in`, `Step.send` and `let-reserved` are not built, `ComponentState` lives in `server/render.ts`.
+- v12 (2026-11-21, `perf-ssr-state`, `compiled-format.v12.change-request.md`): `PageState.modules` holds `ChildManifest` (no `events`, `listens`, `view`, handler `writes`); child `view` chunks leave `chunks`; key order `manifest, chunks, model, props, slots, dynamic, modules`; the server caches the parts of the state that do not change between requests.
+- v13 (2026-11-21, `fix-global-late-listener`, `compiled-format.v13.change-request.md`): global events are listed as `<type>:window` and `<type>:document` in `manifest.events` and the record; the listener adds them at record time.
 - v10 (2026-11-21, `contracts/compiled-format-tasks.change-request.md`, from `custom-effects` and `run-tasks`): `task` chunk kind and `manifest.tasks` (built-in sites point to the handler chunk), continuation tags and payloads, `runTask(host, task)` replaces `RunTask` (removed from `format.ts` and from this contract), task chunk file ids.
 - v10 (2026-11-21, `contracts/compiled-format-keyed.change-request.md`, from `keyed-paths`): `getChunkFile` maps `[`, `]` and `=` in a path to `(`, `)` and `~`; `diffPaths` compares a keyed segment by key.
 - v10 (2026-11-21, from `runtime-flags`): `HAS_*` runtime feature flags; the loader budget of 4096 B gzip is the loader with no optional features.
