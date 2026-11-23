@@ -8,6 +8,7 @@ export default defineConfig({
   ignorePatterns: [
     'packages/idlip/test/fixtures/**/expected/**',
     'dist/**',
+    'packages/idlip/src/core/helpers-source.ts',
     'benchmarks/**',
     '.claude/**',
     'docs/**',

@@ -53,12 +53,6 @@ export default defineConfig({
       output: {
         entryFileNames: 'assets/site.js',
         assetFileNames: 'assets/site[extname]',
-        // The idlip compiler in the REPL copies its helpers into chunks by their source text and
-        // checks their names, so function names stay. Other names still shrink.
-        minify: {
-          compress: { keepNames: { function: true, class: false } },
-          mangle: { keepNames: { function: true, class: false } },
-        },
       },
     },
   },

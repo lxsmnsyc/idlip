@@ -2,11 +2,12 @@
 // chunks (`setText`, `setAttr`, `setOn`, `setBranch`, `clone` and the rest). Each has one
 // source, here. The server imports the render helpers. A client chunk imports the ones it uses
 // from `idlip/helpers`, one shared module that `printHelpersModule` writes from the text of
-// these functions. The Vite plugin serves it, the bundler keeps the helpers the chunks use, and
+// these functions, which `scripts/generate-helpers.ts` extracts at build time. The Vite plugin serves it, the bundler keeps the helpers the chunks use, and
 // the loader starts loading it with the first chunk. The loader stays small, and a build ships
 // each helper once. Rules for the sources:
 // - Every function is named with a `$` suffix, so a copy cannot clash with a name in the module.
 // - No comment inside a body, since the copy is the text of the function.
+// - After a change to a helper, run `pnpm generate` in `packages/idlip`. A test checks the file.
 // - A function calls only the functions of `HELPERS` and the forwarders, by their names.
 // - A loader export is called as `name$`, through the forwarding function below. In a chunk the
 //   name is the import alias, `parseHtml as parseHtml$`. A bundler or a test runner renames
@@ -15,6 +16,7 @@
 import { addBlock, findInnerBlocks, removeBlock } from '../client/patch/blocks.ts';
 import { parseHtml } from '../client/patch/dom.ts';
 import { track$ } from './dynamic.ts';
+import { HELPER_SOURCES } from './helpers-source.ts';
 import type { Namespace } from '../client/patch/dom.ts';
 import type { DomMessage } from './format.ts';
 
@@ -486,22 +488,20 @@ export const HELPERS_MODULE = 'idlip/helpers';
 
 /**
  * Returns the source of the `idlip/helpers` module: a copy of every helper, the loader exports
- * they call as imports from `idlip/client`, and an export of each helper. It throws when a
- * bundler renamed a function, since the copies call each other by name.
+ * they call as imports from `idlip/client`, and an export of each helper. The copies come from
+ * `helpers-source.ts`, which `scripts/generate-helpers.ts` writes from this file at build time.
  */
 export function printHelpersModule(): string {
   const code: string[] = [];
-  for (const [name, source] of Object.entries(HELPERS)) {
-    if (source?.name !== name) {
-      throw new Error(`The helper ${name} was renamed to ${source?.name}`);
+  for (const name of Object.keys(HELPERS)) {
+    const source = HELPER_SOURCES[name] as string | undefined;
+    if (source === undefined) {
+      throw new Error(`The helper ${name} has no generated source`);
     }
-    code.push(source.toString());
+    code.push(source);
   }
   const specifiers: string[] = [];
-  for (const [name, forwarder] of Object.entries(FORWARDERS)) {
-    if (forwarder?.name !== name) {
-      throw new Error(`The forwarder ${name} was renamed to ${forwarder?.name}`);
-    }
+  for (const name of Object.keys(FORWARDERS)) {
     specifiers.push(`${name.slice(0, -1)} as ${name}`);
   }
   return `import { ${specifiers.join(', ')} } from 'idlip/client';\n\n${code.join('\n\n')}\n\nexport { ${Object.keys(HELPERS).join(', ')} };\n`;

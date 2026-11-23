@@ -50,7 +50,8 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown",
+    "generate": "node scripts/generate-helpers.ts",
+    "build": "node scripts/generate-helpers.ts && tsdown",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

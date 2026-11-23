@@ -1,66 +1,106 @@
 // @vitest-environment happy-dom
-// The `idlip/helpers` module is written from the text of the helper functions. A published
-// build of the package may be minified: then the module must still work, or fail with the
-// rename error, never produce a module that calls a name it does not define.
+// The compiler may ship minified inside another bundle, such as the website's REPL. Its chunks
+// and its `idlip/helpers` module must not depend on that: they match the unbundled compiler
+// byte for byte, and the helpers run.
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { build } from 'vite';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import * as blocks from '../../src/client/patch/blocks.ts';
 import { parseHtml } from '../../src/client/patch/dom.ts';
+import { compile, printHelpersModule } from '../../src/compiler/index.ts';
 import { bindImports, toDataUrl } from '../../src/testing/modules.ts';
 
-const ENTRY = path.join(import.meta.dirname, '../../src/core/helpers.ts');
+const ROOT = path.join(import.meta.dirname, '../..');
+const ENTRY = path.join(ROOT, 'src/compiler/index.ts');
+const CACHE = path.join(ROOT, 'node_modules/.cache');
+const SOURCE = `export default function Counter() {
+  let count = 0;
+  const label = \`Count: \${count}\`;
+  function increment() {
+    count += 1;
+  }
+  return (
+    <button on:click={increment}>
+      {label}
+    </button>
+  );
+}
+`;
 
-/** Bundles and minifies `core/helpers.ts` with Vite's bundler, and imports the result. */
-async function importMinified(keepNames: boolean): Promise<Record<string, unknown>> {
+interface Compiler {
+  compile: typeof compile;
+  printHelpersModule: typeof printHelpersModule;
+}
+
+function isCompiler(value: unknown): value is Compiler {
+  return (
+    typeof Reflect.get(Object(value), 'compile') === 'function' &&
+    typeof Reflect.get(Object(value), 'printHelpersModule') === 'function'
+  );
+}
+
+const folders: string[] = [];
+
+afterAll(() => {
+  for (const folder of folders) {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+/** Bundles and minifies the compiler with Vite's bundler, no `keepNames`, and imports it. */
+async function importMinified(): Promise<Compiler> {
   const result = await build({
     configFile: false,
     logLevel: 'silent',
     build: {
       write: false,
       minify: true,
-      lib: { entry: ENTRY, formats: ['es'], fileName: 'helpers' },
-      rolldownOptions: { output: { keepNames } },
+      lib: { entry: ENTRY, formats: ['es'], fileName: 'compiler' },
+      rolldownOptions: { external: ['oxc-parser', 'seroval', /^node:/] },
     },
   });
   const outputs = Array.isArray(result) ? result : [result];
-  let code = '';
+  mkdirSync(CACHE, { recursive: true });
+  const folder = mkdtempSync(path.join(CACHE, 'min-'));
+  folders.push(folder);
+  let entry = '';
   for (const output of outputs) {
     if (!('output' in output)) {
       continue;
     }
     for (const item of output.output) {
-      if (item.type === 'chunk' && item.isEntry) {
-        code = item.code;
+      if (item.type === 'chunk') {
+        writeFileSync(path.join(folder, item.fileName), item.code);
+        entry = item.isEntry ? item.fileName : entry;
       }
     }
   }
-  const module: unknown = await import(/* @vite-ignore */ toDataUrl(code));
-  const exports: Record<string, unknown> = {};
-  for (const [name, value] of Object.entries(
-    typeof module === 'object' && module !== null ? module : {},
-  )) {
-    exports[name] = value;
+  const module: unknown = await import(
+    /* @vite-ignore */ pathToFileURL(path.join(folder, entry)).href
+  );
+  if (!isCompiler(module)) {
+    throw new TypeError('The minified bundle does not export the compiler');
   }
-  return exports;
+  return module;
 }
 
-function callPrint(exports: Record<string, unknown>): string {
-  const print = exports.printHelpersModule;
-  if (typeof print !== 'function') {
-    throw new TypeError('no printHelpersModule');
-  }
-  return String(Reflect.apply(print, undefined, []));
-}
-
-describe('printHelpersModule from a minified build', () => {
-  it('throws the rename error when the minifier renamed the helpers', async () => {
-    const exports = await importMinified(false);
-    expect(() => callPrint(exports)).toThrow(/^The (helper|forwarder) \w+\$ was renamed to /);
+describe('the compiler in a minified bundle', () => {
+  it('writes the same chunks and helpers as the unbundled compiler', async () => {
+    const minified = await importMinified();
+    expect(minified.compile.name).not.toBe('compile');
+    const expected = compile(SOURCE, '/src/counter.tsx');
+    const actual = minified.compile(SOURCE, '/src/counter.tsx');
+    expect(expected.diagnostics).toEqual([]);
+    expect(expected.client.length).toBeGreaterThan(0);
+    expect(actual).toEqual(expected);
+    expect(minified.printHelpersModule()).toBe(printHelpersModule());
   }, 60_000);
 
-  it('writes a working module when the build keeps names', async () => {
-    const source = callPrint(await importMinified(true));
+  it('writes a helpers module that runs', async () => {
+    const minified = await importMinified();
     Reflect.set(globalThis, '$idlipMinifiedTest', {
       client: {
         addBlock: blocks.addBlock,
@@ -70,7 +110,7 @@ describe('printHelpersModule from a minified build', () => {
       },
     });
     const module: unknown = await import(
-      /* @vite-ignore */ toDataUrl(bindImports(source, '$idlipMinifiedTest'))
+      /* @vite-ignore */ toDataUrl(bindImports(minified.printHelpersModule(), '$idlipMinifiedTest'))
     );
     const setAttr = Reflect.get(Object(module), 'setAttr$') as unknown;
     const text = Reflect.get(Object(module), 'text$') as unknown;
@@ -83,5 +123,11 @@ describe('printHelpersModule from a minified build', () => {
     expect(typeof text === 'function' ? Reflect.apply(text, undefined, ['<a&b>']) : '').toBe(
       '&lt;a&amp;b&gt;',
     );
+  }, 60_000);
+});
+
+describe('helpers-source.ts', () => {
+  it('matches the helper sources', () => {
+    execFileSync('node', ['scripts/generate-helpers.ts', '--check'], { cwd: ROOT });
   }, 60_000);
 });
