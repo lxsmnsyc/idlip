@@ -9,7 +9,7 @@ The browser does not run view code to start the page. The server sends the HTML,
 
 ## What the server sends
 
-`render()` of `idlip/server` writes plain markup with data attributes. The second todo of the app from [Getting started](./getting-started.md) renders as follows, with line breaks added:
+The server render of `idlip/server` writes plain markup with data attributes. The second todo of the app from [Getting started](./getting-started.md) renders as follows, with line breaks added:
 
 ```html
 <li i-a="4">
@@ -85,7 +85,7 @@ The listener is inline in `<head>`, so it runs before the loader arrives. A clic
 
 ## Preload the first click
 
-The first click waits for one round trip to fetch its chunks. `renderPreload(page.chunks, page.manifests)` from `idlip/server`, with the result of `renderPage`, returns `<link rel="modulepreload">` tags for the chunks of the first click, so the browser fetches them with the page. For the todo page it names the shared helpers module, the `toggle` handler and the `todos.*.done` binding.
+The first click waits for one round trip to fetch its chunks. `renderToResponse` writes `<link rel="modulepreload">` tags for the chunks of the first click. The same tags come from `renderPreload(page.chunks, page.manifests)` from `idlip/server`, with the result of `render`, which returns `<link rel="modulepreload">` tags for the chunks of the first click, so the browser fetches them with the page. For the todo page it names the shared helpers module, the `toggle` handler and the `todos.*.done` binding.
 
 - **Opt-in.** `examples/todo` calls it, and `?preload=off` leaves the links out. The counts above are without it.
 - **With it on**, the first click makes no request, and the page makes three more requests at load.

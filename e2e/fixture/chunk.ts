@@ -1,11 +1,12 @@
 // A built chunk file, such as `/assets/todo.binding.todos._.done.j_y-el90.js`: the module's base
-// name, the chunk kind, the chunk name with `*` written as `_`, and the build hash. The example
-// sets the file names to `[name].[hash].js`, and a hash has no `.`, so it is the last segment.
-const BUILT_VIEW = /\/[^/.]+\.view\.[\w-]+\.js$/;
+// name (a package's file adds the package name before it, `idlip-example-ui.counter`), the chunk
+// kind, the chunk name with `*` written as `_`, and the build hash. The example sets the file names
+// to `[name].[hash].js`, and a hash has no `.`, so it is the last segment.
+const BUILT_VIEW = /\/[^/]+?\.view\.[\w-]+\.js$/;
 // The helpers module that the chunks share (`idlip/helpers`), which the loader loads with the
 // first chunk.
 const BUILT_HELPERS = /\/_idlip-helpers\.[\w-]+\.js$/;
-const BUILT_CHUNK = /\/[^/.]+\.(handler|binding|list|task|source)\.(.+)\.[\w-]+\.js$/;
+const BUILT_CHUNK = /\/[^/]+?\.(handler|binding|list|task|source)\.(.+)\.[\w-]+\.js$/;
 
 /**
  * Returns the chunk name in a request URL, such as `handler=toggle`, `helpers` for the shared

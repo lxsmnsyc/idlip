@@ -170,45 +170,74 @@ describe('the worker answer', () => {
 });
 
 describe('the runner', () => {
-  function createServices(stored: string[]): RunnerServices {
+  function createServices(): RunnerServices {
     let ids = 0;
-    let urls = 0;
     return {
-      serve: async () => Promise.resolve('https://site.test/assets/repl-run/'),
+      base: () => 'https://site.test/repl-run/',
+      origin: () => 'https://site.test',
       ask: async (request) =>
         Promise.resolve({ kind: 'rendered', id: request.id, rendered: RENDERED }),
-      store: async (own, folder) => {
-        expect(folder.startsWith(own)).toBe(true);
-        stored.push(folder);
-        return Promise.resolve();
-      },
-      runtime: () => 'https://site.test/assets/runtime.js',
+      loadRuntime: async () => Promise.resolve('export {};'),
       createId: () => `owner-${++ids}`,
-      createUrl: () => `blob:${++urls}`,
-      revokeUrl: () => undefined,
     };
   }
 
-  it('gives each runner its own run folder', async () => {
-    const stored: string[] = [];
-    const services = createServices(stored);
+  it('gives each runner its own run folder, named in its chunks', async () => {
+    const services = createServices();
     const first = createRunner(services);
     const second = createRunner(services);
     const files = [{ name: 'counter.tsx', source: COUNTER }];
-    await first(files, '', true);
-    await second(files, '', true);
-    const last = await first(files, '', true);
-    expect(stored).toEqual([
-      'https://site.test/assets/repl-run/owner-1/1/',
-      'https://site.test/assets/repl-run/owner-2/1/',
-      'https://site.test/assets/repl-run/owner-1/2/',
+    const one = await first(files, '', true);
+    const two = await second(files, '', true);
+    const three = await first(files, '', true);
+    const urls: string[] = [];
+    for (const result of [one, two, three]) {
+      urls.push(result.kind === 'served' ? result.url : '');
+    }
+    expect(urls).toEqual([
+      'https://site.test/repl-run/owner-1/1/',
+      'https://site.test/repl-run/owner-2/1/',
+      'https://site.test/repl-run/owner-1/2/',
     ]);
-    expect(last.kind).toBe('served');
+    if (three.kind !== 'served') {
+      throw new Error('The run did not serve');
+    }
+    expect(three.document).toContain(
+      'https://site.test/repl-run/owner-1/2/counter.handler.increment.js',
+    );
+    expect(three.document).not.toContain('owner-2');
+  });
+
+  it('writes a document that carries its chunks and has no network request', async () => {
+    const run = createRunner(createServices());
+    const result = await run(
+      [{ name: 'counter.tsx', source: COUNTER }],
+      '<style>p{}</style>',
+      true,
+    );
+    if (result.kind !== 'served') {
+      throw new Error('The run did not serve');
+    }
+    const page = result.document;
+    expect(page).toContain('<style>p{}</style>');
+    expect(page).toContain('<p>ok</p>');
+    // The chunks and the loader are in the document, so the frame fetches nothing.
+    expect(page).toContain('id="idlip-run"');
+    expect(page).not.toMatch(/<script[^>]*\ssrc=/);
+    // Messages go to the origin of the page only.
+    expect(page).toContain('"https://site.test"');
+    expect(page).not.toContain("postMessage(m,'*')");
+    // No `<` of a chunk can end the data script early.
+    const data = /<script type="application\/json" id="idlip-run">(.*?)<\/script>/s.exec(page)?.[1];
+    expect(data).toBeDefined();
+    expect(data).not.toContain('<');
+    const parsed: unknown = JSON.parse(data ?? '{}');
+    const modules: unknown = Reflect.get(Object(parsed), 'modules');
+    expect(Array.isArray(modules) ? modules.length : 0).toBeGreaterThan(1);
   });
 
   it('only compiles when told not to render or when a file has an error', async () => {
-    const stored: string[] = [];
-    const run = createRunner(createServices(stored));
+    const run = createRunner(createServices());
     expect((await run([{ name: 'a.tsx', source: COUNTER }], '', false)).kind).toBe('compiled');
     const broken = await run(
       [{ name: 'a.tsx', source: 'export default function A() {' }],
@@ -217,7 +246,6 @@ describe('the runner', () => {
     );
     expect(broken.kind).toBe('compiled');
     expect(broken.project.ok).toBe(false);
-    expect(stored).toEqual([]);
   });
 });
 

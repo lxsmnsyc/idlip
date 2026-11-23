@@ -27,6 +27,11 @@ export interface Subject {
   readonly props: Props;
   /** The sources of the stateful children, by import specifier. The subject skips the root model pairs: `open` renders no child. */
   readonly children?: Readonly<Record<string, string>>;
+  /**
+   * True for a component that renders `<html>`. The harness loads its render as a whole document,
+   * with the head output in `<head>`, and patches the document element.
+   */
+  readonly document?: true;
   /** Model pairs worth a run whatever the generator makes, from the initial model. */
   readonly pairs?: (initial: Model) => readonly (readonly [Model, Model])[];
 }
@@ -48,6 +53,40 @@ export interface Opened {
 }
 
 let opened = 0;
+
+/**
+ * Writes the head output into the `<head>` of a document, as the stream does: the winning
+ * title first, then the elements in block order.
+ */
+function writeHead(
+  html: string,
+  heads: readonly { id: number; markup: string; title: string | undefined }[],
+): string {
+  const sorted = heads.toSorted((a, b) => a.id - b.id);
+  const titles = sorted.flatMap((entry) => (entry.title === undefined ? [] : [entry.title]));
+  const output = [...titles.slice(-1), ...titles.slice(0, -1), ...sorted.map((e) => e.markup)];
+  const start = html.indexOf('<head>') + '<head>'.length;
+  return `${html.slice(0, start)}${output.join('')}${html.slice(start)}`;
+}
+
+/**
+ * Returns the element of a fresh document parsed from `html`. Each pair gets its own document,
+ * since the patch keeps the nodes it found for a root.
+ */
+function loadDocument(html: string): HTMLElement {
+  const parsed = new DOMParser().parseFromString(html, 'text/html');
+  const target = document.implementation.createHTMLDocument('');
+  function copy(from: Element, to: Element): void {
+    for (const attribute of from.attributes) {
+      to.setAttribute(attribute.name, attribute.value);
+    }
+  }
+  copy(parsed.documentElement, target.documentElement);
+  copy(parsed.body, target.body);
+  target.head.innerHTML = parsed.head.innerHTML;
+  target.body.innerHTML = parsed.body.innerHTML;
+  return target.documentElement;
+}
 
 async function importCode(code: string): Promise<unknown> {
   return import(/* @vite-ignore */ toDataUrl(code));
@@ -88,15 +127,22 @@ export async function open(subject: Subject): Promise<Opened> {
 
   function renderState(model: Model | undefined): { html: string; state: PageState } | undefined {
     let recorded: PageState | undefined;
+    const heads: { id: number; markup: string; title: string | undefined }[] = [];
+    let next = 0;
     const context: RenderContext = {
-      state(next) {
-        recorded ??= next;
+      state(state) {
+        recorded ??= state;
       },
-      headId: () => 0,
-      head() {},
+      headId: () => next++,
+      head(block, markup, title) {
+        heads.push({ id: block, markup, title });
+      },
     };
     try {
-      const html = server.default(subject.props, context, model);
+      let html = server.default(subject.props, context, model);
+      if (subject.document === true) {
+        html = writeHead(html, heads);
+      }
       return recorded === undefined ? undefined : { html, state: recorded };
     } catch {
       return undefined;
@@ -126,9 +172,12 @@ export async function open(subject: Subject): Promise<Opened> {
       if (before === undefined || after === undefined) {
         throw new Error('The server cannot render this pair');
       }
-      const root = document.createElement('div');
-      root.innerHTML = before.html;
-      document.body.append(root);
+      const root =
+        subject.document === true ? loadDocument(before.html) : document.createElement('div');
+      if (subject.document !== true) {
+        root.innerHTML = before.html;
+        document.body.append(root);
+      }
       try {
         const page: Page = {
           root,
@@ -146,11 +195,18 @@ export async function open(subject: Subject): Promise<Opened> {
           dynamic: structuredClone(before.state.dynamic),
         };
         await clientExports.createPatch(patchList)(page, from, to);
+        if (subject.document === true) {
+          const parsed = new DOMParser().parseFromString(after.html, 'text/html');
+          // The roots are the document elements, so compare the documents to include their attributes.
+          return compareTrees(root.ownerDocument, parsed, isScript);
+        }
         const fresh = document.createElement('div');
         fresh.innerHTML = after.html;
         return compareTrees(root, fresh, isScript);
       } finally {
-        root.remove();
+        if (subject.document !== true) {
+          root.remove();
+        }
       }
     },
     close() {

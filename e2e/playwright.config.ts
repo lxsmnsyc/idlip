@@ -5,14 +5,15 @@ const port = Number(process.env.E2E_PORT ?? 4173);
 const countersPort = Number(process.env.E2E_COUNTERS_PORT ?? 4174);
 const subsPort = Number(process.env.E2E_SUBS_PORT ?? 4175);
 const hotPort = Number(process.env.E2E_HOT_PORT ?? 4576);
+const packagesPort = Number(process.env.E2E_PACKAGES_PORT ?? 4177);
 
 // `example` (default) serves the built `examples/todo`, `examples/counters` and
-// `examples/counters-subs`: run `pnpm build` first. `fixture` serves the golden todo fixture and
-// skips the other two. The todo servers answer `GET /?props=<json>` with the page rendered for
-// those props.
+// `examples/counters-subs` with the Node server that Nitro writes (`.output/server/index.mjs`):
+// run `pnpm build` first. `fixture` serves the golden todo fixture and skips the other two. The
+// todo servers answer `GET /?props=<json>` with the page rendered for those props.
 const targets = {
   fixture: { command: 'node fixture/server.ts', cwd: '.' },
-  example: { command: `pnpm --filter todo preview --port ${port} --strictPort`, cwd: '..' },
+  example: { command: 'node .output/server/index.mjs', cwd: '../examples/todo' },
 };
 
 const name = process.env.E2E_TARGET ?? 'example';
@@ -46,23 +47,24 @@ function createServer(
 
 const todoServer = createServer(target.command, target.cwd, port);
 const countersServer = createServer(
-  `pnpm --filter counters preview --port ${countersPort} --strictPort`,
-  '..',
+  'node .output/server/index.mjs',
+  '../examples/counters',
   countersPort,
 );
 const subsServer = createServer(
-  `pnpm --filter counters-subs preview --port ${subsPort} --strictPort`,
-  '..',
+  'node .output/server/index.mjs',
+  '../examples/counters-subs',
   subsPort,
 );
 
 // `vite dev` of copies of the todo and of `counters-subs` (`fixture/hot-app.ts`), for the hot
 // update tests, which edit the copies. The dev server answers a page only to a request that
 // accepts HTML, so the check reads its client.
-function createHotServer(example: string, at: number): ReturnType<typeof createServer> {
+function createHotServer(example: string, at: number, mode = ''): ReturnType<typeof createServer> {
+  const copy = mode === '' ? example : `${example}-${mode}`;
   return {
     ...createServer(
-      `node e2e/fixture/hot-app.ts ${example} && cd e2e/.hot/${example} && ./node_modules/.bin/vite --port ${at} --strictPort --host 127.0.0.1`,
+      `node e2e/fixture/hot-app.ts ${example} ${mode} && cd e2e/.hot/${copy} && ./node_modules/.bin/vite --port ${at} --strictPort --host 127.0.0.1`,
       '..',
       at,
     ),
@@ -70,6 +72,19 @@ function createHotServer(example: string, at: number): ReturnType<typeof createS
   };
 }
 const hotServer = createHotServer('todo', hotPort);
+// The same copy of the todo without Nitro, served by the dev middleware of the plugin.
+const hotFallbackServer = createHotServer('todo', hotPort + 2, 'fallback');
+// Copies of the todo for the stylesheet tests, which `hot.spec.ts` must not edit under them.
+const stylesServer = createHotServer('todo', hotPort + 3, 'styles');
+const stylesFallbackServer = createHotServer('todo', hotPort + 4, 'styles-fallback');
+// The package-components example, built, and its dev copies with and without Nitro.
+const packagesServer = createServer(
+  'node .output/server/index.mjs',
+  '../examples/package-components',
+  packagesPort,
+);
+const packagesDevServer = createHotServer('package-components', hotPort + 5);
+const packagesFallbackServer = createHotServer('package-components', hotPort + 6, 'fallback');
 const hotChildrenServer = createHotServer('counters-subs', hotPort + 1);
 
 export default defineConfig({
@@ -81,15 +96,45 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      testIgnore: /(nested(-subscribe)?|hot|hot-children)\.spec\.ts/,
+      testIgnore: /(nested(-subscribe)?|hot|hot-children|packages)\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], baseURL: `http://127.0.0.1:${port}` },
     },
     ...(withApps
       ? [
           {
             name: 'hot',
-            testMatch: /hot\.spec\.ts/,
+            testMatch: /\/hot\.spec\.ts/,
             use: { ...devices['Desktop Chrome'], baseURL: `http://127.0.0.1:${hotPort}` },
+          },
+          {
+            name: 'hot-fallback',
+            testMatch: /\/hot\.spec\.ts/,
+            use: { ...devices['Desktop Chrome'], baseURL: `http://127.0.0.1:${hotPort + 2}` },
+          },
+          {
+            name: 'styles',
+            testMatch: /\/styles(-hot)?\.spec\.ts/,
+            use: { ...devices['Desktop Chrome'], baseURL: `http://127.0.0.1:${hotPort + 3}` },
+          },
+          {
+            name: 'styles-fallback',
+            testMatch: /\/styles(-hot)?\.spec\.ts/,
+            use: { ...devices['Desktop Chrome'], baseURL: `http://127.0.0.1:${hotPort + 4}` },
+          },
+          {
+            name: 'packages',
+            testMatch: /\/packages\.spec\.ts/,
+            use: { ...devices['Desktop Chrome'], baseURL: `http://127.0.0.1:${packagesPort}` },
+          },
+          {
+            name: 'packages-dev',
+            testMatch: /\/packages\.spec\.ts/,
+            use: { ...devices['Desktop Chrome'], baseURL: `http://127.0.0.1:${hotPort + 5}` },
+          },
+          {
+            name: 'packages-fallback',
+            testMatch: /\/packages\.spec\.ts/,
+            use: { ...devices['Desktop Chrome'], baseURL: `http://127.0.0.1:${hotPort + 6}` },
           },
           {
             name: 'hot-children',
@@ -110,6 +155,18 @@ export default defineConfig({
       : []),
   ],
   webServer: withApps
-    ? [todoServer, countersServer, subsServer, hotServer, hotChildrenServer]
+    ? [
+        todoServer,
+        countersServer,
+        subsServer,
+        hotServer,
+        hotChildrenServer,
+        hotFallbackServer,
+        stylesServer,
+        stylesFallbackServer,
+        packagesServer,
+        packagesDevServer,
+        packagesFallbackServer,
+      ]
     : [todoServer],
 });

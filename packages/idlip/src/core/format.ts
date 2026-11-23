@@ -68,6 +68,10 @@ export interface Manifest {
   readonly fallback?: Readonly<Record<string, string>>;
   /** True when the view has a `<Head>`, which the loader serves. Absent otherwise. */
   readonly head?: true;
+  /** True when the view is a document (`<html>` with one `<head>` and one `<body>`). */
+  readonly document?: true;
+  /** True when `<html>` or `<body>` has a bound attribute: the state script roots the page at `<html>`. */
+  readonly documentRoot?: true;
   /** Binding groups by key, ordered so a group comes before the groups it covers. */
   readonly groups: Readonly<Record<string, BindingGroup>>;
   /** `<For>` blocks by binding id, written as a string. */
@@ -164,6 +168,13 @@ export const HELPERS_KEY = 'helpers';
  * templates that more than one chunk renders, and the loader loads it with the helpers module.
  */
 export const TEMPLATES_KEY = 'templates';
+
+/**
+ * The key of the loader module's URL in the chunk map of a server module. The plugin writes it
+ * in a build and in dev. The server drops it from the state script and returns it as
+ * `RenderResult.loader`, since only the document's loader script needs it.
+ */
+export const LOADER_KEY = 'loader';
 
 /** The module a chunk imports the templates of more than one chunk from. */
 export const TEMPLATES_MODULE = 'idlip/templates';

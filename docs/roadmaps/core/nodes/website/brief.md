@@ -27,6 +27,9 @@ shared: []
 reserves: []
 provides: []
 depends_on:
+  - on: repl-origin
+    kind: hard
+    why: the public site must not run share-link code on its own origin
   - on: website-search
     kind: hard
     why: the public site needs its search

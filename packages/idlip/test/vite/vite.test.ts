@@ -173,8 +173,12 @@ describe('vite build', () => {
         expect(listExports(readFileSync(file, 'utf8')), id).toEqual(listExports(source));
       }
     }
-    // The build id (`skew`) and the shared helpers module are the keys that are not chunks.
-    expect(Object.keys(urls).toSorted()).toEqual([...expected, 'build', 'helpers'].toSorted());
+    // The build id (`skew`), the loader URL and the shared helpers module are the keys that are
+    // not chunks.
+    expect(Object.keys(urls).toSorted()).toEqual(
+      [...expected, 'build', 'helpers', 'loader'].toSorted(),
+    );
+    expect(urls.loader).toMatch(/^\/assets\/.+\.js$/);
     expect(urls.helpers).toMatch(/^\/assets\/_idlip-helpers-[\w-]+\.js$/);
     // Besides the chunks, only the loader (`idlip/client`) and the files it imports statically, which
     // the page loads at boot.

@@ -38,7 +38,7 @@ export default defineConfig({
   },
   // The WebAssembly binding loads its own files, so the dev server leaves it as it is.
   optimizeDeps: { exclude: ['oxc-parser', '@oxc-parser/binding-wasm32-wasi'] },
-  // The REPL's render worker, runtime and service worker are module workers.
+  // The REPL's render worker and runtime are module workers.
   worker: { format: 'es' },
   build: {
     outDir: 'dist/client',

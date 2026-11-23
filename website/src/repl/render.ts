@@ -104,7 +104,7 @@ export async function renderProject(
   if (!isServerModule(loaded)) {
     throw new TypeError(`${entry.name} has no default export to render`);
   }
-  const page = await server.renderPage(loaded.default, project.props);
+  const page = await server.render(loaded.default, project.props);
   return { head: page.head, body: page.body };
 }
 

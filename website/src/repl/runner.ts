@@ -1,10 +1,13 @@
-// A runner compiles the files of one editor, asks the worker to render them, and stores the run
-// for its frame. Each runner keeps its own run folder, so two live samples on one page keep each
-// other's chunks. `run.ts` gives it the browser services, and the tests give it fakes.
+// A runner compiles the files of one editor, asks the worker to render them, and writes the
+// document of the sandboxed frame that runs them. The document holds the run's chunks, so the run
+// needs no server and no storage, and the frame needs no origin. Each runner has its own run
+// folder, which names the chunks of its frame. `run.ts` gives it the browser services, and the
+// tests give it fakes.
 import { listChunks, writeFrameShim } from './chunks.ts';
 import type { ServedChunk } from './chunks.ts';
 import type { ReplFile } from './files.ts';
-import { writeFrameDocument } from './frame-document.ts';
+import { writeSandboxDocument } from './frame-document.ts';
+import type { FrameModule } from './frame-document.ts';
 import { compileProject } from './project.ts';
 import type { Project } from './project.ts';
 import type { Rendered } from './render.ts';
@@ -16,8 +19,17 @@ export const RENDER_LIMIT = 5000;
 export type RunResult =
   /** Compiled only: the reader has not chosen to run it, or a file has an error. */
   | { kind: 'compiled'; project: Project }
-  | { kind: 'served'; project: Project; url: string; chunks: ServedChunk[]; rendered: Rendered }
-  /** Compiled, but the render or the service worker failed. */
+  | {
+      kind: 'served';
+      project: Project;
+      /** The `srcdoc` of the sandboxed frame. */
+      document: string;
+      /** The name of the run folder, which the chunk URLs of the frame start with. */
+      url: string;
+      chunks: ServedChunk[];
+      rendered: Rendered;
+    }
+  /** Compiled, but the render failed. */
   | { kind: 'failed'; project: Project; message: string };
 
 /**
@@ -31,23 +43,18 @@ export type Runner = (
 ) => Promise<RunResult>;
 
 export interface RunnerServices {
-  /** Starts the service worker once and gives the URL of the folder it serves. */
-  serve: () => Promise<string>;
+  /** The URL of the folder that names the chunks of every run of the page. */
+  base: () => string;
+  /** The origin of the page, the only one the frame sends messages to. */
+  origin: () => string;
   ask: Ask;
-  /** Puts a run in the cache. Drops the older runs under `own`. */
-  store: (
-    own: string,
-    folder: string,
-    document: string,
-    chunks: readonly ServedChunk[],
-  ) => Promise<void>;
-  /** The URL of the loader module of the frame. */
-  runtime: () => string;
+  /** The code of the loader module of the frame. */
+  loadRuntime: () => Promise<string>;
   createId: () => string;
-  /** Makes a module URL for code, and revokes one. */
-  createUrl: (code: string) => string;
-  revokeUrl: (url: string) => void;
 }
+
+/** The file name of the module that gives the chunks the loader of the frame. */
+const SHIM_PATH = 'idlip-frame.js';
 
 /** Counts the requests to the worker, across every runner of the page. */
 let requests = 0;
@@ -59,7 +66,6 @@ function getMessage(error: unknown): string {
 export function createRunner(services: RunnerServices): Runner {
   const owner = services.createId();
   let runs = 0;
-  let shim: string | undefined;
 
   return async (files, styles, render) => {
     const project = compileProject(files);
@@ -67,30 +73,31 @@ export function createRunner(services: RunnerServices): Runner {
       return { kind: 'compiled', project };
     }
     try {
-      const own = `${await services.serve()}${owner}/`;
       const run = ++runs;
-      const folder = `${own}${run}/`;
-
-      // The chunks read the loader through a module URL, which the network panel does not list:
-      // an app build has no such file. The run before this one is gone with its frame.
-      if (shim !== undefined) {
-        services.revokeUrl(shim);
-      }
-      shim = services.createUrl(writeFrameShim(project));
-      const chunks = listChunks(project, folder, shim);
+      const folder = `${services.base()}${owner}/${run}/`;
+      const chunks = listChunks(project, folder, `${folder}${SHIM_PATH}`);
 
       const answer = await services.ask({ id: ++requests, project, chunks, folder }, RENDER_LIMIT);
       if (answer.kind === 'failed') {
         return { kind: 'failed', project, message: `The server render failed: ${answer.message}` };
       }
-      const document = writeFrameDocument({
+
+      // The chunks read the loader through the shim, and import each other by their URLs.
+      const modules: FrameModule[] = [
+        { url: `${folder}${SHIM_PATH}`, name: '', code: writeFrameShim(project) },
+      ];
+      for (const chunk of chunks) {
+        modules.push({ url: `${folder}${chunk.path}`, name: chunk.path, code: chunk.code });
+      }
+      const document = writeSandboxDocument({
         rendered: answer.rendered,
         styles,
-        runtime: services.runtime(),
+        runtime: await services.loadRuntime(),
+        modules,
         run,
+        origin: services.origin(),
       });
-      await services.store(own, folder, document, chunks);
-      return { kind: 'served', project, url: folder, chunks, rendered: answer.rendered };
+      return { kind: 'served', project, document, url: folder, chunks, rendered: answer.rendered };
     } catch (error) {
       return { kind: 'failed', project, message: getMessage(error) };
     }

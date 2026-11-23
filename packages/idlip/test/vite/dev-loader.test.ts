@@ -37,9 +37,11 @@ describe('the dev loader', () => {
       const port = typeof address === 'object' && address !== null ? address.port : 0;
       const response = await fetch(`http://127.0.0.1:${port}/@id/idlip/client`);
       const code = await response.text();
-      // One import, of the URL a chunk's `import 'idlip/client'` gets, and no loader code.
+      // Vite's client first, so a page needs no markup for it. Then one import, of the URL a
+      // chunk's `import 'idlip/client'` gets, and no loader code.
       const chunk = await vite.environments.client.transformRequest('/src/chunk.js');
-      const imported = /^import ["']([^"']+)["']/m.exec(code)?.[1];
+      expect(/^import ["']([^"']+)["']/m.exec(code)?.[1]).toBe('/@vite/client');
+      const imported = /^import ["']([^"']*src\/client\/index\.ts)["']/m.exec(code)?.[1];
       expect(imported).toMatch(/src\/client\/index\.ts$/);
       expect(chunk?.code).toContain(`import "${imported}"`);
       expect(code).not.toContain('resume(');

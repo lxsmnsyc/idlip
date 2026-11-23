@@ -285,7 +285,7 @@ export default function Inbox(): JSX.Element {
 }
 ```
 
-`render()` of `idlip/server` drops the head elements. Use `renderPage()`, which returns `{ head, body }`.
+`renderToResponse()` and `renderToStream()` of `idlip/server` write the head elements into `<head>`. See [Document head](./head.md).
 
 ### Subscribe
 

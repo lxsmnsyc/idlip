@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from 'vitest';
 import { resume } from '../../src/client/loader/resume.ts';
-import { getLoaded, release, setup } from '../client/loader/helpers.ts';
+import { getLoaded, release, setup, until } from '../client/loader/helpers.ts';
 import type { Harness } from '../client/loader/helpers.ts';
 
 let harness: Harness | undefined;
@@ -47,6 +47,8 @@ describe('resume().settled', () => {
     release('handler=add');
     await waiting;
     // The binding chunk of the write set loads with the handler chunk.
+    // A binding chunk starts beside the handler chunk, and `settled` does not wait for it.
+    await until(() => getLoaded().length >= 2);
     expect(getLoaded().toSorted()).toEqual(['binding=count', 'handler=add']);
     expect(harness.patch).toHaveBeenCalledTimes(1);
   });

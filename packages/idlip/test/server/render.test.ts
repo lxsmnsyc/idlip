@@ -3,7 +3,16 @@ import { join } from 'node:path';
 import { runInNewContext } from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
 import type { PageState, RenderContext } from '../../src/core/format.ts';
-import { attr, on, render, renderPage, text } from '../../src/server/index.ts';
+import { attr, on, render, text } from '../../src/server/index.ts';
+
+/** The body markup of a render, for the tests that read the page as a string. */
+async function renderBody<P>(
+  component: (props: P) => unknown,
+  props: P,
+  options?: { nonce?: string },
+): Promise<string> {
+  return (await render(component, props, options)).body;
+}
 
 // Compiled fixture modules import the helpers from the package. Point them at this source.
 vi.mock('idlip/server', async () => import('../../src/server/index.ts'));
@@ -39,7 +48,7 @@ for (const name of ['counter', 'todo']) {
       if (!isComponent(component)) {
         throw new TypeError('bad module');
       }
-      const html = await render(component, input.props);
+      const html = await renderBody(component, input.props);
       expect(html).toBe(readText(join(dir, 'expected/page.html')).trimEnd());
     });
   });
@@ -72,7 +81,7 @@ describe('escaping', () => {
   });
 
   it('keeps a hostile model string from ending the script or the markup', async () => {
-    const html = await render(makeComponent({ s: hostile }), {});
+    const html = await renderBody(makeComponent({ s: hostile }), {});
     const [markup = '', script = ''] = html.split('<script i-state>');
     // Text escapes `<`. The attribute escapes `"`, so `<` inside its quotes is inert.
     expect(markup).toContain('<p>&lt;/script&gt;&lt;!-- "q"');
@@ -98,18 +107,18 @@ describe('escaping', () => {
 
 describe('nonce', () => {
   it('is written on the state script', async () => {
-    const html = await render(makeComponent({ s: 'x' }), {}, { nonce: 'n"1' });
+    const html = await renderBody(makeComponent({ s: 'x' }), {}, { nonce: 'n"1' });
     expect(html).toContain('<script i-state nonce="n&quot;1">');
   });
 
   it('is absent by default', async () => {
-    expect(await render(makeComponent({ s: 'x' }), {})).toContain('<script i-state>');
+    expect(await renderBody(makeComponent({ s: 'x' }), {})).toContain('<script i-state>');
   });
 });
 
 describe('state', () => {
   it('requires the component to record its state', async () => {
-    await expect(render(() => '', {})).rejects.toThrow('recorded no state');
+    await expect(renderBody(() => '', {})).rejects.toThrow('recorded no state');
   });
 });
 
@@ -127,7 +136,7 @@ describe('state values', () => {
   }
 
   it('does not write the stack of an Error', async () => {
-    const html = await render(recordState({ error: new Error('boom') }), {});
+    const html = await renderBody(recordState({ error: new Error('boom') }), {});
     expect(html).toContain('boom');
     expect(html).not.toContain('stack');
     expect(html).not.toContain('node_modules');
@@ -135,15 +144,15 @@ describe('state values', () => {
 
   it('names the model path of a value that does not serialize', async () => {
     const model = { todos: [{ id: 'a', ref: Symbol('x') }] };
-    await expect(render(recordState(model), {})).rejects.toThrow('`model.todos.0.ref`');
-    await expect(render(recordState({ url: new URL('http://a') }), {})).rejects.toThrow(
+    await expect(renderBody(recordState(model), {})).rejects.toThrow('`model.todos.0.ref`');
+    await expect(renderBody(recordState({ url: new URL('http://a') }), {})).rejects.toThrow(
       '`model.url`',
     );
   });
 
   it('names the props path', async () => {
     const props = { deep: { p: Promise.resolve() } };
-    await expect(render(recordState({}, props), {})).rejects.toThrow('`props.deep.p`');
+    await expect(renderBody(recordState({}, props), {})).rejects.toThrow('`props.deep.p`');
   });
 
   it('escapes a hostile class key and a hostile event payload', () => {
@@ -179,8 +188,8 @@ describe('kept module data', () => {
   }
 
   it('writes the model of each render next to the same manifest and chunks', async () => {
-    const first = await render(recordModel({ n: 1 }), {});
-    const second = await render(recordModel({ n: 2 }), {});
+    const first = await renderBody(recordModel({ n: 1 }), {});
+    const second = await renderBody(recordModel({ n: 2 }), {});
     expect(decode(first)).toEqual({
       manifest,
       chunks: { '/k?idlip-handler=go&lang.js': '/a/go.js' },
@@ -196,7 +205,7 @@ describe('kept module data', () => {
 
   it('keeps a value that the model shares', async () => {
     const shared = { x: 1 };
-    const state = decode(await render(recordModel({ a: shared, b: shared }), {}));
+    const state = decode(await renderBody(recordModel({ a: shared, b: shared }), {}));
     const model: unknown = Reflect.get(Object(state), 'model');
     expect(Reflect.get(Object(model), 'a')).toBe(Reflect.get(Object(model), 'b'));
     expect(Reflect.get(Object(state), 'manifest')).toEqual(manifest);
@@ -222,9 +231,9 @@ describe('kept module data', () => {
         return '';
       };
     }
-    const first = decode(await render(withChild(true), {}));
+    const first = decode(await renderBody(withChild(true), {}));
     expect(Reflect.get(Object(first), 'modules')).toHaveProperty(['/c']);
-    const html = await render(withChild(false), {});
+    const html = await renderBody(withChild(false), {});
     const second = decode(html);
     expect(second).not.toHaveProperty('modules');
     expect(second).not.toHaveProperty('slots');
@@ -235,7 +244,7 @@ describe('kept module data', () => {
   it('returns the chunk URLs and manifests that renderPreload reads, children included', async () => {
     const childManifest = { module: '/c', events: [], handlers: {}, groups: {}, lists: {} };
     const child = { manifest: childManifest, chunks: { '/c?idlip-list=1&lang.js': '/a/c.js' } };
-    const page = await renderPage((_props: unknown, context?: RenderContext) => {
+    const page = await render((_props: unknown, context?: RenderContext) => {
       context?.state({ manifest, chunks, model: {}, props: {}, uses: [child] } as PageState);
       return '';
     }, {});
@@ -251,8 +260,8 @@ describe('kept module data', () => {
   });
 
   it('writes the nonce on a kept part', async () => {
-    await render(recordModel({}), {});
-    expect(await render(recordModel({}), {}, { nonce: 'n1' })).toContain(
+    await renderBody(recordModel({}), {});
+    expect(await renderBody(recordModel({}), {}, { nonce: 'n1' })).toContain(
       '<script i-state i-build="abc123" nonce="n1">',
     );
   });

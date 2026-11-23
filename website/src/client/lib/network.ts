@@ -74,6 +74,83 @@ function showEmpty(list: HTMLElement, text: string): void {
   list.replaceChildren(empty);
 }
 
+/** Rows of a network panel: the load and the events after it. */
+interface PanelView {
+  /** Empties the panel for a new document. */
+  reset: () => void;
+  add: (group: 'load' | 'events', label: string, size: number | undefined, isCode: boolean) => void;
+}
+
+function createPanelView(panel: NetworkPanel): PanelView {
+  const code = { load: 0, events: 0 };
+  const seen = { load: false, events: false };
+  return {
+    reset: () => {
+      code.load = 0;
+      code.events = 0;
+      seen.load = false;
+      seen.events = false;
+      showEmpty(panel.load, 'No request');
+      showEmpty(panel.events, 'Nothing yet. Check a todo.');
+      panel.loadCode.textContent = formatSize(0);
+      panel.eventsCode.textContent = formatSize(0);
+    },
+    add: (group, label, size, isCode) => {
+      const list = panel[group];
+      if (!seen[group]) {
+        seen[group] = true;
+        list.replaceChildren();
+      }
+      list.append(createRow(label, size));
+      if (isCode) {
+        code[group] += size ?? 0;
+        const total = group === 'load' ? panel.loadCode : panel.eventsCode;
+        total.textContent = formatSize(code[group]);
+      }
+    },
+  };
+}
+
+/**
+ * The network panel of a frame without an origin, which the page cannot observe. The frame
+ * reports each chunk that runs (`idlipChunk` messages), and the page lists it. The sizes are
+ * the bytes of the code, since nothing travels over the network.
+ */
+export interface MessagePanel {
+  /** A new document: its path and size are the first row. */
+  start: (path: string, bytes: number) => void;
+  /** Handles a message of the frame. Returns false when it is not a chunk report. */
+  receive: (data: unknown) => boolean;
+}
+
+export function createMessagePanel(panel: NetworkPanel): MessagePanel {
+  const view = createPanelView(panel);
+  view.reset();
+  return {
+    start: (path, bytes) => {
+      view.reset();
+      view.add('load', `GET ${path}`, bytes, false);
+    },
+    receive: (data) => {
+      if (typeof data !== 'object' || data === null) {
+        return false;
+      }
+      const name: unknown = Reflect.get(data, 'idlipChunk');
+      const size: unknown = Reflect.get(data, 'size');
+      if (typeof name !== 'string' || typeof size !== 'number') {
+        return false;
+      }
+      view.add(
+        Reflect.get(data, 'afterEvent') === true ? 'events' : 'load',
+        name,
+        size,
+        COMPONENT_CHUNK.test(name),
+      );
+      return true;
+    },
+  };
+}
+
 /**
  * Lists the requests of the frame's current document, and the ones it makes later. Call it on
  * each `load` of the frame. Returns a function that stops watching.
@@ -85,29 +162,19 @@ export function watchFrame(frame: HTMLIFrameElement, panel: NetworkPanel): () =>
     return () => {};
   }
   let eventAt = Number.POSITIVE_INFINITY;
-  const code = { load: 0, events: 0 };
-  showEmpty(panel.load, 'No request');
-  showEmpty(panel.events, 'Nothing yet. Check a todo.');
-  panel.loadCode.textContent = formatSize(0);
-  panel.eventsCode.textContent = formatSize(0);
-  const seen = { load: false, events: false };
+  const rows = createPanelView(panel);
+  rows.reset();
 
   function add(entry: PerformanceResourceTiming): void {
     if (!view) {
       return;
     }
-    const group = entry.startTime >= eventAt ? 'events' : 'load';
-    const list = panel[group];
-    if (!seen[group]) {
-      seen[group] = true;
-      list.replaceChildren();
-    }
-    list.append(createRow(getLabel(entry, view), getSize(entry)));
-    if (COMPONENT_CHUNK.test(entry.name)) {
-      code[group] += getSize(entry) ?? 0;
-      const total = group === 'load' ? panel.loadCode : panel.eventsCode;
-      total.textContent = formatSize(code[group]);
-    }
+    rows.add(
+      entry.startTime >= eventAt ? 'events' : 'load',
+      getLabel(entry, view),
+      getSize(entry),
+      COMPONENT_CHUNK.test(entry.name),
+    );
   }
 
   // The first pointer or key event in the frame splits the load from the events.

@@ -1,5 +1,5 @@
 // oxlint-disable import/prefer-default-export
-// Builds `examples/todo` into the site, renders its page with idlip's own `render()`, and
+// Builds `examples/todo` into the site, renders its page with the `fetch` of its server entry, and
 // measures what the landing page shows about it.
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -17,14 +17,16 @@ const STYLES = fileURLToPath(new URL('../styles.css', import.meta.url));
 const FRAME_STYLES = fileURLToPath(new URL('frame.css', import.meta.url));
 
 interface PageModule {
-  render(url: string, options: { loader: string }): Promise<string>;
+  default: { fetch(request: Request): Promise<Response> };
 }
 
 function isPageModule(value: unknown): value is PageModule {
+  const exported: unknown =
+    typeof value === 'object' && value !== null ? Reflect.get(value, 'default') : undefined;
   return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof Reflect.get(value, 'render') === 'function'
+    typeof exported === 'object' &&
+    exported !== null &&
+    typeof Reflect.get(exported, 'fetch') === 'function'
   );
 }
 
@@ -196,9 +198,11 @@ export async function buildDemo(outDir: string, base: string): Promise<DemoData>
   // Render the page with the example's own entry, then add the frame styles to its head.
   const loaded: unknown = await import(pathToFileURL(path.join(serverDir, 'entry-server.js')).href);
   if (!isPageModule(loaded)) {
-    throw new TypeError('The demo server entry exports no render(url, options)');
+    throw new TypeError('The demo server entry has no default export { fetch(request) }');
   }
-  const page = await loaded.render('/', { loader: `${base}${loader.path}` });
+  // The entry asks for a nonce and a policy, which a static page cannot use, so the nonces go.
+  const answer = await loaded.default.fetch(new Request('http://localhost/'));
+  const page = (await answer.text()).replaceAll(/ nonce="[^"]*"/g, '');
   const styles = `${readTokens()}\n${readFileSync(FRAME_STYLES, 'utf8')}`
     .replaceAll('url(/fonts/', `url(${base}fonts/`)
     .replaceAll(/\s*\n\s*/g, ' ');

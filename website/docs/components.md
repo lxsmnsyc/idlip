@@ -188,7 +188,7 @@ export default function Greeting({ name }: { name: string }) {
 }
 ```
 
-The server passes the props of the root component: `render(TodoApp, { initial })` from `idlip/server`. They go into the state script with the model, so they must serialize too.
+The server passes the props of the root component: `renderToResponse(TodoApp, { initial })` from `idlip/server`. They go into the state script with the model, so they must serialize too.
 
 ## Several components in one file
 

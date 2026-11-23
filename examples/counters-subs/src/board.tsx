@@ -1,4 +1,4 @@
-// A list of `Counter` children with a remove button each. Each row child is slotted by its key.
+// A document with a list of `Counter` children and a remove button each. Each row child is slotted by its key.
 // oxlint-disable typescript/no-confusing-void-expression, typescript/explicit-function-return-type
 import { For } from 'idlip';
 import type { JSX } from 'idlip/jsx-runtime';
@@ -20,11 +20,20 @@ export default function Board(props: { items: Item[] }): JSX.Element {
   }
 
   return (
-    <main>
-      <p>{total} counters</p>
-      <For each={items} key={(c) => c.id}>
-        {(c) => <Counter label={c.label} start={c.start} onRemove={() => remove(c.id)} />}
-      </For>
-    </main>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>counters</title>
+      </head>
+      <body>
+        <main>
+          <p>{total} counters</p>
+          <For each={items} key={(c) => c.id}>
+            {(c) => <Counter label={c.label} start={c.start} onRemove={() => remove(c.id)} />}
+          </For>
+        </main>
+      </body>
+    </html>
   );
 }

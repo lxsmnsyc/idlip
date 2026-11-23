@@ -16,6 +16,16 @@ function read(...parts: string[]): string {
   return readFileSync(join(...parts), 'utf8');
 }
 
+/** Reads the todo example. The harness loads a source from a data URL, which has no stylesheets. */
+function readTodoExample(): string {
+  return read(EXAMPLES, 'todo/src/todo.tsx')
+    .replace("import './todo.css';\n", '')
+    .replace(
+      "import styles from './todo.module.css';",
+      "const styles = { left: 'left', clear: 'clear' };",
+    );
+}
+
 export const SUBJECTS: readonly Subject[] = [
   { name: 'counter', source: read(FIXTURES, 'counter/counter.tsx'), props: { start: 3 } },
   { name: 'todo', source: read(FIXTURES, 'todo/todo.tsx'), props: { initial: TODOS } },
@@ -33,7 +43,20 @@ export const SUBJECTS: readonly Subject[] = [
     // The first row throws, and the next model makes it valid.
     pairs: (initial) => [[initial, { ...initial, items: [{ id: 1, n: 4 }] }]],
   },
-  { name: 'example-todo', source: read(EXAMPLES, 'todo/src/todo.tsx'), props: { initial: TODOS } },
+  {
+    // The example renders its own document.
+    name: 'example-todo',
+    source: readTodoExample(),
+    props: { initial: TODOS },
+    document: true,
+  },
+  {
+    // A document: `<html lang>`, a bound `<body class>` and a head with a bound meta and title.
+    name: 'document',
+    source: read(import.meta.dirname, 'subjects/document.tsx'),
+    props: { count: 2 },
+    document: true,
+  },
   {
     // A default export with a named and a private child in the same file.
     name: 'widgets',

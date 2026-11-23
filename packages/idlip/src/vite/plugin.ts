@@ -1,5 +1,7 @@
 import { globSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import type { ServerResponse } from 'node:http';
+import { Readable, pipeline } from 'node:stream';
+import type { ReadableStream as NodeStream } from 'node:stream/web';
 import path from 'node:path';
 import { isRunnableDevEnvironment } from 'vite';
 import type {
@@ -17,6 +19,7 @@ import type { CompileOptions } from '../compiler/index.ts';
 import type { ChunkUrls, Compile, CompileDiagnostic, CompileResult } from '../core/format.ts';
 import {
   HELPERS_KEY,
+  LOADER_KEY,
   TEMPLATES_KEY,
   TEMPLATES_MODULE,
   getChunkFile,
@@ -26,7 +29,7 @@ import {
   splitModule,
 } from '../core/format.ts';
 import { getDefines, getFeatures, replaceFeatures } from './features.ts';
-import { HOT_EVENT, classifyEdit } from './hot.ts';
+import { HOT_EVENT, changesShell, classifyEdit } from './hot.ts';
 import {
   BUILDS_FILE,
   BUILD_FILE,
@@ -37,6 +40,17 @@ import {
   keepBuilds,
 } from './skew.ts';
 import { isChunkUrls, listChunks, parseChunkId, replaceChunkUrls } from './chunks.ts';
+import { STYLES_KEY } from '../server/styles.ts';
+import {
+  findPackage,
+  getPackageFile,
+  getPackageId,
+  getPackageSlug,
+  listPackageFiles,
+  readPackages,
+} from './packages.ts';
+import type { IdlipPackage } from './packages.ts';
+import { STYLES_PREFIX, cleanId, isScript, isStyle, isStyleModule, listImports } from './styles.ts';
 
 const MODULE_FILE = /\.tsx$/;
 
@@ -60,6 +74,24 @@ const DEV_LOADER_URL = '/@id/idlip/client';
 const HELPERS_ID = '\0idlip-helpers';
 /** The module chunks import the templates of more than one chunk from (`idlip/templates`). */
 const TEMPLATES_ID = '\0idlip-templates';
+/** The name of the plugin that Nitro's Vite integration registers. */
+const NITRO_PLUGIN = 'nitro:main';
+/**
+ * The id prefix of the client entry that imports the stylesheets of one module file. Nothing
+ * loads the entry: the bundler writes the stylesheets that it imports, and the plugin reads their
+ * names.
+ */
+const STYLES_ID = '\0idlip-styles:';
+/**
+ * The id prefix of a module that holds the class names of a CSS Module for one chunk: the object
+ * the stylesheet exports, inlined in the chunk. Why: a chunk that imported the stylesheet's own
+ * module would share it with the other chunks, and a click would load that file.
+ */
+const NAMES_ID = '\0idlip-names:';
+/** A stylesheet import that asks for the text or the URL, not for a link on the page. */
+const STYLE_QUERY = /[?&](?:inline|url|raw)(?:&|=|$)/;
+/** A default import in chunk code: `import styles from "./todo.module.css";`. */
+const DEFAULT_IMPORT = /^import\s+(\w+)\s+from\s+(["'])([^"'\n]+)\2;?[ \t]*$/gm;
 /** The default `modules` globs. */
 const DEFAULT_MODULES = ['src/**/*.tsx'];
 /** The id of a child's view chunk, with the component's name for a named component. */
@@ -74,11 +106,18 @@ export interface IdlipOptions {
   /** Globs of the idlip modules, relative to the root. Default: `src/**\/*.tsx`. */
   modules?: string | readonly string[];
   /**
-   * The server entry `vite dev` renders pages with, such as `/src/entry-server.ts`. It
-   * exports `render(url)`, which returns the page HTML. It is also the input of the ssr build
-   * when the config sets none.
+   * The server entry, such as `/src/entry-server.ts`. Its default export is `{ fetch(request) }`,
+   * which returns the page as a `Response`: Nitro calls it, and so does the dev middleware of
+   * this plugin when Nitro is not there. It is also the input of the ssr build when the config
+   * sets none.
    */
   entry?: string;
+  /**
+   * `false` keeps the plugin's dev middleware off, for a project whose own server renders the
+   * pages. The middleware is off already when the config has Nitro (`nitro()` from
+   * `nitro/vite`), which calls the entry itself.
+   */
+  server?: false;
   /**
    * The input of the client build: the loader. Default: `idlip/client`. Every module an idlip
    * chunk imports must be in its static graph, so a click loads no shared chunk.
@@ -178,10 +217,24 @@ function createBuild(
  * build of client and ssr, the client and server folders under `build.outDir`, and the
  * inputs of both.
  */
-function createConfig(user: UserConfig, options: IdlipOptions): UserConfig {
+function createConfig(
+  user: UserConfig,
+  options: IdlipOptions,
+  packages: readonly IdlipPackage[],
+): UserConfig {
   const environments: Partial<Record<string, EnvironmentOptions>> = user.environments ?? {};
   const outDir = user.build?.outDir ?? 'dist';
+  const names = packages.map((info) => info.name);
   return {
+    // A component package reaches the plugin as source: Vite neither bundles it for the browser
+    // nor leaves it external on the server, and the app and its packages share one runtime.
+    ...(names.length === 0
+      ? {}
+      : {
+          ssr: { noExternal: names },
+          optimizeDeps: { exclude: names },
+          resolve: { dedupe: ['idlip'] },
+        }),
     builder: {},
     environments: {
       client: {
@@ -206,13 +259,19 @@ function checkChunkImports(
   bundle: Rolldown.OutputBundle,
   chunkFiles: ReadonlySet<string>,
   sharedFiles: readonly string[],
+  styleFiles: ReadonlySet<string> = new Set(),
 ): void {
   const items: Partial<Rolldown.OutputBundle> = bundle;
   // Walk the static imports from every entry that is not an idlip chunk.
   const loaded = new Set<string>();
   const pending: string[] = [];
   for (const item of Object.values(bundle)) {
-    if (item.type === 'chunk' && item.isEntry && !chunkFiles.has(item.fileName)) {
+    if (
+      item.type === 'chunk' &&
+      item.isEntry &&
+      !chunkFiles.has(item.fileName) &&
+      !styleFiles.has(item.fileName)
+    ) {
       pending.push(item.fileName);
     }
   }
@@ -323,8 +382,38 @@ function findSharedTemplates(results: readonly CompileResult[]): Map<string, str
   return found;
 }
 
+/** Reads the `fetch` of the default export of the server entry. */
+function readFetch(module: unknown, entry: string): (request: Request) => unknown {
+  const exported: unknown =
+    typeof module === 'object' && module !== null ? Reflect.get(module, 'default') : undefined;
+  const handler: unknown =
+    typeof exported === 'object' && exported !== null ? Reflect.get(exported, 'fetch') : undefined;
+  if (typeof handler !== 'function') {
+    throw new TypeError(`${entry} has no default export { fetch(request) }`);
+  }
+  return (request): unknown => Reflect.apply(handler, exported, [request]) as unknown;
+}
+
+/** Makes the web request of a Node request. */
+function toRequest(request: Connect.IncomingMessage): Request {
+  const url = new URL(
+    request.originalUrl ?? request.url ?? '/',
+    `http://${request.headers.host ?? 'localhost'}`,
+  );
+  const headers = new Headers();
+  for (const [name, value] of Object.entries(request.headers)) {
+    if (typeof value === 'string') {
+      headers.set(name, value);
+    } else if (value !== undefined) {
+      headers.set(name, value.join(', '));
+    }
+  }
+  return new Request(url, { method: request.method, headers });
+}
+
 /**
- * Renders a page with the server entry, for `vite dev`.
+ * Renders a page with the server entry, for `vite dev` without Nitro: calls the `fetch` of its
+ * default export and sends the response.
  */
 async function servePage(
   server: ViteDevServer,
@@ -332,25 +421,29 @@ async function servePage(
   request: Connect.IncomingMessage,
   response: ServerResponse,
 ): Promise<void> {
-  const url = request.originalUrl ?? request.url ?? '/';
   const environment = server.environments.ssr;
   if (!isRunnableDevEnvironment(environment)) {
     throw new Error('idlip needs a runnable ssr environment to render pages in dev');
   }
   const module: unknown = await environment.runner.import(entry);
-  const render: unknown =
-    typeof module === 'object' && module !== null ? Reflect.get(module, 'render') : undefined;
-  if (typeof render !== 'function') {
-    throw new TypeError(`${entry} exports no render(url)`);
+  const answer: unknown = await readFetch(module, entry)(toRequest(request));
+  if (!(answer instanceof Response)) {
+    throw new TypeError(`fetch(request) in ${entry} returned no Response`);
   }
-  const html: unknown = await Reflect.apply(render, undefined, [url]);
-  if (typeof html !== 'string') {
-    throw new TypeError(`render(url) in ${entry} returned no string`);
+  response.statusCode = answer.status;
+  for (const [name, value] of answer.headers) {
+    response.setHeader(name, value);
   }
-  const page = await server.transformIndexHtml(url, html, request.originalUrl);
-  response.statusCode = 200;
-  response.setHeader('Content-Type', 'text/html; charset=utf-8');
-  response.end(page);
+  if (answer.body === null) {
+    response.end();
+  } else {
+    // `pipeline` cancels the web stream when the client leaves, so the render stops its pending
+    // work, and it ends the response when the stream fails, since an error here would crash `vite`.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+    pipeline(Readable.fromWeb(answer.body as NodeStream), response, () => {
+      response.destroy();
+    });
+  }
 }
 
 /**
@@ -368,6 +461,8 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
   let root = '';
   let base = '/';
   let isServe = false;
+  /** True when the config has Nitro, which serves the pages, or the `server` option is off. */
+  let standAside = options.server === false;
   /** Compiled modules by file, with the source they came from. */
   const cache = new Map<
     string,
@@ -393,9 +488,196 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
   let buildFiles: string[] = [];
   /** The templates that more than one chunk of the client build renders, by hash. */
   let shared: Map<string, string> | undefined;
+  /** The stylesheets that each module file reaches, for the client build's entries. */
+  const styleEntries = new Map<string, string[]>();
+  /** The dependencies of the app that publish components, found in `config`. */
+  let packages: IdlipPackage[] = [];
 
+  /** The module id of a file: the path from the root, or the package name and the path in it. */
   function getModuleId(file: string): string {
+    const info = findPackage(packages, toPosix(file));
+    if (info !== undefined) {
+      return getPackageId(info, toPosix(file));
+    }
     return `/${path.relative(root, file).split(path.sep).join('/')}`;
+  }
+
+  /** The file of a module id. */
+  function getFile(id: string): string {
+    return getPackageFile(packages, id) ?? path.join(root, id);
+  }
+
+  /** The URL that dev serves a chunk at: under the base, or `/@fs/` for a file of a package. */
+  function toChunkUrl(id: string): string {
+    if (id.startsWith('/')) {
+      return `${base}${id.slice(1)}`;
+    }
+    const query = id.indexOf('?');
+    const file = getFile(query < 0 ? id : id.slice(0, query));
+    return `${base}@fs${file}${query < 0 ? '' : id.slice(query)}`;
+  }
+
+  /** The URL that dev serves a stylesheet at: under the base, or `/@fs/` outside the root. */
+  function toStyleUrl(id: string): string {
+    const relative = path.relative(root, id);
+    const url = relative.startsWith('..')
+      ? `${base}@fs${toPosix(id)}`
+      : `${base}${toPosix(relative)}`;
+    return encodeURI(url);
+  }
+
+  /**
+   * Lists the stylesheets that a file's import graph reaches, in import order: the file's own
+   * imports first, then those of each script it imports, outside `node_modules`. A child
+   * component's file is a script of the graph, so a parent lists the stylesheets of its children.
+   */
+  async function findStyles(context: Rolldown.PluginContext, file: string): Promise<string[]> {
+    const found = new Set<string>();
+    const seen = new Set<string>();
+    async function visit(current: string): Promise<void> {
+      if (seen.has(current)) {
+        return;
+      }
+      seen.add(current);
+      let source: string;
+      try {
+        source = readFileSync(current, 'utf8');
+      } catch {
+        return;
+      }
+      for (const specifier of listImports(current, source)) {
+        // oxlint-disable-next-line no-await-in-loop
+        const target = await context.resolve(specifier, current);
+        if (target === null || Boolean(target.external) || target.id.startsWith('\0')) {
+          continue;
+        }
+        const id = cleanId(target.id);
+        if (isStyle(id)) {
+          if (!STYLE_QUERY.test(target.id)) {
+            found.add(id);
+          }
+        } else if (isScript(id, findPackage(packages, id) !== undefined)) {
+          // oxlint-disable-next-line no-await-in-loop
+          await visit(id);
+        }
+      }
+    }
+    await visit(file);
+    return [...found];
+  }
+
+  /**
+   * Writes the stylesheet URLs of each module file into the chunk map, from the bundle's entries
+   * for them, and returns the files of those entries. A chunk's stylesheets are its own and those
+   * of the chunks it imports, the imported ones first, as Vite orders them.
+   */
+  function readStyleFiles(
+    bundle: Rolldown.OutputBundle,
+    prefix: string,
+    urls: Record<string, string>,
+  ): Set<string> {
+    const items: Partial<Rolldown.OutputBundle> = bundle;
+    const entries = new Set<string>();
+    for (const item of Object.values(bundle)) {
+      if (item.type === 'chunk' && item.facadeModuleId?.startsWith(STYLES_ID) === true) {
+        entries.add(item.fileName);
+        const file = item.facadeModuleId.slice(STYLES_ID.length);
+        // The import order of the sources, which the links must follow: the first source that a
+        // sheet holds sets its place, whatever order the bundler wrote the chunks in.
+        const order = (styleEntries.get(file) ?? []).map((id) => cleanId(id));
+        const sheets = new Map<string, number>();
+        const visited = new Set<string>();
+        function visit(name: string): void {
+          const chunk = items[name];
+          if (chunk?.type !== 'chunk' || visited.has(name)) {
+            return;
+          }
+          visited.add(name);
+          for (const imported of chunk.imports) {
+            visit(imported);
+          }
+          let place = order.length;
+          for (const id of chunk.moduleIds) {
+            const index = order.indexOf(cleanId(id));
+            if (index >= 0 && index < place) {
+              place = index;
+            }
+          }
+          for (const sheet of chunk.viteMetadata?.importedCss ?? []) {
+            sheets.set(sheet, Math.min(place, sheets.get(sheet) ?? place));
+          }
+        }
+        visit(item.fileName);
+        const list: string[] = [];
+        for (const [sheet] of [...sheets].toSorted((a, b) => a[1] - b[1])) {
+          list.push(encodeURI(`${prefix}${sheet}`));
+        }
+        urls[`${STYLES_PREFIX}${getModuleId(file)}`] = list.join(' ');
+      }
+    }
+    // Nothing loads the entries: the stylesheets are what they were for. A chunk that only the
+    // entries import (the class object of a CSS Module that two entries share) goes with them.
+    const dropped = [...entries];
+    for (const file of dropped) {
+      const item = items[file];
+      Reflect.deleteProperty(bundle, file);
+      if (item?.type !== 'chunk') {
+        continue;
+      }
+      for (const imported of item.imports) {
+        const other = items[imported];
+        if (other?.type !== 'chunk' || other.isEntry || entries.has(imported)) {
+          continue;
+        }
+        let used = false;
+        for (const rest of Object.values(bundle)) {
+          used ||= rest.type === 'chunk' && rest.imports.includes(imported);
+        }
+        if (!used) {
+          entries.add(imported);
+          dropped.push(imported);
+        }
+      }
+    }
+    return entries;
+  }
+
+  /**
+   * Replaces each default import of a CSS Module in the code of a chunk with the module's class
+   * object, written in the chunk. Why: an import of a separate module makes the bundler move the
+   * chunk's code into a common chunk, and a click would load a stub and then that chunk.
+   */
+  async function inlineNames(
+    context: Rolldown.PluginContext,
+    code: string,
+    file: string,
+  ): Promise<string> {
+    let result = code;
+    for (const match of code.matchAll(DEFAULT_IMPORT)) {
+      const [text, local, , specifier] = match;
+      if (!isStyleModule(specifier)) {
+        continue;
+      }
+      // oxlint-disable-next-line no-await-in-loop
+      const target = await context.resolve(specifier, file);
+      if (target === null || Boolean(target.external)) {
+        continue;
+      }
+      // oxlint-disable-next-line no-await-in-loop
+      const info = await context.load({ id: target.id });
+      if (info.code === null) {
+        return context.error(`idlip: ${target.id} has no class names`);
+      }
+      // The module's own `export const` lines and its default export become one local object.
+      const body = info.code
+        .replace(/^export default /m, 'return ')
+        .replaceAll(/^export (const|let|var) /gm, '$1 ');
+      if (/^export /m.test(body)) {
+        return context.error(`idlip: ${target.id} has an export that a chunk cannot inline`);
+      }
+      result = result.replace(text, `const ${local} = (() => {\n${body}\n})();`);
+    }
+    return result;
   }
 
   /** Whether each `.tsx` file holds a component, with the source that was read. */
@@ -413,7 +695,7 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
     if (!specifier.startsWith('.')) {
       return specifier;
     }
-    return getModuleId(path.resolve(path.dirname(path.join(root, importer)), specifier));
+    return getModuleId(path.resolve(path.dirname(getFile(importer)), specifier));
   }
 
   /**
@@ -514,6 +796,13 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
         files.push(file);
       }
     }
+    for (const info of packages) {
+      for (const file of listPackageFiles(info)) {
+        if (hasComponent(file, readFileSync(file, 'utf8'))) {
+          files.push(file);
+        }
+      }
+    }
     moduleFiles = files.toSorted();
     moduleSet = new Set(moduleFiles);
     return moduleFiles;
@@ -560,17 +849,18 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
    * Returns the URLs of a module's chunks: the built files in a build, the ids
    * under the base in dev.
    */
-  function getChunkUrls(result: CompileResult): ChunkUrls | undefined {
-    if (isServe && base === '/') {
-      return undefined;
-    }
+  function getChunkUrls(
+    result: CompileResult,
+    file: string,
+    devStyles: readonly string[],
+  ): ChunkUrls | undefined {
     const all = isServe ? undefined : readBuilt();
     const urls: Record<string, string> = {};
     for (const { manifest } of listCompiled(result)) {
       for (const chunk of listChunks(manifest)) {
         const id = getChunkId(manifest.module, chunk);
         if (all === undefined) {
-          urls[id] = `${base}${id.slice(1)}`;
+          urls[id] = toChunkUrl(id);
         } else if (Object.hasOwn(all, id)) {
           urls[id] = all[id];
         } else {
@@ -580,10 +870,25 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
     }
     // The server writes the build id on the state script and drops it from the chunk map. The
     // helpers URL stays in the map, for the loader.
-    for (const key of [BUILD_KEY, HELPERS_KEY, TEMPLATES_KEY]) {
+    for (const key of [BUILD_KEY, HELPERS_KEY, TEMPLATES_KEY, LOADER_KEY]) {
       if (all !== undefined && Object.hasOwn(all, key)) {
         urls[key] = all[key];
       }
+    }
+    // The page's loader script: the built file, or the dev loader under the base.
+    if (all === undefined) {
+      urls[LOADER_KEY] = `${base}${DEV_LOADER_URL.slice(1)}`;
+    }
+    // The stylesheets of the module's import graph. Dev links the files Vite serves.
+    const key = `${STYLES_PREFIX}${getModuleId(file)}`;
+    let styles = '';
+    if (all === undefined) {
+      styles = devStyles.map(toStyleUrl).join(' ');
+    } else if (Object.hasOwn(all, key)) {
+      styles = all[key];
+    }
+    if (styles !== '') {
+      urls[STYLES_KEY] = styles;
     }
     return urls;
   }
@@ -598,14 +903,21 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
 
     config(user) {
       outDir = user.build?.outDir ?? 'dist';
-      return createConfig(user, options);
+      // A package with an unknown format fails the start.
+      packages = readPackages(path.resolve(user.root ?? process.cwd()));
+      return createConfig(user, options, packages);
     },
 
     configResolved(config) {
       // The real path, since Vite names modules by it and a link would not match.
       root = realpathSync(config.root);
+      // The real root may differ from the configured one (a link), and only then reads again.
+      if (root !== path.resolve(config.root)) {
+        packages = readPackages(root);
+      }
       base = config.base;
       isServe = config.command === 'serve';
+      standAside ||= config.plugins.some((plugin) => plugin.name === NITRO_PLUGIN);
       chunksFile = path.resolve(root, outDir, CHUNKS_FILE);
     },
 
@@ -649,7 +961,12 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       for (const [index, file] of findModules().entries()) {
         const result = results[index];
         // A named component adds its name: `widgets.Counter.handler.add.js`.
-        const stem = path.basename(file, '.tsx');
+        const info = findPackage(packages, file);
+        // A package prefixes its files, so two packages with a `button.tsx` emit different names.
+        const stem =
+          info === undefined
+            ? path.basename(file, '.tsx')
+            : `${getPackageSlug(info)}.${path.basename(file, '.tsx')}`;
         for (const { manifest } of listCompiled(result)) {
           const component = splitModule(manifest.module).name;
           const local = component === undefined ? file : `${file}#${component}`;
@@ -668,11 +985,54 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
           }
         }
       }
+      // One entry per module file imports the stylesheets of its import graph, so the bundler
+      // writes them. No chunk imports a stylesheet, since the page links them.
+      styleEntries.clear();
+      for (const file of findModules()) {
+        // oxlint-disable-next-line no-await-in-loop
+        const styles = await findStyles(this, file);
+        if (styles.length > 0) {
+          styleEntries.set(file, styles);
+          this.emitFile({
+            type: 'chunk',
+            id: `${STYLES_ID}${file}`,
+            name: `${path.basename(file, '.tsx')}.styles`,
+            preserveSignature: 'strict',
+          });
+        }
+      }
       // Every module is compiled before the loader is bundled, so the loader sees the defines.
       defines = getDefines(getFeatures(results), options.skew !== false);
     },
 
-    resolveId(source) {
+    async resolveId(source, importer) {
+      if (source.startsWith(STYLES_ID)) {
+        return source;
+      }
+      // A chunk gets the class names of a CSS Module as a module of its own. The stylesheet
+      // itself is linked by the page.
+      if (
+        importer !== undefined &&
+        !isServe &&
+        this.environment.name === 'client' &&
+        isStyleModule(source) &&
+        parseChunkId(importer) !== undefined
+      ) {
+        const target = await this.resolve(source, importer, { skipSelf: true });
+        if (target !== null && !target.external) {
+          return `${NAMES_ID}${encodeURIComponent(target.id)}@${encodeURIComponent(importer)}`;
+        }
+      }
+      // A chunk imports the view of a package component by its module id, which names no folder.
+      const chunk = parseChunkId(source);
+      if (chunk !== undefined && !source.startsWith('/')) {
+        const file = getPackageFile(packages, chunk.file);
+        if (file !== undefined) {
+          return this.resolve(`${file}${source.slice(chunk.file.length)}`, importer, {
+            skipSelf: true,
+          });
+        }
+      }
       if (source === HELPERS_MODULE) {
         return HELPERS_ID;
       }
@@ -683,8 +1043,28 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
     },
 
     async load(id) {
+      if (id.startsWith(STYLES_ID)) {
+        const styles = styleEntries.get(id.slice(STYLES_ID.length)) ?? [];
+        let code = '';
+        for (const [index, style] of styles.entries()) {
+          // A CSS Module has no side effect for the bundler, so the entry exports it to keep it.
+          code += isStyleModule(style)
+            ? `export { default as s${index} } from ${JSON.stringify(style)};\n`
+            : `import ${JSON.stringify(style)};\n`;
+        }
+        return { code, moduleType: 'js' };
+      }
+      if (id.startsWith(NAMES_ID)) {
+        const real = decodeURIComponent(id.slice(NAMES_ID.length, id.lastIndexOf('@')));
+        const info = await this.load({ id: real });
+        if (info.code === null) {
+          return this.error(`idlip: ${real} has no class names`);
+        }
+        return { code: info.code, moduleType: 'js' };
+      }
       if (id === DEV_LOADER) {
-        return { code: "import 'idlip/client';\n", moduleType: 'js' };
+        // The dev server's client rides with the loader, so a page needs no markup for it.
+        return { code: "import '/@vite/client';\nimport 'idlip/client';\n", moduleType: 'js' };
       }
       if (id === HELPERS_ID) {
         return { code: printHelpersModule(), moduleType: 'js' };
@@ -707,7 +1087,11 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
         }
         for (const module of client) {
           if (module.chunk === parsed.chunk) {
-            return { code: module.code, moduleType: 'js' };
+            const code =
+              isServe || this.environment.name !== 'client'
+                ? module.code
+                : await inlineNames(this, module.code, parsed.file);
+            return { code, moduleType: 'js' };
           }
         }
       }
@@ -738,7 +1122,7 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
         }
         await findChildren(this);
         const result = compileFile(this, id, code);
-        const urls = getChunkUrls(result);
+        const urls = getChunkUrls(result, id, isServe ? await findStyles(this, id) : []);
         return {
           code: urls === undefined ? result.server : replaceChunkUrls(result.server, urls),
           moduleType: 'js',
@@ -783,13 +1167,16 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
           sharedFiles.push(file);
         }
       }
-      checkChunkImports(this, bundle, files, sharedFiles);
+      const styleFiles = readStyleFiles(bundle, base, urls);
+      checkChunkImports(this, bundle, files, sharedFiles, styleFiles);
+      // The page names the loader by this URL, so the server needs no read of the client manifest.
+      urls[LOADER_KEY] = `${base}${findLoaderFile(bundle, new Set([...files, ...styleFiles]))}`;
       if (options.skew !== false) {
         const id = getBuildId(Object.keys(bundle));
         urls[BUILD_KEY] = id;
         // The loader imports this module from its own folder, to learn the server's build.
         const buildFile = path.posix.join(
-          path.posix.dirname(findLoaderFile(bundle, files)),
+          path.posix.dirname(findLoaderFile(bundle, new Set([...files, ...styleFiles]))),
           BUILD_FILE,
         );
         this.emitFile({ type: 'asset', fileName: buildFile, source: getBuildSource(id) });
@@ -835,6 +1222,7 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       // The edit is a chunk swap when the markup and the manifest stay, and a remount otherwise.
       const before = cache.get(file)?.result;
       let message: ReturnType<typeof classifyEdit>;
+      let reload: boolean;
       try {
         const after = compileFile(
           {
@@ -847,9 +1235,15 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
           await read(),
           cache.get(file)?.rendered,
         );
-        message = classifyEdit(before, after, base, timestamp);
+        message = classifyEdit(before, after, base, timestamp, toChunkUrl);
+        reload = changesShell(before, after);
       } catch {
         // A module that does not compile: the page loads again and shows the server's error.
+        this.environment.hot.send({ type: 'full-reload' });
+        return [];
+      }
+      // A remount swaps `<body>` only, so an edit of `<html>` or of the head loads the page again.
+      if (reload && message?.kind === 'remount') {
         this.environment.hot.send({ type: 'full-reload' });
         return [];
       }
@@ -866,6 +1260,13 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
     },
 
     configureServer(server) {
+      // A linked package may sit outside the project: serve it, and watch its source for edits.
+      for (const info of packages) {
+        if (!info.dir.includes('/node_modules/')) {
+          server.config.server.fs.allow.push(info.dir);
+          server.watcher.add(info.src);
+        }
+      }
       // The browser keys modules by URL. A page's `/@id/idlip/client` served as it is would be
       // a second copy of the loader next to the URL that chunks import, so it gets the proxy.
       server.middlewares.use((request, _response, next) => {
@@ -874,7 +1275,8 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
         }
         next();
       });
-      if (entry === undefined) {
+      // Nitro renders the pages in its own worker, so the plugin leaves the route to it.
+      if (entry === undefined || standAside) {
         return;
       }
       server.middlewares.use((request, response, next) => {

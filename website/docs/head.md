@@ -2,7 +2,7 @@
 title: Document head
 order: 20
 section: Guide
-description: Set the title and meta tags from a component with Head, and write them into the page with renderPage.
+description: Set the title and meta tags in the head of the document component, or from any component with Head.
 ---
 
 `<Head>` from `idlip` puts elements in the document `<head>`. Holes in them follow the model like any other hole, so a title can show a count that a click changes.
@@ -35,6 +35,34 @@ export default function Inbox(): JSX.Element {
 ```
 
 A click on the button patches the title and the `content` of the meta tag, as it would patch a hole in the body.
+
+## The head of the document
+
+The root component renders `<html>`, and its `<head>` follows the same rules as `<Head>`. It is the first block of the page:
+
+```tsx
+export default function Inbox(props: { unread: number }) {
+  return (
+    <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <title>Inbox</title>
+      </head>
+      <body>{/* ... */}</body>
+    </html>
+  );
+}
+```
+
+- **The document title is the default title.** A `<Head>` anywhere in the body ranks after the document head, so its title wins. When that block leaves, the document title shows again.
+- **A head with no hole is markup.** The loader needs no code for it.
+- **A `<style>` is markup, with no nonce.** Under `csp: true` the policy blocks it, so allow it with `csp: { extend: { 'style-src': [...] } }` (see [Deploying](./deploying.md#content-security-policy)), or import a stylesheet from the component (see [Styles](./styles.md)), which the page links with the nonce.
+- **A `<script>` is an error**, with or without `src` (`document-head-script`). The server writes a nonce on its own scripts only, so the policy would block it. The loader starts the page, and handlers and effects run code.
+- **A head with a hole is a `<Head>` block.** A title that shows a count, or a `content` that follows the model, patches as in a `<Head>`.
+- **`<html>` and `<body>` take bound attributes**, such as `lang={lang}` or `class={theme}`. An event, `ref` or `html` on `html`, `head` or `body` is an error.
+- **The skeleton is fixed.** `<html>` holds one `<head>` and then one `<body>`. A condition, a `<For>` or a `<Try>` around them, and an `html`, `head` or `body` in any other component, is the error `document-element-misplaced`. Put a changing head element in a `<Head>` in the body.
+- **A component that is not the root renders no `<html>`.** The server rejects a root that does not render it.
+- **A change to `<html>`, to the head or to the `<body>` tag in `vite dev`** loads the page again, since a remount swaps the content of `<body>` only.
 
 ## Rules
 
@@ -90,26 +118,24 @@ Page order is the order in which the server renders the blocks. A `<Head>` in a 
 
 ## On the server
 
-`render()` of `idlip/server` returns only the body and drops head output. Use `renderPage()`, which returns `{ head, body }`:
+`renderToResponse()`, `renderToStream()` and `streamParts()` of `idlip/server` write the elements of every block into the `<head>` of the document component, so the entry writes nothing:
 
 ```ts
-import { renderListener, renderPage } from 'idlip/server';
+import { renderToResponse } from 'idlip/server';
 import Inbox from './inbox.tsx';
 
-export async function render(loader: string): Promise<string> {
-  const page = await renderPage(Inbox, {});
-  return (
-    `<!doctype html><html><head><meta charset="utf-8">${page.head}` +
-    renderListener() +
-    `<script type="module" src="${loader}"></script>` +
-    `</head><body>${page.body}</body></html>`
-  );
-}
+const server = {
+  async fetch(): Promise<Response> {
+    return renderToResponse(Inbox, { unread: 3 });
+  },
+};
+
+export default server;
 ```
 
-- **`head`** holds the elements of every block. The winning title comes first, since the browser reads the first `<title>` in `<head>`.
-- **Do not write a `<title>` of your own** in the host page when a component sets one. The loader leaves a host title alone.
+- **The winning title comes first in `<head>`**, since the browser reads the first `<title>`. The head elements of the document follow it, so `<meta charset>` stays near the start. The elements of the `<Head>` blocks come next, and the listener, the preload links and the loader script come last.
+- **`render()` returns it as `head`.** It is the parts of the first render, and a page that is not a document component, such as a test, takes `head` and `body` from it.
 
 The title update in the browser runs one task after the patch, since the loader watches `<head>` for changes. A test that reads `document.title` waits one tick after `settled()`.
 
-See [idlip](./reference/idlip.md#head) and [idlip/server](./reference/server.md#renderpage) for the signatures.
+See [idlip](./reference/idlip.md#head) and [idlip/server](./reference/server.md#render) for the signatures.

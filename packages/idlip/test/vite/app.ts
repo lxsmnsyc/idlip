@@ -141,6 +141,13 @@ export function render(url) {
   const body = url === '/counter' ? Counter(props.counter, context) : TodoApp(props.todo, context);
   return '<!doctype html><html><head></head><body>' + body + writeState() + '</body></html>';
 }
+
+export default {
+  fetch(request) {
+    const html = render(new URL(request.url).pathname);
+    return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+  },
+};
 `,
   );
   return root;
@@ -152,7 +159,7 @@ export function render(url) {
  */
 export function createConfig(
   root: string,
-  options: { compile?: Compile; client?: string } = {},
+  options: { compile?: Compile; client?: string; server?: false } = {},
 ): InlineConfig {
   return {
     configFile: false,
@@ -162,6 +169,7 @@ export function createConfig(
     plugins: [
       idlip({
         entry: '/src/entry-server.js',
+        ...(options.server === false ? { server: false as const } : {}),
         compile: options.compile ?? createCheckedCompile(root).compile,
         client: options.client ?? CLIENT_STUB,
       }),

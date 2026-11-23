@@ -1,15 +1,15 @@
-import { render as renderComponent, renderListener } from 'idlip/server';
+import { renderToStream } from 'idlip/server';
 import Dashboard from './widgets/Dashboard.tsx';
 
 /**
- * Renders the dashboard page. `loader` is the URL of the built loader module.
+ * Renders the dashboard page. `loader` is the URL of the built loader module. The stream is read
+ * to a string, which is what the harness measures.
  */
 export async function page(loader: string): Promise<string> {
-  const body = await renderComponent(Dashboard, {});
-  return (
-    `<!doctype html><html><head><meta charset="utf-8"><title>bench</title>` +
-    renderListener() +
-    `<script type="module" async src="${loader}"></script>` +
-    `</head><body>${body}</body></html>`
-  );
+  const stream = renderToStream(Dashboard, {}, { loader, preload: false });
+  let html = '';
+  for await (const chunk of stream) {
+    html += chunk;
+  }
+  return html;
 }

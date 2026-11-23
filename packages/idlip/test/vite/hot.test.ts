@@ -16,19 +16,24 @@ import type { InlineConfig, Plugin, ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { compile } from '../../src/compiler/index.ts';
 import type { HotMessage } from '../../src/client/hot.ts';
-import { classifyEdit } from '../../src/vite/hot.ts';
+import { changesShell, classifyEdit } from '../../src/vite/hot.ts';
 import { createConfig } from './app.ts';
 
 const PACKAGE = path.resolve(import.meta.dirname, '../..');
 const CLIENT = path.join(PACKAGE, 'src/client/index.ts');
 const COUNTER = readFileSync(path.join(PACKAGE, 'test/fixtures/counter/counter.tsx'), 'utf8');
-const ENTRY = `import { render as renderComponent, renderListener } from 'idlip/server';
+// The test page wraps the counter in a document by hand, since the counter is a fragment and
+// the HMR messages are what the tests read.
+const ENTRY = `import { render, renderListener } from 'idlip/server';
 import Counter from './counter.tsx';
 
-export async function render() {
-  const body = await renderComponent(Counter, { start: 4 });
-  return '<!doctype html><html><head>' + renderListener() + '</head><body>' + body + '</body></html>';
-}
+export default {
+  async fetch() {
+    const { body } = await render(Counter, { start: 4 });
+    const html = '<!doctype html><html><head>' + renderListener() + '</head><body>' + body + '</body></html>';
+    return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+  },
+};
 `;
 const HANDLER = '/src/counter.tsx?idlip-handler=increment&lang.js';
 
@@ -86,6 +91,51 @@ describe('classifyEdit', () => {
 
   it('remounts a module it has not seen', () => {
     expect(classifyEdit(undefined, before, '/', 7)?.kind).toBe('remount');
+  });
+});
+
+describe('changesShell', () => {
+  const page = `export default function App(props: { n: number }) {
+  let n = props.n;
+  function up() { n = n + 1; }
+  return (
+    <html lang="en">
+      <head>
+        <title>todo</title>
+      </head>
+      <body>
+        <button on:click={up}>{n} clicks</button>
+      </body>
+    </html>
+  );
+}`;
+  const before = compile(page, '/src/app.tsx');
+
+  it('keeps a remount for an edit of the body', () => {
+    const after = compile(page.replace('clicks', 'taps'), '/src/app.tsx');
+    expect(changesShell(before, after)).toBe(false);
+    expect(classifyEdit(before, after, '/', 7)?.kind).toBe('remount');
+  });
+
+  it('asks for a reload when an edit changes the html tag, the body tag or the head', () => {
+    for (const edit of [
+      page.replace('lang="en"', 'lang="fr"'),
+      page.replace('<body>', '<body class="dark">'),
+      page.replace('<body>', '<body data-x="a>b">'),
+      page.replace('<title>todo</title>', '<title>tasks</title>'),
+    ]) {
+      expect(changesShell(before, compile(edit, '/src/app.tsx'))).toBe(true);
+    }
+  });
+
+  it('has no shell in a module that is not a document', () => {
+    const fragment = compile(COUNTER, '/src/counter.tsx');
+    expect(
+      changesShell(
+        fragment,
+        compile(COUNTER.replace('count + 1', 'count + 2'), '/src/counter.tsx'),
+      ),
+    ).toBe(false);
   });
 });
 

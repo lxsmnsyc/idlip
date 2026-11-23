@@ -513,9 +513,17 @@ ${imports.join('\n')}
 
 export default function Dashboard(): JSX.Element {
   return (
-    <main>
-${layout(list, (w) => `<${w.component} />`, '      ')}
-    </main>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <title>bench</title>
+      </head>
+      <body>
+        <main>
+${layout(list, (w) => `<${w.component} />`, '          ')}
+        </main>
+      </body>
+    </html>
   );
 }
 `;

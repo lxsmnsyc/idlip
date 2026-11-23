@@ -26,6 +26,21 @@ shared: []
 reserves: []
 provides: []
 depends_on:
+  - on: fix-style-object
+    kind: hard
+    why: style objects render as [object Object]
+  - on: component-styles
+    kind: hard
+    why: CSS imported by components is dropped today (user decision 2026-11-23)
+  - on: component-packages
+    kind: hard
+    why: component libraries ship in 0.1 (user decision 2026-11-23)
+  - on: entry-setup
+    kind: hard
+    why: 0.1 ships the whole-document entry (user decision 2026-11-23)
+  - on: render-stream
+    kind: hard
+    why: entry-setup builds on it
   - on: event-callbacks
     kind: hard
     why: ships before 0.1 (user decision 2026-11-23)

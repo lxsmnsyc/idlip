@@ -6,8 +6,68 @@ import { listChunks } from './chunks.ts';
 /** The custom event the plugin sends to the page. Its payload is a `HotMessage`. */
 export const HOT_EVENT = 'idlip:hot';
 
-function getUrl(base: string, module: string, chunk: string): string {
-  return `${base}${getChunkId(module, chunk).slice(1)}`;
+/** The URL of a chunk id. The default is the id under the base. */
+type Locate = (id: string) => string;
+
+function getUrl(base: string, locate: Locate | undefined, module: string, chunk: string): string {
+  const id = getChunkId(module, chunk);
+  return locate === undefined ? `${base}${id.slice(1)}` : locate(id);
+}
+
+/**
+ * Returns the index after the `>` that ends a tag in render code. A `${...}` hole and a quoted
+ * attribute value may hold a `>`, so the scan skips both.
+ */
+function findTagEnd(code: string, from: number): number {
+  let depth = 0;
+  let quote = false;
+  for (let index = from; index < code.length; index++) {
+    const char = code[index];
+    if (depth > 0) {
+      depth += char === '{' ? 1 : 0;
+      depth -= char === '}' ? 1 : 0;
+    } else if (char === '$' && code[index + 1] === '{') {
+      depth = 1;
+      index++;
+    } else if (char === '"') {
+      quote = !quote;
+    } else if (char === '>' && !quote) {
+      return index + 1;
+    }
+  }
+  return code.length;
+}
+
+/**
+ * Returns the shell of each document in the server module: the render code from `<html` to
+ * the end of the `<body ...>` tag. It holds the attributes of `<html>` and `<body>` and the
+ * static head.
+ */
+function readShells(result: CompileResult): string[] {
+  const shells: string[] = [];
+  const { server } = result;
+  for (
+    let start = server.indexOf('<html');
+    start !== -1;
+    start = server.indexOf('<html', start + 1)
+  ) {
+    const body = server.indexOf('<body', start);
+    shells.push(body === -1 ? server.slice(start) : server.slice(start, findTagEnd(server, body)));
+  }
+  return shells;
+}
+
+/**
+ * Tells whether an edit changed the shell of a document component: `<html>`, its attributes or
+ * its head. A remount swaps `<body>` only, so such an edit loads the page again.
+ */
+export function changesShell(before: CompileResult | undefined, after: CompileResult): boolean {
+  const next = readShells(after);
+  if (before === undefined || next.length === 0) {
+    return false;
+  }
+  const old = readShells(before);
+  return old.length !== next.length || old.some((shell, index) => shell !== next[index]);
 }
 
 /**
@@ -21,13 +81,14 @@ export function classifyEdit(
   after: CompileResult,
   base: string,
   timestamp: number,
+  locate?: Locate,
 ): HotMessage | undefined {
   const module = after.manifest.module;
   if (before === undefined || before.server !== after.server) {
     const chunks: string[] = [];
     for (const { manifest } of listCompiled(after)) {
       for (const chunk of listChunks(manifest)) {
-        chunks.push(getUrl(base, manifest.module, chunk));
+        chunks.push(getUrl(base, locate, manifest.module, chunk));
       }
     }
     return { module, kind: 'remount', chunks, timestamp };
@@ -44,7 +105,7 @@ export function classifyEdit(
   for (const { manifest, client } of listCompiled(after)) {
     for (const item of client) {
       if (old.get(getChunkId(manifest.module, item.chunk)) !== item.code) {
-        chunks.push(getUrl(base, manifest.module, item.chunk));
+        chunks.push(getUrl(base, locate, manifest.module, item.chunk));
       }
     }
   }

@@ -7,6 +7,7 @@ import { createEditor } from '../repl/editor.ts';
 import { highlight } from '../repl/highlight.ts';
 import REPL_ICON from '../repl/icons.ts';
 import type { Problem } from '../repl/project.ts';
+import { FRAME_SANDBOX } from '../repl/sandbox.ts';
 import type * as RunModule from '../repl/run.ts';
 import type { RunResult, Runner } from '../repl/run.ts';
 import { listCompiledModules, renderCompiled } from './compiled.ts';
@@ -17,7 +18,7 @@ import type { SampleView } from './sample.ts';
 /** The wait after the last key before the sample runs again. */
 const DELAY = 400;
 
-/** The compiler, the render worker and the service worker. A failed load is tried again. */
+/** The compiler and the render worker. A failed load is tried again. */
 let pipeline: Promise<typeof RunModule> | undefined;
 
 async function loadPipeline(): Promise<typeof RunModule> {
@@ -210,9 +211,13 @@ export function attachSession(view: SampleView): void {
     }
     if (result.kind === 'served') {
       waitingFrame = true;
-      // A lazy frame does not follow a new `src` in Chromium. The sample is in view by now.
+      // From the first edit on, the frame runs reader code, so it gets no origin. The attribute
+      // applies to the next navigation, which is the `srcdoc` below. The static frame before it
+      // runs only the site's own build, so it stays on the site's origin.
+      frame.setAttribute('sandbox', FRAME_SANDBOX);
+      // A lazy frame does not follow a new document in Chromium. The sample is in view by now.
       frame.loading = 'eager';
-      frame.src = result.url;
+      frame.srcdoc = result.document;
     }
   }
 

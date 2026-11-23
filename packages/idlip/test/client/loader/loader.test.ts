@@ -29,6 +29,8 @@ describe('counter', () => {
     await harness.settled();
     // The binding chunk starts with the handler chunk. It ran no earlier only while its import
     // of the loader failed outside Vite.
+    // A binding chunk starts beside the handler chunk, and `settled` does not wait for it.
+    await until(() => getLoaded().length >= 2);
     expect(getLoaded().toSorted()).toEqual(['binding=count', 'handler=increment']);
     expect(harness.patch).toHaveBeenCalledTimes(1);
     const [page, prev, next] = harness.patch.mock.calls[0];
@@ -84,6 +86,8 @@ describe('counter', () => {
     expect(harness.patch.mock.calls[1][1]).toEqual({ count: 5 });
     expect(harness.patch.mock.calls[1][2]).toEqual({ count: 6 });
     // Each chunk loads once.
+    // A binding chunk starts beside the handler chunk, and `settled` does not wait for it.
+    await until(() => getLoaded().length >= 2);
     expect(getLoaded().toSorted()).toEqual(['binding=count', 'handler=increment']);
   });
 

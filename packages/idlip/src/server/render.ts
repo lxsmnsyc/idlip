@@ -1,5 +1,5 @@
 import { Feature, serialize } from 'seroval';
-import { getChunkId } from '../core/format.ts';
+import { LOADER_KEY, getChunkId } from '../core/format.ts';
 import type {
   ChildManifest,
   ChunkUrls,
@@ -9,8 +9,8 @@ import type {
   PageState,
   Props,
 } from '../core/format.ts';
-import { DEV } from '../core/dev.ts';
 import { attr } from './helpers.ts';
+import { STYLES_KEY, readStyles } from './styles.ts';
 
 export interface RenderOptions {
   /** Written on the state script. */
@@ -66,11 +66,27 @@ interface NestedContext {
   headRollback(mark: number): void;
 }
 
-/** What `renderPage` returns: the markup for `<head>`, and the body markup with the state script. */
+/** What `render` returns: the markup for `<head>`, and the body markup with the state script. */
 export interface RenderResult {
   /** The elements of every `<Head>`. The title of the last block is first. */
   head: string;
   body: string;
+  /**
+   * True when the component rendered `<html>`. Then `body` is the whole `<html>` element, with
+   * the state script before `</body>`, and `head` goes inside its `<head>`.
+   */
+  document: boolean;
+  /**
+   * The URL of the loader module, from the chunk map of the build: the built file in a build
+   * and the dev URL under `vite dev`. Undefined for a module the plugin did not build.
+   */
+  loader: string | undefined;
+  /**
+   * The URLs of the stylesheets that the root and its children import, in import order.
+   * `renderToStream` and `renderToResponse` link them in `<head>`. Frozen and shared by every
+   * render of the module.
+   */
+  styles: readonly string[];
   /**
    * The chunk URLs of the page, the root's and its children's: the first argument of
    * `renderPreload`. Frozen and shared by every render of the module.
@@ -81,7 +97,31 @@ export interface RenderResult {
    * `renderPreload`. The array is frozen and shared; treat the manifests as read-only too.
    */
   manifests: readonly Manifest[];
+  /**
+   * Chunks for what resolves after the first render, in order. Each chunk is a complete piece of
+   * HTML that goes inside `<body>`, such as a `<script>`. It is empty until `stream-model` adds
+   * data. `renderToStream` and `streamParts` write the chunks after the first one and close the
+   * document after the last.
+   */
+  pending: AsyncIterable<string>;
+  /**
+   * Aborts when the reader of the stream cancels, so the work behind `pending` stops. It is
+   * created on first use, and a signal read after the abort is already aborted. `stream-model`
+   * wires its loaders to this signal.
+   */
+  readonly signal: AbortSignal;
+  /** Aborts `signal`. `renderToStream` and `streamParts` call it when the reader cancels. */
+  abort(reason?: unknown): void;
 }
+
+/** The `pending` of a render that has nothing to send later. `streamParts` compares by identity. */
+export const NOTHING_PENDING: AsyncIterable<string> = Object.freeze({
+  // oxlint-disable-next-line require-yield
+  async *[Symbol.asyncIterator]() {},
+});
+
+/** What a document component's markup ends with. The state script goes before it. */
+const DOCUMENT_END = '</body></html>';
 
 /** The slots a render recorded, by path. */
 type Slots = Record<string, Slot>;
@@ -101,13 +141,17 @@ interface StaticPart {
   readonly events: string;
   /** The build id the plugin put in the chunk map. The state script carries it as `i-build`. */
   readonly build: string | undefined;
-  /** The chunk URLs of the state, without `build`. */
+  /** The URL of the loader module, from the chunk map. The state script does not carry it. */
+  readonly loader: string | undefined;
+  /** The stylesheet URLs of the root and its children, without duplicates. */
+  readonly styles: readonly string[];
+  /** The chunk URLs of the state, without `build` and `loader`. */
   readonly urls: Record<string, string>;
   /** The manifests of the child modules. */
   readonly modules: ReadonlyMap<string, Manifest>;
-  /** A frozen copy of `urls`, which `renderPage` returns to every caller. */
+  /** A frozen copy of `urls`, which `render` returns to every caller. */
   readonly pageChunks: ChunkUrls;
-  /** The root's manifest, then the child manifests, frozen, which `renderPage` returns. */
+  /** The root's manifest, then the child manifests, frozen, which `render` returns. */
   readonly manifests: readonly Manifest[];
   /** `manifest` and `chunks` as seroval wrote them, without the braces. Undefined if not plain. */
   readonly head: string | undefined;
@@ -214,6 +258,7 @@ function collectModules(
   modules: Map<string, Manifest>,
   chunks: Record<string, string>,
   known: Map<string, ModuleInfo>,
+  styles: Set<string>,
 ): void {
   for (const info of uses) {
     const { module, view } = info.manifest;
@@ -222,11 +267,15 @@ function collectModules(
       known.set(module, info);
       const viewId = view === undefined ? undefined : getChunkId(module, view.chunk);
       for (const [id, url] of Object.entries(info.chunks)) {
-        if (id !== viewId) {
+        if (id === STYLES_KEY) {
+          for (const href of readStyles(url)) {
+            styles.add(href);
+          }
+        } else if (id !== viewId) {
           chunks[id] = url;
         }
       }
-      collectModules(info.uses ?? [], modules, chunks, known);
+      collectModules(info.uses ?? [], modules, chunks, known, styles);
     }
   }
 }
@@ -236,10 +285,11 @@ function buildPart(root: ComponentState, children: Iterable<ComponentState> = []
   const modules = new Map<string, Manifest>();
   const known = new Map<string, ModuleInfo>();
   const urls: Record<string, string> = Object.assign({}, root.chunks);
-  collectModules(root.uses ?? [], modules, urls, known);
+  const styles = new Set(readStyles(root.chunks[STYLES_KEY]));
+  collectModules(root.uses ?? [], modules, urls, known, styles);
   // Children outside `uses` join this render's part only.
   for (const state of children) {
-    collectModules([state], modules, urls, known);
+    collectModules([state], modules, urls, known, styles);
   }
   const events = new Set(root.manifest.events);
   for (const manifest of modules.values()) {
@@ -250,6 +300,11 @@ function buildPart(root: ComponentState, children: Iterable<ComponentState> = []
   // The build id is not in the state's `chunks`: it is the `i-build` attribute.
   const build = Object.hasOwn(urls, 'build') ? urls.build : undefined;
   delete urls.build;
+  // The loader URL is for the document's script tag, so the state script leaves it out.
+  const loader = Object.hasOwn(urls, LOADER_KEY) ? urls[LOADER_KEY] : undefined;
+  delete urls.loader;
+  // The stylesheets are links in `<head>`, so the state script leaves them out.
+  Reflect.deleteProperty(urls, STYLES_KEY);
   const tail =
     modules.size === 0
       ? ''
@@ -260,6 +315,8 @@ function buildPart(root: ComponentState, children: Iterable<ComponentState> = []
     known,
     events: escapeScript(JSON.stringify([...events].toSorted().join(' '))),
     build,
+    loader,
+    styles: Object.freeze([...styles]),
     urls,
     modules,
     // Every render returns these objects, so a caller cannot change them for the next one. A copy,
@@ -344,10 +401,13 @@ function writeState(
     body = serializeValues(record, root, slots);
   }
   const script = `(self.$idlip||=[]).push([${part.events},()=>${body}])`;
-  return `<script i-state${attr('i-build', part.build)}${attr('nonce', nonce)}>${script}</script>`;
+  // A page whose `<html>` or `<body>` has a bound attribute roots the page at `<html>`.
+  const kind = root.manifest.documentRoot === true ? '="document"' : '';
+  return `<script i-state${kind}${attr('i-build', part.build)}${attr('nonce', nonce)}>${script}</script>`;
 }
 
-function renderSync(
+/** Renders a compiled component, and returns the parts of its page. */
+export function renderSync(
   component: (props: never) => unknown,
   props: unknown,
   nonce?: string,
@@ -410,42 +470,53 @@ function renderSync(
   // The last title is the one that wins, so it goes first. The others follow, for the client.
   head.unshift(...titles.slice(-1), ...titles.slice(0, -1));
   const part = getPart(root, children);
+  const isDocument = root.manifest.document === true;
+  const state = writeState(part, root, children, nonce);
+  // The state script goes before `</body>`, so the parser keeps it in `<body>`.
+  let body = markup + state;
+  if (isDocument) {
+    if (!markup.endsWith(DOCUMENT_END)) {
+      throw new Error('The document component did not end with </body></html>');
+    }
+    body = markup.slice(0, -DOCUMENT_END.length) + state + DOCUMENT_END;
+  }
+  // The controller exists only when something reads the signal, so a render pays nothing for it.
+  let controller: AbortController | undefined;
+  let aborted: { reason: unknown } | undefined;
   return {
+    get signal(): AbortSignal {
+      if (controller === undefined) {
+        controller = new AbortController();
+        if (aborted !== undefined) {
+          controller.abort(aborted.reason);
+        }
+      }
+      return controller.signal;
+    },
+    abort(reason?: unknown): void {
+      aborted ??= { reason };
+      controller?.abort(reason);
+    },
     head: head.join(''),
-    body: markup + writeState(part, root, children, nonce),
+    body,
+    document: isDocument,
+    loader: part.loader,
+    styles: part.styles,
     chunks: part.pageChunks,
     manifests: part.manifests,
+    pending: NOTHING_PENDING,
   };
 }
 
 /**
- * Renders a compiled component to HTML: its markup, then its state script. The elements of a
- * `<Head>` are not in the result: use `renderPage` to get them.
+ * Renders a compiled component and returns the parts of its page: the markup for `<head>`, the
+ * body markup with the state script, and `pending` for what resolves later. `renderToStream` and
+ * `streamParts` write them as a document. `chunks` and `manifests` are what `renderPreload`
+ * reads: `renderPreload(page.chunks, page.manifests)`.
  */
 // A promise executor turns a thrown error into a rejection without an `await`.
 // oxlint-disable-next-line typescript/promise-function-async
 export function render<P>(
-  component: (props: P) => unknown,
-  props: P,
-  options: RenderOptions = {},
-): Promise<string> {
-  return new Promise((resolve) => {
-    const { head, body } = renderSync(component, props, options.nonce);
-    if (DEV && head !== '') {
-      // oxlint-disable-next-line no-console
-      console.warn('idlip: render() drops the <Head> output of the page. Use renderPage().');
-    }
-    resolve(body);
-  });
-}
-
-/**
- * Renders a compiled component and returns the markup for `<head>` next to the body markup.
- * The host writes `head` inside `<head>` and `body` in `<body>`. `chunks` and `manifests` are
- * what `renderPreload` reads: `renderPreload(page.chunks, page.manifests)`.
- */
-// oxlint-disable-next-line typescript/promise-function-async
-export function renderPage<P>(
   component: (props: P) => unknown,
   props: P,
   options: RenderOptions = {},

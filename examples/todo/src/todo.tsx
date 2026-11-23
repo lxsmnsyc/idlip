@@ -1,8 +1,11 @@
 // The todo of docs/proposals/0002-modules.md without `await`: ids come from `next`,
-// and `persist` is left out until `custom-effects`.
+// and `persist` is left out until `custom-effects`. The component renders the whole document:
+// the server adds the doctype, the listener, the loader script and the state script.
 // Handlers and event arrows follow docs/proposals/0002-modules.md, which has no return types.
 // oxlint-disable typescript/no-confusing-void-expression, typescript/explicit-function-return-type
 import { For } from 'idlip';
+import './todo.css';
+import styles from './todo.module.css';
 import type { JSX } from 'idlip/jsx-runtime';
 
 interface Todo {
@@ -47,35 +50,44 @@ export default function TodoApp(props: { initial: Todo[] }): JSX.Element {
   }
 
   return (
-    <main>
-      <form
-        on:submit={(e) => {
-          e.preventDefault();
-          add();
-        }}
-      >
-        <input
-          value={draft}
-          on:input={(e) => setDraft(e.currentTarget.value)}
-          on:keydown={(e) => {
-            if (e.key === 'Escape') {
-              clear();
-            }
-          }}
-        />
-        <button disabled={draft === ''}>Add</button>
-      </form>
-      <p>{left} left</p>
-      <ul>
-        <For each={todos} key={(t) => t.id}>
-          {(t) => (
-            <li class={{ done: t.done }}>
-              <input type="checkbox" checked={t.done} on:click={() => toggle(t.id)} />
-              {t.text}
-            </li>
-          )}
-        </For>
-      </ul>
-    </main>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>todo</title>
+      </head>
+      <body>
+        <main>
+          <form
+            on:submit={(e) => {
+              e.preventDefault();
+              add();
+            }}
+          >
+            <input
+              value={draft}
+              on:input={(e) => setDraft(e.currentTarget.value)}
+              on:keydown={(e) => {
+                if (e.key === 'Escape') {
+                  clear();
+                }
+              }}
+            />
+            <button disabled={draft === ''}>Add</button>
+          </form>
+          <p class={left === 0 ? styles.clear : styles.left}>{left} left</p>
+          <ul>
+            <For each={todos} key={(t) => t.id}>
+              {(t) => (
+                <li class={{ done: t.done }}>
+                  <input type="checkbox" checked={t.done} on:click={() => toggle(t.id)} />
+                  {t.text}
+                </li>
+              )}
+            </For>
+          </ul>
+        </main>
+      </body>
+    </html>
   );
 }

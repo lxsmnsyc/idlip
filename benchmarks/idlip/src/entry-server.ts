@@ -1,4 +1,4 @@
-import { renderListener, renderPage, renderPreload } from 'idlip/server';
+import { renderToStream } from 'idlip/server';
 import App from './app.tsx';
 
 export function todos(n: number) {
@@ -11,15 +11,18 @@ export function todos(n: number) {
 
 /**
  * Renders the page with `n` todos. `loader` is the URL of the built loader module. With
- * `preload` (the default) the head preloads the chunks of the first click.
+ * `preload` (the default) the head preloads the chunks of the first click. The stream is read to
+ * a string, which is what the harness measures.
  */
 export async function page(n: number, loader: string, preload = true): Promise<string> {
-  const { body, chunks, manifests } = await renderPage(App, { initial: todos(n) });
-  return (
-    `<!doctype html><html><head><meta charset="utf-8"><title>bench</title>` +
-    renderListener() +
-    (preload ? renderPreload(chunks, manifests) : '') +
-    `<script type="module" async src="${loader}"></script>` +
-    `</head><body>${body}</body></html>`
+  const stream = renderToStream(
+    App,
+    { initial: todos(n) },
+    { loader, preload: preload ? {} : false },
   );
+  let html = '';
+  for await (const chunk of stream) {
+    html += chunk;
+  }
+  return html;
 }

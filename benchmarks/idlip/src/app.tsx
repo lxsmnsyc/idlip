@@ -47,36 +47,44 @@ export default function App(props: { initial: Todo[] }): JSX.Element {
   }
 
   return (
-    <main>
-      <h1>Todos</h1>
-      <form
-        on:submit={(e) => {
-          e.preventDefault();
-          add();
-        }}
-      >
-        <input
-          value={draft}
-          placeholder="What needs doing?"
-          on:input={(e) => setDraft(e.currentTarget.value)}
-        />
-        <button>Add</button>
-      </form>
-      <ul>
-        <For each={todos} key={(t) => t.id}>
-          {(t) => (
-            <li class={{ done: t.done }}>
-              <button class="todo" on:click={() => toggle(t.id)}>
-                {t.title}
-              </button>
-            </li>
-          )}
-        </For>
-      </ul>
-      <p>{left} left</p>
-      <h2>Counter</h2>
-      <button on:click={() => increment()}>Clicked {count} times</button>
-      <p>Double: {double}</p>
-    </main>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <title>bench</title>
+      </head>
+      <body>
+        <main>
+          <h1>Todos</h1>
+          <form
+            on:submit={(e) => {
+              e.preventDefault();
+              add();
+            }}
+          >
+            <input
+              value={draft}
+              placeholder="What needs doing?"
+              on:input={(e) => setDraft(e.currentTarget.value)}
+            />
+            <button>Add</button>
+          </form>
+          <ul>
+            <For each={todos} key={(t) => t.id}>
+              {(t) => (
+                <li class={{ done: t.done }}>
+                  <button class="todo" on:click={() => toggle(t.id)}>
+                    {t.title}
+                  </button>
+                </li>
+              )}
+            </For>
+          </ul>
+          <p>{left} left</p>
+          <h2>Counter</h2>
+          <button on:click={() => increment()}>Clicked {count} times</button>
+          <p>Double: {double}</p>
+        </main>
+      </body>
+    </html>
   );
 }

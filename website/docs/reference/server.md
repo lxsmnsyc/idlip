@@ -2,26 +2,107 @@
 title: idlip/server
 order: 101
 section: Reference
-description: Render a compiled component to HTML, write the listener script and preload the chunks of the first click.
+description: Render a document component as a Response or a stream, write the listener script and preload the chunks of the first click.
 ---
 
-`idlip/server` renders compiled components on the server. Import a `*.tsx` module through the Vite plugin, which gives the server build the compiled server module, then pass its default export to `render` or `renderPage`.
+`idlip/server` renders compiled components on the server. Import a `*.tsx` module through the Vite plugin, which gives the server build the compiled server module, then pass its default export to `renderToResponse`.
+
+The root component renders the whole document: `<html>` with one `<head>` and one `<body>`. The server adds the doctype, the listener, the preload links, the loader script and the state script. A root that does not render `<html>` is a `TypeError`.
 
 ```ts
-import { renderListener, renderPage } from 'idlip/server';
+import { renderToResponse } from 'idlip/server';
 import TodoApp from './todo.tsx';
 
-export async function renderTodo(nonce: string): Promise<string> {
-  const page = await renderPage(TodoApp, { initial: [] }, { nonce });
-  return (
-    `<!doctype html><html><head>${page.head}${renderListener({ nonce })}` +
-    `<script type="module" src="/@id/idlip/client" nonce="${nonce}"></script>` +
-    `</head><body>${page.body}</body></html>`
-  );
-}
+const server = {
+  // Nitro calls `fetch` for each request that is not a file of the build.
+  async fetch(): Promise<Response> {
+    return renderToResponse(TodoApp, { initial: [] }, { csp: true });
+  },
+};
+
+export default server;
 ```
 
 ## Rendering
+
+### `renderToResponse`
+
+```ts
+function renderToResponse<P>(
+  component: (props: P) => unknown,
+  props: P,
+  options?: ResponseOptions,
+): Promise<Response>;
+```
+
+Renders a document component and returns the page as a `Response` with `content-type: text/html; charset=utf-8`. The body streams: the first chunk is the whole first render, and the pending chunks follow. The promise rejects when the render throws or the component does not render `<html>`, before any header is decided, so an entry can answer 500.
+
+### `ResponseOptions`
+
+```ts
+interface ResponseOptions extends StreamOptions {
+  csp?: boolean | CspOptions;
+  status?: number;
+  headers?: HeadersInit;
+}
+```
+
+- **`csp`** makes a nonce for the response, writes it on the listener, the loader script, the stylesheet links, the preload links and the state script, and sets the `content-security-policy` header. `true` is idlip's policy:
+
+  ```
+  default-src 'none'; script-src 'nonce-…' 'strict-dynamic'; style-src 'self' 'nonce-…'; base-uri 'none'; object-src 'none'; require-trusted-types-for 'script'; trusted-types idlip
+  ```
+
+  `extend` adds sources to a directive, such as `{ 'img-src': ['https:'] }`, and adds a directive the policy lacks. A `style-src` replaces the policy's own `'self'` and nonce. A source added to `default-src` replaces `'none'`. The script directives (`script-src`, `script-src-elem`, `script-src-attr`) and the Trusted Types directives (`trusted-types`, `require-trusted-types-for`) cannot be extended, and a name or a source that holds a space, `;` or `,` throws. In development (`NODE_ENV` other than `production`) the response has no policy header, since Vite's HMR client and error overlay need more than it allows, but the nonce is still written.
+
+- **`nonce`** (from `RenderOptions`) replaces the nonce that `csp` would make, for a host that makes its own.
+- **`status`** is 200 by default, and **`headers`** are added to the response. `content-type` is `text/html; charset=utf-8` unless `headers` has one.
+
+### `CspOptions`
+
+```ts
+interface CspOptions {
+  /** Sources to add to a directive by name. */
+  extend?: Readonly<Record<string, readonly string[]>>;
+}
+```
+
+`csp: { extend }` of `ResponseOptions` takes it. See `csp` above for what `extend` can add.
+
+### `renderToStream`
+
+```ts
+function renderToStream<P>(
+  component: (props: P) => unknown,
+  props: P,
+  options?: StreamOptions,
+): ReadableStream<string>;
+```
+
+Renders a document component as a stream of the whole document. The first chunk is the whole first render: the doctype, the document with the winning title first in its `<head>` and the rest of the `<Head>` output after the document's own head elements, then the stylesheet links, the listener script, the preload links and the loader script, then `<body>` with the markup and the state script. The pending chunks of the page follow (see `RenderResult.pending`), and `</body></html>` ends the document, in the first chunk when nothing is pending.
+
+The component renders as soon as the stream is constructed, before the reader reads. A render error, or a root that does not render `<html>`, fails the stream before it sends a byte. When the reader cancels, the stream aborts `signal` of the result and stops the pending work. For a status page, call `render`, then `streamParts`.
+
+### `streamParts`
+
+```ts
+function streamParts(parts: RenderResult, options?: StreamOptions): ReadableStream<string>;
+```
+
+Streams what `render` returned, as `renderToStream` does. Use it when the server needs the parts before it sends headers, such as the `chunks` for a `Link` header or the error of a render. `pending` is single-use: a second `streamParts` on the same result streams no pending chunks.
+
+### `StreamOptions`
+
+```ts
+interface StreamOptions extends RenderOptions {
+  /** The URL of the loader module, for a page built without the plugin. */
+  loader?: string;
+  /** Options of `renderPreload` for the links in `<head>`, or `false` for none. */
+  preload?: PreloadOptions | false;
+}
+```
+
+`nonce` is written on the state script, the listener, the loader script, the stylesheet links and the preload links. The loader URL comes from the build, as `RenderResult.loader`. `loader` replaces it, for a page whose server modules the plugin did not build. A page with neither writes no loader script, and warns in development.
 
 ### `render`
 
@@ -30,22 +111,10 @@ function render<P>(
   component: (props: P) => unknown,
   props: P,
   options?: RenderOptions,
-): Promise<string>;
-```
-
-Renders a compiled component to HTML: its markup, then its state script. The state script holds the model, serialized with seroval, so the client resumes without running view code. The elements of a `<Head>` are not in the result: use `renderPage` to get them.
-
-### `renderPage`
-
-```ts
-function renderPage<P>(
-  component: (props: P) => unknown,
-  props: P,
-  options?: RenderOptions,
 ): Promise<RenderResult>;
 ```
 
-Renders a compiled component and returns the markup for `<head>` next to the body markup. Write `head` inside `<head>` and `body` in `<body>`.
+Renders a compiled component and returns the parts of its first render, plus `pending`. The streams write them as a document. The component can be any compiled component: a fragment, a child or a document. A test or a tool reads `body` and `head` from it.
 
 ### `RenderOptions`
 
@@ -60,13 +129,26 @@ interface RenderOptions {
 
 ```ts
 interface RenderResult {
-  /** The elements of every `<Head>`. The title of the last block is first. */
+  /** The elements of the document head and of every `<Head>`. The title of the last block is first. */
   head: string;
+  /** The markup with the state script. For a document, the whole `<html>` element, with the state script before `</body>`. */
   body: string;
+  /** True when the component rendered `<html>`. */
+  document: boolean;
+  /** The URL of the loader module, from the build. Undefined for a module the plugin did not build. */
+  loader: string | undefined;
+  /** The URLs of the stylesheets that the root and its children import, in import order. `renderToStream` links them in `<head>`. */
+  styles: readonly string[];
   /** The chunk URLs of the page, the root's and its children's: the first argument of `renderPreload`. */
   chunks: ChunkUrls;
   /** The manifests of the root and of the child modules: the second argument of `renderPreload`. */
   manifests: readonly Manifest[];
+  /** Chunks of HTML for `<body>` that follow the first render, as data resolves. Empty for now. */
+  pending: AsyncIterable<string>;
+  /** Aborts when the reader of a stream cancels, so the work behind `pending` stops. */
+  readonly signal: AbortSignal;
+  /** Aborts `signal`. The stream calls it on cancel. */
+  abort(reason?: unknown): void;
 }
 ```
 

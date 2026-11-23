@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { ICON, renderFooter, renderHead, renderHeader } from '../layout.ts';
 import REPL_ICON from './icons.ts';
+import { FRAME_SANDBOX } from './sandbox.ts';
 
 const STYLES = fileURLToPath(new URL('../styles.css', import.meta.url));
 const DEMO_FRAME = fileURLToPath(new URL('../demo/frame.css', import.meta.url));
@@ -68,7 +69,7 @@ export function renderRepl({ base, start }: { base: string; start: string }): st
     <div class="repl-run">
       <div class="demo-app repl-app">
         <div class="demo-bar"><span data-repl-address>Server render, then resume</span><button class="icon-button" type="button" data-repl-reload aria-label="Run again" title="Run again">${ICON.reload}</button></div>
-        <iframe class="demo-frame repl-frame" title="The running page" data-repl-frame></iframe>
+        <iframe class="demo-frame repl-frame" title="The running page" sandbox="${FRAME_SANDBOX}" data-repl-frame></iframe>
       </div>
       ${network}
     </div>`;

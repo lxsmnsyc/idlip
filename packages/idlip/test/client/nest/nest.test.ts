@@ -84,6 +84,8 @@ describe('nested board', () => {
     expect(labels).toEqual(['Spare', 'First', 'Renamed']);
     // The child's own state stays.
     expect(getCounts()).toEqual(['0', '0', '1']);
+    // A binding chunk starts beside the handler chunk, and `settled` does not wait for it.
+    await until(() => getLoaded().includes('counter:binding=props.label'));
     expect(getLoaded()).toContain('counter:binding=props.label');
     expect(getLoaded()).not.toContain('counter:binding=count');
     expect(harness.errors).toEqual([]);
