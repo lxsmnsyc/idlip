@@ -81,7 +81,7 @@ A prop is a hole in the closed grammar of [views](./views.md#holes). The parent 
 
 - **A props value** such as `label={c.label}` is copied into the child's slot in the state script. When the parent changes `items`, the binding of `items.*.label` passes the new label to the child, and the child patches its `<span>`.
 - **A `let` initial value reads props once.** `let count = props.start` starts the counter at `start`. After that, `count` belongs to the child, and a new `start` from the parent does not reset it.
-- **A callback prop** follows the rule of [event attributes](./views.md#events). It is a handler of the parent, or an arrow whose body is one call to a handler. `onRemove={() => remove(c.id)}` compiles to the message `["remove",["a1"],"",""]`. The last item is the model path of the component that owns the handler, `""` for the root. No closure goes to the browser.
+- **A callback prop** follows the rule of [event attributes](./views.md#events). It is a handler of the parent, or an arrow whose body is one call to a handler, and it cannot read the event. `onRemove={() => remove(c.id)}` compiles to the message `["remove",["a1"],"",""]`, built when the parent renders. The messages of the child's own events are computed when the event runs instead. The last item is the model path of the component that owns the handler, `""` for the root. No closure goes to the browser.
 
 ## Messages from a child
 

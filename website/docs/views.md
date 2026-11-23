@@ -128,19 +128,22 @@ export default function Notice(): JSX.Element {
 
 ## Events
 
-An event attribute is `on:` and the event name: `on:click`, `on:input`, `on:submit`. It takes a handler, or an arrow whose body is one handler call.
+An event attribute is `on:` and the event name: `on:click`, `on:input`, `on:submit`. It takes a handler, or an arrow that sends messages to handlers.
 
 The counter and the todo app use all three forms:
 
-| Attribute                                           | Message                                            |
-| --------------------------------------------------- | -------------------------------------------------- |
-| `on:click={increment}`                              | `increment` with no arguments.                     |
-| `on:click={() => toggle(t.id)}`                     | `toggle` with `t.id`, computed at render.          |
-| `on:input={(e) => setDraft(e.currentTarget.value)}` | `setDraft` with a value read when the event fires. |
+| Attribute                                           | Message                                                      |
+| --------------------------------------------------- | ------------------------------------------------------------ |
+| `on:click={increment}`                              | `increment` with no arguments.                               |
+| `on:click={() => toggle(t.id)}`                     | `toggle` with `t.id`, read from the row when the event runs. |
+| `on:input={(e) => setDraft(e.currentTarget.value)}` | `setDraft` with the value of the field when the event runs.  |
 
-- **Arguments** are holes, or paths on the event parameter such as `e.currentTarget.value`. The browser reads an event path when the event fires.
-- **`e.preventDefault()` and `e.stopPropagation()`** may come before the call.
-- **A key test** may wrap the call: `if (e.key === 'Escape') { clear(); }`. The test can also check `e.ctrlKey`, `e.shiftKey`, `e.altKey` and `e.metaKey`. The listener runs the test, so a key that does not match loads nothing.
+- **An arrow is a function in the handler chunk.** It runs after the event has dispatched, once the chunk has loaded. It reads the event, the state, the props and the row, and it sends a message to each handler it calls. The HTML holds only the name of the function.
+- **A body may hold** handler calls, `if` and `else` on any expression of the view, and `const` declarations. It may call several handlers, or none in some branches. At least one call must be in the arrow (`event-no-call`).
+- **Arguments** are expressions. `e.currentTarget.value` and `e.key` read the event, and `t.id` reads the row the user clicked.
+- **`e.preventDefault()` and `e.stopPropagation()`** go first, since the browser must see them while the event dispatches. The compiler lifts them to the page.
+- **A conditional prevent** is an `if` on the key at the start, with no call inside: `if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); }`. The page prevents those keys at once, and the arrow still runs for every key.
+- **A key test** may wrap the whole arrow: `if (e.key === 'Escape') { clear(); }`. The test can also check `e.ctrlKey`, `e.shiftKey`, `e.altKey` and `e.metaKey`. The listener runs the test, so a key that does not match loads nothing.
 
 ### Forms
 
@@ -166,7 +169,7 @@ export default function Signup(): JSX.Element {
 }
 ```
 
-Each field name in the path must be fixed. `e.currentTarget.elements[field].value` is the error `event-computed-key`.
+A field name may be computed: `e.currentTarget.elements[field].value` reads the field when the event runs.
 
 ## Block components
 
@@ -292,19 +295,20 @@ export default function Inbox(): JSX.Element {
 
 Each rule is a compile error with this id:
 
-| Rule id              | Cause                                                                |
-| -------------------- | -------------------------------------------------------------------- |
-| `view-map`           | `.map()` in a view. Use `<For each key>`.                            |
-| `hole-global`        | A global such as `JSON` or `window` in a hole. Wrap it in a helper.  |
-| `hole-method`        | A method outside the list above, such as `date.getTime()`.           |
-| `jsx-spread`         | A spread attribute, `<div {...attrs} />`.                            |
-| `event-closure`      | An event arrow with more than one handler call, or other statements. |
-| `event-placeholder`  | The event parameter used other than as a path, such as `save(e)`.    |
-| `event-computed-key` | A computed key in an event path, such as `elements[field].value`.    |
-| `attr-event`         | An `onclick` attribute. Use `on:click`.                              |
-| `html-trusted`       | `html={value}` without `trusted(...)`.                               |
-| `srcdoc-trusted`     | A bound `srcdoc` without `trusted(...)`.                             |
-| `hole-dynamic`       | A hole whose model paths the compiler cannot find and cannot record. |
+| Rule id             | Cause                                                                |
+| ------------------- | -------------------------------------------------------------------- |
+| `view-map`          | `.map()` in a view. Use `<For each key>`.                            |
+| `hole-global`       | A global such as `JSON` or `window` in a hole. Wrap it in a helper.  |
+| `hole-method`       | A method outside the list above, such as `date.getTime()`.           |
+| `jsx-spread`        | A spread attribute, `<div {...attrs} />`.                            |
+| `event-closure`     | An `async` event arrow, or a statement that is not a handler call.   |
+| `event-statement`   | A statement other than a call, `if`, `else` or `const` in an arrow.  |
+| `event-no-call`     | An event arrow that calls no handler.                                |
+| `event-placeholder` | The whole event passed as an argument, such as `save(e)`.            |
+| `attr-event`        | An `onclick` attribute. Use `on:click`.                              |
+| `html-trusted`      | `html={value}` without `trusted(...)`.                               |
+| `srcdoc-trusted`    | A bound `srcdoc` without `trusted(...)`.                             |
+| `hole-dynamic`      | A hole whose model paths the compiler cannot find and cannot record. |
 
 A helper that takes the whole `props`, or an object of state fields, is not an error. At the top level of a root component, the server records the paths the helper reads and sends them with the state. Inside `<For>`, a condition, a `<Try>` or a child component, the hole uses the paths the compiler finds.
 

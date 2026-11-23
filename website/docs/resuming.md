@@ -43,9 +43,9 @@ The e2e test records every request from the navigation on, and fails if any othe
 
 A click on the second checkbox runs these steps:
 
-1. The listener reads `["toggle",["a2"]]` from the checkbox and queues the message `toggle("a2")`.
+1. The listener reads `$e3` from the checkbox and queues the event with the element. It sends no message yet.
 2. The loader decodes the state script, once for the page.
-3. The loader imports the `toggle` handler chunk, and with it the helpers module the chunks share. It runs the handler on the model. The result is the next model.
+3. The loader imports the `toggle` handler chunk, and with it the helpers module the chunks share. The chunk exports the function `$e3` of the click, which reads the row the user clicked and returns the message `toggle("a2")`. The loader runs the handler on the model. The result is the next model.
 4. The manifest says `toggle` writes `todos.*.done`. The loader imports the binding chunk of that path only. It asks for all three files before any arrives, so the click costs one round trip.
 5. The binding chunk patches the checkbox, the `done` class of the row and the `0 left` count, since `countLeft(todos)` reads `todos.*.done`.
 

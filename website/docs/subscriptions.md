@@ -108,7 +108,7 @@ Each value is an ordinary message with the value as its payload, so it goes thro
 
 ## Server, resume and unmount
 
-- **Server.** The server never runs a source. For each `<Subscribe>` in the rendered view it writes a marker: `<template i-sub="timer" i-input="1000" i-key="1000" on:value=...>`. The input and the key are written with `JSON.stringify`, so they must be JSON values. A stopped subscription, one whose condition is false, writes no marker.
+- **Server.** The server never runs a source. For each `<Subscribe>` in the rendered view it writes a marker: `<template i-sub="timer" i-input="1000" i-key="1000" on:value="$e0">`, where `$e0` is the function of the handler call, which receives each value. The input and the key are written with `JSON.stringify`, so they must be JSON values. A stopped subscription, one whose condition is false, writes no marker.
 - **Resume.** The loader starts the sources whose markers are in the page, with no event needed. The source lives in its own `source=<name>` chunk, which loads at start. A page without `<Subscribe>` loads nothing for subscriptions.
 - **Add and remove.** When a patch adds a block with a `<Subscribe>`, its source starts. A `<Subscribe>` in a `<For>` row starts and stops with its row.
 - **Unmount.** When the block is removed, the runtime aborts the signal and calls the generator's `return()` without waiting for it. It drops any value yielded after that. No handler runs for a subscription that is gone.

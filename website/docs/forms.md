@@ -61,10 +61,10 @@ export default function Guests(): JSX.Element {
 }
 ```
 
-- **The browser reads the paths when the event fires**, before any chunk loads. The message holds the values, not the form.
+- **The arrow reads the paths when it runs**, after the chunk loads. The message holds the values, not the form.
 - **`value`, `checked` and `valueAsNumber`** are typed on each field.
 - **A `submit` is always prevented**, so the page does not navigate. You do not need `e.preventDefault()`.
-- **Each field name is fixed in the source.** `e.currentTarget.elements[field].value` is the error `event-computed-key`.
+- **A field name may be computed.** `e.currentTarget.elements[field].value` is read when the arrow runs.
 - **The browser still validates.** A `required` field that is empty stops the submit before the handler runs.
 
 A form in a `<For>` row works the same way. Pass the row's key next to the fields: `on:submit={(e) => rename(item.id, e.currentTarget.elements.text.value)}`.

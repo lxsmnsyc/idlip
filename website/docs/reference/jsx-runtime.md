@@ -70,4 +70,4 @@ An event with `currentTarget` typed as the element the listener is on.
 type EventProp<El extends Element, E extends Event> = (event: EventFor<El, E>) => unknown;
 ```
 
-The type of an `on:*` or `latest:*` prop. The compiler restricts the value to a handler, or an arrow function whose body is one handler call.
+The type of an `on:*` or `latest:*` prop. The compiler restricts the value to a handler, or a synchronous arrow function whose statements are handler calls, `if`, `else` and `const`.

@@ -413,7 +413,7 @@ Where a child's model lives: its `key` prop, else the `<For>` key inside a loop,
 
 ### `Event`
 
-An `on:*` or `latest:*` prop, or a message prop on a child: `name`, `mode` (`on` or `latest`), `target`, `args`, the model `paths` the arguments read at render, `modifiers` and `span`.
+An `on:*` or `latest:*` prop, or a message prop on a child: `name`, `mode` (`on` or `latest`), `body`, `modifiers` and `span`. A `steps` body is the handler calls and branches of an arrow, which compile to a function in the handler chunk. A `message` body is a `target` with `args` and the model `paths` that they read at render: a message prop of a child, a forwarded one or a `reset`.
 
 ### `Target`
 
@@ -430,7 +430,7 @@ What an event dispatches: a handler of the component, a message prop forwarded t
 
 ```ts
 type EventModifier =
-  | { kind: 'prevent' }
+  | { kind: 'prevent'; keys?: string[] }
   | { kind: 'stop' }
   | { kind: 'once' }
   | { kind: 'capture' }
@@ -438,7 +438,7 @@ type EventModifier =
   | { kind: 'key'; filter: string };
 ```
 
-`prevent` and `stop` come from leading `e.preventDefault();` and `e.stopPropagation();` statements, and `key` from an `if (e.key === '...')` test. A `key` filter is the key name, after any of `Ctrl+`, `Alt+`, `Shift+` and `Meta+` that the test reads, in that order, such as `Escape` or `Ctrl+s`. `once`, `capture` and `passive` have no source form yet.
+`prevent` and `stop` come from leading `e.preventDefault();` and `e.stopPropagation();` statements, `prevent` with `keys` from a leading `if (<key test>) e.preventDefault();`, and `key` from a sole `if (e.key === '...')` test. A `key` filter is the key name, after any of `Ctrl+`, `Alt+`, `Shift+` and `Meta+` that the test reads, in that order, such as `Escape` or `Ctrl+s`. `once`, `capture` and `passive` have no source form yet.
 
 ### `Hole`
 
