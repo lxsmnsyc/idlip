@@ -2,6 +2,7 @@ import { parseSync } from 'oxc-parser';
 import type { ObjectExpression, Program } from '@oxc-project/types';
 import { HELPERS_KEY, LOADER_KEY, TEMPLATES_KEY } from '../core/format.ts';
 import type { ChunkUrls, Manifest } from '../core/format.ts';
+import { STYLES_KEY } from '../server/styles.ts';
 import { BUILD_KEY } from './skew.ts';
 
 /**
@@ -167,7 +168,7 @@ export function replaceChunkUrls(code: string, urls: ChunkUrls): string {
     for (const key of readKeys(map)) {
       own[key] = Object.hasOwn(urls, key) ? urls[key] : key;
     }
-    for (const key of [BUILD_KEY, HELPERS_KEY, TEMPLATES_KEY, LOADER_KEY]) {
+    for (const key of [BUILD_KEY, HELPERS_KEY, TEMPLATES_KEY, LOADER_KEY, STYLES_KEY]) {
       if (Object.hasOwn(urls, key)) {
         own[key] = urls[key];
       }

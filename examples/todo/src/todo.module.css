@@ -1,0 +1,10 @@
+.left {
+  margin: 0.5rem 0;
+  color: rgb(10, 20, 30);
+}
+
+.clear {
+  margin: 0.5rem 0;
+  color: rgb(0, 128, 0);
+  font-weight: 600;
+}

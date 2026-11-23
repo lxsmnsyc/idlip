@@ -87,12 +87,12 @@ Nitro writes `.output/server/index.mjs` as a module worker, `.output/server/wran
 `csp: true` of `renderToResponse` makes a nonce for each response, writes it on the listener, the preload links, the loader script and the state script, and sets this header:
 
 ```
-default-src 'none'; script-src 'nonce-…' 'strict-dynamic'; base-uri 'none'; object-src 'none'; require-trusted-types-for 'script'; trusted-types idlip
+default-src 'none'; script-src 'nonce-…' 'strict-dynamic'; style-src 'self' 'nonce-…'; base-uri 'none'; object-src 'none'; require-trusted-types-for 'script'; trusted-types idlip
 ```
 
-`default-src 'none'` blocks styles, images and requests, so a page with a stylesheet adds its sources: `csp: { extend: { 'style-src': ["'self'"], 'img-src': ['https:'] } }`. Sources are added to a directive of that name, or the directive is added. The script directives (`script-src`, `script-src-elem`, `script-src-attr`) and the Trusted Types directives (`trusted-types`, `require-trusted-types-for`) cannot be extended. A host that makes its own nonce passes it as `nonce`, and `csp` uses it.
+`default-src 'none'` blocks images and requests, so a page that loads them adds its sources: `csp: { extend: { 'img-src': ['https:'] } }`. Sources are added to a directive of that name, or the directive is added. The policy allows the stylesheets of the build with `style-src 'self'` and the nonce. A `style-src` in `extend` replaces both, for a page that loads styles from another origin (see [Styles](./styles.md#content-security-policy)). The script directives (`script-src`, `script-src-elem`, `script-src-attr`) and the Trusted Types directives (`trusted-types`, `require-trusted-types-for`) cannot be extended. A host that makes its own nonce passes it as `nonce`, and `csp` uses it.
 
-- **A static `<style>` in the head has no nonce.** The policy blocks it. Add `style-src` with `extend`, or load the styles with a `<link rel="stylesheet">`. A `<script>` in the document head is a compile error for the same reason.
+- **A static `<style>` in the head has no nonce.** The policy blocks it. Import the styles from the component instead (see [Styles](./styles.md)), or write the `<link rel="stylesheet">` yourself. A `<script>` in the document head is a compile error for the same reason.
 - **No header in development.** The policy would block Vite's HMR socket and error overlay. The nonce is still written, so the markup is the same.
 - **The page and its assets are not the same response.** Nitro serves the files of `.output/public` itself, and the policy applies to the page.
 

@@ -7,6 +7,10 @@ import { printHelpersModule } from '../core/helpers.ts';
 
 const IMPORT = /import\s*\{([^}]*)\}\s*from\s*['"]idlip\/(server|client|helpers)['"];?/g;
 
+/** A default import of a CSS Module: `import styles from './app.module.css'`. */
+const STYLE_MODULE_IMPORT =
+  /import\s+([\w$]+)\s+from\s*['"][^'"]+\.module\.(?:css|scss|sass|less|styl|stylus|pcss|postcss|sss)(?:\?[^'"]*)?['"];?/g;
+
 function toPattern(specifiers: string): string {
   const names: string[] = [];
   for (const part of specifiers.split(',')) {
@@ -20,13 +24,22 @@ function toPattern(specifiers: string): string {
   return names.join(', ');
 }
 
-/** Points the module's `idlip/server`, `idlip/client` and `idlip/helpers` imports at `globalThis[key]`. */
+/**
+ * Points the module's `idlip/server`, `idlip/client` and `idlip/helpers` imports at
+ * `globalThis[key]`. A test loads no stylesheet, so a CSS Module import becomes an object whose
+ * class names are their own keys: `styles.done` is `'done'`.
+ */
 export function bindImports(code: string, key: string): string {
-  return code.replaceAll(
-    IMPORT,
-    (_all, specifiers: string, scope: string) =>
-      `const { ${toPattern(specifiers)} } = globalThis[${JSON.stringify(key)}].${scope};`,
-  );
+  return code
+    .replaceAll(
+      STYLE_MODULE_IMPORT,
+      (_all, name: string) => `const ${name} = new Proxy({}, { get: (_target, key) => key });`,
+    )
+    .replaceAll(
+      IMPORT,
+      (_all, specifiers: string, scope: string) =>
+        `const { ${toPattern(specifiers)} } = globalThis[${JSON.stringify(key)}].${scope};`,
+    );
 }
 
 export function toDataUrl(code: string): string {

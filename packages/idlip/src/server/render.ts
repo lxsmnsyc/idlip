@@ -10,6 +10,7 @@ import type {
   Props,
 } from '../core/format.ts';
 import { attr } from './helpers.ts';
+import { STYLES_KEY, readStyles } from './styles.ts';
 
 export interface RenderOptions {
   /** Written on the state script. */
@@ -81,6 +82,12 @@ export interface RenderResult {
    */
   loader: string | undefined;
   /**
+   * The URLs of the stylesheets that the root and its children import, in import order.
+   * `renderToStream` and `renderToResponse` link them in `<head>`. Frozen and shared by every
+   * render of the module.
+   */
+  styles: readonly string[];
+  /**
    * The chunk URLs of the page, the root's and its children's: the first argument of
    * `renderPreload`. Frozen and shared by every render of the module.
    */
@@ -136,6 +143,8 @@ interface StaticPart {
   readonly build: string | undefined;
   /** The URL of the loader module, from the chunk map. The state script does not carry it. */
   readonly loader: string | undefined;
+  /** The stylesheet URLs of the root and its children, without duplicates. */
+  readonly styles: readonly string[];
   /** The chunk URLs of the state, without `build` and `loader`. */
   readonly urls: Record<string, string>;
   /** The manifests of the child modules. */
@@ -249,6 +258,7 @@ function collectModules(
   modules: Map<string, Manifest>,
   chunks: Record<string, string>,
   known: Map<string, ModuleInfo>,
+  styles: Set<string>,
 ): void {
   for (const info of uses) {
     const { module, view } = info.manifest;
@@ -257,11 +267,15 @@ function collectModules(
       known.set(module, info);
       const viewId = view === undefined ? undefined : getChunkId(module, view.chunk);
       for (const [id, url] of Object.entries(info.chunks)) {
-        if (id !== viewId) {
+        if (id === STYLES_KEY) {
+          for (const href of readStyles(url)) {
+            styles.add(href);
+          }
+        } else if (id !== viewId) {
           chunks[id] = url;
         }
       }
-      collectModules(info.uses ?? [], modules, chunks, known);
+      collectModules(info.uses ?? [], modules, chunks, known, styles);
     }
   }
 }
@@ -271,10 +285,11 @@ function buildPart(root: ComponentState, children: Iterable<ComponentState> = []
   const modules = new Map<string, Manifest>();
   const known = new Map<string, ModuleInfo>();
   const urls: Record<string, string> = Object.assign({}, root.chunks);
-  collectModules(root.uses ?? [], modules, urls, known);
+  const styles = new Set(readStyles(root.chunks[STYLES_KEY]));
+  collectModules(root.uses ?? [], modules, urls, known, styles);
   // Children outside `uses` join this render's part only.
   for (const state of children) {
-    collectModules([state], modules, urls, known);
+    collectModules([state], modules, urls, known, styles);
   }
   const events = new Set(root.manifest.events);
   for (const manifest of modules.values()) {
@@ -288,6 +303,8 @@ function buildPart(root: ComponentState, children: Iterable<ComponentState> = []
   // The loader URL is for the document's script tag, so the state script leaves it out.
   const loader = Object.hasOwn(urls, LOADER_KEY) ? urls[LOADER_KEY] : undefined;
   delete urls.loader;
+  // The stylesheets are links in `<head>`, so the state script leaves them out.
+  Reflect.deleteProperty(urls, STYLES_KEY);
   const tail =
     modules.size === 0
       ? ''
@@ -299,6 +316,7 @@ function buildPart(root: ComponentState, children: Iterable<ComponentState> = []
     events: escapeScript(JSON.stringify([...events].toSorted().join(' '))),
     build,
     loader,
+    styles: Object.freeze([...styles]),
     urls,
     modules,
     // Every render returns these objects, so a caller cannot change them for the next one. A copy,
@@ -483,6 +501,7 @@ export function renderSync(
     body,
     document: isDocument,
     loader: part.loader,
+    styles: part.styles,
     chunks: part.pageChunks,
     manifests: part.manifests,
     pending: NOTHING_PENDING,

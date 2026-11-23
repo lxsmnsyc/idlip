@@ -91,12 +91,12 @@ export default defineConfig({
       ? [
           {
             name: 'hot',
-            testMatch: /hot\.spec\.ts/,
+            testMatch: /(hot|styles)\.spec\.ts/,
             use: { ...devices['Desktop Chrome'], baseURL: `http://127.0.0.1:${hotPort}` },
           },
           {
             name: 'hot-fallback',
-            testMatch: /hot\.spec\.ts/,
+            testMatch: /(hot|styles)\.spec\.ts/,
             use: { ...devices['Desktop Chrome'], baseURL: `http://127.0.0.1:${hotPort + 2}` },
           },
           {

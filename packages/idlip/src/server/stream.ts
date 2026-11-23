@@ -2,6 +2,7 @@ import { renderListener } from '../client/loader/listener.ts';
 import { DEV } from '../core/dev.ts';
 import { attr } from './helpers.ts';
 import { renderPreload } from './preload.ts';
+import { renderStyles } from './styles.ts';
 import type { PreloadOptions } from './preload.ts';
 import { NOTHING_PENDING, renderSync } from './render.ts';
 import type { RenderOptions, RenderResult } from './render.ts';
@@ -72,7 +73,7 @@ function splitTitle(head: string): { title: string; rest: string } {
 /**
  * The first render whole, up to `</body>`: the doctype, the document with the winning title
  * first in its `<head>` and the rest of the head output after the head elements of the
- * document, then the listener, the preload links and the loader script, and the body with the
+ * document, then the stylesheet links, the listener, the preload links and the loader script, and the body with the
  * state script. The tail comes after the pending chunks.
  */
 function writeFirst(parts: RenderResult, options: StreamOptions): string {
@@ -89,7 +90,8 @@ function writeFirst(parts: RenderResult, options: StreamOptions): string {
   if (close < 0) {
     throw new Error('The document component did not render <html><head>..</head><body>');
   }
-  let added = renderListener({ nonce });
+  // The stylesheets come first, so the browser fetches them while it reads the rest of the head.
+  let added = renderStyles(parts.styles, nonce) + renderListener({ nonce });
   if (options.preload !== false) {
     added += renderPreload(parts.chunks, parts.manifests, { nonce, ...options.preload });
   }

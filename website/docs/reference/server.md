@@ -47,13 +47,13 @@ interface ResponseOptions extends StreamOptions {
 }
 ```
 
-- **`csp`** makes a nonce for the response, writes it on the listener, the loader script, the preload links and the state script, and sets the `content-security-policy` header. `true` is idlip's policy:
+- **`csp`** makes a nonce for the response, writes it on the listener, the loader script, the stylesheet links, the preload links and the state script, and sets the `content-security-policy` header. `true` is idlip's policy:
 
   ```
-  default-src 'none'; script-src 'nonce-…' 'strict-dynamic'; base-uri 'none'; object-src 'none'; require-trusted-types-for 'script'; trusted-types idlip
+  default-src 'none'; script-src 'nonce-…' 'strict-dynamic'; style-src 'self' 'nonce-…'; base-uri 'none'; object-src 'none'; require-trusted-types-for 'script'; trusted-types idlip
   ```
 
-  `extend` adds sources to a directive, such as `{ 'style-src': ["'self'"], 'img-src': ['https:'] }`, and adds a directive the policy lacks. A source added to `default-src` replaces `'none'`. The script directives (`script-src`, `script-src-elem`, `script-src-attr`) and the Trusted Types directives (`trusted-types`, `require-trusted-types-for`) cannot be extended, and a name or a source that holds a space, `;` or `,` throws. In development (`NODE_ENV` other than `production`) the response has no policy header, since Vite's HMR client and error overlay need more than it allows, but the nonce is still written.
+  `extend` adds sources to a directive, such as `{ 'img-src': ['https:'] }`, and adds a directive the policy lacks. A `style-src` replaces the policy's own `'self'` and nonce. A source added to `default-src` replaces `'none'`. The script directives (`script-src`, `script-src-elem`, `script-src-attr`) and the Trusted Types directives (`trusted-types`, `require-trusted-types-for`) cannot be extended, and a name or a source that holds a space, `;` or `,` throws. In development (`NODE_ENV` other than `production`) the response has no policy header, since Vite's HMR client and error overlay need more than it allows, but the nonce is still written.
 
 - **`nonce`** (from `RenderOptions`) replaces the nonce that `csp` would make, for a host that makes its own.
 - **`status`** is 200 by default, and **`headers`** are added to the response. `content-type` is `text/html; charset=utf-8` unless `headers` has one.
@@ -79,7 +79,7 @@ function renderToStream<P>(
 ): ReadableStream<string>;
 ```
 
-Renders a document component as a stream of the whole document. The first chunk is the whole first render: the doctype, the document with the winning title first in its `<head>` and the rest of the `<Head>` output after the document's own head elements, then the listener script, the preload links and the loader script, then `<body>` with the markup and the state script. The pending chunks of the page follow (see `RenderResult.pending`), and `</body></html>` ends the document, in the first chunk when nothing is pending.
+Renders a document component as a stream of the whole document. The first chunk is the whole first render: the doctype, the document with the winning title first in its `<head>` and the rest of the `<Head>` output after the document's own head elements, then the stylesheet links, the listener script, the preload links and the loader script, then `<body>` with the markup and the state script. The pending chunks of the page follow (see `RenderResult.pending`), and `</body></html>` ends the document, in the first chunk when nothing is pending.
 
 The component renders as soon as the stream is constructed, before the reader reads. A render error, or a root that does not render `<html>`, fails the stream before it sends a byte. When the reader cancels, the stream aborts `signal` of the result and stops the pending work. For a status page, call `render`, then `streamParts`.
 
@@ -102,7 +102,7 @@ interface StreamOptions extends RenderOptions {
 }
 ```
 
-`nonce` is written on the state script, the listener, the loader script and the preload links. The loader URL comes from the build, as `RenderResult.loader`. `loader` replaces it, for a page whose server modules the plugin did not build. A page with neither writes no loader script, and warns in development.
+`nonce` is written on the state script, the listener, the loader script, the stylesheet links and the preload links. The loader URL comes from the build, as `RenderResult.loader`. `loader` replaces it, for a page whose server modules the plugin did not build. A page with neither writes no loader script, and warns in development.
 
 ### `render`
 
@@ -137,6 +137,8 @@ interface RenderResult {
   document: boolean;
   /** The URL of the loader module, from the build. Undefined for a module the plugin did not build. */
   loader: string | undefined;
+  /** The URLs of the stylesheets that the root and its children import, in import order. `renderToStream` links them in `<head>`. */
+  styles: readonly string[];
   /** The chunk URLs of the page, the root's and its children's: the first argument of `renderPreload`. */
   chunks: ChunkUrls;
   /** The manifests of the root and of the child modules: the second argument of `renderPreload`. */

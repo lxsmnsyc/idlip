@@ -4,6 +4,8 @@
 // Handlers and event arrows follow docs/proposals/0002-modules.md, which has no return types.
 // oxlint-disable typescript/no-confusing-void-expression, typescript/explicit-function-return-type
 import { For } from 'idlip';
+import './todo.css';
+import styles from './todo.module.css';
 import type { JSX } from 'idlip/jsx-runtime';
 
 interface Todo {
@@ -73,7 +75,7 @@ export default function TodoApp(props: { initial: Todo[] }): JSX.Element {
             />
             <button disabled={draft === ''}>Add</button>
           </form>
-          <p>{left} left</p>
+          <p class={left === 0 ? styles.clear : styles.left}>{left} left</p>
           <ul>
             <For each={todos} key={(t) => t.id}>
               {(t) => (

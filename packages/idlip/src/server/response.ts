@@ -6,8 +6,9 @@ import type { StreamOptions } from './stream.ts';
 /** Sources to add to the directives of idlip's content security policy. */
 export interface CspOptions {
   /**
-   * Sources added to a directive by name, such as `{ 'style-src': ["'self'"], 'img-src': ['https:'] }`.
-   * A directive that the policy lacks is added. `default-src` is `'none'`, so adding sources to it
+   * Sources added to a directive by name, such as `{ 'img-src': ['https:'] }`. A directive that
+   * the policy lacks is added. `style-src` is the exception: the policy has `'self'` and the nonce
+   * for the stylesheets of the build, and a `style-src` here replaces them. `default-src` is `'none'`, so adding sources to it
    * replaces `'none'`. The script directives (`script-src`, `script-src-elem`, `script-src-attr`)
    * and the Trusted Types directives (`trusted-types`, `require-trusted-types-for`) cannot be
    * extended.
@@ -59,6 +60,9 @@ export function createPolicy(nonce: string, options: CspOptions = {}): string {
   const directives = new Map<string, string[]>([
     ['default-src', ["'none'"]],
     ['script-src', [`'nonce-${nonce}'`, "'strict-dynamic'"]],
+    // The stylesheets of the build are files of the page's own origin. A `extend` of
+    // `style-src` replaces this.
+    ['style-src', ["'self'", `'nonce-${nonce}'`]],
     ['base-uri', ["'none'"]],
     ['object-src', ["'none'"]],
     ['require-trusted-types-for', ["'script'"]],
@@ -76,7 +80,7 @@ export function createPolicy(nonce: string, options: CspOptions = {}): string {
         throw new TypeError(`csp.extend: "${source}" is not a source of ${name}`);
       }
     }
-    const kept = directives.get(name) ?? [];
+    const kept = name === 'style-src' ? [] : (directives.get(name) ?? []);
     // `'none'` stands alone, so a source replaces it.
     const base = kept.length === 1 && kept[0] === "'none'" && sources.length > 0 ? [] : kept;
     directives.set(name, [...base, ...sources]);

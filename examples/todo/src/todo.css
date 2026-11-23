@@ -1,0 +1,19 @@
+body {
+  max-width: 28rem;
+  margin: 2rem auto;
+  font-family: system-ui, sans-serif;
+  color: rgb(34, 40, 49);
+}
+
+form {
+  display: flex;
+  gap: 0.5rem;
+}
+
+form input {
+  flex: 1;
+}
+
+li.done {
+  text-decoration: line-through;
+}

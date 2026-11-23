@@ -40,6 +40,8 @@ import {
   keepBuilds,
 } from './skew.ts';
 import { isChunkUrls, listChunks, parseChunkId, replaceChunkUrls } from './chunks.ts';
+import { STYLES_KEY } from '../server/styles.ts';
+import { STYLES_PREFIX, cleanId, isScript, isStyle, isStyleModule, listImports } from './styles.ts';
 
 const MODULE_FILE = /\.tsx$/;
 
@@ -65,6 +67,20 @@ const HELPERS_ID = '\0idlip-helpers';
 const TEMPLATES_ID = '\0idlip-templates';
 /** The name of the plugin that Nitro's Vite integration registers. */
 const NITRO_PLUGIN = 'nitro:main';
+/**
+ * The id prefix of the client entry that imports the stylesheets of one module file. Nothing
+ * loads the entry: the bundler writes the stylesheets that it imports, and the plugin reads their
+ * names.
+ */
+const STYLES_ID = '\0idlip-styles:';
+/**
+ * The id prefix of a module that holds the class names of a CSS Module for one chunk: the object
+ * the stylesheet exports, inlined in the chunk. Why: a chunk that imported the stylesheet's own
+ * module would share it with the other chunks, and a click would load that file.
+ */
+const NAMES_ID = '\0idlip-names:';
+/** A stylesheet import that asks for the text or the URL, not for a link on the page. */
+const STYLE_QUERY = /[?&](?:inline|url|raw)(?:&|=|$)/;
 /** The default `modules` globs. */
 const DEFAULT_MODULES = ['src/**/*.tsx'];
 /** The id of a child's view chunk, with the component's name for a named component. */
@@ -218,13 +234,19 @@ function checkChunkImports(
   bundle: Rolldown.OutputBundle,
   chunkFiles: ReadonlySet<string>,
   sharedFiles: readonly string[],
+  styleFiles: ReadonlySet<string> = new Set(),
 ): void {
   const items: Partial<Rolldown.OutputBundle> = bundle;
   // Walk the static imports from every entry that is not an idlip chunk.
   const loaded = new Set<string>();
   const pending: string[] = [];
   for (const item of Object.values(bundle)) {
-    if (item.type === 'chunk' && item.isEntry && !chunkFiles.has(item.fileName)) {
+    if (
+      item.type === 'chunk' &&
+      item.isEntry &&
+      !chunkFiles.has(item.fileName) &&
+      !styleFiles.has(item.fileName)
+    ) {
       pending.push(item.fileName);
     }
   }
@@ -441,9 +463,106 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
   let buildFiles: string[] = [];
   /** The templates that more than one chunk of the client build renders, by hash. */
   let shared: Map<string, string> | undefined;
+  /** The stylesheets that each module file reaches, for the client build's entries. */
+  const styleEntries = new Map<string, string[]>();
 
   function getModuleId(file: string): string {
     return `/${path.relative(root, file).split(path.sep).join('/')}`;
+  }
+
+  /** The URL that dev serves a stylesheet at: under the base, or `/@fs/` outside the root. */
+  function toStyleUrl(id: string): string {
+    const relative = path.relative(root, id);
+    const url = relative.startsWith('..')
+      ? `${base}@fs${toPosix(id)}`
+      : `${base}${toPosix(relative)}`;
+    return encodeURI(url);
+  }
+
+  /**
+   * Lists the stylesheets that a file's import graph reaches, in import order: the file's own
+   * imports first, then those of each script it imports, outside `node_modules`. A child
+   * component's file is a script of the graph, so a parent lists the stylesheets of its children.
+   */
+  async function findStyles(context: Rolldown.PluginContext, file: string): Promise<string[]> {
+    const found = new Set<string>();
+    const seen = new Set<string>();
+    async function visit(current: string): Promise<void> {
+      if (seen.has(current)) {
+        return;
+      }
+      seen.add(current);
+      let source: string;
+      try {
+        source = readFileSync(current, 'utf8');
+      } catch {
+        return;
+      }
+      for (const specifier of listImports(current, source)) {
+        // oxlint-disable-next-line no-await-in-loop
+        const target = await context.resolve(specifier, current);
+        if (target === null || Boolean(target.external) || target.id.startsWith('\0')) {
+          continue;
+        }
+        const id = cleanId(target.id);
+        if (isStyle(id)) {
+          if (!STYLE_QUERY.test(target.id)) {
+            found.add(id);
+          }
+        } else if (isScript(id)) {
+          // oxlint-disable-next-line no-await-in-loop
+          await visit(id);
+        }
+      }
+    }
+    await visit(file);
+    return [...found];
+  }
+
+  /**
+   * Writes the stylesheet URLs of each module file into the chunk map, from the bundle's entries
+   * for them, and returns the files of those entries. A chunk's stylesheets are its own and those
+   * of the chunks it imports, the imported ones first, as Vite orders them.
+   */
+  function readStyleFiles(
+    bundle: Rolldown.OutputBundle,
+    prefix: string,
+    urls: Record<string, string>,
+  ): Set<string> {
+    const items: Partial<Rolldown.OutputBundle> = bundle;
+    const entries = new Set<string>();
+    for (const item of Object.values(bundle)) {
+      if (item.type === 'chunk' && item.facadeModuleId?.startsWith(STYLES_ID) === true) {
+        entries.add(item.fileName);
+        const file = item.facadeModuleId.slice(STYLES_ID.length);
+        const sheets = new Set<string>();
+        const visited = new Set<string>();
+        function visit(name: string): void {
+          const chunk = items[name];
+          if (chunk?.type !== 'chunk' || visited.has(name)) {
+            return;
+          }
+          visited.add(name);
+          for (const imported of chunk.imports) {
+            visit(imported);
+          }
+          for (const sheet of chunk.viteMetadata?.importedCss ?? []) {
+            sheets.add(sheet);
+          }
+        }
+        visit(item.fileName);
+        const list: string[] = [];
+        for (const sheet of sheets) {
+          list.push(encodeURI(`${prefix}${sheet}`));
+        }
+        urls[`${STYLES_PREFIX}${getModuleId(file)}`] = list.join(' ');
+      }
+    }
+    // Nothing loads the entries: the stylesheets are what they were for.
+    for (const file of entries) {
+      Reflect.deleteProperty(bundle, file);
+    }
+    return entries;
   }
 
   /** Whether each `.tsx` file holds a component, with the source that was read. */
@@ -608,7 +727,11 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
    * Returns the URLs of a module's chunks: the built files in a build, the ids
    * under the base in dev.
    */
-  function getChunkUrls(result: CompileResult): ChunkUrls | undefined {
+  function getChunkUrls(
+    result: CompileResult,
+    file: string,
+    devStyles: readonly string[],
+  ): ChunkUrls | undefined {
     const all = isServe ? undefined : readBuilt();
     const urls: Record<string, string> = {};
     for (const { manifest } of listCompiled(result)) {
@@ -633,6 +756,17 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
     // The page's loader script: the built file, or the dev loader under the base.
     if (all === undefined) {
       urls[LOADER_KEY] = `${base}${DEV_LOADER_URL.slice(1)}`;
+    }
+    // The stylesheets of the module's import graph. Dev links the files Vite serves.
+    const key = `${STYLES_PREFIX}${getModuleId(file)}`;
+    let styles = '';
+    if (all === undefined) {
+      styles = devStyles.map(toStyleUrl).join(' ');
+    } else if (Object.hasOwn(all, key)) {
+      styles = all[key];
+    }
+    if (styles !== '') {
+      urls[STYLES_KEY] = styles;
     }
     return urls;
   }
@@ -718,11 +852,44 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
           }
         }
       }
+      // One entry per module file imports the stylesheets of its import graph, so the bundler
+      // writes them. No chunk imports a stylesheet, since the page links them.
+      styleEntries.clear();
+      for (const file of findModules()) {
+        // oxlint-disable-next-line no-await-in-loop
+        const styles = await findStyles(this, file);
+        if (styles.length > 0) {
+          styleEntries.set(file, styles);
+          this.emitFile({
+            type: 'chunk',
+            id: `${STYLES_ID}${file}`,
+            name: `${path.basename(file, '.tsx')}.styles`,
+            preserveSignature: 'strict',
+          });
+        }
+      }
       // Every module is compiled before the loader is bundled, so the loader sees the defines.
       defines = getDefines(getFeatures(results), options.skew !== false);
     },
 
-    resolveId(source) {
+    async resolveId(source, importer) {
+      if (source.startsWith(STYLES_ID)) {
+        return source;
+      }
+      // A chunk gets the class names of a CSS Module as a module of its own. The stylesheet
+      // itself is linked by the page.
+      if (
+        importer !== undefined &&
+        !isServe &&
+        this.environment.name === 'client' &&
+        isStyleModule(source) &&
+        parseChunkId(importer) !== undefined
+      ) {
+        const target = await this.resolve(source, importer, { skipSelf: true });
+        if (target !== null && !target.external) {
+          return `${NAMES_ID}${encodeURIComponent(target.id)}@${encodeURIComponent(importer)}`;
+        }
+      }
       if (source === HELPERS_MODULE) {
         return HELPERS_ID;
       }
@@ -733,6 +900,25 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
     },
 
     async load(id) {
+      if (id.startsWith(STYLES_ID)) {
+        const styles = styleEntries.get(id.slice(STYLES_ID.length)) ?? [];
+        let code = '';
+        for (const [index, style] of styles.entries()) {
+          // A CSS Module has no side effect for the bundler, so the entry exports it to keep it.
+          code += isStyleModule(style)
+            ? `export { default as s${index} } from ${JSON.stringify(style)};\n`
+            : `import ${JSON.stringify(style)};\n`;
+        }
+        return { code, moduleType: 'js' };
+      }
+      if (id.startsWith(NAMES_ID)) {
+        const real = decodeURIComponent(id.slice(NAMES_ID.length, id.lastIndexOf('@')));
+        const info = await this.load({ id: real });
+        if (info.code === null) {
+          return this.error(`idlip: ${real} has no class names`);
+        }
+        return { code: info.code, moduleType: 'js' };
+      }
       if (id === DEV_LOADER) {
         // The dev server's client rides with the loader, so a page needs no markup for it.
         return { code: "import '/@vite/client';\nimport 'idlip/client';\n", moduleType: 'js' };
@@ -789,7 +975,7 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
         }
         await findChildren(this);
         const result = compileFile(this, id, code);
-        const urls = getChunkUrls(result);
+        const urls = getChunkUrls(result, id, isServe ? await findStyles(this, id) : []);
         return {
           code: urls === undefined ? result.server : replaceChunkUrls(result.server, urls),
           moduleType: 'js',
@@ -834,15 +1020,16 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
           sharedFiles.push(file);
         }
       }
-      checkChunkImports(this, bundle, files, sharedFiles);
+      const styleFiles = readStyleFiles(bundle, base, urls);
+      checkChunkImports(this, bundle, files, sharedFiles, styleFiles);
       // The page names the loader by this URL, so the server needs no read of the client manifest.
-      urls[LOADER_KEY] = `${base}${findLoaderFile(bundle, files)}`;
+      urls[LOADER_KEY] = `${base}${findLoaderFile(bundle, new Set([...files, ...styleFiles]))}`;
       if (options.skew !== false) {
         const id = getBuildId(Object.keys(bundle));
         urls[BUILD_KEY] = id;
         // The loader imports this module from its own folder, to learn the server's build.
         const buildFile = path.posix.join(
-          path.posix.dirname(findLoaderFile(bundle, files)),
+          path.posix.dirname(findLoaderFile(bundle, new Set([...files, ...styleFiles]))),
           BUILD_FILE,
         );
         this.emitFile({ type: 'asset', fileName: buildFile, source: getBuildSource(id) });

@@ -56,7 +56,7 @@ export default function Inbox(props: { unread: number }) {
 
 - **The document title is the default title.** A `<Head>` anywhere in the body ranks after the document head, so its title wins. When that block leaves, the document title shows again.
 - **A head with no hole is markup.** The loader needs no code for it.
-- **A `<style>` is markup, with no nonce.** Under `csp: true` the policy blocks it, so allow it with `csp: { extend: { 'style-src': [...] } }` (see [Deploying](./deploying.md#content-security-policy)), or use a `<link rel="stylesheet">` from `'self'`.
+- **A `<style>` is markup, with no nonce.** Under `csp: true` the policy blocks it, so allow it with `csp: { extend: { 'style-src': [...] } }` (see [Deploying](./deploying.md#content-security-policy)), or import a stylesheet from the component (see [Styles](./styles.md)), which the page links with the nonce.
 - **A `<script>` is an error**, with or without `src` (`document-head-script`). The server writes a nonce on its own scripts only, so the policy would block it. The loader starts the page, and handlers and effects run code.
 - **A head with a hole is a `<Head>` block.** A title that shows a count, or a `content` that follows the model, patches as in a `<Head>`.
 - **`<html>` and `<body>` take bound attributes**, such as `lang={lang}` or `class={theme}`. An event, `ref` or `html` on `html`, `head` or `body` is an error.

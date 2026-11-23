@@ -85,6 +85,10 @@ test('only the page and the loader load before the first event', async ({ page, 
     const { pathname, search } = new URL(url);
     expected.push(`script ${pathname}${search}`);
   }
+  // The stylesheets of the page load with it.
+  for (const match of html.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)) {
+    expected.push(`stylesheet ${match[1]}`);
+  }
   expect(requests.toSorted()).toEqual(expected.toSorted());
   expect(await page.evaluate(() => window.idlipDecoded)).toBe(0);
 });

@@ -71,7 +71,8 @@ describe('renderToResponse', () => {
     const nonce = /'nonce-([^']+)'/.exec(policy)?.[1] ?? '';
     expect(nonce).toMatch(/^[\w+/]{22}==$/);
     expect(policy).toBe(
-      `default-src 'none'; script-src 'nonce-${nonce}' 'strict-dynamic'; base-uri 'none'; ` +
+      `default-src 'none'; script-src 'nonce-${nonce}' 'strict-dynamic'; ` +
+        `style-src 'self' 'nonce-${nonce}'; base-uri 'none'; ` +
         `object-src 'none'; require-trusted-types-for 'script'; trusted-types idlip`,
     );
     const html = await response.text();

@@ -16,6 +16,16 @@ function read(...parts: string[]): string {
   return readFileSync(join(...parts), 'utf8');
 }
 
+/** Reads the todo example. The harness loads a source from a data URL, which has no stylesheets. */
+function readTodoExample(): string {
+  return read(EXAMPLES, 'todo/src/todo.tsx')
+    .replace("import './todo.css';\n", '')
+    .replace(
+      "import styles from './todo.module.css';",
+      "const styles = { left: 'left', clear: 'clear' };",
+    );
+}
+
 export const SUBJECTS: readonly Subject[] = [
   { name: 'counter', source: read(FIXTURES, 'counter/counter.tsx'), props: { start: 3 } },
   { name: 'todo', source: read(FIXTURES, 'todo/todo.tsx'), props: { initial: TODOS } },
@@ -36,7 +46,7 @@ export const SUBJECTS: readonly Subject[] = [
   {
     // The example renders its own document.
     name: 'example-todo',
-    source: read(EXAMPLES, 'todo/src/todo.tsx'),
+    source: readTodoExample(),
     props: { initial: TODOS },
     document: true,
   },
