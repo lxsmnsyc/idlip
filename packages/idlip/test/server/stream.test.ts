@@ -117,17 +117,20 @@ describe('renderToStream', () => {
     expect(html).not.toContain('/built/loader.js');
   });
 
-  it('writes the head output first in the head, the winning title before the static elements', async () => {
-    const component = makeComponent('<title>x</title>');
+  it('writes the winning title first, then the elements of the document head, then the rest', async () => {
+    const component = makeComponent('<title>x</title><meta name="a">');
     const html = (await readChunks(renderToStream(component, {}))).join('');
     const page = await render(component, {});
+    expect(page.head).toBe('<title>x</title><meta name="a">');
     expect(html).toBe(
-      `<!doctype html><html lang="en"><head>${page.head}<meta charset="utf-8">` +
+      `<!doctype html><html lang="en"><head><title>x</title><meta charset="utf-8"><meta name="a">` +
         `${renderListener()}${renderPreload(page.chunks, page.manifests)}` +
         `<script type="module" async src="/built/loader.js"></script></head><body>` +
         `<p>hi</p>${page.body.slice(page.body.indexOf('<script i-state'), -'</body></html>'.length)}</body></html>`,
     );
     expect(html.indexOf('<title>x</title>')).toBeLessThan(html.indexOf('<meta charset'));
+    // The other head output follows the elements of the document, so the charset stays early.
+    expect(html.indexOf('<meta charset')).toBeLessThan(html.indexOf('<meta name="a">'));
   });
 
   it('finds the head after an html tag with a quoted greater-than sign', async () => {

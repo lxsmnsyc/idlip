@@ -79,7 +79,7 @@ function renderToStream<P>(
 ): ReadableStream<string>;
 ```
 
-Renders a document component as a stream of the whole document. The first chunk is the whole first render: the doctype, the document with the `<Head>` output at the start of its `<head>`, the listener script, the preload links and the loader script at the end of it, then `<body>` with the markup and the state script. The pending chunks of the page follow (see `RenderResult.pending`), and `</body></html>` ends the document, in the first chunk when nothing is pending.
+Renders a document component as a stream of the whole document. The first chunk is the whole first render: the doctype, the document with the winning title first in its `<head>` and the rest of the `<Head>` output after the document's own head elements, then the listener script, the preload links and the loader script, then `<body>` with the markup and the state script. The pending chunks of the page follow (see `RenderResult.pending`), and `</body></html>` ends the document, in the first chunk when nothing is pending.
 
 The component renders as soon as the stream is constructed, before the reader reads. A render error, or a root that does not render `<html>`, fails the stream before it sends a byte. When the reader cancels, the stream aborts `signal` of the result and stops the pending work. For a status page, call `render`, then `streamParts`.
 

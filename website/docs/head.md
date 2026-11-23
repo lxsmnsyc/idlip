@@ -133,7 +133,7 @@ const server = {
 export default server;
 ```
 
-- **The head output goes at the start of `<head>`.** It holds the elements of every block, with the winning title first, since the browser reads the first `<title>` in `<head>`. The other head elements of the document, such as `<meta charset>`, follow it, and the listener, the preload links and the loader script come last.
+- **The winning title comes first in `<head>`**, since the browser reads the first `<title>`. The head elements of the document follow it, so `<meta charset>` stays near the start. The elements of the `<Head>` blocks come next, and the listener, the preload links and the loader script come last.
 - **`render()` returns it as `head`.** It is the parts of the first render, and a page that is not a document component, such as a test, takes `head` and `body` from it.
 
 The title update in the browser runs one task after the patch, since the loader watches `<head>` for changes. A test that reads `document.title` waits one tick after `settled()`.

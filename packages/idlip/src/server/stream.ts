@@ -53,9 +53,27 @@ function findHeadStart(html: string): number {
 }
 
 /**
- * The first render whole, up to `</body>`: the doctype, the document with the head output at
- * the start of its `<head>`, the listener, the preload links and the loader script at the end
- * of it, and the body with the state script. The tail comes after the pending chunks.
+ * Splits the head output into its winning title and the rest. The output starts with the
+ * title of the last block, which the render puts first. A title holds escaped text, so the
+ * first `</title>` ends it.
+ */
+function splitTitle(head: string): { title: string; rest: string } {
+  if (!head.startsWith('<title')) {
+    return { title: '', rest: head };
+  }
+  const end = head.indexOf('</title>');
+  if (end < 0) {
+    return { title: '', rest: head };
+  }
+  const cut = end + '</title>'.length;
+  return { title: head.slice(0, cut), rest: head.slice(cut) };
+}
+
+/**
+ * The first render whole, up to `</body>`: the doctype, the document with the winning title
+ * first in its `<head>` and the rest of the head output after the head elements of the
+ * document, then the listener, the preload links and the loader script, and the body with the
+ * state script. The tail comes after the pending chunks.
  */
 function writeFirst(parts: RenderResult, options: StreamOptions): string {
   if (!parts.document) {
@@ -83,9 +101,13 @@ function writeFirst(parts: RenderResult, options: StreamOptions): string {
       'idlip: the page has no loader script. Build it with the idlip() plugin, or pass `loader`.',
     );
   }
+  // The winning title comes first, since the browser reads the first `<title>`. The head
+  // elements of the document follow it, so `<meta charset>` stays near the start, then the
+  // rest of the head output, then what the server adds.
+  const split = splitTitle(parts.head);
   // The closing tags go after the pending chunks, so the first chunk stops before them.
   const end = html.length - TAIL.length;
-  return `<!doctype html>${html.slice(0, open)}${parts.head}${html.slice(open, close)}${added}${html.slice(close, end)}`;
+  return `<!doctype html>${html.slice(0, open)}${split.title}${html.slice(open, close)}${split.rest}${added}${html.slice(close, end)}`;
 }
 
 /** Stops the iterator of the pending chunks without waiting. A failure has no reader to tell. */

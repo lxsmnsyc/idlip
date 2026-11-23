@@ -32,7 +32,7 @@
 - **Nitro dev needs its own `node_modules/.nitro`.** `e2e/fixture/hot-app.ts` links each package instead of the whole `node_modules`. A symlinked `node_modules` made the dev worker fail to import Vite.
 - **The plugin and Nitro both answering** gave a 500 on every dev page before the plugin stood aside.
 - **`mount` and a document.** The attributes of `<html>` and `<body>` are not applied (the root is a `<div>`).
-- **Head order.** Head output goes at the start of `<head>`, so a title from a body `<Head>` comes before the document title, which is why the winner needs no further move.
+- **Head order.** The winning title comes first in `<head>`, then the document's own head elements (`<meta charset>`), then the rest of the `<Head>` output, then the listener, links and loader script. A title from a body `<Head>` thus precedes the document title.
 - Cloudflare: the build writes `nodejs_compat` in `wrangler.json`. Neither the Vercel nor the Cloudflare output was deployed or run.
 - The three `check:reference` problems (`EventBody`, `EventStep`, `printTemplatesModule` in `reference/compiler.md`) are not from this node.
 
