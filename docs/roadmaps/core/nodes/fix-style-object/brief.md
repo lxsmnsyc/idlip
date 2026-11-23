@@ -1,7 +1,7 @@
 ---
 id: fix-style-object
 title: Style objects render as CSS text
-status: todo
+status: done
 priority: must
 type: fix
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-23
-spent:
+spent: 83000
 owns:
   - packages/idlip/test/style-object/**
 shared:
@@ -50,3 +50,5 @@ depends_on: []
 
 - Tests: static object, dynamic object updated on click, custom property, camelCase key, dropped `null`, string form unchanged, and a differential server-vs-client check if the repo has one for attributes.
 - Loader size unchanged for the todo example; `pnpm test`, typecheck, lint, format check and website build pass.
+
+Landed 2026-11-23 on batch/core: `joinStyle$` in the shared helpers, literal objects fold at compile time, `StyleValue` type. Orchestrator review: values are not split on `;`, same as the string form.
