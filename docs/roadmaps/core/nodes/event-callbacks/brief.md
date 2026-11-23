@@ -1,7 +1,7 @@
 ---
 id: event-callbacks
 title: Event arrows compile to functions in the handler chunk
-status: todo
+status: done
 priority: must
 type: feature
 story:
@@ -20,7 +20,7 @@ exclusive: [benchmark]
 fulfilled_by:
 gate: false
 added: 2026-11-23
-spent:
+spent: 620000
 owns:
   - packages/idlip/src/compiler/view/codegen/events.ts
   - packages/idlip/src/compiler/update/**
@@ -78,3 +78,5 @@ Read first: `contracts/compiled-format.md` (event attribute, manifest), `contrac
 - No `$event` path payloads in compiled HTML; a test checks the fixtures.
 - Server HTML size, first click and rows/dashboard numbers before/after in outcome.md; nothing slower beyond noise.
 - Build, unit, differential, e2e, website tests, lint and format pass.
+
+Landed as ec2ebee..3eb79dc on `batch/core` after one fresh review round (row lookup stops at the component boundary; event functions fold into `manifest.handlers` and load every tag at once). Todo loader 4087 B gzip.
