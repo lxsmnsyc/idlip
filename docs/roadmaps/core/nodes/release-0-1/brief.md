@@ -26,6 +26,9 @@ shared: []
 reserves: []
 provides: []
 depends_on:
+  - on: fix-style-object
+    kind: hard
+    why: style objects render as [object Object]
   - on: component-styles
     kind: hard
     why: CSS imported by components is dropped today (user decision 2026-11-23)
