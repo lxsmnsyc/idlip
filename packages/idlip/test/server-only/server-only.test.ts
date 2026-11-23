@@ -1,10 +1,10 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { createBuilder } from 'vite';
+import { createBuilder, createServer } from 'vite';
 import { afterAll, describe, expect, it } from 'vitest';
 import { idlip } from '../../src/vite/index.ts';
-import { isBuiltIn, isPublicKey, scanModule } from '../../src/vite/server-only.ts';
+import { isNodeSpecifier, isPublicKey, scanModule } from '../../src/vite/server-only.ts';
 
 const PACKAGE = path.resolve(import.meta.dirname, '../..');
 const CLIENT = path.join(PACKAGE, 'src/client/index.ts');
@@ -74,6 +74,7 @@ describe('scanModule', () => {
     const scan = scanModule(
       'a.ts',
       `import type { A } from 'node:fs';
+import { type B, type C } from 'node:path';
 import { b } from './b.ts';
 export * from 'c';
 export { d } from 'd';
@@ -86,10 +87,8 @@ const y = import('e');
   });
 
   it('tells built-ins and public keys', () => {
-    expect(isBuiltIn('node:fs')).toBe(true);
-    expect(isBuiltIn('fs/promises')).toBe(true);
-    expect(isBuiltIn('./fs')).toBe(false);
-    expect(isBuiltIn('seroval')).toBe(false);
+    expect(isNodeSpecifier('node:fs')).toBe(true);
+    expect(isNodeSpecifier('fs')).toBe(false);
     expect(isPublicKey('VITE_A', ['VITE_'])).toBe(true);
     expect(isPublicKey('MODE', ['VITE_'])).toBe(true);
     expect(isPublicKey('SECRET', ['VITE_'])).toBe(false);
@@ -145,7 +144,7 @@ describe('server-only code in a client chunk', () => {
       ),
     });
     expect(message).toContain(
-      'idlip: the client chunk handler=add of /src/app.tsx reads import.meta.env.SECRET_TOKEN, which the browser does not get: /src/app.tsx > handler=add > /src/env.ts.',
+      'idlip: the client chunk handler=add of /src/app.tsx reads import.meta.env.SECRET_TOKEN, which is undefined in the browser: /src/app.tsx > handler=add > /src/env.ts.',
     );
   });
 
@@ -194,5 +193,166 @@ describe('server-only code in a client chunk', () => {
       ),
     });
     expect(message).toBe('');
+  });
+
+  it('keeps a mixed import that has a value specifier', () => {
+    const scan = scanModule('a.ts', `import { type A, b } from 'node:fs';\n`);
+    expect(scan.imports).toEqual(['node:fs']);
+  });
+
+  it('passes an import whose specifiers are all inline types', async () => {
+    const message = await build({
+      'src/t.ts': `import { type Stats } from 'node:fs';\nexport function size(s: Stats | undefined) { return s ? 1 : 0; }\n`,
+      'src/app.tsx': printApp(
+        `import { size } from './t.ts';`,
+        `function add() { count = count + size(undefined); }`,
+        `<button on:click={add}>{count}</button>`,
+      ),
+    });
+    expect(message).toBe('');
+  });
+
+  it('passes a node: import in a function that tree-shaking removes', async () => {
+    const message = await build({
+      'src/u.ts': `import { readFileSync } from 'node:fs';
+export function used(n: number) { return n + 1; }
+export function srv() { return readFileSync('x', 'utf8') + import.meta.env.SECRET_TOKEN; }
+`,
+      'src/app.tsx': printApp(
+        `import { used } from './u.ts';`,
+        `function add() { count = used(count); }`,
+        `<button on:click={add}>{count}</button>`,
+      ),
+    });
+    expect(message).toBe('');
+  });
+
+  it('passes a bare name that resolves to an installed package', async () => {
+    const message = await build({
+      'node_modules/events/package.json': JSON.stringify({ name: 'events', main: 'index.js' }),
+      'node_modules/events/index.js': `export default class Events {}\n`,
+      'src/app.tsx': printApp(
+        `import Events from 'events';`,
+        `function add() { count = count + new Events().constructor.name.length; }`,
+        `<button on:click={add}>{count}</button>`,
+      ),
+    });
+    expect(message).toBe('');
+  });
+
+  it('fails a package that imports a Node.js module, directly and through a local file', async () => {
+    const pg = {
+      'node_modules/fakepg/package.json': JSON.stringify({
+        name: 'fakepg',
+        type: 'module',
+        main: 'index.js',
+      }),
+      'node_modules/fakepg/index.js': `import { Socket } from 'node:net';\nexport function connect() { return new Socket(); }\n`,
+    };
+    const direct = await build({
+      ...pg,
+      'src/app.tsx': printApp(
+        `import { connect } from 'fakepg';`,
+        `function add() { connect(); count = count + 1; }`,
+        `<button on:click={add}>{count}</button>`,
+      ),
+    });
+    expect(direct).toContain(
+      'idlip: the client chunk handler=add of /src/app.tsx imports a Node.js module: /src/app.tsx > handler=add > /node_modules/fakepg/index.js > node:net.',
+    );
+    const local = await build({
+      ...pg,
+      'src/db.ts': `import { connect } from 'fakepg';\nexport function open() { return connect(); }\n`,
+      'src/app.tsx': printApp(
+        `import { open } from './db.ts';`,
+        `function add() { open(); count = count + 1; }`,
+        `<button on:click={add}>{count}</button>`,
+      ),
+    });
+    expect(local).toContain(
+      '/src/app.tsx > handler=add > /src/db.ts > /node_modules/fakepg/index.js > node:net.',
+    );
+  });
+
+  it('fails a CommonJS file that requires a built-in', async () => {
+    const message = await build({
+      'src/lib.cjs': `const fs = require('fs');\nmodule.exports = { read() { return fs.readFileSync('x'); } };\n`,
+      'src/app.tsx': printApp(
+        `import lib from './lib.cjs';`,
+        `function add() { lib.read(); count = count + 1; }`,
+        `<button on:click={add}>{count}</button>`,
+      ),
+    });
+    expect(message).toContain('imports a Node.js module');
+    expect(message).toContain('handler=add');
+  });
+
+  it('follows the browser condition of a package export map', async () => {
+    const message = await build({
+      'node_modules/dual/package.json': JSON.stringify({
+        name: 'dual',
+        type: 'module',
+        exports: { node: './node.js', default: './browser.js' },
+      }),
+      'node_modules/dual/node.js': `import { readFileSync } from 'node:fs';\nexport function get() { return readFileSync('x'); }\n`,
+      'node_modules/dual/browser.js': `export function get() { return 'x'; }\n`,
+      'src/app.tsx': printApp(
+        `import { get } from 'dual';`,
+        `function add() { count = count + get().length; }`,
+        `<button on:click={add}>{count}</button>`,
+      ),
+    });
+    expect(message).toBe('');
+  });
+});
+
+describe('server-only code in vite dev', () => {
+  it('fails a chunk request with the chain and keeps the server up', async () => {
+    const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'idlip-server-only-dev-')));
+    roots.push(root);
+    writeFileSync(`${root}/package.json`, JSON.stringify({ name: 'app', type: 'module' }));
+    const files: Record<string, string> = {
+      'src/db.ts': `import { readFileSync } from 'node:fs';\nexport function load(n: number) { return readFileSync('x').length + n; }\n`,
+      'src/app.tsx': printApp(
+        `import { load } from './db.ts';`,
+        `function add() { count = load(count); }\n  function reset() { count = 0; }`,
+        `<button on:click={add}>{count}</button><button on:click={reset}>0</button>`,
+      ),
+      'src/entry-server.js': `import { renderToResponse } from 'idlip/server';
+import App from './app.tsx';
+export default { fetch() { return renderToResponse(App, {}, { preload: false }); } };
+`,
+    };
+    for (const [file, source] of Object.entries(files)) {
+      mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+      writeFileSync(path.join(root, file), source);
+    }
+    const server = await createServer({
+      configFile: false,
+      root,
+      logLevel: 'silent',
+      cacheDir: path.join(root, '.vite'),
+      server: { middlewareMode: true, ws: false },
+      plugins: [idlip({ entry: '/src/entry-server.js', client: CLIENT })],
+      resolve: {
+        alias: {
+          'idlip/client': CLIENT,
+          'idlip/server': path.join(PACKAGE, 'src/server/index.ts'),
+        },
+      },
+    });
+    try {
+      const client = server.environments.client;
+      await expect(
+        client.transformRequest('/src/app.tsx?idlip-handler=add&lang.js'),
+      ).rejects.toThrow(
+        'idlip: the client chunk handler=add of /src/app.tsx imports a Node.js module: /src/app.tsx > handler=add > /src/db.ts > node:fs.',
+      );
+      // The chunk that does not reach it still loads.
+      const reset = await client.transformRequest('/src/app.tsx?idlip-handler=reset&lang.js');
+      expect(reset?.code).toContain('reset');
+    } finally {
+      await server.close();
+    }
   });
 });

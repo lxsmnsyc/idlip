@@ -1,14 +1,25 @@
 import { readFileSync } from 'node:fs';
-import { builtinModules } from 'node:module';
 import { parseSync } from 'oxc-parser';
 
 /** The `import.meta.env` keys that Vite sets itself, so they are not private. */
 const BUILT_IN_ENV = new Set(['MODE', 'DEV', 'PROD', 'SSR', 'BASE_URL']);
 
-const BUILT_IN_MODULES = new Set(builtinModules);
+/** The id prefix that Vite gives a Node.js built-in it cannot run in the browser. */
+export const BROWSER_EXTERNAL = '__vite-browser-external';
 
 /** A file the walk reads: scripts only, so a stylesheet or an image is not parsed. */
 const SCRIPT = /\.[cm]?[jt]sx?$/;
+
+/** The call that stands for a private `import.meta.env` read in a build. */
+export const PRIVATE_ENV = '__idlip_private_env__';
+
+const PRIVATE_READ = new RegExp(`${PRIVATE_ENV}\\(("(?:[^"\\\\]|\\\\.)*")\\)`);
+
+/** The key of the first marked private read in the code of a chunk, or undefined. */
+export function findPrivateRead(code: string): string | undefined {
+  const match = PRIVATE_READ.exec(code);
+  return match === null ? undefined : String(JSON.parse(match[1]));
+}
 
 /** What one module imports and which `import.meta.env` keys it reads. */
 export interface ModuleScan {
@@ -16,6 +27,8 @@ export interface ModuleScan {
   imports: string[];
   /** The keys read as `import.meta.env.KEY`, in source order. */
   keys: string[];
+  /** The same reads with the offsets of the member expression. */
+  reads: { key: string; start: number; end: number }[];
 }
 
 /** Where a check looks for the import graph: resolving a specifier and reading a file. */
@@ -44,10 +57,16 @@ export interface ServerOnlyChunk {
 export type ScanCache = Map<string, { source: string; scan: ModuleScan }>;
 
 /**
- * Whether a specifier names a Node.js built-in module: `node:fs`, or a bare `fs` or `fs/promises`.
+ * Whether a specifier names a Node.js module for certain: `node:fs`. A bare `fs` is one only when
+ * Vite resolves it to its browser-external stub, since `events` or `buffer` may be an npm package.
  */
-export function isBuiltIn(specifier: string): boolean {
-  return specifier.startsWith('node:') || BUILT_IN_MODULES.has(specifier);
+export function isNodeSpecifier(specifier: string): boolean {
+  return specifier.startsWith('node:');
+}
+
+/** Whether a resolved id is the stub that Vite gives a Node.js built-in in the browser. */
+export function isBrowserExternal(id: string): boolean {
+  return id.includes(BROWSER_EXTERNAL);
 }
 
 /**
@@ -105,12 +124,26 @@ function readEnvKey(node: Record<string, unknown>): string | undefined {
   return readLiteral(property);
 }
 
+/** Whether every specifier of an import declaration is inline `type`, which leaves no import. */
+function isTypeOnly(node: Record<string, unknown>): boolean {
+  const specifiers = node.specifiers;
+  if (!Array.isArray(specifiers) || specifiers.length === 0) {
+    return false;
+  }
+  for (const specifier of specifiers) {
+    if (!isRecord(specifier) || specifier.importKind !== 'type') {
+      return false;
+    }
+  }
+  return true;
+}
+
 /**
  * Reads the imports and the `import.meta.env` keys of a module. A type-only import and a type-only
  * export are not imports, since they leave no code.
  */
 export function scanModule(file: string, source: string): ModuleScan {
-  const scan: ModuleScan = { imports: [], keys: [] };
+  const scan: ModuleScan = { imports: [], keys: [], reads: [] };
   const stack: unknown[] = [parseSync(file, source).program];
   while (stack.length > 0) {
     const node = stack.pop();
@@ -128,7 +161,7 @@ export function scanModule(file: string, source: string): ModuleScan {
     if (type === 'ImportDeclaration' || type === 'ExportAllDeclaration') {
       const specifier = readLiteral(node.source);
       const kind = type === 'ImportDeclaration' ? node.importKind : node.exportKind;
-      if (specifier !== undefined && kind !== 'type') {
+      if (specifier !== undefined && kind !== 'type' && !isTypeOnly(node)) {
         scan.imports.push(specifier);
       }
     } else if (type === 'ExportNamedDeclaration' && node.source !== null) {
@@ -143,8 +176,9 @@ export function scanModule(file: string, source: string): ModuleScan {
       }
     } else {
       const key = readEnvKey(node);
-      if (key !== undefined) {
+      if (key !== undefined && typeof node.start === 'number' && typeof node.end === 'number') {
         scan.keys.push(key);
+        scan.reads.push({ key, start: node.start, end: node.end });
       }
     }
     // A type annotation holds no code, so the walk skips it.
@@ -174,8 +208,33 @@ function isWalked(file: string): boolean {
   );
 }
 
+/** The advice that ends the error of a Node.js import. */
+export const ADVICE =
+  'The browser cannot run it. Move the code that needs it to where the server renders and pass the result in as a prop, or use a package that runs in the browser.';
+
+/** The error of a client chunk that reaches a Node.js module. */
+export function printNodeError(where: string, chain: readonly string[]): string {
+  return `idlip: ${where} imports a Node.js module: ${printChain(chain)}. ${ADVICE}`;
+}
+
+/** The error of a client chunk that reads a private `import.meta.env` key. */
+export function printEnvError(
+  where: string,
+  key: string,
+  chain: readonly string[],
+  prefixes: readonly string[],
+): string {
+  const shown = [];
+  for (const prefix of prefixes) {
+    if (prefix !== '') {
+      shown.push(`${prefix}*`);
+    }
+  }
+  return `idlip: ${where} reads import.meta.env.${key}, which is undefined in the browser: ${printChain(chain)}. Only ${shown.join(', ')}, MODE, DEV, PROD, SSR and BASE_URL reach the browser. Read it where the server renders and pass the value in as a prop.`;
+}
+
 /** Prints a chain of names, from the component to the cause. */
-function printChain(names: readonly string[]): string {
+export function printChain(names: readonly string[]): string {
   return names.join(' > ');
 }
 
@@ -199,22 +258,20 @@ export async function checkServerOnly(
     // The keys come first, since a module reads them without importing anything.
     for (const key of scan.keys) {
       if (!isPublicKey(key, chunk.prefixes)) {
-        const prefixes = chunk.prefixes.filter((prefix) => prefix !== '');
-        throw new Error(
-          `idlip: ${where} reads import.meta.env.${key}, which the browser does not get: ${printChain(chain)}. Only ${prefixes.map((prefix) => `${prefix}*`).join(', ')}, MODE, DEV, PROD, SSR and BASE_URL reach the browser. Read it where the server renders and pass it in as a prop.`,
-        );
+        throw new Error(printEnvError(where, key, chain, chunk.prefixes));
       }
     }
     for (const specifier of scan.imports) {
-      if (isBuiltIn(specifier)) {
-        throw new Error(
-          `idlip: ${where} imports a Node.js module: ${printChain([...chain, specifier])}. The browser cannot run it. Import it where the server renders and pass the result in as a prop.`,
-        );
+      if (isNodeSpecifier(specifier)) {
+        throw new Error(printNodeError(where, [...chain, specifier]));
       }
       if (isRuntime(specifier)) {
         continue;
       }
       const target = await host.resolve(specifier, file);
+      if (target !== undefined && isBrowserExternal(target)) {
+        throw new Error(printNodeError(where, [...chain, specifier]));
+      }
       if (target === undefined || seen.has(target) || !isWalked(target)) {
         continue;
       }

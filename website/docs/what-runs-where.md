@@ -32,10 +32,10 @@ The only way a value gets from the server to the browser is the model, which hol
 
 ## What fails the build
 
-The build fails, and `vite dev` fails when the chunk is first requested, in two cases:
+The build fails in two cases. `vite dev` fails when the chunk is first requested.
 
-- The import graph of a client chunk reaches a `node:` import or a bare Node.js built-in such as `fs`, `path` or `crypto`.
-- A client chunk, or a module it imports, reads `import.meta.env.KEY` where `KEY` does not start with the `envPrefix` of Vite (`VITE_` by default). `MODE`, `DEV`, `PROD`, `SSR` and `BASE_URL` are allowed.
+- A client chunk reaches a Node.js module, whether in your own files or in a package: a `node:` import, or a bare name such as `fs` that Vite resolves to its browser stub. A bare name that resolves to an installed package, such as `events` or `buffer`, is fine.
+- A client chunk reads `import.meta.env.KEY` where `KEY` does not start with the `envPrefix` of Vite (`VITE_` by default). `MODE`, `DEV`, `PROD`, `SSR` and `BASE_URL` are allowed. In the browser such a key is `undefined`, so this catches a bug: the value never ships.
 
 The error names the chain, from the component and its chunk through each import to the cause:
 
@@ -45,7 +45,7 @@ idlip: the client chunk handler=add of /src/app.tsx imports a Node.js module: /s
 
 Code that only the server render reaches is not checked: the body of a component outside its handlers and bindings, and the entry. A component may import `node:fs` and read a file there.
 
-The check reads your own files. It does not read packages in `node_modules` or the runtime of idlip, and it does not run your code, so a server-only value that reaches a chunk through a package is not caught.
+A build checks the code that stays in the chunk after unused code is removed, so a server-only function in a shared file that no chunk calls passes. `vite dev` has no such step. It follows the imports of your own files, so it can report an import that a build would remove, and it does not look into packages. Run a build to be sure.
 
 ## Server functions
 

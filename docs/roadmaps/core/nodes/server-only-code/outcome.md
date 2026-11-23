@@ -2,24 +2,26 @@
 
 ## Public API
 
-No new option, export or compiler change. The plugin adds two build errors (also shown in the `vite dev` overlay when the chunk is first requested). Messages, with `<...>` for the parts that vary:
+No new option, export or compiler change. The plugin adds two build errors (also shown in the `vite dev` overlay when the chunk is first requested). `<chain>` is names joined by `>`: the component, the chunk, each module down to the cause.
 
 ```
-idlip: the client chunk <chunk> of <component module id> imports a Node.js module: <component> > <chunk> > <file> > ... > <specifier>. The browser cannot run it. Import it where the server renders and pass the result in as a prop.
+idlip: the client chunk <chunk> of <component module id> imports a Node.js module: <chain>. The browser cannot run it. Move the code that needs it to where the server renders and pass the result in as a prop, or use a package that runs in the browser.
 ```
 
 ```
-idlip: the client chunk <chunk> of <component module id> reads import.meta.env.<KEY>, which the browser does not get: <component> > <chunk> > <file> > .... Only <prefix>*, MODE, DEV, PROD, SSR and BASE_URL reach the browser. Read it where the server renders and pass it in as a prop.
+idlip: the client chunk <chunk> of <component module id> reads import.meta.env.<KEY>, which is undefined in the browser: <chain>. Only <prefix>*, MODE, DEV, PROD, SSR and BASE_URL reach the browser. Read it where the server renders and pass the value in as a prop.
 ```
 
-Example: `idlip: the client chunk handler=add of /src/app.tsx imports a Node.js module: /src/app.tsx > handler=add > /src/db.ts > node:fs.` A `<prefix>` is each entry of Vite's `envPrefix` (default `VITE_`). Only your own files are walked; `idlip` and `idlip/*`, `node_modules` files, virtual ids and non-scripts are skipped.
+Example: `idlip: the client chunk handler=add of /src/app.tsx imports a Node.js module: /src/app.tsx > handler=add > /node_modules/fakepg/index.js > node:net.` `<prefix>` is each entry of Vite's `envPrefix` (default `VITE_`).
+
+How it decides. Build: from the bundle. A chunk module `__vite-browser-external:*` that an importer reads is a Node.js module (this covers packages, `.cjs` `require`, `exports` conditions and polyfills, since Vite resolved them). A private `import.meta.env` read is rewritten to a pure marked call, and one left in a chunk after tree-shaking is the error. Dev: the AST walk of your own files, which cannot tree-shake.
 
 ## Built
 
 - `packages/idlip/src/vite/server-only.ts`: `scanModule`, `isBuiltIn`, `isPublicKey`, `checkServerOnly`, `readSource`.
 - `plugin.ts`: `load` of a client-environment chunk calls `checkChunk`; `envPrefixes` read in `configResolved` (default `VITE_`). `vite/CLAUDE.md` has the rule.
 - Docs: `website/docs/what-runs-where.md` (Guide, order 16).
-- Tests: `packages/idlip/test/server-only/server-only.test.ts` (9: scan, helpers, handler/binding/derived const to `node:`, bare `path`, private key through an import, private key in a module-level binding, public and custom-prefix keys pass, server-render-only imports pass).
+- Tests: `packages/idlip/test/server-only/server-only.test.ts` (17, plus the cases below: scan, helpers, handler/binding/derived const to `node:`, bare `path`, private key through an import, private key in a module-level binding, public and custom-prefix keys pass, server-render-only imports pass).
 - Changeset `.changeset/server-only-guard.md` (`idlip`, minor).
 
 ## Acceptance
@@ -28,6 +30,8 @@ Example: `idlip: the client chunk handler=add of /src/app.tsx imports a Node.js 
 
 ## Deviations and gotchas
 
-- `import.meta.env` directly in a handler or derived const is already a compile error (`hole-grammar`), so a private key reaches a chunk through a module-level binding or an imported module. Tests cover both.
-- A dependency in `node_modules` that imports Node modules is not walked. A private key read through `process.env` is not checked.
-- Dev is checked in `load`, not covered by a dev-server test; it shares the build code path.
+- `import.meta.env` directly in a handler or derived const is already a compile error (`hole-grammar`), so a private key reaches a chunk through a module-level binding or an imported module.
+- Dev cannot tree-shake, so it follows imports of your own files and can flag a server-only import in a shared file that a build removes. It does not look into packages (a build does). A test drives dev with `createServer` and `transformRequest`: the error has the chain, and another chunk still loads.
+- In a production build Vite's stub is a CommonJS module that the bundler keeps even when its import is unused. An importer that binds it to a variable nothing reads counts as tree-shaken (`isUnusedStub`). This reads the bundler's generated code, so a new Rolldown naming scheme would need a look.
+- A private env read in a package under `node_modules` is not marked.
+- Not checked: `process.env`.

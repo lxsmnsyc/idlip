@@ -41,7 +41,18 @@ import {
 } from './skew.ts';
 import { isChunkUrls, listChunks, parseChunkId, replaceChunkUrls } from './chunks.ts';
 import { STYLES_KEY } from '../server/styles.ts';
-import { checkServerOnly, readSource } from './server-only.ts';
+import {
+  BROWSER_EXTERNAL,
+  PRIVATE_ENV,
+  checkServerOnly,
+  findPrivateRead,
+  isBrowserExternal,
+  isPublicKey,
+  printEnvError,
+  printNodeError,
+  readSource,
+  scanModule,
+} from './server-only.ts';
 import type { ScanCache } from './server-only.ts';
 import {
   findPackage,
@@ -517,7 +528,10 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
     const host = {
       async resolve(specifier: string, importer: string): Promise<string | undefined> {
         const found = await context.resolve(specifier, importer, { skipSelf: true });
-        return found?.external === false ? found.id : undefined;
+        if (found === null) {
+          return undefined;
+        }
+        return found.external === true && !isBrowserExternal(found.id) ? undefined : found.id;
       },
       read: readSource,
     };
@@ -1116,7 +1130,8 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
         }
         for (const module of client) {
           if (module.chunk === parsed.chunk) {
-            if (this.environment.name === 'client') {
+            // A build checks the bundle instead (`idlip:server-only`), which tree-shakes first.
+            if (isServe && this.environment.name === 'client') {
               await checkChunk(this, parsed.file, parsed.module, parsed.chunk, module.code);
             }
             const code =
@@ -1343,5 +1358,149 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
     },
   };
 
-  return [main, features];
+  /** The private `import.meta.env` keys that a module of the client build reads, by module id. */
+  const privateReads = new Map<string, Set<string>>();
+
+  /** The name a chain shows for a module id of the bundle. */
+  function getChainName(id: string): string {
+    if (isBrowserExternal(id)) {
+      return id.slice(id.indexOf(BROWSER_EXTERNAL) + BROWSER_EXTERNAL.length + 1);
+    }
+    const file = id.replace(/^\0/, '').split('?')[0];
+    return path.isAbsolute(file) ? getModuleId(file) : file;
+  }
+
+  /**
+   * Walks the importers of a module of the bundle back to a client chunk. Returns the chunk's
+   * names and the modules from the chunk to the module, or undefined when no chunk imports it.
+   */
+  function findChain(
+    context: Rolldown.PluginContext,
+    start: string,
+  ): { where: string; chain: string[] } | undefined {
+    const parents = new Map<string, string | undefined>([[start, undefined]]);
+    const queue = [start];
+    for (const id of queue) {
+      const parsed = parseChunkId(id);
+      if (parsed !== undefined) {
+        const component = getModuleId(parsed.file) + parsed.module.slice(parsed.file.length);
+        const chain = [component, parsed.chunk];
+        for (let at = parents.get(id); at !== undefined; at = parents.get(at)) {
+          chain.push(getChainName(at));
+        }
+        return { where: `the client chunk ${parsed.chunk} of ${component}`, chain };
+      }
+      const info = context.getModuleInfo(id);
+      for (const importer of [...(info?.importers ?? []), ...(info?.dynamicImporters ?? [])]) {
+        if (!parents.has(importer)) {
+          parents.set(importer, id);
+          queue.push(importer);
+        }
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Whether a module of a chunk binds the browser-external stub to a variable that nothing in the
+   * chunk reads. A tree-shaken import leaves that variable, and the stub only throws when read.
+   */
+  function isUnusedStub(item: Rolldown.OutputChunk, importer: string): boolean {
+    const code = item.modules[importer]?.code;
+    if (typeof code !== 'string') {
+      return false;
+    }
+    const binding = /var (\w+) = (?:__toESM\()?require_\w*browser_external\w*\(\)/.exec(code);
+    if (binding === null) {
+      return false;
+    }
+    return item.code.split(new RegExp(`\\b${binding[1]}\\b`)).length <= 2;
+  }
+
+  /** The error for a chunk of the bundle that holds server-only code, or undefined. */
+  function findServerOnly(
+    context: Rolldown.PluginContext,
+    item: Rolldown.OutputChunk,
+  ): string | undefined {
+    for (const [id, rendered] of Object.entries(item.modules)) {
+      if (!isBrowserExternal(id) || rendered.renderedLength === 0) {
+        continue;
+      }
+      for (const importer of context.getModuleInfo(id)?.importers ?? []) {
+        // A built-in that a module imports and never reads stays as an unused variable.
+        const found = isUnusedStub(item, importer) ? undefined : findChain(context, importer);
+        if (found !== undefined) {
+          return printNodeError(found.where, [...found.chain, getChainName(id)]);
+        }
+      }
+    }
+    const key = findPrivateRead(item.code);
+    if (key === undefined) {
+      return undefined;
+    }
+    let start: string | undefined;
+    for (const id of Object.keys(item.modules)) {
+      if (privateReads.get(id)?.has(key) === true) {
+        start = id;
+      }
+    }
+    const found = start === undefined ? undefined : findChain(context, start);
+    if (found !== undefined) {
+      return printEnvError(found.where, key, found.chain, envPrefixes);
+    }
+    return printEnvError(`the client chunk ${item.fileName}`, key, [item.fileName], envPrefixes);
+  }
+
+  // A build checks what Vite resolved and what the bundler kept, not what a file imports. A
+  // Node.js built-in is the browser-external module, and a private key is a marked read that
+  // tree-shaking left in a chunk.
+  const serverOnly: Plugin = {
+    name: 'idlip:server-only',
+    enforce: 'pre',
+    sharedDuringBuild: true,
+    transform: {
+      filter: { code: { include: 'import.meta.env' } },
+      handler(code, id) {
+        if (
+          isServe ||
+          this.environment.name !== 'client' ||
+          id.startsWith('\0') ||
+          id.includes('/node_modules/')
+        ) {
+          return undefined;
+        }
+        const file = id.split('?')[0];
+        if (!/\.[cm]?[jt]sx?$/.test(file)) {
+          return undefined;
+        }
+        // Each private read becomes a call that the bundler removes with the code around it.
+        let out = code;
+        const keys = new Set<string>();
+        for (const read of scanModule(file, code).reads.toReversed()) {
+          if (!isPublicKey(read.key, envPrefixes)) {
+            keys.add(read.key);
+            out = `${out.slice(0, read.start)}/* @__PURE__ */ ${PRIVATE_ENV}(${JSON.stringify(read.key)})${out.slice(read.end)}`;
+          }
+        }
+        if (keys.size === 0) {
+          return undefined;
+        }
+        privateReads.set(id, keys);
+        return { code: out, map: null };
+      },
+    },
+    generateBundle(_output, bundle) {
+      if (this.environment.name !== 'client' || isServe) {
+        return;
+      }
+      for (const item of Object.values(bundle)) {
+        const message = item.type === 'chunk' ? findServerOnly(this, item) : undefined;
+        if (message !== undefined) {
+          this.error(message);
+        }
+      }
+    },
+  };
+
+  return [main, features, serverOnly];
 }
