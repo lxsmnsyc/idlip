@@ -28,7 +28,7 @@ function sumFiles(files: readonly DemoFile[], field: 'raw' | 'gzip'): number {
  * The sizes a docs page may use, by name, in bytes as `4787 B`: `demo.<file>.raw` and
  * `demo.<file>.gzip` for `document`, `listener`, `loader`, `handler`, `helpers` and `binding`.
  * `demo.load` is the document and the loader, the requests before the first event. `demo.click`
- * is the requests of the first click. Raw is the size as served, gzip is gzip -9.
+ * is the requests of the first click. Raw is the size as served, gzip is zlib level 9.
  */
 export function listSizes(demo: DemoData): Map<string, string> {
   const sizes = new Map<string, string>();

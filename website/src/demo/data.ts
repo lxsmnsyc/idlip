@@ -5,7 +5,7 @@ export const DEMO_DATA = fileURLToPath(
   new URL('../../dist/demo-server/demo.json', import.meta.url),
 );
 
-/** A file of the demo build, with its size as served and with gzip -9. */
+/** A file of the demo build, with its size as served and with zlib level 9. */
 export interface DemoFile {
   /** The path under the base, such as `demo/assets/loader.BMTA43Fn.js`. */
   path: string;

@@ -5,7 +5,7 @@ section: Guide
 description: What the server sends, what the browser loads before the first event, and what the first click loads.
 ---
 
-The browser does not run view code to start the page. The server sends the HTML, the model and a small listener. A click loads the handler it names and the binding chunks of the model paths that changed. The sizes on this page come from the site's build of `examples/todo`: `pnpm --filter website build` measures them into `website/dist/demo-server/demo.json`. Raw is the size as served, and gzip is `gzip -9` of the same bytes. The build fills the numbers, so a change to the loader or the compiler changes them with no edit here.
+The browser does not run view code to start the page. The server sends the HTML, the model and a small listener. A click loads the handler it names and the binding chunks of the model paths that changed. The sizes on this page come from the site's build of `examples/todo`: `pnpm --filter website build` measures them into `website/dist/demo-server/demo.json`. Raw is the size as served, and gzip is zlib level 9 of the same bytes. The build fills the numbers, so a change to the loader or the compiler changes them with no edit here.
 
 ## What the server sends
 
@@ -31,7 +31,7 @@ The `<head>` holds two scripts:
 
 The page loads the document and the loader, and nothing else. The state is not decoded yet.
 
-| Request                        | Raw                   | gzip -9                |
+| Request                        | Raw                   | gzip                   |
 | ------------------------------ | --------------------- | ---------------------- |
 | `GET /` (document)             | {{demo.document.raw}} | {{demo.document.gzip}} |
 | `GET /assets/loader.<hash>.js` | {{demo.loader.raw}}   | {{demo.loader.gzip}}   |
@@ -55,7 +55,7 @@ A click on the second checkbox runs these steps:
 
 The click makes three requests:
 
-| Request                                           | Raw                  | gzip -9               |
+| Request                                           | Raw                  | gzip                  |
 | ------------------------------------------------- | -------------------- | --------------------- |
 | `GET /assets/todo.handler.toggle.<hash>.js`       | {{demo.handler.raw}} | {{demo.handler.gzip}} |
 | `GET /assets/_idlip-helpers.<hash>.js`            | {{demo.helpers.raw}} | {{demo.helpers.gzip}} |

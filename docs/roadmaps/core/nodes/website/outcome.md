@@ -34,7 +34,10 @@ The worker part is done. The gate stays open: the user deploys and confirms.
 
 ## Checks run
 
-See the final report of the worker. `pnpm --filter website test` and `check:samples` fail on files this node does not own, see below.
+- `pnpm --filter website build`, `typecheck`, `pnpm lint` and `pnpm format:check` pass.
+- A clean `git archive` export with `pnpm install --frozen-lockfile` runs the `buildCommand` and writes 32 pages.
+- `pnpm --filter website test` (2 failures) and `check:samples` (3 problems) fail the same way on main at 9473f96. `fix-website-checks` fixes them.
+- Each `vercel.json` header source was run through path-to-regexp 6.1.0 against every file of `dist/client`.
 
 ## Not done
 

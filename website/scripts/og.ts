@@ -86,9 +86,13 @@ function readCopy(): Copy {
  */
 function writeMark(): string {
   const svg = readFileSync(ICON, 'utf8');
-  const shapes = [...svg.matchAll(/<(circle|rect) ([^>]*)\/>/g)].filter(
-    (match) => !match[2].startsWith('width="64"'),
-  );
+  const shapes: RegExpExecArray[] = [];
+  for (const match of svg.matchAll(/<(circle|rect) ([^>]*)\/>/g)) {
+    // The 64 x 64 rounded square is the tile behind the mark; the tile here draws its own.
+    if (!match[2].startsWith('width="64"')) {
+      shapes.push(match);
+    }
+  }
   if (shapes.length !== 3) {
     throw new Error(`${ICON} no longer has a ring, a dot and a body`);
   }
