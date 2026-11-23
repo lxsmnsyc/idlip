@@ -112,13 +112,26 @@ describe('sample checker', () => {
     expect(checkMarkdown(markdown, 'ok.md')).toEqual([]);
   });
 
-  it('fails on a view the analyzer rejects', () => {
-    // A closure in a model value does not resume.
+  it('fails on a function that is assigned to a let', () => {
+    // A function in a let is state, and state does not resume.
     const broken = [
       '```tsx',
       'export default function A() {',
       '  let f = () => 1;',
       '  return <p>{f}</p>;',
+      '}',
+      '```',
+    ].join('\n');
+    const problems = checkMarkdown(broken, 'bad.md');
+    expect(problems[0]).toMatchObject({ file: 'bad.md', line: 1 });
+    expect(problems[0]?.message).toMatch(/^error let-function:/);
+  });
+
+  it('fails on a closure in a hole', () => {
+    const broken = [
+      '```tsx',
+      'export default function A() {',
+      '  return <p>{() => 1}</p>;',
       '}',
       '```',
     ].join('\n');

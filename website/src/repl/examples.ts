@@ -22,6 +22,17 @@ function dropLeadingComments(source: string): string {
   return lines.slice(start).join('\n');
 }
 
+/**
+ * The REPL serves no stylesheet, so a file that imports one runs without it. The todo app
+ * styles its count with a CSS Module: the REPL keeps the class names and drops the imports.
+ */
+function dropStyles(source: string): string {
+  return source
+    .replace(/^import '[^']+\.css';\n/gm, '')
+    .replace(/^import styles from '[^']+\.module\.css';\n/m, '')
+    .replaceAll(/\bstyles\.(\w+)/g, "'$1'");
+}
+
 function writeProps(props: unknown): ReplFile {
   return { name: PROPS_FILE, source: `${JSON.stringify(props, null, 2)}\n` };
 }
@@ -171,7 +182,7 @@ export const EXAMPLES: readonly Example[] = [
     id: 'todo',
     label: 'Todo',
     files: [
-      { name: 'todo.tsx', source: dropLeadingComments(todo) },
+      { name: 'todo.tsx', source: dropStyles(dropLeadingComments(todo)) },
       writeProps({
         initial: [
           { id: 't1', text: 'Write the view', done: true },

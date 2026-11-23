@@ -35,7 +35,7 @@ A package can ship idlip components for other apps. It ships them as source, and
 
 The app adds the package to its `dependencies` or `devDependencies`, and imports from it like any module:
 
-```tsx
+```tsx no-check
 import { For } from 'idlip';
 import Counter from '@acme/ui/counter.tsx';
 
@@ -65,7 +65,7 @@ A module of a package is named by the package and the path in it: `src/button.ts
 
 A component imports its stylesheet and CSS Modules as an app component does:
 
-```tsx
+```tsx no-check
 import './counter.css';
 import styles from './counter.module.css';
 ```

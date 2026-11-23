@@ -68,9 +68,20 @@ The object is a plain value. Use it in the view, in a hole or in a handler. The 
 
 A stylesheet reads a model value through a custom property. Set it with `style`, as text or as an object:
 
-```tsx fragment
-<div class="bar" style={`--size: ${size}px`} />
-<div class="bar" style={{ '--size': `${size}px` }} />
+```tsx
+export default function Bar() {
+  let size = 40;
+  function grow() {
+    size += 10;
+  }
+  return (
+    <div>
+      <button on:click={grow}>Grow</button>
+      <div class="bar" style={`--size: ${size}px`} />
+      <div class="bar" style={{ '--size': `${size}px` }} />
+    </div>
+  );
+}
 ```
 
 ```css
