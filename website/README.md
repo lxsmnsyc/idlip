@@ -57,7 +57,7 @@ export default function Counter(props: { start: number }) {
 - **More files.** A fence right after it with a name is one more file of the sample: `tsx live part.tsx` for a child, `json live props.json` for the props. Blank lines between them are fine.
 - **Checks.** The build compiles each sample and fails on an error. `check:samples` also renders each one on the server side.
 - **Static frame.** The build writes `dist/client/live/<page>-<n>/` for each sample: the server render as a page, its chunks, and the Compiled tab. A reader who never edits loads that page, the loader and the chunks of their clicks. No compiler and no service worker.
-- **Edits.** The editor loads on the first focus or key in the code. The compiler, the render worker and the service worker load with the first edit. The edit then runs as in the REPL.
+- **Edits.** The editor loads on the first focus or key in the code. The compiler and the render worker load with the first edit. The edit then runs as in the REPL, in a sandboxed frame with no origin (see Isolation).
 - **Code from the address.** A docs page never runs code from its URL or hash. A sample runs the code the build put in the page, or the reader's own edits. Its REPL button opens a sample of one file by id (`#sample=`), which runs. An edited sample, or one of several files, opens with its files in the hash (`#files=`), where the REPL waits for Run.
 
 ## Figures
@@ -76,3 +76,13 @@ A `figure` fence with a name and no body is an animated figure:
 - **Script.** `src/client/figures.ts` imports `src/figures/player.ts` when the first figure is 400 px from the viewport. The story plays when 40% of the figure shows, pauses off screen and in a hidden tab, and stops at the last step. The replay button starts it again. The row's checkbox takes clicks and keys.
 
 See [DESIGN.md](./DESIGN.md) for the tokens. `vercel.json` is not here; the deployment is set up by hand.
+
+## Isolation
+
+Code of a reader runs in a frame with `sandbox="allow-scripts"` and no `allow-same-origin`, so the frame has an opaque origin. It cannot read the page (`parent.document` throws), the site's `localStorage` or cookies, or navigate the page. This covers the REPL frame and the frame of a live sample after an edit.
+
+- The page writes the whole frame document and gives it as `srcdoc` (`src/repl/frame-document.ts`, `writeSandboxDocument`). The document holds the loader and the client chunks. The frame makes blob URLs from them and an import map points each chunk URL at its blob, so the frame needs no request to the site.
+- The page and the frame talk by `postMessage` only: theme and a height request go in, errors, height and chunk reports come out. The page accepts a message only from the frame's window and, for an opaque frame, only from origin `null`. The frame sends to the page's origin.
+- The static frame of a live sample runs only the site's own build, so it stays on the site's origin without a sandbox. The `sandbox` attribute is set on the first edit, before the new document loads.
+- Limits: the frame cannot use `localStorage`, cookies, forms, popups or modals, and the site's web fonts do not load in it (fonts need CORS headers the host does not send), so it falls back to system fonts.
+- Proof: `e2e/tests/website-repl.spec.ts` runs a hostile click handler in both frames.

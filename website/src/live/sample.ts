@@ -65,18 +65,16 @@ function query<T extends Element>(root: ParentNode, selector: string, type: new 
   return element;
 }
 
-/** Gives the frame the theme the page shows, chosen or from the system. */
+/**
+ * Gives the frame the theme the page shows, chosen or from the system. The frame can run reader
+ * code without an origin, so the page does not reach into it: the theme goes by message, which
+ * the bridge of the frame's document reads. The bridge answers with the frame's height.
+ */
 function syncTheme(frame: HTMLIFrameElement): void {
-  const root = frame.contentDocument?.documentElement;
-  const theme = document.documentElement.dataset.theme;
-  if (!root) {
-    return;
-  }
-  if (theme === undefined) {
-    delete root.dataset.theme;
-  } else {
-    root.dataset.theme = theme;
-  }
+  frame.contentWindow?.postMessage(
+    { idlipTheme: document.documentElement.dataset.theme ?? null },
+    '*',
+  );
 }
 
 /** Moves the focus between the tabs of a tab list with the arrow keys, Home and End. */
@@ -324,29 +322,25 @@ export function startSample(root: HTMLElement): void {
   replLink?.addEventListener('pointerenter', updateLink);
   replLink?.addEventListener('focus', updateLink);
 
-  /** The height of the frame's body, read at once: the frame may have loaded before this script. */
-  function readHeight(): void {
-    const body = frame.contentDocument?.body;
-    if (body) {
-      frame.style.height = `${Math.ceil(body.getBoundingClientRect().height)}px`;
-    }
-  }
-
+  // The theme message also asks the frame for its height, which it may have reported before
+  // this script ran.
   frame.addEventListener('load', () => {
     syncTheme(frame);
-    readHeight();
   });
-  if (
-    frame.contentDocument?.readyState === 'complete' &&
-    frame.contentWindow?.location.href !== 'about:blank'
-  ) {
+  if (frame.contentWindow !== null && frame.contentWindow.location.href !== 'about:blank') {
     syncTheme(frame);
-    readHeight();
   }
 
   window.addEventListener('message', (event) => {
     const data: unknown = event.data;
-    if (event.source !== frame.contentWindow || typeof data !== 'object' || data === null) {
+    // The static frame has the site's origin. The frame of an edit has none, so `null`.
+    const known = event.origin === location.origin || event.origin === 'null';
+    if (
+      !known ||
+      event.source !== frame.contentWindow ||
+      typeof data !== 'object' ||
+      data === null
+    ) {
       return;
     }
     const height: unknown = Reflect.get(data, 'idlipHeight');

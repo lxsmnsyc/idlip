@@ -2,7 +2,7 @@
 // The REPL page: files and the editor on one side, the output tabs on the other. Each edit
 // compiles the files in the REPL worker and, when they compile, runs them in the frame. Files
 // from a share link only compile until the reader chooses Run.
-import type { NetworkPanel, watchFrame } from '../client/lib/network.ts';
+import type { NetworkPanel, createMessagePanel } from '../client/lib/network.ts';
 import { HELPERS_PATH, listFileChunks } from './chunks.ts';
 import { createEditor } from './editor.ts';
 import { EXAMPLES } from './examples.ts';
@@ -133,18 +133,15 @@ function findPanel(root: HTMLElement): NetworkPanel {
   };
 }
 
-/** Gives the frame the theme the page shows, chosen or from the system. */
+/**
+ * Gives the frame the theme the page shows, chosen or from the system. The frame has no origin,
+ * so the page cannot reach into it: the theme goes by message, which the frame's bridge reads.
+ */
 function syncTheme(frame: HTMLIFrameElement): void {
-  const root = frame.contentDocument?.documentElement;
-  const theme = document.documentElement.dataset.theme;
-  if (!root) {
-    return;
-  }
-  if (theme === undefined) {
-    delete root.dataset.theme;
-  } else {
-    root.dataset.theme = theme;
-  }
+  frame.contentWindow?.postMessage(
+    { idlipTheme: document.documentElement.dataset.theme ?? null },
+    '*',
+  );
 }
 
 function logError(error: unknown): void {
@@ -164,7 +161,7 @@ function renderModule(title: string, file: string, code: string): string {
  * Starts the REPL in its page. `watch` is the network panel of the site script, passed in so the
  * site script and this chunk share no module, and docs pages load one script.
  */
-export function startRepl(root: HTMLElement, watch: typeof watchFrame): void {
+export function startRepl(root: HTMLElement, watch: typeof createMessagePanel): void {
   const fileTabs = query(root, '[data-repl-files]', HTMLElement);
   const addForm = query(root, '[data-repl-add]', HTMLFormElement);
   const addInput = query(addForm, 'input', HTMLInputElement);
@@ -185,7 +182,8 @@ export function startRepl(root: HTMLElement, watch: typeof watchFrame): void {
   const fileProblems = query(root, '[data-repl-file-problems]', HTMLElement);
   const undo = query(root, '[data-repl-undo]', HTMLButtonElement);
   const runButton = query(root, '[data-repl-run]', HTMLButtonElement);
-  const panel = findPanel(root);
+  const net = findPanel(root);
+  const panel = watch(net);
   const css =
     document.querySelector<HTMLTemplateElement>('template[data-repl-frame-css]')?.content
       .textContent ?? '';
@@ -194,8 +192,9 @@ export function startRepl(root: HTMLElement, watch: typeof watchFrame): void {
   let active = files[0].name;
   let problems: Problem[] = [];
   let status: Status = { kind: 'loading' };
+  // True from the new `srcdoc` of the frame to its `load`.
+  let framePending = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
-  let stopWatch = (): void => {};
   let shareReset: ReturnType<typeof setTimeout> | undefined;
   // Files run on their own only when their code came from the site: an example, a docs
   // sample, or edits the reader made after choosing Run.
@@ -529,7 +528,9 @@ export function startRepl(root: HTMLElement, watch: typeof watchFrame): void {
         clearErrors();
         setStatus({ kind: 'running' });
         address.textContent = new URL(result.url).pathname;
-        frame.src = result.url;
+        framePending = true;
+        panel.start(new URL(result.url).pathname, new TextEncoder().encode(result.document).length);
+        frame.srcdoc = result.document;
         break;
       }
     }
@@ -593,14 +594,13 @@ export function startRepl(root: HTMLElement, watch: typeof watchFrame): void {
   }
 
   frame.addEventListener('load', () => {
-    stopWatch();
-    if (frame.contentWindow?.location.href === 'about:blank') {
+    if (!framePending) {
       return;
     }
+    framePending = false;
     syncTheme(frame);
-    stopWatch = watch(frame, panel);
     // The panel's own hint names the todo of the landing page.
-    const empty = panel.events.querySelector('.net-empty');
+    const empty = net.events.querySelector('.net-empty');
     if (empty) {
       empty.textContent = 'Nothing yet. Click in the page.';
     }
@@ -609,9 +609,19 @@ export function startRepl(root: HTMLElement, watch: typeof watchFrame): void {
     }
   });
 
+  // The frame has no origin, so its messages come from `null`. They are data only: a string
+  // for the error line, a number for the height, a chunk report for the panel.
   window.addEventListener('message', (event) => {
     const data: unknown = event.data;
-    if (event.source !== frame.contentWindow || typeof data !== 'object' || data === null) {
+    if (
+      event.source !== frame.contentWindow ||
+      event.origin !== 'null' ||
+      typeof data !== 'object' ||
+      data === null
+    ) {
+      return;
+    }
+    if (panel.receive(data)) {
       return;
     }
     const message: unknown = Reflect.get(data, 'message');

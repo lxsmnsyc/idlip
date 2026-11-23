@@ -1,6 +1,6 @@
 // Writes the static frame of each live sample at build time. A reader who never edits a sample
 // sees this frame: the server render as a page, its client chunks and the shared loader. No
-// compiler, no worker and no service worker load for it. Events still resume in it.
+// compiler, no worker load for it. Events still resume in it.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { gzipSync } from 'node:zlib';

@@ -67,18 +67,10 @@ async function readStatus(page: Page, index: number): Promise<string> {
 
 /** Waits until the frame of the sample at `index` shows run `run` of the edited code. */
 async function waitForRun(page: Page, index: number, run: number): Promise<void> {
-  await expect
-    .poll(
-      async () =>
-        page
-          .locator('[data-live-sample] iframe')
-          .nth(index)
-          .evaluate((frame) =>
-            frame instanceof HTMLIFrameElement ? frame.contentDocument?.title : undefined,
-          ),
-      { timeout: 30_000 },
-    )
-    .toBe(`Run ${run}`);
+  // The frame of a run has no origin, so the page cannot read its title. Playwright can.
+  await expect(
+    page.locator('[data-live-sample] iframe').nth(index).contentFrame().locator('title'),
+  ).toHaveJSProperty('textContent', `Run ${run}`, { timeout: 30_000 });
 }
 
 async function replaceCode(page: Page, index: number, code: string): Promise<void> {
