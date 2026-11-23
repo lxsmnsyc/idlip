@@ -37,6 +37,12 @@ shared:
 reserves: []
 provides: []
 depends_on:
+  - on: loader-savings
+    kind: hard
+    why: needs loader room
+  - on: concurrency-model
+    kind: hard
+    why: builds the design it records (user decision 2026-11-23)
   - on: render-stream
     kind: hard
     why: appends chunks to its stream
