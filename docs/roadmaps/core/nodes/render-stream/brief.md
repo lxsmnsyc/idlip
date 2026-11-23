@@ -45,8 +45,8 @@ Read first: brumate `website/docs/reference-server.md` (`renderToStream`, `rende
 
 ## Do
 
-- `renderToStream(Component, props, options?)` returns a `ReadableStream<string>` of the whole document: head (listener, loader script, preload links, `<Head>` output), body, state script. The head flushes before the body renders, so the browser starts fetching the loader early.
-- Keep `render`/`renderPage` for callers that need the parts; add the equivalent of brumate's `streamParts(result)` if it is cheap.
+- User decision (2026-11-23), brumate's split: `render()` returns the parts of the first render and `pending: AsyncIterable<string>` for what resolves later (empty until `stream-model`). `renderToStream(Component, props, options?)` wraps it in a `ReadableStream<string>`, and `streamParts(result, options?)` does the same for a `render()` result.
+- The first chunk is the whole first render (head, body, state), as in brumate. Cancelling the reader stops pending work.
 - Nonce, preload options and the `Try` error path behave as in `renderPage`.
 - Design the stream so `stream-model` can append later chunks (data that resolves after the first flush) without a format break: write the hook point in a compiled-format change request.
 
