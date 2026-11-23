@@ -7,8 +7,8 @@ import { isRunnableDevEnvironment } from 'vite';
 import type {
   BuildEnvironment,
   Connect,
-  Logger,
   EnvironmentOptions,
+  Logger,
   Plugin,
   Rolldown,
   UserConfig,
