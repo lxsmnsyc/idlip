@@ -15,7 +15,7 @@ from:
 size: L
 spike: false
 hypothesis:
-verify: 
+verify:
 exclusive: []
 fulfilled_by:
 gate: false

@@ -59,6 +59,7 @@ It publishes its `.tsx` source under `dir`. The app's plugin compiles it.
 Read first: brumate `docs/packages.md` and its plugin code for the dependency scan, `packages/idlip/src/vite/plugin.ts` (`findModules`, module ids, chunk names, `optimizeDeps`, `ssr.noExternal`), and the Nitro integration from `entry-setup`.
 
 ## Do
+
 - Scan the app's `dependencies` and `devDependencies` (direct ones, resolved from the app root, symlinked workspace packages included) for the `idlip` field. Compile every `.tsx` under each package's `dir` as an idlip module.
 - Keep those packages out of `optimizeDeps` and in `ssr.noExternal` (and Nitro's externals), so their files reach the plugin in dev and in build.
 - Module ids and chunk names are stable and unique across packages: prefix with the package name, so two packages with a `button.tsx` do not collide.
@@ -67,6 +68,7 @@ Read first: brumate `docs/packages.md` and its plugin code for the dependency sc
 - An example: `examples/package-components` holds a workspace package with the field and an app that uses it. Docs page `website/docs/packages.md`: how to publish a component package.
 
 ## Acceptance
+
 - An e2e test: the example app renders a package component with its CSS, a click runs the package component's handler from its own chunk, after a production build and in dev.
 - A test: an unknown format version fails with the message above.
 - A test: two packages with the same file name build without a chunk name collision.

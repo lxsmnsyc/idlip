@@ -42,10 +42,12 @@ The todo loader is 4087 B gzip against a 4096 B budget (contract), 9 B of room. 
 Read first: `packages/idlip/src/client/CLAUDE.md` (flag recipe, flag costs, the rules that each saving must keep), `nodes/loader-trim/outcome.md`, `nodes/event-callbacks/outcome.md` (what grew the loader last), and the e2e `loaderBudget` test.
 
 ## Do
+
 - Profile the todo loader by module and by function (bundle with the flags of the todo app, gzip -9 per function contribution). List the candidates with their size.
 - Find savings that keep behaviour: shared code paths, smaller encodings in the state script the loader reads, code that only some apps need moved behind a `HAS_*` flag, dev-only code that reaches production.
 - Each saving is its own commit with its before/after gzip size and the tests that cover the path.
 
 ## Acceptance
+
 - The todo loader is at most 3800 B gzip -9 (about 300 B of room), or the outcome explains why not with the list of what was tried.
 - Unit, differential and e2e tests pass; the flag-cost list in `client/CLAUDE.md` is updated.

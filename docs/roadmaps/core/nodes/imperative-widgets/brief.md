@@ -7,7 +7,7 @@ type: feature
 story:
 early: false
 outline: true
-milestone: 
+milestone:
 target:
 ship: auto
 land: auto
@@ -15,7 +15,7 @@ from:
 size: M
 spike: false
 hypothesis:
-verify: 
+verify:
 exclusive: []
 fulfilled_by:
 gate: false
