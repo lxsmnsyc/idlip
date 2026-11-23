@@ -1,6 +1,6 @@
 {
   "name": "idlip",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "A resumable UI framework built on Model-View-Update",
   "homepage": "https://github.com/lxsmnsyc/idlip",
   "bugs": "https://github.com/lxsmnsyc/idlip/issues",
