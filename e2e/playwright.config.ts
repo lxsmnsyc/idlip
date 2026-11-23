@@ -60,7 +60,7 @@ const subsServer = createServer(
 // update tests, which edit the copies. The dev server answers a page only to a request that
 // accepts HTML, so the check reads its client.
 function createHotServer(example: string, at: number, mode = ''): ReturnType<typeof createServer> {
-  const copy = mode === 'fallback' ? `${example}-fallback` : example;
+  const copy = mode === '' ? example : `${example}-${mode}`;
   return {
     ...createServer(
       `node e2e/fixture/hot-app.ts ${example} ${mode} && cd e2e/.hot/${copy} && ./node_modules/.bin/vite --port ${at} --strictPort --host 127.0.0.1`,
@@ -73,6 +73,9 @@ function createHotServer(example: string, at: number, mode = ''): ReturnType<typ
 const hotServer = createHotServer('todo', hotPort);
 // The same copy of the todo without Nitro, served by the dev middleware of the plugin.
 const hotFallbackServer = createHotServer('todo', hotPort + 2, 'fallback');
+// Copies of the todo for the stylesheet tests, which `hot.spec.ts` must not edit under them.
+const stylesServer = createHotServer('todo', hotPort + 3, 'styles');
+const stylesFallbackServer = createHotServer('todo', hotPort + 4, 'styles-fallback');
 const hotChildrenServer = createHotServer('counters-subs', hotPort + 1);
 
 export default defineConfig({
@@ -91,13 +94,23 @@ export default defineConfig({
       ? [
           {
             name: 'hot',
-            testMatch: /(hot|styles)\.spec\.ts/,
+            testMatch: /\/hot\.spec\.ts/,
             use: { ...devices['Desktop Chrome'], baseURL: `http://127.0.0.1:${hotPort}` },
           },
           {
             name: 'hot-fallback',
-            testMatch: /(hot|styles)\.spec\.ts/,
+            testMatch: /\/hot\.spec\.ts/,
             use: { ...devices['Desktop Chrome'], baseURL: `http://127.0.0.1:${hotPort + 2}` },
+          },
+          {
+            name: 'styles',
+            testMatch: /\/styles(-hot)?\.spec\.ts/,
+            use: { ...devices['Desktop Chrome'], baseURL: `http://127.0.0.1:${hotPort + 3}` },
+          },
+          {
+            name: 'styles-fallback',
+            testMatch: /\/styles(-hot)?\.spec\.ts/,
+            use: { ...devices['Desktop Chrome'], baseURL: `http://127.0.0.1:${hotPort + 4}` },
           },
           {
             name: 'hot-children',
@@ -118,6 +131,15 @@ export default defineConfig({
       : []),
   ],
   webServer: withApps
-    ? [todoServer, countersServer, subsServer, hotServer, hotChildrenServer, hotFallbackServer]
+    ? [
+        todoServer,
+        countersServer,
+        subsServer,
+        hotServer,
+        hotChildrenServer,
+        hotFallbackServer,
+        stylesServer,
+        stylesFallbackServer,
+      ]
     : [todoServer],
 });

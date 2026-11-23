@@ -1,8 +1,8 @@
 import { expect, test } from './support.ts';
 
 // The todo example imports `todo.css` (a plain stylesheet) and `todo.module.css` (a CSS Module).
-// The `chromium` project reads the production build served by Nitro, and the `hot` and
-// `hot-fallback` projects read `vite dev` with and without Nitro.
+// The `chromium` project reads the production build served by Nitro, and the `styles` and
+// `styles-fallback` projects read `vite dev` with and without Nitro.
 
 test('the page links its stylesheets in the head, so the first paint is styled', async ({
   page,

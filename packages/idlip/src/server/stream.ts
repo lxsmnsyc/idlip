@@ -73,8 +73,8 @@ function splitTitle(head: string): { title: string; rest: string } {
 /**
  * The first render whole, up to `</body>`: the doctype, the document with the winning title
  * first in its `<head>` and the rest of the head output after the head elements of the
- * document, then the stylesheet links, the listener, the preload links and the loader script, and the body with the
- * state script. The tail comes after the pending chunks.
+ * document, then the stylesheet links, the listener, the preload links and the loader script,
+ * and the body with the state script. The tail comes after the pending chunks.
  */
 function writeFirst(parts: RenderResult, options: StreamOptions): string {
   if (!parts.document) {

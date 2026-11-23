@@ -34,7 +34,7 @@ import styles from './todo.module.css';
 ## Built
 
 - `packages/idlip/src/vite/styles.ts`, `plugin.ts`: the import walk (`findStyles`), one client entry per module file that makes Vite write the stylesheets, the `styles:<file>` keys of the chunk map, and per-chunk copies of a CSS Module's class object (`\0idlip-names:`).
-- `packages/idlip/src/server/styles.ts` (`STYLES_KEY`, `readStyles`, `renderStyles`), `render.ts` (`RenderResult.styles`, the union over children, the key kept out of the state script), `stream.ts` (the links come first in the added head output), `response.ts` (`style-src` in the policy).
+- `packages/idlip/src/server/styles.ts` (`STYLES_KEY`, `readStyles`, `renderStyles`), `render.ts` (`RenderResult.styles`, the union over children, the key kept out of the state script), `stream.ts` (the links come first in the added head output, before the listener script and the preload links), `response.ts` (`style-src` in the policy).
 - `examples/todo`: `todo.css` (plain), `todo.module.css` (CSS Module on the count), `env.d.ts` for the module types.
 - `packages/idlip/src/testing/modules.ts`: `mount` loads no stylesheet.
 - Docs: `website/docs/styles.md`, and the policy text of `deploying.md`, `head.md` and `reference/server.md`. The sidebar lists the page from its front matter (Guide, order 14).
@@ -59,7 +59,7 @@ import styles from './todo.module.css';
 - The brief asks the compiler to keep CSS imports. I did not change it: the server module needs no stylesheet code, and the plugin finds the imports from the source. A bare import is still dropped from the compiled output.
 - A client chunk never imports the stylesheet. Where it reads a CSS Module (`styles.x` in a binding or list), it gets a private copy of the class object. A shared copy would be a shared chunk and a second request on the first click.
 - The page links every stylesheet of the root's import graph, not only what it renders. A stylesheet that only a never-rendered branch imports is still sent.
-- `style-src` blocks the `style` attribute. `style={{ '--size': size }}` under `csp: true` needs `csp: { extend: { 'style-src-attr': ["'unsafe-inline'"] } }`. Not added by default.
+- `style-src` blocks the `style` attribute. `style={`--size: ${size}px`}` under `csp: true` needs `csp: { extend: { 'style-src-attr': ["'unsafe-inline'"] } }`. Not added by default.
 - A stylesheet imported by a package in `node_modules` is not linked. Import it from your own code.
 - In dev, a CSS Module that a click's chunk imports is also injected by Vite as a `<style>`, next to the link (same rules).
 - `?inline`, `?url` and `?raw` imports are not linked.

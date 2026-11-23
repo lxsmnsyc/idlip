@@ -8,8 +8,8 @@ export interface CspOptions {
   /**
    * Sources added to a directive by name, such as `{ 'img-src': ['https:'] }`. A directive that
    * the policy lacks is added. `style-src` is the exception: the policy has `'self'` and the nonce
-   * for the stylesheets of the build, and a `style-src` here replaces them. `default-src` is `'none'`, so adding sources to it
-   * replaces `'none'`. The script directives (`script-src`, `script-src-elem`, `script-src-attr`)
+   * for the stylesheets of the build, and a `style-src` here replaces them. `default-src` is
+   * `'none'`, so adding sources to it replaces `'none'`. The script directives (`script-src`, `script-src-elem`, `script-src-attr`)
    * and the Trusted Types directives (`trusted-types`, `require-trusted-types-for`) cannot be
    * extended.
    */

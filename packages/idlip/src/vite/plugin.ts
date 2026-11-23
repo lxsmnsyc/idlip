@@ -535,7 +535,10 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       if (item.type === 'chunk' && item.facadeModuleId?.startsWith(STYLES_ID) === true) {
         entries.add(item.fileName);
         const file = item.facadeModuleId.slice(STYLES_ID.length);
-        const sheets = new Set<string>();
+        // The import order of the sources, which the links must follow: the first source that a
+        // sheet holds sets its place, whatever order the bundler wrote the chunks in.
+        const order = (styleEntries.get(file) ?? []).map((id) => cleanId(id));
+        const sheets = new Map<string, number>();
         const visited = new Set<string>();
         function visit(name: string): void {
           const chunk = items[name];
@@ -546,13 +549,20 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
           for (const imported of chunk.imports) {
             visit(imported);
           }
+          let place = order.length;
+          for (const id of chunk.moduleIds) {
+            const index = order.indexOf(cleanId(id));
+            if (index >= 0 && index < place) {
+              place = index;
+            }
+          }
           for (const sheet of chunk.viteMetadata?.importedCss ?? []) {
-            sheets.add(sheet);
+            sheets.set(sheet, Math.min(place, sheets.get(sheet) ?? place));
           }
         }
         visit(item.fileName);
         const list: string[] = [];
-        for (const sheet of sheets) {
+        for (const [sheet] of [...sheets].toSorted((a, b) => a[1] - b[1])) {
           list.push(encodeURI(`${prefix}${sheet}`));
         }
         urls[`${STYLES_PREFIX}${getModuleId(file)}`] = list.join(' ');

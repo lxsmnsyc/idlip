@@ -69,7 +69,7 @@ The object is a plain value. Use it in the view, in a hole or in a handler. The 
 A stylesheet reads a model value through a custom property. Set it with `style`:
 
 ```tsx fragment
-<div class="bar" style={{ '--size': `${size}px` }} />
+<div class="bar" style={`--size: ${size}px`} />
 ```
 
 ```css
@@ -104,7 +104,7 @@ renderToResponse(App, props, {
 });
 ```
 
-A `style` attribute is an inline style, which `style-src` does not allow, so `style={{ '--size': size }}` needs `style-src-attr`: `csp: { extend: { 'style-src-attr': ["'unsafe-inline'"] } }`. A class from a stylesheet needs nothing.
+A `style` attribute is an inline style, which `style-src` does not allow, so ``style={`--size: ${size}px`}`` needs `style-src-attr`: `csp: { extend: { 'style-src-attr': ["'unsafe-inline'"] } }`. A class from a stylesheet needs nothing.
 
 ## Testing
 
