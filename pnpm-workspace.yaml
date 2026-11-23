@@ -1,6 +1,8 @@
 packages:
   - packages/*
   - examples/*
+  # The component package that examples/package-components uses.
+  - examples/package-components/ui
   - e2e
   - website
   # Benchmark apps. The root build, test and typecheck scripts leave them out.

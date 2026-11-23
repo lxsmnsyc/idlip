@@ -5,6 +5,7 @@ const port = Number(process.env.E2E_PORT ?? 4173);
 const countersPort = Number(process.env.E2E_COUNTERS_PORT ?? 4174);
 const subsPort = Number(process.env.E2E_SUBS_PORT ?? 4175);
 const hotPort = Number(process.env.E2E_HOT_PORT ?? 4576);
+const packagesPort = Number(process.env.E2E_PACKAGES_PORT ?? 4177);
 
 // `example` (default) serves the built `examples/todo`, `examples/counters` and
 // `examples/counters-subs` with the Node server that Nitro writes (`.output/server/index.mjs`):
@@ -76,6 +77,14 @@ const hotFallbackServer = createHotServer('todo', hotPort + 2, 'fallback');
 // Copies of the todo for the stylesheet tests, which `hot.spec.ts` must not edit under them.
 const stylesServer = createHotServer('todo', hotPort + 3, 'styles');
 const stylesFallbackServer = createHotServer('todo', hotPort + 4, 'styles-fallback');
+// The package-components example, built, and its dev copies with and without Nitro.
+const packagesServer = createServer(
+  'node .output/server/index.mjs',
+  '../examples/package-components',
+  packagesPort,
+);
+const packagesDevServer = createHotServer('package-components', hotPort + 5);
+const packagesFallbackServer = createHotServer('package-components', hotPort + 6, 'fallback');
 const hotChildrenServer = createHotServer('counters-subs', hotPort + 1);
 
 export default defineConfig({
@@ -87,7 +96,7 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      testIgnore: /(nested(-subscribe)?|hot|hot-children)\.spec\.ts/,
+      testIgnore: /(nested(-subscribe)?|hot|hot-children|packages)\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], baseURL: `http://127.0.0.1:${port}` },
     },
     ...(withApps
@@ -111,6 +120,21 @@ export default defineConfig({
             name: 'styles-fallback',
             testMatch: /\/styles(-hot)?\.spec\.ts/,
             use: { ...devices['Desktop Chrome'], baseURL: `http://127.0.0.1:${hotPort + 4}` },
+          },
+          {
+            name: 'packages',
+            testMatch: /\/packages\.spec\.ts/,
+            use: { ...devices['Desktop Chrome'], baseURL: `http://127.0.0.1:${packagesPort}` },
+          },
+          {
+            name: 'packages-dev',
+            testMatch: /\/packages\.spec\.ts/,
+            use: { ...devices['Desktop Chrome'], baseURL: `http://127.0.0.1:${hotPort + 5}` },
+          },
+          {
+            name: 'packages-fallback',
+            testMatch: /\/packages\.spec\.ts/,
+            use: { ...devices['Desktop Chrome'], baseURL: `http://127.0.0.1:${hotPort + 6}` },
           },
           {
             name: 'hot-children',
@@ -140,6 +164,9 @@ export default defineConfig({
         hotFallbackServer,
         stylesServer,
         stylesFallbackServer,
+        packagesServer,
+        packagesDevServer,
+        packagesFallbackServer,
       ]
     : [todoServer],
 });

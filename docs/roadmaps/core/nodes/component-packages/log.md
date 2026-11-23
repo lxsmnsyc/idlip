@@ -1,0 +1,14 @@
+# Log: component-packages
+
+- Repro: `import Counter from '@idlip-example/ui/counter.tsx'` from a workspace package built, but the file only warned that it was outside `modules`, and the package component was plain JSX.
+- Design: `vite/packages.ts` reads the app's `dependencies` and `devDependencies`, finds each package from the app root the way Node does (`node_modules` up the tree, real path), and keeps those with an `idlip` field. `findModules` adds their `.tsx` files that hold a component, so every other part (children scan, chunks, hot update, `isModule`) works unchanged.
+- Module id: `<name>/<path in the package>`, not rooted with `/`. The compiler only needs posix dirname for it, so no compiler change. `getModuleId`/`getFile` in `plugin.ts` convert both ways. The id is the same wherever the package is installed.
+- Chunk names: a package file's emitted name is `<package slug>.<file>.<kind>.<name>`, such as `idlip-example-ui.counter.handler.add`. Chunks match by the absolute file as their entry id, so names only matter for people and the e2e label.
+- Measured: a client chunk imports a package component's view by module id (`@idlip-example/ui/src/counter.tsx?idlip-view&lang.js`), which resolved to nothing and made the build fail with "which the loader does not import". `resolveId` now maps it to the file with `this.resolve`.
+- Dev: a package chunk URL is `<base>@fs/<file>?idlip-...`, since the module id names no folder under the root. `classifyEdit` takes an optional `locate` for it (hot updates). A linked package outside the project is added to `server.fs.allow` and the watcher.
+- Config: `ssr.noExternal`, `optimizeDeps.exclude` and `resolve.dedupe: ['idlip']` for the found packages, only when there are any. Nitro's bundle holds the package: measured with the example (`.output/server/_ssr/ssr.mjs`).
+- CSS: `findStyles` skipped scripts under `node_modules`, so an installed package's stylesheets were not found. `isScript` takes `inPackage`, so scripts of an idlip package are walked. The test builds with packages installed as real folders in `node_modules`.
+- The compiler requires a child's import specifier to end in `.tsx` (diagnostic `component-import`). So a package exports `"./*.tsx": "./src/*.tsx"` and the app imports `@acme/ui/button.tsx`. This differs from brumate, whose components have their own extension.
+- Found, not mine: a child view that reads a CSS Module is emitted as two files (the entry re-exports a chunk of the same module), in an app too (checked on `examples/counters` with a temporary module). The build passes and a click is fine. Noted in the docs.
+- Ports for e2e: the `packages` project reads `E2E_PACKAGES_PORT` (default 4177); its dev copies use `E2E_HOT_PORT` + 5 and + 6.
+- `pnpm check` is in the brief but the root has no such script. I ran the separate commands.

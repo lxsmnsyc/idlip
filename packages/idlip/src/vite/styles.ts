@@ -22,9 +22,12 @@ export function isStyleModule(id: string): boolean {
   return STYLE_MODULE.test(id);
 }
 
-/** Whether the walk reads the file's imports: a script outside `node_modules`. */
-export function isScript(id: string): boolean {
-  return SCRIPT_FILE.test(id) && !id.includes('/node_modules/');
+/**
+ * Whether the walk reads the file's imports: a script outside `node_modules`, or a script of an
+ * idlip package (`inPackage`), which is installed there.
+ */
+export function isScript(id: string, inPackage = false): boolean {
+  return SCRIPT_FILE.test(id) && (inPackage || !id.includes('/node_modules/'));
 }
 
 /** Returns the id without its query. */

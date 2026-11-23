@@ -41,6 +41,15 @@ import {
 } from './skew.ts';
 import { isChunkUrls, listChunks, parseChunkId, replaceChunkUrls } from './chunks.ts';
 import { STYLES_KEY } from '../server/styles.ts';
+import {
+  findPackage,
+  getPackageFile,
+  getPackageId,
+  getPackageSlug,
+  listPackageFiles,
+  readPackages,
+} from './packages.ts';
+import type { IdlipPackage } from './packages.ts';
 import { STYLES_PREFIX, cleanId, isScript, isStyle, isStyleModule, listImports } from './styles.ts';
 
 const MODULE_FILE = /\.tsx$/;
@@ -206,10 +215,24 @@ function createBuild(
  * build of client and ssr, the client and server folders under `build.outDir`, and the
  * inputs of both.
  */
-function createConfig(user: UserConfig, options: IdlipOptions): UserConfig {
+function createConfig(
+  user: UserConfig,
+  options: IdlipOptions,
+  packages: readonly IdlipPackage[],
+): UserConfig {
   const environments: Partial<Record<string, EnvironmentOptions>> = user.environments ?? {};
   const outDir = user.build?.outDir ?? 'dist';
+  const names = packages.map((info) => info.name);
   return {
+    // A component package reaches the plugin as source: Vite neither bundles it for the browser
+    // nor leaves it external on the server, and the app and its packages share one runtime.
+    ...(names.length === 0
+      ? {}
+      : {
+          ssr: { noExternal: names },
+          optimizeDeps: { exclude: names },
+          resolve: { dedupe: ['idlip'] },
+        }),
     builder: {},
     environments: {
       client: {
@@ -465,9 +488,31 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
   let shared: Map<string, string> | undefined;
   /** The stylesheets that each module file reaches, for the client build's entries. */
   const styleEntries = new Map<string, string[]>();
+  /** The dependencies of the app that publish components, found in `config`. */
+  let packages: IdlipPackage[] = [];
 
+  /** The module id of a file: the path from the root, or the package name and the path in it. */
   function getModuleId(file: string): string {
+    const info = findPackage(packages, toPosix(file));
+    if (info !== undefined) {
+      return getPackageId(info, toPosix(file));
+    }
     return `/${path.relative(root, file).split(path.sep).join('/')}`;
+  }
+
+  /** The file of a module id. */
+  function getFile(id: string): string {
+    return getPackageFile(packages, id) ?? path.join(root, id);
+  }
+
+  /** The URL that dev serves a chunk at: under the base, or `/@fs/` for a file of a package. */
+  function toChunkUrl(id: string): string {
+    if (id.startsWith('/')) {
+      return `${base}${id.slice(1)}`;
+    }
+    const query = id.indexOf('?');
+    const file = getFile(query < 0 ? id : id.slice(0, query));
+    return `${base}@fs${file}${query < 0 ? '' : id.slice(query)}`;
   }
 
   /** The URL that dev serves a stylesheet at: under the base, or `/@fs/` outside the root. */
@@ -509,7 +554,7 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
           if (!STYLE_QUERY.test(target.id)) {
             found.add(id);
           }
-        } else if (isScript(id)) {
+        } else if (isScript(id, findPackage(packages, id) !== undefined)) {
           // oxlint-disable-next-line no-await-in-loop
           await visit(id);
         }
@@ -590,7 +635,7 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
     if (!specifier.startsWith('.')) {
       return specifier;
     }
-    return getModuleId(path.resolve(path.dirname(path.join(root, importer)), specifier));
+    return getModuleId(path.resolve(path.dirname(getFile(importer)), specifier));
   }
 
   /**
@@ -691,6 +736,13 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
         files.push(file);
       }
     }
+    for (const info of packages) {
+      for (const file of listPackageFiles(info)) {
+        if (hasComponent(file, readFileSync(file, 'utf8'))) {
+          files.push(file);
+        }
+      }
+    }
     moduleFiles = files.toSorted();
     moduleSet = new Set(moduleFiles);
     return moduleFiles;
@@ -748,7 +800,7 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       for (const chunk of listChunks(manifest)) {
         const id = getChunkId(manifest.module, chunk);
         if (all === undefined) {
-          urls[id] = `${base}${id.slice(1)}`;
+          urls[id] = toChunkUrl(id);
         } else if (Object.hasOwn(all, id)) {
           urls[id] = all[id];
         } else {
@@ -791,12 +843,15 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
 
     config(user) {
       outDir = user.build?.outDir ?? 'dist';
-      return createConfig(user, options);
+      // A package with an unknown format fails the start.
+      packages = readPackages(path.resolve(user.root ?? process.cwd()));
+      return createConfig(user, options, packages);
     },
 
     configResolved(config) {
       // The real path, since Vite names modules by it and a link would not match.
       root = realpathSync(config.root);
+      packages = readPackages(root);
       base = config.base;
       isServe = config.command === 'serve';
       standAside ||= config.plugins.some((plugin) => plugin.name === NITRO_PLUGIN);
@@ -843,7 +898,12 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
       for (const [index, file] of findModules().entries()) {
         const result = results[index];
         // A named component adds its name: `widgets.Counter.handler.add.js`.
-        const stem = path.basename(file, '.tsx');
+        const info = findPackage(packages, file);
+        // A package prefixes its files, so two packages with a `button.tsx` emit different names.
+        const stem =
+          info === undefined
+            ? path.basename(file, '.tsx')
+            : `${getPackageSlug(info)}.${path.basename(file, '.tsx')}`;
         for (const { manifest } of listCompiled(result)) {
           const component = splitModule(manifest.module).name;
           const local = component === undefined ? file : `${file}#${component}`;
@@ -898,6 +958,16 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
         const target = await this.resolve(source, importer, { skipSelf: true });
         if (target !== null && !target.external) {
           return `${NAMES_ID}${encodeURIComponent(target.id)}@${encodeURIComponent(importer)}`;
+        }
+      }
+      // A chunk imports the view of a package component by its module id, which names no folder.
+      const chunk = parseChunkId(source);
+      if (chunk !== undefined && !source.startsWith('/')) {
+        const file = getPackageFile(packages, chunk.file);
+        if (file !== undefined) {
+          return this.resolve(`${file}${source.slice(chunk.file.length)}`, importer, {
+            skipSelf: true,
+          });
         }
       }
       if (source === HELPERS_MODULE) {
@@ -1098,7 +1168,7 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
           await read(),
           cache.get(file)?.rendered,
         );
-        message = classifyEdit(before, after, base, timestamp);
+        message = classifyEdit(before, after, base, timestamp, toChunkUrl);
         reload = changesShell(before, after);
       } catch {
         // A module that does not compile: the page loads again and shows the server's error.
@@ -1123,6 +1193,13 @@ export function idlip(options: IdlipOptions = {}): Plugin[] {
     },
 
     configureServer(server) {
+      // A linked package may sit outside the project: serve it, and watch its source for edits.
+      for (const info of packages) {
+        if (!info.dir.includes('/node_modules/')) {
+          server.config.server.fs.allow.push(info.dir);
+          server.watcher.add(info.src);
+        }
+      }
       // The browser keys modules by URL. A page's `/@id/idlip/client` served as it is would be
       // a second copy of the loader next to the URL that chunks import, so it gets the proxy.
       server.middlewares.use((request, _response, next) => {

@@ -6,8 +6,12 @@ import { listChunks } from './chunks.ts';
 /** The custom event the plugin sends to the page. Its payload is a `HotMessage`. */
 export const HOT_EVENT = 'idlip:hot';
 
-function getUrl(base: string, module: string, chunk: string): string {
-  return `${base}${getChunkId(module, chunk).slice(1)}`;
+/** The URL of a chunk id. The default is the id under the base. */
+type Locate = (id: string) => string;
+
+function getUrl(base: string, locate: Locate | undefined, module: string, chunk: string): string {
+  const id = getChunkId(module, chunk);
+  return locate === undefined ? `${base}${id.slice(1)}` : locate(id);
 }
 
 /**
@@ -77,13 +81,14 @@ export function classifyEdit(
   after: CompileResult,
   base: string,
   timestamp: number,
+  locate?: Locate,
 ): HotMessage | undefined {
   const module = after.manifest.module;
   if (before === undefined || before.server !== after.server) {
     const chunks: string[] = [];
     for (const { manifest } of listCompiled(after)) {
       for (const chunk of listChunks(manifest)) {
-        chunks.push(getUrl(base, manifest.module, chunk));
+        chunks.push(getUrl(base, locate, manifest.module, chunk));
       }
     }
     return { module, kind: 'remount', chunks, timestamp };
@@ -100,7 +105,7 @@ export function classifyEdit(
   for (const { manifest, client } of listCompiled(after)) {
     for (const item of client) {
       if (old.get(getChunkId(manifest.module, item.chunk)) !== item.code) {
-        chunks.push(getUrl(base, manifest.module, item.chunk));
+        chunks.push(getUrl(base, locate, manifest.module, item.chunk));
       }
     }
   }

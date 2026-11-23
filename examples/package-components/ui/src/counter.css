@@ -1,0 +1,7 @@
+.ui-counter {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 0;
+  border-bottom: 1px solid rgb(200, 200, 200);
+}
