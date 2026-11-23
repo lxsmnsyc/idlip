@@ -1,7 +1,7 @@
 ---
 id: repl-origin
 title: Run REPL and live sample frames on a separate origin
-status: todo
+status: done
 priority: must
 type: fix
 story:
@@ -20,7 +20,7 @@ exclusive: []
 fulfilled_by:
 gate: false
 added: 2026-11-23
-spent:
+spent: 342000
 owns:
   - website/src/repl/**
   - website/src/live/**
@@ -48,3 +48,5 @@ Read first: `website/src/repl/` (`app.ts`, `frame-document.ts`, the worker), `we
 
 - A test (or e2e) shows code in a REPL frame cannot read `parent.document` or the site's `localStorage`.
 - The REPL, share links and live samples still work; the website builds and its tests pass.
+
+Landed 2026-11-23 on batch/core (92bac41, 1237b11): REPL frame, render worker and edited live samples run with an opaque origin; reviewed, one fix round.
