@@ -62,7 +62,7 @@ export default function Inbox(props: { unread: number }) {
 - **`<html>` and `<body>` take bound attributes**, such as `lang={lang}` or `class={theme}`. An event, `ref` or `html` on `html`, `head` or `body` is an error.
 - **The skeleton is fixed.** `<html>` holds one `<head>` and then one `<body>`. A condition, a `<For>` or a `<Try>` around them, and an `html`, `head` or `body` in any other component, is the error `document-element-misplaced`. Put a changing head element in a `<Head>` in the body.
 - **A component that is not the root renders no `<html>`.** The server rejects a root that does not render it.
-- **A change to `<html>` or to the head in `vite dev`** loads the page again, since a remount swaps `<body>` only.
+- **A change to `<html>`, to the head or to the `<body>` tag in `vite dev`** loads the page again, since a remount swaps the content of `<body>` only.
 
 ## Rules
 

@@ -145,7 +145,7 @@ For a host that sends its own `Response`, `renderToStream(TodoApp, props, { nonc
 
 - **A handler or binding edit swaps chunks.** The next time the loader needs a changed chunk, it imports the new one. The page and its model stay as they are.
 - **A markup edit of the body remounts.** The loader waits for pending events and keeps the model of each component. It fetches the page again and patches it to the kept models. Child components keep their models, and their props come from the new render. Subscriptions start again.
-- **An edit of `<html>` or of the head loads the page again.** A remount swaps `<body>` only, so the page starts from the server's state.
+- **An edit of `<html>`, of the head or of the `<body>` tag loads the page again.** A remount swaps the content of `<body>` only, so the page starts from the server's state.
 - **An edit that does not compile** reloads the page, which then shows the server's compile error.
 - **Vite's client rides with the loader.** The dev loader module imports `/@vite/client`, so the page has no markup for it.
 - **No policy and no `immutable`.** `csp: true` writes the nonce and sends no header in development.

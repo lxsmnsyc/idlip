@@ -117,9 +117,11 @@ describe('changesShell', () => {
     expect(classifyEdit(before, after, '/', 7)?.kind).toBe('remount');
   });
 
-  it('asks for a reload when an edit changes the html tag or the head', () => {
+  it('asks for a reload when an edit changes the html tag, the body tag or the head', () => {
     for (const edit of [
       page.replace('lang="en"', 'lang="fr"'),
+      page.replace('<body>', '<body class="dark">'),
+      page.replace('<body>', '<body data-x="a>b">'),
       page.replace('<title>todo</title>', '<title>tasks</title>'),
     ]) {
       expect(changesShell(before, compile(edit, '/src/app.tsx'))).toBe(true);

@@ -11,8 +11,33 @@ function getUrl(base: string, module: string, chunk: string): string {
 }
 
 /**
+ * Returns the index after the `>` that ends a tag in render code. A `${...}` hole and a quoted
+ * attribute value may hold a `>`, so the scan skips both.
+ */
+function findTagEnd(code: string, from: number): number {
+  let depth = 0;
+  let quote = false;
+  for (let index = from; index < code.length; index++) {
+    const char = code[index];
+    if (depth > 0) {
+      depth += char === '{' ? 1 : 0;
+      depth -= char === '}' ? 1 : 0;
+    } else if (char === '$' && code[index + 1] === '{') {
+      depth = 1;
+      index++;
+    } else if (char === '"') {
+      quote = !quote;
+    } else if (char === '>' && !quote) {
+      return index + 1;
+    }
+  }
+  return code.length;
+}
+
+/**
  * Returns the shell of each document in the server module: the render code from `<html` to
- * the `<body` tag, which holds the attributes of `<html>` and the static head.
+ * the end of the `<body ...>` tag. It holds the attributes of `<html>` and `<body>` and the
+ * static head.
  */
 function readShells(result: CompileResult): string[] {
   const shells: string[] = [];
@@ -22,8 +47,8 @@ function readShells(result: CompileResult): string[] {
     start !== -1;
     start = server.indexOf('<html', start + 1)
   ) {
-    const end = server.indexOf('<body', start);
-    shells.push(end === -1 ? server.slice(start) : server.slice(start, end));
+    const body = server.indexOf('<body', start);
+    shells.push(body === -1 ? server.slice(start) : server.slice(start, findTagEnd(server, body)));
   }
   return shells;
 }
