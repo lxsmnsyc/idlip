@@ -152,8 +152,12 @@
   box-sizing: border-box;
 }
 
+/* Mobile browsers enlarge the text of wide blocks, such as the code of a live sample that grows
+   to its longest line. The page sets its own sizes, so that scaling stays off. */
 html {
   scroll-padding-top: calc(var(--header-height) + 1rem);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
