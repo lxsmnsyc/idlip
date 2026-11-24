@@ -68,9 +68,9 @@ The test `packages/idlip/test/client/subs/subs.test.ts` runs a clock like this o
 
 ## A custom source
 
-A source is an async generator function of `(input, signal)`. A source with several parameters takes one input object. It must end its `await`s when the signal aborts. `until(signal, promise)` and `Time.sleep(ms, signal)` reject on abort:
+A source is an async generator function of `(input, signal)`. A source with several parameters takes one input object. It must end its `await`s when the signal aborts. `until(signal, promise)` and `Time.sleep(ms, signal)` reject on abort. This source polls a `/status` endpoint of your server:
 
-```tsx live
+```tsx
 import { Subscribe, Time, until } from 'idlip';
 import type { JSX } from 'idlip/jsx-runtime';
 
@@ -93,6 +93,35 @@ export default function Status(): JSX.Element {
     <p>
       <Subscribe to={poll} input={{ url: '/status', ms: 5000 }} on:value={show} />
       {status}
+    </p>
+  );
+}
+```
+
+A source needs no server. This one counts down and ends, which stops the subscription:
+
+```tsx live
+import { Subscribe, Time } from 'idlip';
+import type { JSX } from 'idlip/jsx-runtime';
+
+async function* countdown(input: { from: number; ms: number }, signal: AbortSignal) {
+  for (let n = input.from; n >= 0; n -= 1) {
+    yield n;
+    await Time.sleep(input.ms, signal);
+  }
+}
+
+export default function Launch(): JSX.Element {
+  let left = 10;
+
+  function tick(n: number) {
+    left = n;
+  }
+
+  return (
+    <p>
+      <Subscribe to={countdown} input={{ from: 10, ms: 1000 }} on:value={tick} />
+      {left === 0 ? 'Liftoff' : `${left} s`}
     </p>
   );
 }
