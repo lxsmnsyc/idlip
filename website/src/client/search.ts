@@ -41,7 +41,7 @@ function readPlatform(): string {
 }
 
 // The key hint names the key of the system.
-if (/Mac|iPhone|iPad/.test(readPlatform())) {
+if (/mac|iphone|ipad/i.test(readPlatform())) {
   for (const key of document.querySelectorAll(`${TRIGGER} kbd`)) {
     key.textContent = '⌘K';
   }
