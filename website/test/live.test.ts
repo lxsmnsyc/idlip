@@ -203,6 +203,29 @@ describe('the live samples of the docs', () => {
     };
     expect(checkLiveSamples([broken])[0]).toMatch(/^docs\/x\.md: a\.tsx:1:/);
   });
+
+  it('reports a chunk that imports a module the sample does not serve', () => {
+    const missing: PageSample = {
+      file: 'docs/x.md',
+      id: 'x-1',
+      files: [
+        {
+          name: 'a.tsx',
+          source: `import { load } from './api.ts';
+export default function A() {
+  let value = 0;
+  async function open() {
+    value = await load();
+  }
+  return <button on:click={open}>{value}</button>;
+}`,
+        },
+      ],
+    };
+    expect(checkLiveSamples([missing])).toEqual([
+      'docs/x.md: a.task.open_1.js: imports ./api.ts, which the live sample does not serve',
+    ]);
+  });
 });
 
 describe('the live script', () => {

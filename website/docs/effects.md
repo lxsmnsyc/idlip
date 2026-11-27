@@ -29,12 +29,20 @@ export async function loadUser(id: string): Promise<User> {
 }
 ```
 
-The component keeps the lifecycle in one union and sets it in the handler:
+The component keeps the lifecycle in one union and sets it in the handler. The sample below has no server to fetch from, so a module-level `loadUser` that waits and returns a user stands in for the one in `api.ts`:
 
 ```tsx live
 import type { JSX } from 'idlip/jsx-runtime';
-import { loadUser } from './api.ts';
-import type { User } from './api.ts';
+
+interface User {
+  id: string;
+  name: string;
+}
+
+async function loadUser(id: string): Promise<User> {
+  await new Promise((resolve) => setTimeout(resolve, 800));
+  return { id, name: 'Ada' };
+}
 
 type UserState =
   | { state: 'idle' }
@@ -66,7 +74,7 @@ export default function Profile(): JSX.Element {
 A click on Open runs these steps:
 
 1. The message `open` with `['u1']` sets `user` to the loading state. The page patches at once, so the loading state shows.
-2. The loader loads the `task=open$1` chunk and calls `loadUser('u1')` in it. That chunk holds only the import.
+2. The loader loads the `task=open$1` chunk and calls `loadUser('u1')` in it. That chunk holds only `loadUser`, or only its import when it comes from another module.
 3. When the call settles, the loader queues the continuation `open$1` with the outcome: `{ ok: true, value }` or `{ ok: false, error }`.
 4. `open$1` runs the rest of the `try` block, or the `catch` block on a failure, and the page patches again.
 
